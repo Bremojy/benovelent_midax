@@ -1,60 +1,126 @@
-import { Target, Eye, HeartHandshake } from "lucide-react";
+import {
+  Target,
+  Eye,
+  HeartHandshake,
+  Users,
+  ShieldCheck,
+  Award,
+  ArrowRight,
+} from "lucide-react";
+
+import { Link } from "react-router-dom";
 
 function About() {
   return (
-    <main className="inner-page">
+    <main className="about-page">
 
-      {/* PAGE HERO */}
+      {/* HERO */}
 
-      <section className="page-hero">
-        <div>
-          <p className="section-label">ABOUT BENEVOLENT MIDAX</p>
+      <section className="about-hero">
+
+        <div className="about-hero-content">
+
+          <p className="about-label">
+            ABOUT BENEVOLENT MIDAX
+          </p>
 
           <h1>
-            Together, We Care.
+            Together We Protect.
             <br />
-            Together, We Support.
+            Together We Thrive.
           </h1>
 
-          <p>
-            Learn more about our purpose, mission and vision.
+          <p className="about-hero-text">
+            Building a dependable community where members
+            stand together during life's most important moments.
           </p>
+
+          <Link
+            to="/contact"
+            className="about-primary-btn"
+          >
+            Join the Community
+            <ArrowRight size={18} />
+          </Link>
+
         </div>
+
       </section>
 
+      {/* STATISTICS */}
+
+      <section className="about-stats">
+
+        <div className="about-container">
+
+          <div className="about-stats-grid">
+
+            <div className="about-stat">
+              <h2>500+</h2>
+              <p>Active Members</p>
+            </div>
+
+            <div className="about-stat">
+              <h2>100%</h2>
+              <p>Transparency</p>
+            </div>
+
+            <div className="about-stat">
+              <h2>24/7</h2>
+              <p>Community Support</p>
+            </div>
+
+            <div className="about-stat">
+              <h2>10+</h2>
+              <p>Years of Unity</p>
+            </div>
+
+          </div>
+
+        </div>
+
+      </section>
 
       {/* WHO WE ARE */}
 
-      <section className="section">
+      <section className="about-section">
 
-        <div className="section-container">
+        <div className="about-container">
 
-          <div className="about-content">
+          <div className="about-grid">
+
+            <div className="about-image">
+
+              <img
+                src="/about.jpg"
+                alt="Benevolent Midax"
+              />
+
+            </div>
 
             <div>
-              <p className="section-label">
+
+              <p className="about-label">
                 WHO WE ARE
               </p>
 
               <h2>
-                A Community Built on Support
+                A Strong Community Built on Care
               </h2>
-            </div>
 
-            <div>
-
-              <p className="large-text">
-                Benevolent Midax is a benevolent support
-                scheme established to support members and
-                their families during challenging moments.
+              <p className="about-large-text">
+                Benevolent Midax is a member-driven
+                support scheme committed to ensuring
+                that no family faces difficult moments
+                alone.
               </p>
 
               <p>
-                Our purpose is rooted in compassion,
-                unity and collective responsibility.
-                Through the scheme, members come together
-                to provide assistance where it is needed
-                most.
+                Through collective responsibility,
+                compassion and accountability,
+                members contribute towards building
+                a reliable support system that creates
+                confidence, unity and lasting impact.
               </p>
 
             </div>
@@ -65,84 +131,172 @@ function About() {
 
       </section>
 
+      {/* VALUES */}
 
-      {/* MISSION & VISION */}
+      <section className="about-values">
 
-      <section className="values-section">
+        <div className="about-container">
 
-        <div className="section-container">
+          <div className="about-title">
 
-          <div className="values-grid">
+            <p className="about-label">
+              OUR FOUNDATION
+            </p>
 
-            <div className="value-card">
+            <h2>
+              Guided by Purpose
+            </h2>
 
-              <div className="value-icon">
-                <Target size={32} />
+          </div>
+
+          <div className="about-cards">
+
+            <div className="about-card">
+
+              <div className="about-icon">
+
+                <Target size={34} />
+
               </div>
 
-              <p className="section-label">
-                OUR MISSION
-              </p>
-
-              <h3>
-                Supporting Our Members
-              </h3>
+              <h3>Mission</h3>
 
               <p>
-                To provide meaningful support to eligible
-                members and their families during difficult
-                times while promoting unity, compassion
-                and accountability.
+                Supporting members and their
+                families through compassionate,
+                reliable and timely assistance.
               </p>
 
             </div>
 
+            <div className="about-card">
 
-            <div className="value-card">
+              <div className="about-icon">
 
-              <div className="value-icon">
-                <Eye size={32} />
+                <Eye size={34} />
+
               </div>
 
-              <p className="section-label">
-                OUR VISION
-              </p>
-
-              <h3>
-                A Stronger Community
-              </h3>
+              <h3>Vision</h3>
 
               <p>
-                To build a united and dependable community
-                where members can confidently stand together
-                and support one another.
+                Creating a trusted community
+                where everyone feels secure,
+                valued and supported.
               </p>
 
             </div>
 
+            <div className="about-card">
 
-            <div className="value-card">
+              <div className="about-icon">
 
-              <div className="value-icon">
-                <HeartHandshake size={32} />
+                <HeartHandshake size={34} />
+
               </div>
 
-              <p className="section-label">
-                OUR VALUES
-              </p>
-
-              <h3>
-                Compassion & Integrity
-              </h3>
+              <h3>Values</h3>
 
               <p>
-                We believe in accountability, integrity,
-                transparency and responsible leadership.
+                Compassion, integrity,
+                accountability and unity
+                define everything we do.
               </p>
 
             </div>
 
           </div>
+
+        </div>
+
+      </section>
+
+      {/* WHY CHOOSE US */}
+
+      <section className="about-features">
+
+        <div className="about-container">
+
+          <div className="about-title">
+
+            <p className="about-label">
+              WHY MIDAX
+            </p>
+
+            <h2>
+              More Than a Benevolent Scheme
+            </h2>
+
+          </div>
+
+          <div className="about-feature-grid">
+
+            <div className="feature-box">
+
+              <Users size={38} />
+
+              <h3>Community First</h3>
+
+              <p>
+                Every member belongs to a caring
+                family that stands together.
+              </p>
+
+            </div>
+
+            <div className="feature-box">
+
+              <ShieldCheck size={38} />
+
+              <h3>Transparency</h3>
+
+              <p>
+                Every contribution is managed
+                with accountability and trust.
+              </p>
+
+            </div>
+
+            <div className="feature-box">
+
+              <Award size={38} />
+
+              <h3>Reliable Support</h3>
+
+              <p>
+                Assistance when it matters most,
+                giving members peace of mind.
+              </p>
+
+            </div>
+
+          </div>
+
+        </div>
+
+      </section>
+
+      {/* CTA */}
+
+      <section className="about-cta">
+
+        <div className="about-container">
+
+          <h2>
+            Join a Community That Cares
+          </h2>
+
+          <p>
+            Become part of a dependable family
+            built on compassion, unity and support.
+          </p>
+
+          <Link
+            to="/contact"
+            className="about-primary-btn"
+          >
+            Contact Us
+          </Link>
 
         </div>
 
