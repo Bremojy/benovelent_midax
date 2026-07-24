@@ -20,7 +20,7 @@ function Member() {
   const fetchMembers = async () => {
     try {
       const response = await fetch(
-        "http://localhost:5000/api/members"
+        "https://benovelent-midax.onrender.com/api/members"
       );
 
       const data = await response.json();

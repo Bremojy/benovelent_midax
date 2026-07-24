@@ -28,7 +28,7 @@ function Hero() {
 
       const response =
         await fetch(
-          "http://localhost:5000/api/carousel/active"
+          "https://benovelent-midax.onrender.com/api/carousel/active"
         );
 
       const data =

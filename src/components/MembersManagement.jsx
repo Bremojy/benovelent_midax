@@ -13,7 +13,7 @@ import {
   Loader2,
 } from "lucide-react";
 
-const API_URL = "http://localhost:5000/api";
+const API_URL = "https://benovelent-midax.onrender.com/api";
 
 export default function MembersManagement() {
 
