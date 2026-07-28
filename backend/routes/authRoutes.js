@@ -2,6 +2,11 @@ const express = require("express");
 
 const router = express.Router();
 
+
+const authController = require("../controllers/authController");
+
+const protect = require("../middleware/authMiddleware");
+
 const {
   adminSignup,
   adminLogin,
@@ -24,11 +29,14 @@ router.post("/login", adminLogin);
 // ======================================
 // MEMBER ROUTES
 // ======================================
+// Login
+router.post("/login", authController.login);
 
-// Member Login
-router.post("/member/login", memberLogin);
+// Current logged-in user
+router.get("/me", protect, authController.getMe);
 
-// Member Logout (Protected)
-router.post("/member/logout", auth, memberLogout);
+// Logout
+router.post("/logout", protect, authController.logout);
+
 
 module.exports = router;

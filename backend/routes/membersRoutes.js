@@ -1,11 +1,25 @@
 const express = require("express");
 
-const Member = require("../models/Member");
-
-const auth = require("../middleware/auth");
-const roleAuth = require("../middleware/roleAuth");
 
 const router = express.Router();
+
+
+
+const protect = require("../middleware/authMiddleware");
+
+const authorize = require("../middleware/roleMiddleware");
+
+const {
+    createMember
+} = require("../controllers/memberController");
+
+router.post(
+    "/create-member",
+    protect,
+    authorize("admin","superadmin"),
+    createMember
+);
+
 
 /* ===================================================
    ADMIN ROUTES

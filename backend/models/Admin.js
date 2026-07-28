@@ -23,6 +23,28 @@ const adminSchema = new mongoose.Schema(
       type: String,
       default: "admin",
     },
+    failedLoginAttempts: {
+    type: Number,
+    default: 0
+},
+
+accountLockedUntil: {
+    type: Date,
+    default: null
+},
+
+mustChangePassword: {
+    type: Boolean,
+    default: true
+},
+
+passwordChangedAt: {
+    type: Date
+},
+
+resetPasswordToken: String,
+
+resetPasswordExpires: Date
   },
   {
     timestamps: true,
