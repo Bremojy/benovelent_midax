@@ -1,4 +1,5 @@
 const express = require("express");
+const adminRoutes = require("./routes/adminRoutes");
 
 const cors = require("cors");
 
@@ -55,7 +56,7 @@ app.use(
   "/api/leaders",
   leaderRoutes
 );
-
+app.use("/api/admin", adminRoutes);
 app.use(
   "/api/members",
   memberRoutes
