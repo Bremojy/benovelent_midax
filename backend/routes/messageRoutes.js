@@ -11,10 +11,10 @@ const {
     markAsRead
 } = require("../controllers/messageController");
 
-const { protect } = require("../middleware/authMiddleware");
+const protect = require("../middleware/authMiddleware");
 
 // =======================================
-// Message Routes
+// MESSAGE ROUTES
 // =======================================
 
 // Send a message
@@ -32,7 +32,7 @@ router.put("/:id", protect, editMessage);
 // Delete a message
 router.delete("/:id", protect, deleteMessage);
 
-// React to a message (👍❤️😂🔥 etc.)
+// React to a message
 router.put("/:id/react", protect, reactToMessage);
 
 // Mark a message as read

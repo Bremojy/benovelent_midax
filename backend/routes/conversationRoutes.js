@@ -10,7 +10,7 @@ const {
     removeMember
 } = require("../controllers/conversationController");
 
-const { protect } = require("../middleware/authMiddleware");
+const protect = require("../middleware/authMiddleware");
 
 // =======================================
 // Conversation Routes

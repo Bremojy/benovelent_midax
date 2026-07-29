@@ -2,6 +2,10 @@ const News = require("../models/News");
 const Member = require("../models/Member");
 const Notification = require("../models/Notification");
 
+const newsController = require("../controllers/newsController");
+
+console.log(newsController);
+
 /* =====================================================
    CREATE NEWS
 ===================================================== */
@@ -1279,5 +1283,33 @@ exports.toggleLike=async(req,res)=>{
 
     }
 
+};
+
+// ======================================================
+// COMPATIBILITY EXPORTS
+// Keeps older routes working without changing the router
+// ======================================================
+
+// Main aliases
+exports.getNews = exports.getAllNews;
+exports.getSingleNews = exports.getNewsById;
+
+// Likes
+exports.likeNews = exports.toggleLike;
+exports.unlikeNews = exports.toggleLike;
+
+// Comments
+exports.addComment = async (req, res) => {
+    return res.status(501).json({
+        success: false,
+        message: "Comment feature has not been implemented yet."
+    });
+};
+
+exports.deleteComment = async (req, res) => {
+    return res.status(501).json({
+        success: false,
+        message: "Comment feature has not been implemented yet."
+    });
 };
 

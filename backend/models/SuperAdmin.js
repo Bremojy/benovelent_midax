@@ -1,10 +1,11 @@
 const mongoose = require("mongoose");
 
-const adminSchema = new mongoose.Schema(
+const superAdminSchema = new mongoose.Schema(
   {
     name: {
       type: String,
       required: true,
+      trim: true,
     },
 
     email: {
@@ -12,6 +13,8 @@ const adminSchema = new mongoose.Schema(
       required: true,
       unique: true,
       lowercase: true,
+      trim: true,
+      index: true,
     },
 
     password: {
@@ -22,29 +25,37 @@ const adminSchema = new mongoose.Schema(
     role: {
       type: String,
       default: "admin",
+      enum: ["admin", "superadmin"],
     },
+
     failedLoginAttempts: {
-    type: Number,
-    default: 0
-},
+      type: Number,
+      default: 0,
+    },
 
-accountLockedUntil: {
-    type: Date,
-    default: null
-},
+    accountLockedUntil: {
+      type: Date,
+      default: null,
+    },
 
-mustChangePassword: {
-    type: Boolean,
-    default: true
-},
+    mustChangePassword: {
+      type: Boolean,
+      default: true,
+    },
 
-passwordChangedAt: {
-    type: Date
-},
+    passwordChangedAt: {
+      type: Date,
+    },
 
-resetPasswordToken: String,
+    resetPasswordToken: {
+      type: String,
+      default: null,
+    },
 
-resetPasswordExpires: Date
+    resetPasswordExpires: {
+      type: Date,
+      default: null,
+    },
   },
   {
     timestamps: true,
@@ -52,5 +63,5 @@ resetPasswordExpires: Date
 );
 
 module.exports =
-    mongoose.models.SuperAdmin ||
-    mongoose.model("SuperAdmin", superAdminSchema);
+  mongoose.models.SuperAdmin ||
+  mongoose.model("SuperAdmin", superAdminSchema);

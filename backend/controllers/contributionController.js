@@ -712,8 +712,7 @@ exports.getMemberContributionSummary = async (req, res) => {
 /* =====================================================
    CONTRIBUTION DASHBOARD
 ===================================================== */
-
-exports.getContributionDashboard = async (req, res) => {
+exports.getContributionSummary = async (req, res) => {
 
     try {
 
@@ -742,9 +741,7 @@ exports.getContributionDashboard = async (req, res) => {
         contributions.forEach(item => {
 
             dashboard.totalExpected += item.expectedAmount;
-
             dashboard.totalCollected += item.paidAmount;
-
             dashboard.totalOutstanding += item.balance;
 
             switch (item.status) {
@@ -793,5 +790,36 @@ exports.getContributionDashboard = async (req, res) => {
 
     }
 
+};
+
+/* =====================================================
+   COMPATIBILITY EXPORTS
+===================================================== */
+
+// Get one contribution
+exports.getContribution = async (req, res) => {
+    try {
+        const contribution = await Contribution.findById(req.params.id)
+            .populate("member")
+            .populate("finance");
+
+        if (!contribution) {
+            return res.status(404).json({
+                success: false,
+                message: "Contribution not found."
+            });
+        }
+
+        res.json({
+            success: true,
+            contribution
+        });
+
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
 };
 

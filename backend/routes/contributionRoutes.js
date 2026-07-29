@@ -13,7 +13,7 @@ const {
     getContributionSummary
 } = require("../controllers/contributionController");
 
-const { protect } = require("../middleware/authMiddleware");
+const protect = require("../middleware/authMiddleware");
 
 // ==========================================
 // CONTRIBUTION ROUTES
@@ -25,8 +25,6 @@ router.post("/", protect, createContribution);
 // Get all contributions
 router.get("/", protect, getContributions);
 
-// Contribution dashboard summary
-router.get("/summary/dashboard", protect, getContributionSummary);
 
 // Get all contributions for one member
 router.get("/member/:memberId", protect, getMemberContributions);

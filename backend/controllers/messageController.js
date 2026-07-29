@@ -99,7 +99,7 @@ message:error.message
 GET CONVERSATION MESSAGES
 ===================================================== */
 
-exports.getMessages=async(req,res)=>{
+exports.getConversationMessages = async (req, res) => {
 
 try{
 
@@ -235,7 +235,7 @@ message:error.message
 DELETE FOR ME
 ===================================================== */
 
-exports.deleteForMe=async(req,res)=>{
+exports.deleteMessage = async (req, res) => {
 
 try{
 
@@ -354,8 +354,7 @@ message:error.message
 /* =====================================================
 MARK AS SEEN
 ===================================================== */
-
-exports.markSeen=async(req,res)=>{
+exports.markAsRead = async (req, res) => {
 
 try{
 
@@ -411,7 +410,7 @@ message:error.message
 REACT TO MESSAGE
 ===================================================== */
 
-exports.reactMessage=async(req,res)=>{
+exports.reactToMessage = async (req, res) => {
 
 try{
 
@@ -467,5 +466,53 @@ message:error.message
 });
 
 }
+
+};
+
+/* =====================================================
+GET SINGLE MESSAGE
+===================================================== */
+
+exports.getMessage = async (req, res) => {
+
+    try {
+
+        const message = await Message.findById(req.params.id)
+            .populate("sender", "fullName profileImage")
+            .populate("replyTo");
+
+        if (!message) {
+
+            return res.status(404).json({
+
+                success: false,
+
+                message: "Message not found."
+
+            });
+
+        }
+
+        res.json({
+
+            success: true,
+
+            message
+
+        });
+
+    }
+
+    catch (error) {
+
+        res.status(500).json({
+
+            success: false,
+
+            message: error.message
+
+        });
+
+    }
 
 };

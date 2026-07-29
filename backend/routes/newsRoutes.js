@@ -15,7 +15,10 @@ const {
     unpinNews
 } = require("../controllers/newsController");
 
-const { protect } = require("../middleware/authMiddleware");
+const protect = require("../middleware/authMiddleware");
+
+console.log("protect =", protect);
+console.log("createNews =", createNews);
 
 // =======================================
 // NEWS ROUTES

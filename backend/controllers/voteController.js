@@ -602,4 +602,146 @@ exports.getLiveResults = async(req,res)=>{
     }
 
 };
+/* =====================================================
+   COMPATIBILITY EXPORTS
+===================================================== */
 
+// Routes already expecting these names
+exports.getVotesByPoll = exports.getAllVotes;
+
+exports.deleteVote = exports.removeVote;
+
+
+/* =====================================================
+   UPDATE VOTE
+===================================================== */
+
+exports.updateVote = async (req, res) => {
+
+    try {
+
+        const { selectedOptions } = req.body;
+
+        if (!selectedOptions || !selectedOptions.length) {
+
+            return res.status(400).json({
+                success: false,
+                message: "Please select at least one option."
+            });
+
+        }
+
+        const vote = await Vote.findById(req.params.id);
+
+        if (!vote) {
+
+            return res.status(404).json({
+                success: false,
+                message: "Vote not found."
+            });
+
+        }
+
+        // Only owner can update
+        if (vote.member.toString() !== req.user._id.toString()) {
+
+            return res.status(403).json({
+                success: false,
+                message: "Unauthorized."
+            });
+
+        }
+
+        const poll = await Poll.findById(vote.poll);
+
+        if (!poll) {
+
+            return res.status(404).json({
+                success: false,
+                message: "Poll not found."
+            });
+
+        }
+
+        if (!poll.active) {
+
+            return res.status(400).json({
+                success: false,
+                message: "Poll is closed."
+            });
+
+        }
+
+        // Remove previous vote counts
+        vote.selectedOptions.forEach(optionId => {
+
+            const option = poll.options.find(
+                o => o._id.toString() === optionId.toString()
+            );
+
+            if (option && option.votes > 0) {
+                option.votes--;
+            }
+
+        });
+
+        // Validate new options
+        for (const optionId of selectedOptions) {
+
+            const exists = poll.options.find(
+                o => o._id.toString() === optionId
+            );
+
+            if (!exists) {
+
+                return res.status(400).json({
+                    success: false,
+                    message: "Invalid poll option selected."
+                });
+
+            }
+
+        }
+
+        // Add new vote counts
+        selectedOptions.forEach(optionId => {
+
+            const option = poll.options.find(
+                o => o._id.toString() === optionId
+            );
+
+            if (option) {
+                option.votes++;
+            }
+
+        });
+
+        vote.selectedOptions = selectedOptions;
+
+        await vote.save();
+        await poll.save();
+
+        res.json({
+
+            success: true,
+            message: "Vote updated successfully.",
+            vote
+
+        });
+
+    }
+
+    catch (error) {
+
+        console.error(error);
+
+        res.status(500).json({
+
+            success: false,
+            message: error.message
+
+        });
+
+    }
+
+};

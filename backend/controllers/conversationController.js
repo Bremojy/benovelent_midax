@@ -394,3 +394,79 @@ message:error.message
 }
 
 };
+
+/* =====================================================
+   COMPATIBILITY EXPORTS
+===================================================== */
+
+exports.addMember = async (req, res) => {
+    try {
+        const conversation = await Conversation.findById(req.params.id);
+
+        if (!conversation) {
+            return res.status(404).json({
+                success: false,
+                message: "Conversation not found."
+            });
+        }
+
+        const { memberId } = req.body;
+
+        if (!memberId) {
+            return res.status(400).json({
+                success: false,
+                message: "memberId is required."
+            });
+        }
+
+        if (!conversation.participants.includes(memberId)) {
+            conversation.participants.push(memberId);
+            await conversation.save();
+        }
+
+        res.json({
+            success: true,
+            message: "Member added successfully.",
+            conversation
+        });
+
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+};
+
+exports.removeMember = async (req, res) => {
+    try {
+        const conversation = await Conversation.findById(req.params.id);
+
+        if (!conversation) {
+            return res.status(404).json({
+                success: false,
+                message: "Conversation not found."
+            });
+        }
+
+        const { memberId } = req.body;
+
+        conversation.participants = conversation.participants.filter(
+            id => id.toString() !== memberId
+        );
+
+        await conversation.save();
+
+        res.json({
+            success: true,
+            message: "Member removed successfully.",
+            conversation
+        });
+
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+};

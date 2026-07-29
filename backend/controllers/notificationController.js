@@ -338,3 +338,37 @@ message:error.message
 }
 
 };
+
+/* =====================================================
+   COMPATIBILITY EXPORTS
+===================================================== */
+
+// Route aliases
+exports.markAsRead = exports.markRead;
+exports.markAllAsRead = exports.markAllRead;
+
+// Get single notification
+exports.getNotification = async (req, res) => {
+    try {
+        const notification = await Notification.findById(req.params.id)
+            .populate("sender", "fullName profileImage");
+
+        if (!notification) {
+            return res.status(404).json({
+                success: false,
+                message: "Notification not found."
+            });
+        }
+
+        res.json({
+            success: true,
+            notification
+        });
+
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+};

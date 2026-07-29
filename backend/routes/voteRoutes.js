@@ -9,14 +9,14 @@ const {
     deleteVote
 } = require("../controllers/voteController");
 
-const { protect } = require("../middleware/authMiddleware");
+const protect = require("../middleware/authMiddleware");
 
 // ==========================================
 // VOTE ROUTES
 // ==========================================
 
 // Cast a vote
-router.post("/", protect, castVote);
+router.post("/:pollId", protect, castVote);
 
 // Get my vote for a specific poll
 router.get("/poll/:pollId/me", protect, getMyVote);

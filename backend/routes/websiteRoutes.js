@@ -2,17 +2,17 @@ const express = require("express");
 const router = express.Router();
 
 const {
-    getWebsiteContent,
-    getSection,
-    createSection,
-    updateSection,
-    deleteSection,
-    uploadHeroImage,
-    uploadGalleryImage,
-    getWebsiteStatistics
+  getWebsiteContent,
+  getSection,
+  createSection,
+  updateSection,
+  deleteSection,
+  uploadHeroImage,
+  uploadGalleryImage,
+  getWebsiteStatistics,
 } = require("../controllers/websiteController");
 
-const { protect } = require("../middleware/authMiddleware");
+const protect = require("../middleware/authMiddleware");
 
 // ==========================================
 // WEBSITE ROUTES
@@ -22,7 +22,8 @@ const { protect } = require("../middleware/authMiddleware");
 router.get("/", getWebsiteContent);
 
 // Website statistics
-router.get("/statistics", protect, getWebsiteStatistics);
+// Uncomment after getWebsiteStatistics exists
+// router.get("/statistics", protect, getWebsiteStatistics);
 
 // Get one section
 router.get("/:section", getSection);
@@ -37,9 +38,11 @@ router.put("/:section", protect, updateSection);
 router.delete("/:section", protect, deleteSection);
 
 // Upload Hero Image
-router.post("/hero/upload", protect, uploadHeroImage);
+// Uncomment after uploadHeroImage exists
+// router.post("/hero/upload", protect, uploadHeroImage);
 
 // Upload Gallery Image
-router.post("/gallery/upload", protect, uploadGalleryImage);
+// Uncomment after uploadGalleryImage exists
+// router.post("/gallery/upload", protect, uploadGalleryImage);
 
 module.exports = router;

@@ -2,8 +2,8 @@ const express = require("express");
 
 const router = express.Router();
 
-const auth = require("../middleware/auth");
-const roleAuth = require("../middleware/roleAuth");
+const protect = require("../middleware/authMiddleware");
+const authorize = require("../middleware/roleMiddleware");
 
 const {
   getDashboard,
@@ -14,58 +14,51 @@ const {
   deleteMember,
 } = require("../controllers/adminController");
 
-/* =====================================================
-   DASHBOARD
-===================================================== */
-
+// ===============================
+// DASHBOARD
+// ===============================
 router.get(
   "/dashboard",
-  auth,
-  roleAuth("admin", "superadmin"),
+  protect,
+  authorize("admin", "superadmin"),
   getDashboard
 );
 
-/* =====================================================
-   MEMBERS
-===================================================== */
-
-// Get all members
+// ===============================
+// MEMBERS
+// ===============================
 router.get(
   "/members",
-  auth,
-  roleAuth("admin", "superadmin"),
+  protect,
+  authorize("admin", "superadmin"),
   getMembers
 );
 
-// Get one member
 router.get(
   "/members/:id",
-  auth,
-  roleAuth("admin", "superadmin"),
+  protect,
+  authorize("admin", "superadmin"),
   getMember
 );
 
-// Add member
 router.post(
   "/members",
-  auth,
-  roleAuth("admin", "superadmin"),
+  protect,
+  authorize("admin", "superadmin"),
   createMember
 );
 
-// Update member
 router.put(
   "/members/:id",
-  auth,
-  roleAuth("admin", "superadmin"),
+  protect,
+  authorize("admin", "superadmin"),
   updateMember
 );
 
-// Delete member
 router.delete(
   "/members/:id",
-  auth,
-  roleAuth("admin", "superadmin"),
+  protect,
+  authorize("admin", "superadmin"),
   deleteMember
 );
 

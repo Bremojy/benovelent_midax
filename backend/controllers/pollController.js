@@ -890,3 +890,14 @@ exports.getPollSummary = async (req, res) => {
 
 };
 
+/* =====================================================
+   COMPATIBILITY EXPORTS
+===================================================== */
+
+exports.getPolls = exports.getAllPolls;
+
+exports.getPoll = exports.getPollById;
+
+exports.reopenPoll = exports.openPoll;
+
+exports.getPollResults = exports.getPollStatistics;

@@ -8,7 +8,7 @@ const {
   getSummary,
 } = require("../controllers/memberController");
 
-const { protect } = require("../middleware/authMiddleware");
+const protect = require("../middleware/authMiddleware");
 
 // Member dashboard
 router.get("/dashboard", protect, getDashboard);
