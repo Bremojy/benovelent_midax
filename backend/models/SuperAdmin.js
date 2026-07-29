@@ -51,4 +51,6 @@ resetPasswordExpires: Date
   }
 );
 
-module.exports = mongoose.model("Admin", adminSchema);
+module.exports =
+    mongoose.models.SuperAdmin ||
+    mongoose.model("SuperAdmin", superAdminSchema);

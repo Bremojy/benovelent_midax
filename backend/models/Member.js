@@ -174,5 +174,6 @@ memberSchema.index({ username: 1 });
 memberSchema.index({ memberNumber: 1 });
 memberSchema.index({ status: 1 });
 memberSchema.index({ online: 1 });
-
-module.exports = mongoose.model("Member", memberSchema);
+module.exports =
+    mongoose.models.Member ||
+    mongoose.model("Member", memberSchema);

@@ -106,7 +106,6 @@ financeSchema.index({ type: 1 });
 financeSchema.index({ status: 1 });
 financeSchema.index({ transactionDate: -1 });
 
-module.exports = mongoose.model(
-    "Finance",
-    financeSchema
-);
+module.exports =
+    mongoose.models.Finance ||
+    mongoose.model("Finance", financeSchema);

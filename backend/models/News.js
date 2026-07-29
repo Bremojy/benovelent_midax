@@ -153,7 +153,6 @@ newsSchema.index({publishDate:-1});
 newsSchema.index({featured:1});
 newsSchema.index({pinned:1});
 
-module.exports = mongoose.model(
-    "News",
-    newsSchema
-);
+module.exports =
+    mongoose.models.News ||
+    mongoose.model("News", newsSchema);

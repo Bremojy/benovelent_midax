@@ -90,7 +90,6 @@ pollSchema.index({active:1});
 pollSchema.index({endDate:1});
 pollSchema.index({createdAt:-1});
 
-module.exports = mongoose.model(
-    "Poll",
-    pollSchema
-);
+module.exports =
+    mongoose.models.Poll ||
+    mongoose.model("Poll", pollSchema);

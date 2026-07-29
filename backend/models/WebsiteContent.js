@@ -58,7 +58,9 @@ const websiteContentSchema = new mongoose.Schema(
 
 websiteContentSchema.index({ section: 1 });
 
-module.exports = mongoose.model(
-  "WebsiteContent",
-  websiteContentSchema
-);
+module.exports =
+  mongoose.models.WebsiteContent ||
+  mongoose.model(
+    "WebsiteContent",
+    websiteContentSchema
+  );
