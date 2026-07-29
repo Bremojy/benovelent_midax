@@ -8,7 +8,7 @@ import {
 
 import api, { UPLOAD_URL } from "../services/api";
 
-import "../styles/News.css";
+import "./News.css";
 
 function News() {
   const [news, setNews] = useState([]);

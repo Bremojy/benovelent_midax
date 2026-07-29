@@ -7,7 +7,7 @@ import {
 
 import api, { UPLOAD_URL } from "../services/api";
 
-import "../styles/Leaders.css";
+import "./Leaders.css";
 
 function Leaders() {
   const [leaders, setLeaders] = useState([]);

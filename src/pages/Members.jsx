@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import Navbar from "../components/Navbar";
 import {
   Search,
   Users,
@@ -103,6 +104,9 @@ function Member() {
     );
 
   return (
+<div>
+    <Navbar />
+
     <div className="admin-page">
 
       {/* ===============================
@@ -657,6 +661,7 @@ function Member() {
 
       )}
 
+    </div>
     </div>
   );
 }

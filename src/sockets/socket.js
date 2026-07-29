@@ -2,7 +2,7 @@ import { io } from "socket.io-client";
 
 const SOCKET_URL =
   import.meta.env.VITE_SOCKET_URL ||
-  "https://benovelent-midax-byn8561me-bremojys-projects.vercel.app/";
+  "https://benovelent-midax.onrender.com";
 
 const socket = io(SOCKET_URL, {
   autoConnect: false,
