@@ -62,7 +62,14 @@ const handleLogin = async (e) => {
       return;
     }
 
-    const { token, user } = data;
+const { token, user } = data;
+
+alert(
+  "Role returned by backend: " +
+  user.role
+);
+
+console.log(data);
 
     // Clear previous sessions
     localStorage.removeItem("memberToken");
