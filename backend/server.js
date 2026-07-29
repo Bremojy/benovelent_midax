@@ -1,28 +1,48 @@
 const express = require("express");
-const adminRoutes = require("./routes/adminRoutes");
-
+const http = require("http");
 const cors = require("cors");
-
 const mongoose = require("mongoose");
-
 require("dotenv").config();
 
+// ===============================
+// SOCKET.IO
+// ===============================
 
-const authRoutes =
-  require("./routes/authRoutes");
+const { initSocket } = require("./sockets/socket");
 
-const leaderRoutes =
-  require("./routes/leaderRoutes");
+// ===============================
+// ROUTES
+// ===============================
 
+const authRoutes = require("./routes/authRoutes");
+const adminRoutes = require("./routes/adminRoutes");
+const memberRoutes = require("./routes/memberRoutes");
+const leaderRoutes = require("./routes/leaderRoutes");
+const carouselRoutes = require("./routes/carouselRoutes");
 
-const carouselRoutes =
-  require("./routes/carouselRoutes");
+// These will be used as we continue building
+const websiteRoutes = require("./routes/websiteRoutes");
+const newsRoutes = require("./routes/newsRoutes");
+const pollRoutes = require("./routes/pollRoutes");
+const voteRoutes = require("./routes/voteRoutes");
+const financeRoutes = require("./routes/financeRoutes");
+const contributionRoutes = require("./routes/contributionRoutes");
+const conversationRoutes = require("./routes/conversationRoutes");
+const messageRoutes = require("./routes/messageRoutes");
+const notificationRoutes = require("./routes/notificationRoutes");
 
-const memberRoutes =
-  require("./routes/memberRoutes");
+// ===============================
+// EXPRESS APP
+// ===============================
 
 const app = express();
+const server = http.createServer(app);
 
+// ===============================
+// SOCKET INITIALIZATION
+// ===============================
+
+initSocket(server);
 
 // ===============================
 // MIDDLEWARE
@@ -32,80 +52,98 @@ app.use(cors());
 
 app.use(express.json());
 
+app.use(express.urlencoded({ extended: true }));
 
 // ===============================
-// ROUTES
+// ROOT
 // ===============================
 
 app.get("/", (req, res) => {
 
-  res.json({
-    message:
-      "Benevolent Midax API is running",
-  });
+    res.json({
+
+        success: true,
+
+        message: "Benevolent Midax API Running",
+
+        version: "1.0.0"
+
+    });
 
 });
 
+// ===============================
+// API ROUTES
+// ===============================
 
-app.use(
-  "/api/auth",
-  authRoutes
-);
+app.use("/api/auth", authRoutes);
 
-app.use(
-  "/api/leaders",
-  leaderRoutes
-);
 app.use("/api/admin", adminRoutes);
-app.use(
-  "/api/members",
-  memberRoutes
-);
 
-app.use(
-  "/api/carousel",
-  carouselRoutes
-);
+app.use("/api/members", memberRoutes);
 
+app.use("/api/leaders", leaderRoutes);
 
+app.use("/api/carousel", carouselRoutes);
 
+// New Modules
+
+app.use("/api/website", websiteRoutes);
+
+app.use("/api/news", newsRoutes);
+
+app.use("/api/polls", pollRoutes);
+
+app.use("/api/votes", voteRoutes);
+
+app.use("/api/finance", financeRoutes);
+
+app.use("/api/contributions", contributionRoutes);
+
+app.use("/api/conversations", conversationRoutes);
+
+app.use("/api/messages", messageRoutes);
+
+app.use("/api/notifications", notificationRoutes);
+
+// ===============================
+// 404
+// ===============================
+
+app.use((req, res) => {
+
+    res.status(404).json({
+
+        success: false,
+
+        message: "Route not found"
+
+    });
+
+});
 
 // ===============================
 // DATABASE
 // ===============================
 
-mongoose
-  .connect(process.env.MONGO_URI)
+mongoose.connect(process.env.MONGO_URI)
 
-  .then(() => {
+.then(() => {
 
-    console.log(
-      "MongoDB connected successfully"
-    );
+    console.log("MongoDB Connected");
 
+    const PORT = process.env.PORT || 5000;
 
-    app.listen(
-      process.env.PORT || 5000,
+    server.listen(PORT, () => {
 
-      () => {
+        console.log(`Server running on port ${PORT}`);
 
-        console.log(
-          `Server running on port ${
-            process.env.PORT || 5000
-          }`
-        );
+    });
 
-      }
+})
 
-    );
+.catch((err) => {
 
-  })
+    console.log(err);
 
-  .catch((error) => {
-
-    console.error(
-      "MongoDB connection failed:",
-      error
-    );
-
-  });
+});

@@ -89,6 +89,11 @@ const memberSchema = new mongoose.Schema(
     default: 0,
 },
 
+unreadMessages: {
+  type: Number,
+  default: 0,
+},
+
 socketId: {
     type: String,
     default: "",
@@ -163,5 +168,11 @@ memberSchema.pre("save", async function (next) {
 
   next();
 });
+
+memberSchema.index({ email: 1 });
+memberSchema.index({ username: 1 });
+memberSchema.index({ memberNumber: 1 });
+memberSchema.index({ status: 1 });
+memberSchema.index({ online: 1 });
 
 module.exports = mongoose.model("Member", memberSchema);
