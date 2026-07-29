@@ -1,0 +1,149 @@
+/* ========================================
+   TOPBAR
+======================================== */
+
+.dashboard-topbar {
+  height: 72px;
+  background: #ffffff;
+  border-bottom: 1px solid #e8e8e8;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 30px;
+  position: sticky;
+  top: 0;
+  z-index: 900;
+}
+
+/* LEFT */
+
+.topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.menu-btn {
+  width: 42px;
+  height: 42px;
+  border: none;
+  border-radius: 10px;
+  background: #f3f3f3;
+  cursor: pointer;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.menu-btn:hover {
+  background: #ff7a00;
+  color: white;
+}
+
+.search-box {
+  width: 340px;
+  height: 44px;
+  border-radius: 12px;
+  background: #f7f7f7;
+  display: flex;
+  align-items: center;
+  padding: 0 15px;
+  gap: 10px;
+}
+
+.search-box input {
+  width: 100%;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 15px;
+}
+
+/* RIGHT */
+
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.icon-btn {
+  position: relative;
+  width: 42px;
+  height: 42px;
+  border: none;
+  border-radius: 10px;
+  background: #f3f3f3;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+}
+
+.icon-btn:hover {
+  background: #ff7a00;
+  color: white;
+}
+
+.badge {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  min-width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #ff3b30;
+  color: white;
+  font-size: 11px;
+  font-weight: 600;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.user-box {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: #ff7a00;
+  color: white;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-weight: 700;
+  font-size: 18px;
+}
+
+.user-info h4 {
+  margin: 0;
+  font-size: 15px;
+  color: #333;
+}
+
+.user-info p {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: #777;
+}
+
+/* MOBILE */
+
+@media (max-width: 900px) {
+  .dashboard-topbar {
+    padding: 0 16px;
+  }
+
+  .search-box {
+    display: none;
+  }
+
+  .user-info {
+    display: none;
+  }
+}

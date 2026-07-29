@@ -1,0 +1,62 @@
+@media (max-width: 1024px) {
+
+  .login-wrapper{
+    grid-template-columns:1fr;
+    padding:30px;
+  }
+
+  .login-info{
+    text-align:center;
+    order:2;
+  }
+
+  .modern-login-card{
+    order:1;
+    max-width:500px;
+    width:100%;
+    margin:auto;
+  }
+
+}
+
+@media (max-width:768px){
+
+  .modern-login-page{
+    padding:20px;
+  }
+
+  .modern-login-card{
+    padding:30px;
+    border-radius:20px;
+  }
+
+  .login-info h1{
+    font-size:36px;
+  }
+
+}
+
+@media (max-width:480px){
+
+  .modern-login-page{
+    padding:15px;
+  }
+
+  .modern-login-card{
+    padding:22px;
+    border-radius:18px;
+  }
+
+  .login-info{
+    display:none;
+  }
+
+  .login-button{
+    width:100%;
+  }
+
+  .input-group input{
+    font-size:16px;
+  }
+
+}

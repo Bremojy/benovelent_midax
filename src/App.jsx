@@ -24,16 +24,15 @@ const Contact = lazy(() => import("./pages/Contact"));
 const Login = lazy(() => import("./pages/Login"));
 
 const AdminDashboard = lazy(() =>
-  import("./pages/AdminDashboard")
+  import("./pages/admin/AdminDashboard")
 );
 
-// Future portals
 const MemberDashboard = lazy(() =>
-  import("./pages/MemberDashboard")
+  import("./pages/member/MemberDashboard")
 );
 
 const SuperAdminDashboard = lazy(() =>
-  import("./pages/SuperAdminDashboard")
+  import("./pages/superadmin/SuperAdminDashboard")
 );
 
 // ========================================

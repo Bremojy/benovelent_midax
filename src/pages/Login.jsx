@@ -1,4 +1,5 @@
 import { useState } from "react";
+import "./Login.css";
 
 import {
   Mail,
@@ -28,88 +29,91 @@ function Login() {
   const [showPassword, setShowPassword] =
   useState(false); 
 
-  const handleLogin = async (e) => {
+const handleLogin = async (e) => {
+  e.preventDefault();
 
-    e.preventDefault();
+  setError("");
+  setLoading(true);
 
-    setError("");
+  try {
+    const API =
+      import.meta.env.VITE_API_URL ||
+      "https://benovelent-midax.onrender.com";
 
-    setLoading(true);
-
-
-    try {
-
-      const response =
-        await fetch(
-          "https://benovelent-midax.onrender.com/api/auth/login",
-          {
-            method: "POST",
-
-            headers: {
-              "Content-Type":
-                "application/json",
-            },
-
-            body: JSON.stringify({
-              email,
-              password,
-            }),
-          }
-        );
-
-
-      const data =
-        await response.json();
-
-
-      if (!response.ok) {
-
-        setError(
-          data.message ||
-          "Login failed"
-        );
-
-        setLoading(false);
-
-        return;
+    const response = await fetch(
+      `${API}/api/auth/login`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email,
+          password,
+        }),
       }
+    );
 
+    const data = await response.json();
 
-      // Save authentication
-
-      localStorage.setItem(
-        "adminToken",
-        data.token
-      );
-
-
-      localStorage.setItem(
-        "adminUser",
-        JSON.stringify(
-          data.admin
-        )
-      );
-
-
-      // Go to dashboard
-
-      navigate("/admin");
-
-
-    } catch (error) {
-
-      console.error(error);
-
-      setError(
-        "Unable to connect to server"
-      );
-
+    if (!response.ok) {
+      setError(data.message || "Login failed");
+      setLoading(false);
+      return;
     }
 
+    const { token, user } = data;
 
+    // Clear previous sessions
+    localStorage.removeItem("memberToken");
+    localStorage.removeItem("adminToken");
+    localStorage.removeItem("superAdminToken");
+
+    // Save logged in user
+    localStorage.setItem(
+      "user",
+      JSON.stringify(user)
+    );
+
+    switch ((user.role || "").toLowerCase()) {
+
+      case "superadmin":
+        localStorage.setItem(
+          "superAdminToken",
+          token
+        );
+        navigate("/superadmin");
+        break;
+
+      case "admin":
+        localStorage.setItem(
+          "adminToken",
+          token
+        );
+        navigate("/admin");
+        break;
+
+      case "member":
+        localStorage.setItem(
+          "memberToken",
+          token
+        );
+        navigate("/member");
+        break;
+
+      default:
+        setError("Unknown user role.");
+        localStorage.clear();
+        break;
+    }
+
+  } catch (err) {
+    console.error(err);
+    setError("Unable to connect to server.");
+  } finally {
     setLoading(false);
-
-  };
+  }
+};
 
 
   return (
@@ -140,14 +144,18 @@ function Login() {
 
       </div>
 
-      <h1>
+    <h1>
+Welcome Back
+</h1>
+<div className="portal-badges">
+  <span>Member</span>
+  <span>Admin</span>
+  <span>Super Admin</span>
+</div>
 
-        Administrator
-        <br />
-
-        Portal
-
-      </h1>
+<p className="login-subtitle">
+Sign in to access your Benevolent Midax account.
+</p>
 
       <p>
 
@@ -198,7 +206,7 @@ function Login() {
 
         <p className="section-label">
 
-          ADMIN LOGIN
+          SECURE LOGIN
 
         </p>
 
@@ -210,7 +218,7 @@ function Login() {
 
         <span>
 
-          Sign in to continue
+          Members, Administrators and Super Administrators can sign in here.
 
         </span>
 
@@ -239,7 +247,7 @@ function Login() {
 
   <input
     type="email"
-    placeholder="admin@example.com"
+    placeholder="Enter your email"
     value={email}
     onChange={(e) =>
       setEmail(e.target.value)
@@ -261,7 +269,7 @@ function Login() {
         ? "text"
         : "password"
     }
-    placeholder="Enter Password"
+    placeholder="Enter your password"
     value={password}
     onChange={(e) =>
       setPassword(e.target.value)
