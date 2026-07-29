@@ -1,18 +1,29 @@
 const express = require("express");
 const multer = require("multer");
 const path = require("path");
+const fs = require("fs");
 
 const Leader = require("../models/Leader");
 
 const router = express.Router();
 
 // ========================================
-// MULTER (LOCAL STORAGE)
+// CREATE UPLOAD FOLDER IF IT DOESN'T EXIST
+// ========================================
+
+const uploadPath = path.join(__dirname, "../uploads/leaders");
+
+if (!fs.existsSync(uploadPath)) {
+    fs.mkdirSync(uploadPath, { recursive: true });
+}
+
+// ========================================
+// MULTER STORAGE
 // ========================================
 
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-        cb(null, "uploads/leaders");
+        cb(null, uploadPath);
     },
 
     filename: (req, file, cb) => {
@@ -79,12 +90,7 @@ router.get("/active", async (req, res) => {
 
 router.post("/upload", upload.single("image"), async (req, res) => {
     try {
-        const {
-            name,
-            position,
-            bio,
-            order,
-        } = req.body;
+        const { name, position, bio, order } = req.body;
 
         if (!name || !position) {
             return res.status(400).json({
@@ -121,11 +127,23 @@ router.post("/upload", upload.single("image"), async (req, res) => {
 // UPDATE LEADER
 // ========================================
 
-router.put("/:id", async (req, res) => {
+router.put("/:id", upload.single("image"), async (req, res) => {
     try {
+        const updateData = {
+            ...req.body,
+        };
+
+        if (req.file) {
+            updateData.imageUrl = `/uploads/leaders/${req.file.filename}`;
+        }
+
+        if (updateData.order) {
+            updateData.order = Number(updateData.order);
+        }
+
         const leader = await Leader.findByIdAndUpdate(
             req.params.id,
-            req.body,
+            updateData,
             {
                 new: true,
                 runValidators: true,
@@ -164,6 +182,19 @@ router.delete("/:id", async (req, res) => {
             return res.status(404).json({
                 message: "Leader not found",
             });
+        }
+
+        // Delete image from uploads folder
+        if (leader.imageUrl) {
+            const imagePath = path.join(
+                __dirname,
+                "..",
+                leader.imageUrl.replace(/^\/+/, "")
+            );
+
+            if (fs.existsSync(imagePath)) {
+                fs.unlinkSync(imagePath);
+            }
         }
 
         res.json({

@@ -59,24 +59,23 @@ app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 // STATIC UPLOADS
 // ===============================
 
-// Makes everything inside backend/uploads public
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
-
-// ===============================
-// ROOT
-// ===============================
-app.get("/", (req, res) => {
-  res.status(200).json({
-    success: true,
-    message: "Benevolent Midax API Running",
-    version: "1.0.0",
-  });
-});
-
 app.use(
     "/uploads",
     express.static(path.join(__dirname, "uploads"))
 );
+
+// ===============================
+// ROOT
+// ===============================
+
+app.get("/", (req, res) => {
+    res.status(200).json({
+        success: true,
+        message: "Benevolent Midax API Running",
+        version: "1.0.0",
+    });
+});
+
 
 // ===============================
 // API ROUTES

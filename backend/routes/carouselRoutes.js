@@ -1,18 +1,29 @@
 const express = require("express");
 const multer = require("multer");
 const path = require("path");
+const fs = require("fs");
 
 const Carousel = require("../models/Carousel");
 
 const router = express.Router();
 
 // ========================================
-// MULTER CONFIGURATION (LOCAL STORAGE)
+// CREATE UPLOAD FOLDER IF IT DOESN'T EXIST
+// ========================================
+
+const uploadPath = path.join(__dirname, "../uploads/carousel");
+
+if (!fs.existsSync(uploadPath)) {
+    fs.mkdirSync(uploadPath, { recursive: true });
+}
+
+// ========================================
+// MULTER CONFIGURATION
 // ========================================
 
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-        cb(null, "uploads/carousel");
+        cb(null, uploadPath);
     },
 
     filename: (req, file, cb) => {
@@ -169,11 +180,23 @@ router.post("/", async (req, res) => {
 // UPDATE CAROUSEL
 // ========================================
 
-router.put("/:id", async (req, res) => {
+router.put("/:id", upload.single("image"), async (req, res) => {
     try {
+        const updateData = {
+            ...req.body,
+        };
+
+        if (req.file) {
+            updateData.imageUrl = `/uploads/carousel/${req.file.filename}`;
+        }
+
+        if (updateData.order) {
+            updateData.order = Number(updateData.order);
+        }
+
         const slide = await Carousel.findByIdAndUpdate(
             req.params.id,
-            req.body,
+            updateData,
             {
                 new: true,
                 runValidators: true,
@@ -213,6 +236,18 @@ router.delete("/:id", async (req, res) => {
             return res.status(404).json({
                 message: "Carousel slide not found",
             });
+        }
+
+        if (slide.imageUrl) {
+            const imagePath = path.join(
+                __dirname,
+                "..",
+                slide.imageUrl.replace(/^\/+/, "")
+            );
+
+            if (fs.existsSync(imagePath)) {
+                fs.unlinkSync(imagePath);
+            }
         }
 
         res.json({
