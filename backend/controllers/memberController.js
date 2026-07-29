@@ -1,88 +1,77 @@
 const bcrypt = require("bcryptjs");
 
-const Member = require("../models/Member");
+const Member = require("../models/Member");const Contribution = require("../models/Contribution");
+const News = require("../models/News");
+const Message = require("../models/Message");   
 
 exports.getDashboard = async (req, res) => {
+  try {
+    const member = await Member.findById(req.user._id)
+      .select("-password")
+      .lean();
 
-    try {
-
-        const member = await Member.findById(req.user._id)
-            .select("-password")
-            .lean();
-
-        if (!member) {
-
-            return res.status(404).json({
-
-                success:false,
-
-                message:"Member not found."
-
-            });
-
-        }
-
-        res.json({
-
-            success:true,
-
-            dashboard:{
-
-                member,
-
-                statistics:{
-
-                    totalContribution:
-                        member.monthlyContribution,
-
-                    unreadNotifications:
-                        member.unreadNotifications || 0,
-
-                    unreadMessages:
-                        member.unreadMessages || 0,
-
-                    activeStatus:
-                        member.status,
-
-                    online:
-                        member.online
-
-                },
-
-                quickLinks:[
-
-                    "Profile",
-
-                    "Messages",
-
-                    "News",
-
-                    "Polls",
-
-                    "Finance"
-
-                ]
-
-            }
-
-        });
-
+    if (!member) {
+      return res.status(404).json({
+        success: false,
+        message: "Member not found.",
+      });
     }
 
-    catch(error){
+    // Contribution statistics
+    const contributions = await Contribution.find({
+      member: member._id,
+    }).sort({ year: -1, month: -1 });
 
-        console.error(error);
+    const totalContributions = contributions.reduce(
+      (sum, item) => sum + (item.paidAmount || 0),
+      0
+    );
 
-        res.status(500).json({
+    const latestContributions = contributions.slice(0, 5);
 
-            success:false,
+    // Latest published news
+    const announcements = await News.find({
+      status: "published",
+      published: true,
+    })
+      .sort({ publishDate: -1 })
+      .limit(5)
+      .select("title category publishDate");
 
-            message:error.message
+    // Unread messages
+    const unreadMessages = await Message.countDocuments({
+      deletedForEveryone: false,
+      sender: { $ne: member._id },
+      seenBy: { $ne: member._id },
+    });
 
-        });
+    res.json({
+      success: true,
 
-    }
+      dashboard: {
+        member,
 
+        statistics: {
+          totalContributions,
+          monthlyContribution: member.monthlyContribution,
+          unreadMessages,
+          membershipStatus: member.status,
+          online: member.online,
+        },
+
+        announcements,
+
+        recentContributions: latestContributions,
+      },
+    });
+  } catch (error) {
+    console.error(error);
+
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
 };
 
 

@@ -82,7 +82,7 @@ app.get("/", (req, res) => {
 // ===============================
 app.use("/api/auth", authRoutes);
 app.use("/api/admin", adminRoutes);
-app.use("/api/members", memberRoutes);
+app.use("/api/member", memberRoutes);
 app.use("/api/leaders", leaderRoutes);
 app.use("/api/carousel", carouselRoutes);
 app.use("/api/website", websiteRoutes);
