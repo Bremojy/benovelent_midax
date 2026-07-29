@@ -1,86 +1,103 @@
-import "../../styles/member.css";
+import {
+  Download,
+  CheckCircle,
+} from "lucide-react";
 
-function ContributionHistory() {
+import "./ContributionHistory.css";
 
-  const history = [
+function ContributionHistory({
 
-    {
-      date: "01 Jul 2026",
-      amount: "KSh 500",
-      status: "Paid",
-    },
+  contributions=[]
 
-    {
-      date: "01 Jun 2026",
-      amount: "KSh 500",
-      status: "Paid",
-    },
+}){
 
-    {
-      date: "01 May 2026",
-      amount: "KSh 500",
-      status: "Paid",
-    },
+return(
 
-  ];
+<div className="history-card">
 
-  return (
+<div className="history-header">
 
-    <div className="history-card">
+<h2>
 
-      <h3>Recent Contributions</h3>
+Contribution History
 
-      <table>
+</h2>
 
-        <thead>
+</div>
 
-          <tr>
+<table>
 
-            <th>Date</th>
+<thead>
 
-            <th>Amount</th>
+<tr>
 
-            <th>Status</th>
+<th>Date</th>
 
-          </tr>
+<th>Amount</th>
 
-        </thead>
+<th>Status</th>
 
-        <tbody>
+<th></th>
 
-          {
+</tr>
 
-            history.map((row, index) => (
+</thead>
 
-              <tr key={index}>
+<tbody>
 
-                <td>{row.date}</td>
+{contributions.map((item)=>(
 
-                <td>{row.amount}</td>
+<tr key={item._id}>
 
-                <td>
+<td>
 
-                  <span className="paid-status">
+{new Date(item.date)
+.toLocaleDateString()}
 
-                    {row.status}
+</td>
 
-                  </span>
+<td>
 
-                </td>
+KSh {Number(item.amount)
+.toLocaleString()}
 
-              </tr>
+</td>
 
-            ))
+<td>
 
-          }
+<span className="paid">
 
-        </tbody>
+<CheckCircle size={16}/>
 
-      </table>
+Paid
 
-    </div>
+</span>
 
-  );
+</td>
+
+<td>
+
+<button>
+
+<Download size={16}/>
+
+Receipt
+
+</button>
+
+</td>
+
+</tr>
+
+))}
+
+</tbody>
+
+</table>
+
+</div>
+
+);
 
 }
 

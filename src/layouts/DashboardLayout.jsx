@@ -1,23 +1,19 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import DashboardSidebar from "../components/dashboard/DashboardSidebar";
 import DashboardTopbar from "../components/dashboard/DashboardTopbar";
 
 import "../styles/dashboard.css";
 
-function DashboardLayout({
-  children,
-}) {
-  const [sidebarOpen, setSidebarOpen] =
-    useState(window.innerWidth > 900);
+function DashboardLayout({ children }) {
+  const [sidebarOpen, setSidebarOpen] = useState(
+    window.innerWidth > 992
+  );
 
-  // Current logged-in user
-  // Later this will come from AuthContext or backend
   const user = JSON.parse(
     localStorage.getItem("user") || "{}"
   );
 
-  // Determine role
   let role = "member";
 
   if (localStorage.getItem("superAdminToken")) {
@@ -28,8 +24,36 @@ function DashboardLayout({
     role = "member";
   }
 
+  useEffect(() => {
+    const resize = () => {
+      if (window.innerWidth >= 992) {
+        setSidebarOpen(true);
+      } else {
+        setSidebarOpen(false);
+      }
+    };
+
+    window.addEventListener("resize", resize);
+
+    return () =>
+      window.removeEventListener(
+        "resize",
+        resize
+      );
+  }, []);
+
   return (
     <div className="dashboard-container">
+
+      {sidebarOpen && (
+        <div
+          className="dashboard-overlay"
+          onClick={() =>
+            window.innerWidth < 992 &&
+            setSidebarOpen(false)
+          }
+        />
+      )}
 
       <DashboardSidebar
         role={role}
@@ -37,22 +61,26 @@ function DashboardLayout({
         setSidebarOpen={setSidebarOpen}
       />
 
-      <div className="dashboard-main">
+<div className="dashboard-main">
 
-        <DashboardTopbar
-          role={role}
-          user={user}
-          sidebarOpen={sidebarOpen}
-          setSidebarOpen={setSidebarOpen}
-        />
+    <DashboardTopbar
+        role={role}
+        user={user}
+        sidebarOpen={sidebarOpen}
+        setSidebarOpen={setSidebarOpen}
+    />
 
-        <main className="dashboard-content">
+    <main className="dashboard-content">
 
-          {children}
+        <div className="dashboard-page">
 
-        </main>
+            {children}
 
-      </div>
+        </div>
+
+    </main>
+
+</div>
 
     </div>
   );

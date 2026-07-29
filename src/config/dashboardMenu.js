@@ -22,6 +22,12 @@ export const dashboardMenus = {
     },
 
     {
+  title: "Notifications",
+  icon: Bell,
+  path: "/member/notifications",
+},
+
+    {
       title: "My Contributions",
       icon: Wallet,
       path: "/member/contributions",

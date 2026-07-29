@@ -34,6 +34,9 @@ const MemberDashboard = lazy(() =>
 const SuperAdminDashboard = lazy(() =>
   import("./pages/superadmin/SuperAdminDashboard")
 );
+const Notifications = lazy(() =>
+  import("./pages/member/Notifications")
+);
 
 // ========================================
 // COMPONENTS
@@ -155,6 +158,11 @@ function AppContent() {
             path="/about"
             element={<About />}
           />
+
+          <Route
+  path="/member/notifications"
+  element={<Notifications />}
+/>
 
           <Route
             path="/services"
