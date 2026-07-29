@@ -34,8 +34,33 @@ const MemberDashboard = lazy(() =>
 const SuperAdminDashboard = lazy(() =>
   import("./pages/superadmin/SuperAdminDashboard")
 );
+
 const Notifications = lazy(() =>
   import("./pages/member/Notifications")
+);
+
+const Messages = lazy(() =>
+  import("./pages/member/Messages")
+);
+
+const Profile = lazy(() =>
+  import("./pages/member/Profile")
+);
+
+const Contributions = lazy(() =>
+  import("./pages/member/Contributions")
+);
+
+const Claims = lazy(() =>
+  import("./pages/member/Claims")
+);
+
+const Announcements = lazy(() =>
+  import("./pages/member/Announcements")
+);
+
+const Settings = lazy(() =>
+  import("./pages/member/Settings")
 );
 
 // ========================================
@@ -78,34 +103,34 @@ function LoadingScreen() {
 // PROTECTED ROUTES
 // ========================================
 
-function ProtectedAdmin() {
+function ProtectedAdmin({ children }) {
   const token = localStorage.getItem("adminToken");
 
   if (!token) {
     return <Navigate to="/login" replace />;
   }
 
-  return <AdminDashboard />;
+  return children;
 }
 
-function ProtectedMember() {
+function ProtectedMember({ children }) {
   const token = localStorage.getItem("memberToken");
 
   if (!token) {
     return <Navigate to="/login" replace />;
   }
 
-  return <MemberDashboard />;
+  return children;
 }
 
-function ProtectedSuperAdmin() {
+function ProtectedSuperAdmin({ children }) {
   const token = localStorage.getItem("superAdminToken");
 
   if (!token) {
     return <Navigate to="/login" replace />;
   }
 
-  return <SuperAdminDashboard />;
+  return children;
 }
 
 // ========================================
@@ -147,83 +172,121 @@ function AppContent() {
 
         <Routes>
 
-          {/* PUBLIC */}
+  {/* ================= PUBLIC ================= */}
 
-          <Route
-            path="/"
-            element={<Home />}
-          />
+  <Route path="/" element={<Home />} />
+  <Route path="/about" element={<About />} />
+  <Route path="/services" element={<Services />} />
+  <Route path="/leaders" element={<Leaders />} />
+  <Route path="/members" element={<Members />} />
+  <Route path="/news" element={<News />} />
+  <Route path="/contact" element={<Contact />} />
+  <Route path="/login" element={<Login />} />
 
-          <Route
-            path="/about"
-            element={<About />}
-          />
+  {/* ================= ADMIN ================= */}
 
-          <Route
-  path="/member/notifications"
-  element={<Notifications />}
-/>
+  <Route
+    path="/admin"
+    element={
+      <ProtectedAdmin>
+        <AdminDashboard />
+      </ProtectedAdmin>
+    }
+  />
 
-          <Route
-            path="/services"
-            element={<Services />}
-          />
+  {/* ================= MEMBER ================= */}
 
-          <Route
-            path="/leaders"
-            element={<Leaders />}
-          />
+  <Route
+    path="/member"
+    element={
+      <ProtectedMember>
+        <MemberDashboard />
+      </ProtectedMember>
+    }
+  />
 
-          <Route
-            path="/members"
-            element={<Members />}
-          />
+  <Route
+    path="/member/profile"
+    element={
+      <ProtectedMember>
+        <Profile />
+      </ProtectedMember>
+    }
+  />
 
-          <Route
-            path="/news"
-            element={<News />}
-          />
+  <Route
+    path="/member/contributions"
+    element={
+      <ProtectedMember>
+        <Contributions />
+      </ProtectedMember>
+    }
+  />
 
-          <Route
-            path="/contact"
-            element={<Contact />}
-          />
+  <Route
+    path="/member/claims"
+    element={
+      <ProtectedMember>
+        <Claims />
+      </ProtectedMember>
+    }
+  />
 
-          <Route
-            path="/login"
-            element={<Login />}
-          />
+  <Route
+    path="/member/announcements"
+    element={
+      <ProtectedMember>
+        <Announcements />
+      </ProtectedMember>
+    }
+  />
 
-          {/* PORTALS */}
+  <Route
+    path="/member/messages"
+    element={
+      <ProtectedMember>
+        <Messages />
+      </ProtectedMember>
+    }
+  />
 
-          <Route
-            path="/admin"
-            element={<ProtectedAdmin />}
-          />
+  <Route
+    path="/member/notifications"
+    element={
+      <ProtectedMember>
+        <Notifications />
+      </ProtectedMember>
+    }
+  />
 
-          <Route
-            path="/member"
-            element={<ProtectedMember />}
-          />
+  <Route
+    path="/member/settings"
+    element={
+      <ProtectedMember>
+        <Settings />
+      </ProtectedMember>
+    }
+  />
 
-          <Route
-            path="/superadmin"
-            element={<ProtectedSuperAdmin />}
-          />
+  {/* ================= SUPER ADMIN ================= */}
 
-          {/* 404 */}
+  <Route
+    path="/superadmin"
+    element={
+      <ProtectedSuperAdmin>
+        <SuperAdminDashboard />
+      </ProtectedSuperAdmin>
+    }
+  />
 
-          <Route
-            path="*"
-            element={
-              <Navigate
-                to="/"
-                replace
-              />
-            }
-          />
+  {/* ================= 404 ================= */}
 
-        </Routes>
+  <Route
+    path="*"
+    element={<Navigate to="/" replace />}
+  />
+
+</Routes>
 
       </Suspense>
 

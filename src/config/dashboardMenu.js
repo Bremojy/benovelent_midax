@@ -22,6 +22,12 @@ export const dashboardMenus = {
     },
 
     {
+  title: "Settings",
+  icon: Settings,
+  path: "/member/settings",
+},
+
+    {
   title: "Notifications",
   icon: Bell,
   path: "/member/notifications",

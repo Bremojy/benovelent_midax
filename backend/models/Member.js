@@ -39,6 +39,11 @@ const memberSchema = new mongoose.Schema(
       default: "",
     },
 
+    coverImage: {
+      type: String,
+      default: "",
+    },
+
     bio: {
       type: String,
       default: "",
@@ -84,37 +89,25 @@ const memberSchema = new mongoose.Schema(
       default: "active",
     },
 
+    verified: {
+      type: Boolean,
+      default: false,
+    },
+
     unreadNotifications: {
-    type: Number,
-    default: 0,
-},
+      type: Number,
+      default: 0,
+    },
 
-unreadMessages: {
-  type: Number,
-  default: 0,
-},
+    unreadMessages: {
+      type: Number,
+      default: 0,
+    },
 
-socketId: {
-    type: String,
-    default: "",
-},
-coverImage: {
-    type: String,
-    default: "",
-},
-
-verified: {
-    type: Boolean,
-    default: false,
-},
-lastLogin: {
-    type: Date,
-},
-
-isDeleted: {
-    type: Boolean,
-    default: false,
-},
+    socketId: {
+      type: String,
+      default: "",
+    },
 
     online: {
       type: Boolean,
@@ -126,56 +119,124 @@ isDeleted: {
       default: Date.now,
     },
 
+    lastLogin: {
+      type: Date,
+    },
+
+    isDeleted: {
+      type: Boolean,
+      default: false,
+    },
+
     notes: {
       type: String,
       trim: true,
     },
+
+    // =====================================
+    // SETTINGS
+    // =====================================
+
+    notifications: {
+      type: Boolean,
+      default: true,
+    },
+
+    emailNotifications: {
+      type: Boolean,
+      default: true,
+    },
+
+    darkMode: {
+      type: Boolean,
+      default: false,
+    },
+
+    language: {
+      type: String,
+      default: "English",
+    },
+
+    // =====================================
+    // SECURITY
+    // =====================================
+
     failedLoginAttempts: {
-    type: Number,
-    default: 0
-},
+      type: Number,
+      default: 0,
+    },
 
-accountLockedUntil: {
-    type: Date,
-    default: null
-},
+    accountLockedUntil: {
+      type: Date,
+      default: null,
+    },
 
-mustChangePassword: {
-    type: Boolean,
-    default: true
-},
+    mustChangePassword: {
+      type: Boolean,
+      default: true,
+    },
 
-passwordChangedAt: {
-    type: Date
-},
+    passwordChangedAt: {
+      type: Date,
+    },
 
-resetPasswordToken: String,
+    resetPasswordToken: {
+      type: String,
+    },
 
-resetPasswordExpires: Date
+    resetPasswordExpires: {
+      type: Date,
+    },
   },
   {
     timestamps: true,
   }
 );
+
+// =====================================
+// PASSWORD MATCH
+// =====================================
+
 memberSchema.methods.matchPassword = async function (enteredPassword) {
-  return await bcrypt.compare(enteredPassword, this.password);
+  return await bcrypt.compare(
+    enteredPassword,
+    this.password
+  );
 };
-memberSchema.pre("save", async function () {
+
+// =====================================
+// HASH PASSWORD
+// =====================================
+
+memberSchema.pre("save", async function (next) {
 
   if (!this.isModified("password")) {
-    return;
+    return next();
   }
 
   const salt = await bcrypt.genSalt(10);
 
-  this.password = await bcrypt.hash(this.password, salt);
+  this.password = await bcrypt.hash(
+    this.password,
+    salt
+  );
+
+  next();
 
 });
+
+// =====================================
+// INDEXES
+// =====================================
+
 memberSchema.index({ email: 1 });
 memberSchema.index({ username: 1 });
 memberSchema.index({ memberNumber: 1 });
 memberSchema.index({ status: 1 });
 memberSchema.index({ online: 1 });
+
+// =====================================
+
 module.exports =
-    mongoose.models.Member ||
-    mongoose.model("Member", memberSchema);
+  mongoose.models.Member ||
+  mongoose.model("Member", memberSchema);

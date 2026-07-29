@@ -6,18 +6,36 @@ const {
   getProfile,
   updateProfile,
   getSummary,
+  getSettings,
+  updateSettings,
 } = require("../controllers/memberController");
 
 const protect = require("../middleware/authMiddleware");
 
-// Member dashboard
+// ===============================
+// DASHBOARD
+// ===============================
+
 router.get("/dashboard", protect, getDashboard);
 
-// Profile
+// ===============================
+// PROFILE
+// ===============================
+
 router.get("/profile", protect, getProfile);
 router.put("/profile", protect, updateProfile);
 
-// Summary
+// ===============================
+// SUMMARY
+// ===============================
+
 router.get("/summary", protect, getSummary);
+
+// ===============================
+// SETTINGS
+// ===============================
+
+router.get("/settings", protect, getSettings);
+router.put("/settings", protect, updateSettings);
 
 module.exports = router;

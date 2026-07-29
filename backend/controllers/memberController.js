@@ -285,3 +285,100 @@ exports.getSummary = async (req,res)=>{
     }
 
 };
+
+
+// ==========================================
+// MEMBER SETTINGS
+// ==========================================
+
+exports.getSettings = async (req, res) => {
+  try {
+
+    const member = await Member.findById(req.user.id);
+
+    if (!member) {
+      return res.status(404).json({
+        success: false,
+        message: "Member not found",
+      });
+    }
+
+    res.json({
+      success: true,
+      settings: {
+        notifications:
+          member.notifications ?? true,
+
+        emailNotifications:
+          member.emailNotifications ?? true,
+
+        darkMode:
+          member.darkMode ?? false,
+
+        language:
+          member.language || "English",
+      },
+    });
+
+  } catch (err) {
+
+    console.error(err);
+
+    res.status(500).json({
+      success: false,
+      message: "Server Error",
+    });
+
+  }
+};
+
+
+
+// ==========================================
+// UPDATE SETTINGS
+// ==========================================
+
+exports.updateSettings = async (req, res) => {
+
+  try {
+
+    const member = await Member.findById(req.user.id);
+
+    if (!member) {
+      return res.status(404).json({
+        success:false,
+        message:"Member not found",
+      });
+    }
+
+    member.notifications =
+      req.body.notifications;
+
+    member.emailNotifications =
+      req.body.emailNotifications;
+
+    member.darkMode =
+      req.body.darkMode;
+
+    member.language =
+      req.body.language;
+
+    await member.save();
+
+    res.json({
+      success:true,
+      message:"Settings updated successfully.",
+    });
+
+  } catch(err){
+
+    console.error(err);
+
+    res.status(500).json({
+      success:false,
+      message:"Server Error",
+    });
+
+  }
+
+};

@@ -12,7 +12,7 @@ const BASE_URL =
 // AXIOS INSTANCE
 // ========================================
 
-const api = axios.create({
+const API = axios.create({
   baseURL: `${BASE_URL}/api`,
   timeout: 15000,
   headers: {
@@ -24,32 +24,53 @@ const api = axios.create({
 // REQUEST INTERCEPTOR
 // ========================================
 
-api.interceptors.request.use(
+API.interceptors.request.use(
+
   (config) => {
-    const token =
-      localStorage.getItem("memberToken") ||
-      localStorage.getItem("adminToken") ||
+
+    const memberToken =
+      localStorage.getItem("memberToken");
+
+    const adminToken =
+      localStorage.getItem("adminToken");
+
+    const superAdminToken =
       localStorage.getItem("superAdminToken");
 
+    const token =
+      superAdminToken ||
+      adminToken ||
+      memberToken;
+
     if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+      config.headers.Authorization =
+        `Bearer ${token}`;
     }
 
     return config;
+
   },
+
   (error) => Promise.reject(error)
+
 );
 
 // ========================================
 // RESPONSE INTERCEPTOR
 // ========================================
 
-api.interceptors.response.use(
+API.interceptors.response.use(
+
   (response) => response,
 
   (error) => {
 
-    // Auto logout if token expired
+    console.error(
+      "API Error:",
+      error.response?.data ||
+      error.message
+    );
+
     if (error.response?.status === 401) {
 
       localStorage.removeItem("memberToken");
@@ -57,23 +78,41 @@ api.interceptors.response.use(
       localStorage.removeItem("superAdminToken");
       localStorage.removeItem("user");
 
-      if (window.location.pathname !== "/login") {
+      if (
+        window.location.pathname !== "/login"
+      ) {
         window.location.href = "/login";
       }
 
     }
 
-    console.error(
-      "API Error:",
-      error.response?.data || error.message
-    );
+    if (error.response?.status === 403) {
+
+      console.warn(
+        "Permission denied."
+      );
+
+    }
+
+    if (error.response?.status === 500) {
+
+      console.error(
+        "Server error."
+      );
+
+    }
 
     return Promise.reject(error);
 
   }
+
 );
 
-export default api;
+// ========================================
+// EXPORTS
+// ========================================
 
-// Used for images uploaded by multer
+export default API;
+
+// Used by uploaded images
 export const UPLOAD_URL = BASE_URL;
