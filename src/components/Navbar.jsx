@@ -4,6 +4,7 @@ import { useState } from "react";
 
 function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
+
   const location = useLocation();
 
   const closeMenu = () => {
@@ -28,7 +29,6 @@ function Navbar() {
           className="logo"
           onClick={closeMenu}
         >
-
           <span className="logo-icon">
             B
           </span>
@@ -47,9 +47,8 @@ function Navbar() {
 
         </Link>
 
-
         {/* =========================
-            DESKTOP NAVIGATION
+            NAVIGATION
         ========================== */}
 
         <nav
@@ -72,7 +71,6 @@ function Navbar() {
             Home
           </Link>
 
-
           <Link
             to="/about"
             className={
@@ -82,9 +80,8 @@ function Navbar() {
             }
             onClick={closeMenu}
           >
-            About Us
+            About
           </Link>
-
 
           <Link
             to="/services"
@@ -97,9 +94,42 @@ function Navbar() {
           >
             Services
           </Link>
-<Link to="/members" onClick={() => setMenuOpen(false)}>
-  Members
-</Link>
+
+          <Link
+            to="/leaders"
+            className={
+              isActive("/leaders")
+                ? "nav-link active"
+                : "nav-link"
+            }
+            onClick={closeMenu}
+          >
+            Leaders
+          </Link>
+
+          <Link
+            to="/members"
+            className={
+              isActive("/members")
+                ? "nav-link active"
+                : "nav-link"
+            }
+            onClick={closeMenu}
+          >
+            Members
+          </Link>
+
+          <Link
+            to="/news"
+            className={
+              isActive("/news")
+                ? "nav-link active"
+                : "nav-link"
+            }
+            onClick={closeMenu}
+          >
+            News
+          </Link>
 
           <Link
             to="/contact"
@@ -113,19 +143,17 @@ function Navbar() {
             Contact
           </Link>
 
-
-          {/* ADMIN LOGIN */}
+          {/* MEMBER LOGIN */}
 
           <Link
             to="/login"
             className="admin-link"
             onClick={closeMenu}
           >
-            Admin Login
+            Member Login
           </Link>
 
         </nav>
-
 
         {/* =========================
             MOBILE MENU BUTTON

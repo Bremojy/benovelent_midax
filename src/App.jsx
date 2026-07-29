@@ -5,11 +5,10 @@ import {
   Navigate,
   useLocation,
 } from "react-router-dom";
+
+import { lazy, Suspense } from "react";
+
 import ScrollToTop from "./components/ScrollToTop";
-import {
-  lazy,
-  Suspense,
-} from "react";
 
 // ========================================
 // LAZY LOADED PAGES
@@ -18,11 +17,23 @@ import {
 const Home = lazy(() => import("./pages/Home"));
 const About = lazy(() => import("./pages/About"));
 const Services = lazy(() => import("./pages/Services"));
-const Contact = lazy(() => import("./pages/Contact"));
+const Leaders = lazy(() => import("./pages/Leaders"));
 const Members = lazy(() => import("./pages/Members"));
+const News = lazy(() => import("./pages/News"));
+const Contact = lazy(() => import("./pages/Contact"));
 const Login = lazy(() => import("./pages/Login"));
+
 const AdminDashboard = lazy(() =>
   import("./pages/AdminDashboard")
+);
+
+// Future portals
+const MemberDashboard = lazy(() =>
+  import("./pages/MemberDashboard")
+);
+
+const SuperAdminDashboard = lazy(() =>
+  import("./pages/SuperAdminDashboard")
 );
 
 // ========================================
@@ -39,7 +50,7 @@ import Footer from "./components/Footer";
 import "./App.css";
 
 // ========================================
-// SIMPLE LOADING SCREEN
+// LOADING SCREEN
 // ========================================
 
 function LoadingScreen() {
@@ -51,9 +62,9 @@ function LoadingScreen() {
         justifyContent: "center",
         alignItems: "center",
         background: "#f8f9fa",
+        color: "#ff7a00",
         fontSize: "22px",
         fontWeight: "700",
-        color: "#ff7a00",
       }}
     >
       Loading...
@@ -62,18 +73,37 @@ function LoadingScreen() {
 }
 
 // ========================================
-// PROTECTED ADMIN ROUTE
+// PROTECTED ROUTES
 // ========================================
 
 function ProtectedAdmin() {
   const token = localStorage.getItem("adminToken");
-  const user = localStorage.getItem("adminUser");
 
-  if (!token || !user) {
+  if (!token) {
     return <Navigate to="/login" replace />;
   }
 
   return <AdminDashboard />;
+}
+
+function ProtectedMember() {
+  const token = localStorage.getItem("memberToken");
+
+  if (!token) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return <MemberDashboard />;
+}
+
+function ProtectedSuperAdmin() {
+  const token = localStorage.getItem("superAdminToken");
+
+  if (!token) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return <SuperAdminDashboard />;
 }
 
 // ========================================
@@ -85,6 +115,8 @@ function PublicNavbar() {
 
   const hideNavbar =
     location.pathname.startsWith("/admin") ||
+    location.pathname.startsWith("/member") ||
+    location.pathname.startsWith("/superadmin") ||
     location.pathname === "/login";
 
   if (hideNavbar) return null;
@@ -101,6 +133,8 @@ function AppContent() {
 
   const hideFooter =
     location.pathname.startsWith("/admin") ||
+    location.pathname.startsWith("/member") ||
+    location.pathname.startsWith("/superadmin") ||
     location.pathname === "/login";
 
   return (
@@ -108,7 +142,11 @@ function AppContent() {
       <PublicNavbar />
 
       <Suspense fallback={<LoadingScreen />}>
+
         <Routes>
+
+          {/* PUBLIC */}
+
           <Route
             path="/"
             element={<Home />}
@@ -125,8 +163,18 @@ function AppContent() {
           />
 
           <Route
+            path="/leaders"
+            element={<Leaders />}
+          />
+
+          <Route
             path="/members"
             element={<Members />}
+          />
+
+          <Route
+            path="/news"
+            element={<News />}
           />
 
           <Route
@@ -139,10 +187,24 @@ function AppContent() {
             element={<Login />}
           />
 
+          {/* PORTALS */}
+
           <Route
             path="/admin"
             element={<ProtectedAdmin />}
           />
+
+          <Route
+            path="/member"
+            element={<ProtectedMember />}
+          />
+
+          <Route
+            path="/superadmin"
+            element={<ProtectedSuperAdmin />}
+          />
+
+          {/* 404 */}
 
           <Route
             path="*"
@@ -153,10 +215,13 @@ function AppContent() {
               />
             }
           />
+
         </Routes>
+
       </Suspense>
 
       {!hideFooter && <Footer />}
+
     </>
   );
 }
@@ -166,9 +231,7 @@ function AppContent() {
 // ========================================
 
 function App() {
-
   return (
-
     <BrowserRouter>
 
       <ScrollToTop />
@@ -176,9 +239,7 @@ function App() {
       <AppContent />
 
     </BrowserRouter>
-
   );
-
 }
 
 export default App;

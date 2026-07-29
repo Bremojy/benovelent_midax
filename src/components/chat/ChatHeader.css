@@ -1,0 +1,183 @@
+.chat-header{
+
+    height:80px;
+
+    background:#ffffff;
+
+    border-bottom:1px solid #ececec;
+
+    display:flex;
+
+    justify-content:space-between;
+
+    align-items:center;
+
+    padding:0 25px;
+
+}
+
+.chat-user{
+
+    display:flex;
+
+    align-items:center;
+
+    gap:15px;
+
+}
+
+.chat-avatar{
+
+    position:relative;
+
+}
+
+.chat-avatar img{
+
+    width:52px;
+
+    height:52px;
+
+    border-radius:50%;
+
+    object-fit:cover;
+
+}
+
+.online-indicator{
+
+    position:absolute;
+
+    bottom:2px;
+
+    right:2px;
+
+}
+
+.chat-user-info h3{
+
+    color:#222;
+
+    margin-bottom:4px;
+
+    font-size:17px;
+
+}
+
+.chat-user-info p{
+
+    color:#888;
+
+    font-size:14px;
+
+}
+
+.typing-status{
+
+    color:#ff7a00 !important;
+
+    font-weight:600;
+
+    animation:typingPulse 1s infinite;
+
+}
+
+.chat-actions{
+
+    display:flex;
+
+    gap:12px;
+
+}
+
+.chat-actions button{
+
+    width:42px;
+
+    height:42px;
+
+    border:none;
+
+    border-radius:50%;
+
+    background:#f7f7f7;
+
+    cursor:pointer;
+
+    display:flex;
+
+    align-items:center;
+
+    justify-content:center;
+
+    transition:.25s;
+
+}
+
+.chat-actions button:hover{
+
+    background:#ff7a00;
+
+    color:white;
+
+}
+
+.empty{
+
+    justify-content:center;
+
+    color:#777;
+
+}
+
+@keyframes typingPulse{
+
+    0%{
+
+        opacity:1;
+
+    }
+
+    50%{
+
+        opacity:.45;
+
+    }
+
+    100%{
+
+        opacity:1;
+
+    }
+
+}
+
+@media(max-width:768px){
+
+.chat-header{
+
+    padding:0 15px;
+
+}
+
+.chat-actions{
+
+    gap:8px;
+
+}
+
+.chat-actions button{
+
+    width:38px;
+
+    height:38px;
+
+}
+
+.chat-user-info h3{
+
+    font-size:15px;
+
+}
+
+}

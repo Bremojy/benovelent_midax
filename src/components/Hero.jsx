@@ -1,116 +1,82 @@
-import {
-  useEffect,
-  useState,
-} from "react";
-
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-
 import {
   ArrowRight,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
 
+import api, { UPLOAD_URL } from "../services/api";
+
 function Hero() {
+  const [slides, setSlides] = useState([]);
+  const [currentSlide, setCurrentSlide] = useState(0);
+  const [loading, setLoading] = useState(true);
 
-  const [slides, setSlides] =
-    useState([]);
+  // ========================================
+  // FETCH CAROUSEL
+  // ========================================
 
-  const [currentSlide, setCurrentSlide] =
-    useState(0);
-
-  const [loading, setLoading] =
-    useState(true);
-
-    const fetchSlides = async () => {
-
+  const fetchSlides = async () => {
     try {
+      const response = await api.get("/carousel/active");
 
-      const response =
-        await fetch(
-          "https://benovelent-midax.onrender.com/api/carousel/active"
-        );
-
-      const data =
-        await response.json();
-
-      setSlides(data);
-
+      if (Array.isArray(response.data)) {
+        setSlides(response.data);
+      } else {
+        setSlides([]);
+      }
     } catch (error) {
-
-      console.error(
-        "Failed to load carousel:",
-        error
-      );
-
+      console.error("Failed to load carousel:", error);
+      setSlides([]);
     } finally {
-
       setLoading(false);
-
     }
-
   };
-    useEffect(() => {
 
+  useEffect(() => {
     fetchSlides();
-
   }, []);
-  
-    useEffect(() => {
 
-    if (slides.length <= 1) {
-      return;
-    }
+  // ========================================
+  // AUTO SLIDE
+  // ========================================
 
-    const timer =
-      setInterval(() => {
+  useEffect(() => {
+    if (slides.length <= 1) return;
 
-        setCurrentSlide(
-          (previous) =>
-            (previous + 1) %
-            slides.length
-        );
+    const timer = setInterval(() => {
+      setCurrentSlide((previous) => (previous + 1) % slides.length);
+    }, 6000);
 
-      }, 6000);
+    return () => clearInterval(timer);
+  }, [slides]);
 
-    return () =>
-      clearInterval(timer);
+  // ========================================
+  // NAVIGATION
+  // ========================================
 
-  }, [slides.length]);
-
-    const nextSlide = () => {
-
-    setCurrentSlide(
-      (previous) =>
-        (previous + 1) %
-        slides.length
-    );
-
+  const nextSlide = () => {
+    setCurrentSlide((previous) => (previous + 1) % slides.length);
   };
-
 
   const previousSlide = () => {
-
     setCurrentSlide(
-      (previous) =>
-        (previous - 1 + slides.length) %
-        slides.length
+      (previous) => (previous - 1 + slides.length) % slides.length
     );
-
   };
-    if (loading) {
 
+  // ========================================
+  // LOADING SCREEN
+  // ========================================
+
+  if (loading) {
     return (
-
       <section className="hero">
-
         <div className="hero-overlay"></div>
 
         <div className="hero-content">
-
-          <p className="hero-label">
-            BENEVOLENT MIDAX
-          </p>
+          <p className="hero-label">BENEVOLENT MIDAX</p>
 
           <h1>
             Standing Together.
@@ -119,157 +85,93 @@ function Hero() {
           </h1>
 
           <p className="hero-description">
-            A community dedicated to supporting
-            our members and their families.
+            A community dedicated to supporting our members and their families.
           </p>
-
         </div>
-
       </section>
-
     );
-
   }
-    const current =
+
+  // ========================================
+  // CURRENT SLIDE
+  // ========================================
+
+  const current =
     slides.length > 0
       ? slides[currentSlide]
       : {
-
-          imageUrl:
-            "/hero-default.jpg",
-
-          title:
-            "Standing Together.",
-
+          imageUrl: "/hero-default.jpg",
+          title: "Standing Together.",
           description:
             "A community dedicated to supporting our members and their families during life's most difficult moments.",
-
-          buttonText:
-            "Discover More",
-
-          buttonLink:
-            "/about",
-
+          buttonText: "Discover More",
+          buttonLink: "/about",
         };
-  return (
 
+  // Build full image URL
+  const backgroundImage = current.imageUrl.startsWith("http")
+    ? current.imageUrl
+    : `${UPLOAD_URL}${current.imageUrl}`;
+
+  return (
     <section
       className="hero"
       style={{
-        backgroundImage:
-          `url(${current.imageUrl})`,
+        backgroundImage: `url(${backgroundImage})`,
       }}
     >
-
       <div className="hero-overlay"></div>
 
-
       <div className="hero-content">
+        <p className="hero-label">BENEVOLENT MIDAX</p>
 
-        <p className="hero-label">
-          BENEVOLENT MIDAX
-        </p>
-
-
-        <h1>
-
-          {current.title}
-
-        </h1>
-
+        <h1>{current.title}</h1>
 
         <p className="hero-description">
-
           {current.description}
-
         </p>
 
-
         <div className="hero-buttons">
-
           <Link
-            to={
-              current.buttonLink ||
-              "/about"
-            }
+            to={current.buttonLink || "/about"}
             className="primary-button"
           >
-
-            {current.buttonText ||
-              "Discover More"}
+            {current.buttonText || "Discover More"}
 
             <ArrowRight size={20} />
-
           </Link>
-
 
           <Link
             to="/contact"
             className="secondary-button"
           >
-
             Get in Touch
-
           </Link>
-
         </div>
-
       </div>
 
-
-      {/* PREVIOUS BUTTON */}
-
       {slides.length > 1 && (
+        <>
+          <button
+            className="hero-arrow hero-arrow-left"
+            onClick={previousSlide}
+            aria-label="Previous Slide"
+          >
+            <ChevronLeft size={28} />
+          </button>
 
-        <button
-          className="hero-arrow hero-arrow-left"
-          onClick={
-            previousSlide
-          }
-          aria-label="Previous slide"
-        >
+          <button
+            className="hero-arrow hero-arrow-right"
+            onClick={nextSlide}
+            aria-label="Next Slide"
+          >
+            <ChevronRight size={28} />
+          </button>
 
-          <ChevronLeft
-            size={28}
-          />
-
-        </button>
-
-      )}
-
-
-      {/* NEXT BUTTON */}
-
-      {slides.length > 1 && (
-
-        <button
-          className="hero-arrow hero-arrow-right"
-          onClick={
-            nextSlide
-          }
-          aria-label="Next slide"
-        >
-
-          <ChevronRight
-            size={28}
-          />
-
-        </button>
-
-      )}
-
-
-      {/* SLIDE INDICATORS */}
-
-      {slides.length > 1 && (
-
-        <div className="hero-dots">
-
-          {slides.map(
-            (slide, index) => (
-
+          <div className="hero-dots">
+            {slides.map((slide, index) => (
               <button
-                key={slide._id}
+                key={slide._id || index}
                 className={
                   index === currentSlide
                     ? "hero-dot active"
@@ -278,29 +180,17 @@ function Hero() {
                 onClick={() =>
                   setCurrentSlide(index)
                 }
-                aria-label={
-                  `Go to slide ${index + 1}`
-                }
+                aria-label={`Slide ${index + 1}`}
               />
-
-            )
-          )}
-
-        </div>
-
+            ))}
+          </div>
+        </>
       )}
 
-
       <div className="hero-scroll">
-
-        <span>
-          Scroll to explore
-        </span>
-
+        <span>Scroll to explore</span>
       </div>
-
     </section>
-
   );
 }
 
