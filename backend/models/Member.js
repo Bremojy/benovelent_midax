@@ -208,10 +208,9 @@ memberSchema.methods.matchPassword = async function (enteredPassword) {
 // HASH PASSWORD
 // =====================================
 
-memberSchema.pre("save", async function (next) {
-
+memberSchema.pre("save", async function () {
   if (!this.isModified("password")) {
-    return next();
+    return;
   }
 
   const salt = await bcrypt.genSalt(10);
@@ -220,9 +219,6 @@ memberSchema.pre("save", async function (next) {
     this.password,
     salt
   );
-
-  next();
-
 });
 
 // =====================================
