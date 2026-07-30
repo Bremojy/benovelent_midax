@@ -16,6 +16,7 @@ const memberSchema = new mongoose.Schema(
       trim: true,
     },
 
+
     username: {
       type: String,
       unique: true,
@@ -134,6 +135,236 @@ const memberSchema = new mongoose.Schema(
     },
 
     // =====================================
+// PERSONAL INFORMATION
+// =====================================
+
+nationalId: {
+  type: String,
+  trim: true,
+},
+
+gender: {
+  type: String,
+  enum: ["Male", "Female", "Other"],
+},
+
+dateOfBirth: {
+  type: Date,
+},
+
+maritalStatus: {
+  type: String,
+  enum: ["Single", "Married", "Divorced", "Widowed"],
+},
+
+passportPhoto: {
+  type: String,
+  default: "",
+},
+
+// =====================================
+// ADDRESS INFORMATION
+// =====================================
+
+county: {
+  type: String,
+  trim: true,
+},
+
+subCounty: {
+  type: String,
+  trim: true,
+},
+
+ward: {
+  type: String,
+  trim: true,
+},
+
+village: {
+  type: String,
+  trim: true,
+},
+
+postalAddress: {
+  type: String,
+  trim: true,
+},
+
+// =====================================
+// EMPLOYMENT
+// =====================================
+
+occupation: {
+  type: String,
+  trim: true,
+},
+
+employer: {
+  type: String,
+  trim: true,
+},
+
+monthlyIncome: {
+  type: Number,
+  default: 0,
+},
+
+// =====================================
+// NEXT OF KIN
+// =====================================
+
+nextOfKin: {
+  fullName: {
+    type: String,
+    trim: true,
+  },
+
+  relationship: {
+    type: String,
+    trim: true,
+  },
+
+  phone: {
+    type: String,
+    trim: true,
+  },
+
+  nationalId: {
+    type: String,
+    trim: true,
+  },
+},
+
+// =====================================
+// PAYMENT DETAILS
+// =====================================
+
+mpesaNumber: {
+  type: String,
+  trim: true,
+},
+
+bankName: {
+  type: String,
+  trim: true,
+},
+
+bankBranch: {
+  type: String,
+  trim: true,
+},
+
+accountNumber: {
+  type: String,
+  trim: true,
+},
+
+// =====================================
+// DOCUMENTS
+// =====================================
+
+documents: {
+  nationalIdFront: {
+    type: String,
+    default: "",
+  },
+
+  nationalIdBack: {
+    type: String,
+    default: "",
+  },
+
+  passportPhoto: {
+    type: String,
+    default: "",
+  },
+
+  signature: {
+    type: String,
+    default: "",
+  },
+},
+
+// =====================================
+// MEMBER AGREEMENTS
+// =====================================
+
+acceptedConstitution: {
+  type: Boolean,
+  default: false,
+},
+
+acceptedPrivacyPolicy: {
+  type: Boolean,
+  default: false,
+},
+
+acceptedDeclaration: {
+  type: Boolean,
+  default: false,
+},
+
+// =====================================
+// PROFILE STATUS
+// =====================================
+
+profileCompletion: {
+  type: Number,
+  default: 0,
+  min: 0,
+  max: 100,
+},
+
+profileCompleted: {
+  type: Boolean,
+  default: false,
+},
+
+profileVerified: {
+  type: Boolean,
+  default: false,
+},
+
+// =====================================
+// MEMBERSHIP DETAILS
+// =====================================
+
+membershipType: {
+  type: String,
+  enum: ["Regular", "Honorary"],
+  default: "Regular",
+},
+
+registrationFeePaid: {
+  type: Boolean,
+  default: false,
+},
+
+// =====================================
+// EMERGENCY CONTACT
+// =====================================
+
+emergencyContact: {
+  fullName: {
+    type: String,
+    trim: true,
+  },
+
+  relationship: {
+    type: String,
+    trim: true,
+  },
+
+  phone: {
+    type: String,
+    trim: true,
+  },
+},
+
+
+
+    // =====================================
     // SETTINGS
     // =====================================
 
@@ -217,8 +448,11 @@ memberSchema.pre("save", async function () {
 
   this.password = await bcrypt.hash(
     this.password,
+    
     salt
   );
+
+  this.calculateProfileCompletion();
 });
 
 // =====================================
@@ -232,6 +466,47 @@ memberSchema.index({ status: 1 });
 memberSchema.index({ online: 1 });
 
 // =====================================
+
+// =====================================
+// PROFILE COMPLETION
+// =====================================
+
+memberSchema.methods.calculateProfileCompletion = function () {
+
+  let completed = 0;
+
+  const total = 20;
+
+  if (this.fullName) completed++;
+  if (this.phone) completed++;
+  if (this.email) completed++;
+  if (this.memberNumber) completed++;
+  if (this.nationalId) completed++;
+  if (this.gender) completed++;
+  if (this.dateOfBirth) completed++;
+  if (this.maritalStatus) completed++;
+  if (this.county) completed++;
+  if (this.subCounty) completed++;
+  if (this.ward) completed++;
+  if (this.village) completed++;
+  if (this.occupation) completed++;
+  if (this.nextOfKin?.fullName) completed++;
+  if (this.mpesaNumber || this.accountNumber) completed++;
+  if (this.documents?.nationalIdFront) completed++;
+  if (this.documents?.nationalIdBack) completed++;
+  if (this.documents?.passportPhoto) completed++;
+  if (this.acceptedConstitution) completed++;
+  if (this.acceptedDeclaration) completed++;
+
+  this.profileCompletion = Math.round(
+    (completed / total) * 100
+  );
+
+  this.profileCompleted =
+    this.profileCompletion === 100;
+
+  return this.profileCompletion;
+};
 
 module.exports =
   mongoose.models.Member ||

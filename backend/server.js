@@ -14,6 +14,8 @@ const { initSocket } = require("./sockets/socket");
 // ===============================
 // ROUTES
 // ===============================
+const dependentRoutes =
+require("./routes/dependentRoutes");
 const authRoutes = require("./routes/authRoutes");
 const adminRoutes = require("./routes/adminRoutes");
 const memberRoutes = require("./routes/memberRoutes");
@@ -28,6 +30,13 @@ const contributionRoutes = require("./routes/contributionRoutes");
 const conversationRoutes = require("./routes/conversationRoutes");
 const messageRoutes = require("./routes/messageRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
+const educationSupportRoutes =
+require("./routes/educationSupportRoutes");
+const auditLogRoutes =
+require("./routes/auditLogRoutes");
+
+const funeralSupportRoutes =
+require("./routes/funeralSupportRoutes");
 
 // ===============================
 // APP
@@ -80,7 +89,19 @@ app.get("/", (req, res) => {
 // ===============================
 // API ROUTES
 // ===============================
+app.use(
+    "/api/dependents",
+    dependentRoutes
+);
+app.use(
+    "/api/audit-logs",
+    auditLogRoutes
+);
 app.use("/api/auth", authRoutes);
+app.use(
+    "/api/funeral",
+    funeralSupportRoutes
+);
 app.use("/api/admin", adminRoutes);
 app.use("/api/member", memberRoutes);
 app.use("/api/leaders", leaderRoutes);
@@ -89,6 +110,10 @@ app.use("/api/website", websiteRoutes);
 app.use("/api/news", newsRoutes);
 app.use("/api/polls", pollRoutes);
 app.use("/api/votes", voteRoutes);
+app.use(
+  "/api/education",
+  educationSupportRoutes
+);
 app.use("/api/finance", financeRoutes);
 app.use("/api/contributions", contributionRoutes);
 app.use("/api/conversations", conversationRoutes);

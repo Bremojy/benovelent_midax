@@ -2,16 +2,28 @@ const mongoose = require("mongoose");
 
 const notificationSchema = new mongoose.Schema(
 {
-    recipient:{
-        type:mongoose.Schema.Types.ObjectId,
-        ref:"Member",
-        required:true
-    },
+   recipient: {
+    type: mongoose.Schema.Types.ObjectId,
+    required: true,
+    refPath: "recipientModel",
+},
 
-    sender:{
-        type:mongoose.Schema.Types.ObjectId,
-        ref:"Member"
-    },
+recipientModel: {
+    type: String,
+    enum: ["Member", "Admin", "SuperAdmin"],
+    default: "Member",
+},
+
+sender: {
+    type: mongoose.Schema.Types.ObjectId,
+    refPath: "senderModel",
+},
+
+senderModel: {
+    type: String,
+    enum: ["Member", "Admin", "SuperAdmin"],
+    default: "Member",
+},
 
     title:{
         type:String,
@@ -25,21 +37,25 @@ const notificationSchema = new mongoose.Schema(
         trim:true
     },
 
-    type:{
-        type:String,
-        enum:[
-            "message",
-            "reaction",
-            "news",
-            "poll",
-            "vote",
-            "finance",
-            "contribution",
-            "announcement",
-            "system"
-        ],
-        default:"system"
-    },
+    type: {
+    type: String,
+    enum: [
+        "message",
+        "reaction",
+        "news",
+        "poll",
+        "vote",
+        "finance",
+        "contribution",
+        "announcement",
+        "education",
+        "medical",
+        "funeral",
+        "claim",
+        "system"
+    ],
+    default: "system"
+},
 
     referenceId:{
         type:mongoose.Schema.Types.ObjectId
