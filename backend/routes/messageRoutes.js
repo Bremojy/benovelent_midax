@@ -11,7 +11,7 @@ const {
     markAsRead
 } = require("../controllers/messageController");
 
-const protect = require("../middleware/authMiddleware");
+const { verifyToken: protect } = require("../middleware/authMiddleware");
 
 // =======================================
 // MESSAGE ROUTES

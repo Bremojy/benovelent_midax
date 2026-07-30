@@ -26,7 +26,7 @@ const {
 
 } = require("../controllers/funeralSupportController");
 
-const protect =
+const { verifyToken: protect } =
 require("../middleware/authMiddleware");
 
 const verified =
@@ -36,7 +36,7 @@ const memberStatus =
 require("../middleware/memberStatusMiddleware");
 
 const profileCompleted =
-require("../middleware/profileMiddleware");
+require("../middleware/profileCompletionMiddleware");
 
 const admin =
 require("../middleware/adminMiddleware");

@@ -3,18 +3,13 @@ const express = require("express");
 const router = express.Router();
 
 const {
-
     getAuditLogs,
-
     getAuditLog,
-
     deleteAuditLog,
-
-    getAuditSummary
-
+    getAuditSummary,
 } = require("../controllers/auditLogController");
 
-const protect =
+const { verifyToken: protect } =
 require("../middleware/authMiddleware");
 
 const admin =

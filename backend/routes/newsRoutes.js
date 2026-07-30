@@ -15,7 +15,7 @@ const {
     unpinNews
 } = require("../controllers/newsController");
 
-const protect = require("../middleware/authMiddleware");
+const { verifyToken: protect } = require("../middleware/authMiddleware");
 
 console.log("protect =", protect);
 console.log("createNews =", createNews);

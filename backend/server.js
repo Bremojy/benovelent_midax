@@ -3,6 +3,7 @@ const http = require("http");
 const cors = require("cors");
 const mongoose = require("mongoose");
 const path = require("path");
+const medicalSupportRoutes = require("./routes/medicalSupportRoutes");
 
 require("dotenv").config();
 
@@ -97,6 +98,8 @@ app.use(
     "/api/audit-logs",
     auditLogRoutes
 );
+
+app.use("/api/medical", medicalSupportRoutes);
 app.use("/api/auth", authRoutes);
 app.use(
     "/api/funeral",

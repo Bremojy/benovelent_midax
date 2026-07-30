@@ -3,7 +3,7 @@ const router = express.Router();
 const multer = require("multer");
 const path = require("path");
 
-const protect = require("../middleware/authMiddleware");
+const { verifyToken: protect } = require("../middleware/authMiddleware");
 
 const {
     getCarousel,

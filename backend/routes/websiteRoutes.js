@@ -12,7 +12,7 @@ const {
   getWebsiteStatistics,
 } = require("../controllers/websiteController");
 
-const protect = require("../middleware/authMiddleware");
+const { verifyToken: protect } = require("../middleware/authMiddleware");
 
 // ==========================================
 // WEBSITE ROUTES

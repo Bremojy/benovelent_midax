@@ -12,7 +12,7 @@ const {
     getPollResults
 } = require("../controllers/pollController");
 
-const protect = require("../middleware/authMiddleware");
+const { verifyToken: protect } = require("../middleware/authMiddleware");
 
 // ==========================================
 // POLL ROUTES

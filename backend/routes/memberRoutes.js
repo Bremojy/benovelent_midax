@@ -13,7 +13,7 @@ const {
 } = require("../controllers/memberController");
 
 
-const protect = require("../middleware/authMiddleware");
+const { verifyToken: protect } = require("../middleware/authMiddleware");
 
 // ===============================
 // DASHBOARD

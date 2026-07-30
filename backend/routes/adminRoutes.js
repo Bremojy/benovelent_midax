@@ -2,8 +2,8 @@ const express = require("express");
 
 const router = express.Router();
 
-const protect = require("../middleware/authMiddleware");
-const authorize = require("../middleware/roleMiddleware");
+const { verifyToken: protect } = require("../middleware/authMiddleware");
+const { isAdmin } = require("../middleware/roleMiddleware");
 
 const {
   getDashboard,
@@ -14,51 +14,53 @@ const {
   deleteMember,
 } = require("../controllers/adminController");
 
-// ===============================
+// =======================================
 // DASHBOARD
-// ===============================
+// =======================================
+
 router.get(
   "/dashboard",
   protect,
-  authorize("admin", "superadmin"),
+  isAdmin,
   getDashboard
 );
 
-// ===============================
+// =======================================
 // MEMBERS
-// ===============================
+// =======================================
+
 router.get(
   "/members",
   protect,
-  authorize("admin", "superadmin"),
+  isAdmin,
   getMembers
 );
 
 router.get(
   "/members/:id",
   protect,
-  authorize("admin", "superadmin"),
+  isAdmin,
   getMember
 );
 
 router.post(
   "/members",
   protect,
-  authorize("admin", "superadmin"),
+  isAdmin,
   createMember
 );
 
 router.put(
   "/members/:id",
   protect,
-  authorize("admin", "superadmin"),
+  isAdmin,
   updateMember
 );
 
 router.delete(
   "/members/:id",
   protect,
-  authorize("admin", "superadmin"),
+  isAdmin,
   deleteMember
 );
 

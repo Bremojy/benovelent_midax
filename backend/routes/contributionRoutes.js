@@ -13,7 +13,7 @@ const {
     getContributionSummary
 } = require("../controllers/contributionController");
 
-const protect = require("../middleware/authMiddleware");
+const { verifyToken: protect } = require("../middleware/authMiddleware");
 
 // ==========================================
 // CONTRIBUTION ROUTES

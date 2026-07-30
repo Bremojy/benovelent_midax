@@ -9,7 +9,7 @@ const {
     deleteVote
 } = require("../controllers/voteController");
 
-const protect = require("../middleware/authMiddleware");
+const { verifyToken: protect } = require("../middleware/authMiddleware");
 
 // ==========================================
 // VOTE ROUTES

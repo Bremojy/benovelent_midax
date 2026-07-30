@@ -11,7 +11,7 @@ const {
     clearNotifications
 } = require("../controllers/notificationController");
 
-const protect = require("../middleware/authMiddleware");
+const { verifyToken: protect } = require("../middleware/authMiddleware");
 
 // =======================================
 // NOTIFICATION ROUTES

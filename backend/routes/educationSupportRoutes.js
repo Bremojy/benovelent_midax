@@ -2,25 +2,34 @@ const express = require("express");
 
 const router = express.Router();
 
-const protect = require("../middleware/authMiddleware");
+const { verifyToken: protect } = require("../middleware/authMiddleware");
 
-const requireVerifiedMember = require("../middleware/verifiedMiddleware");
-const requireCompleteProfile = require("../middleware/profileMiddleware");
-const requireActiveMember = require("../middleware/memberStatusMiddleware");
-const requireAdmin = require("../middleware/adminMiddleware");
-const requireSuperAdmin = require("../middleware/superAdminMiddleware");
+const requireVerifiedMember =
+require("../middleware/verifiedMiddleware");
+
+const profileCompleted =
+require("../middleware/profileCompletionMiddleware");
+
+const requireActiveMember =
+require("../middleware/memberStatusMiddleware");
+
+const requireAdmin =
+require("../middleware/adminMiddleware");
+
+const requireSuperAdmin =
+require("../middleware/superAdminMiddleware");
 
 const {
-  applyEducationSupport,
-  getMyApplications,
-  getApplicationById,
-  getAllApplications,
-  getEducationSummary,
-  approveApplication,
-  rejectApplication,
-  disburseFunds,
-  recordRepayment,
-  deleteApplication,
+    applyEducationSupport,
+    getMyApplications,
+    getApplicationById,
+    getAllApplications,
+    getEducationSummary,
+    approveApplication,
+    rejectApplication,
+    disburseFunds,
+    recordRepayment,
+    deleteApplication,
 } = require("../controllers/educationSupportController");
 
 // ======================================================
@@ -29,26 +38,26 @@ const {
 
 // Apply
 router.post(
-  "/apply",
-  protect,
-  requireVerifiedMember,
-  requireCompleteProfile,
-  requireActiveMember,
-  applyEducationSupport
+    "/apply",
+    protect,
+    requireVerifiedMember,
+    profileCompleted,
+    requireActiveMember,
+    applyEducationSupport
 );
 
 // View my applications
 router.get(
-  "/my-applications",
-  protect,
-  getMyApplications
+    "/my-applications",
+    protect,
+    getMyApplications
 );
 
 // View single application
 router.get(
-  "/:id",
-  protect,
-  getApplicationById
+    "/:id",
+    protect,
+    getApplicationById
 );
 
 // ======================================================
@@ -57,50 +66,50 @@ router.get(
 
 // Dashboard summary
 router.get(
-  "/dashboard",
-  protect,
-  requireAdmin,
-  getEducationSummary
+    "/dashboard",
+    protect,
+    requireAdmin,
+    getEducationSummary
 );
 
 // Get all applications
 router.get(
-  "/",
-  protect,
-  requireAdmin,
-  getAllApplications
+    "/",
+    protect,
+    requireAdmin,
+    getAllApplications
 );
 
 // Approve
 router.put(
-  "/:id/approve",
-  protect,
-  requireAdmin,
-  approveApplication
+    "/:id/approve",
+    protect,
+    requireAdmin,
+    approveApplication
 );
 
 // Reject
 router.put(
-  "/:id/reject",
-  protect,
-  requireAdmin,
-  rejectApplication
+    "/:id/reject",
+    protect,
+    requireAdmin,
+    rejectApplication
 );
 
 // Disburse
 router.put(
-  "/:id/disburse",
-  protect,
-  requireAdmin,
-  disburseFunds
+    "/:id/disburse",
+    protect,
+    requireAdmin,
+    disburseFunds
 );
 
 // Record repayment
 router.put(
-  "/:id/repayment",
-  protect,
-  requireAdmin,
-  recordRepayment
+    "/:id/repayment",
+    protect,
+    requireAdmin,
+    recordRepayment
 );
 
 // ======================================================
@@ -108,10 +117,10 @@ router.put(
 // ======================================================
 
 router.delete(
-  "/:id",
-  protect,
-  requireSuperAdmin,
-  deleteApplication
+    "/:id",
+    protect,
+    requireSuperAdmin,
+    deleteApplication
 );
 
 module.exports = router;

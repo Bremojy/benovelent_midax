@@ -13,7 +13,7 @@ const {
   getFinanceSummary,
 } = require("../controllers/financeController");
 
-const protect = require("../middleware/authMiddleware");
+const { verifyToken: protect } = require("../middleware/authMiddleware");
 
 // ==========================================
 // FINANCE ROUTES
