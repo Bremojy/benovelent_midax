@@ -21,9 +21,9 @@ import Footer from "./components/Footer";
 
 import "./App.css";
 
-// ========================================
+// =====================================================
 // PUBLIC PAGES
-// ========================================
+// =====================================================
 
 const Home = lazy(
   () => import("./pages/Home")
@@ -57,9 +57,10 @@ const Login = lazy(
   () => import("./pages/Login")
 );
 
-// ========================================
+
+// =====================================================
 // ADMIN PAGES
-// ========================================
+// =====================================================
 
 const AdminDashboard = lazy(
   () =>
@@ -75,9 +76,10 @@ const AdminMembers = lazy(
     )
 );
 
-// ========================================
+
+// =====================================================
 // MEMBER PAGES
-// ========================================
+// =====================================================
 
 const MemberDashboard = lazy(
   () =>
@@ -149,9 +151,10 @@ const Settings = lazy(
     )
 );
 
-// ========================================
+
+// =====================================================
 // SUPERADMIN PAGES
-// ========================================
+// =====================================================
 
 const SuperAdminDashboard = lazy(
   () =>
@@ -160,9 +163,17 @@ const SuperAdminDashboard = lazy(
     )
 );
 
-// ========================================
+const SuperAdminAdmins = lazy(
+  () =>
+    import(
+      "./pages/superadmin/SuperAdminAdmins"
+    )
+);
+
+
+// =====================================================
 // LOADING SCREEN
-// ========================================
+// =====================================================
 
 function LoadingScreen() {
   return (
@@ -183,9 +194,10 @@ function LoadingScreen() {
   );
 }
 
-// ========================================
+
+// =====================================================
 // PUBLIC NAVBAR
-// ========================================
+// =====================================================
 
 function PublicNavbar() {
   const location = useLocation();
@@ -205,9 +217,10 @@ function PublicNavbar() {
   return <Navbar />;
 }
 
-// ========================================
+
+// =====================================================
 // APP CONTENT
-// ========================================
+// =====================================================
 
 function AppContent() {
   const location = useLocation();
@@ -230,11 +243,12 @@ function AppContent() {
       <Suspense
         fallback={<LoadingScreen />}
       >
+
         <Routes>
 
-          {/* ==================================
-              PUBLIC ROUTES
-          ================================== */}
+          {/* =================================================
+              PUBLIC PORTAL
+          ================================================= */}
 
           <Route
             path="/"
@@ -271,9 +285,10 @@ function AppContent() {
             element={<Contact />}
           />
 
-          {/* ==================================
+
+          {/* =================================================
               LOGIN
-          ================================== */}
+          ================================================= */}
 
           <Route
             path="/login"
@@ -284,15 +299,18 @@ function AppContent() {
             }
           />
 
-          {/* ==================================
+
+          {/* =================================================
               ADMIN PORTAL
-          ================================== */}
+          ================================================= */}
 
           <Route
             path="/admin"
             element={
               <ProtectedRoute
-                allowedRoles={["admin"]}
+                allowedRoles={[
+                  "admin",
+                ]}
               >
                 <AdminDashboard />
               </ProtectedRoute>
@@ -313,15 +331,18 @@ function AppContent() {
             }
           />
 
-          {/* ==================================
+
+          {/* =================================================
               MEMBER PORTAL
-          ================================== */}
+          ================================================= */}
 
           <Route
             path="/member"
             element={
               <ProtectedRoute
-                allowedRoles={["member"]}
+                allowedRoles={[
+                  "member",
+                ]}
               >
                 <MemberDashboard />
               </ProtectedRoute>
@@ -332,7 +353,9 @@ function AppContent() {
             path="/member/profile"
             element={
               <ProtectedRoute
-                allowedRoles={["member"]}
+                allowedRoles={[
+                  "member",
+                ]}
               >
                 <Profile />
               </ProtectedRoute>
@@ -343,7 +366,9 @@ function AppContent() {
             path="/member/contributions"
             element={
               <ProtectedRoute
-                allowedRoles={["member"]}
+                allowedRoles={[
+                  "member",
+                ]}
               >
                 <Contributions />
               </ProtectedRoute>
@@ -354,7 +379,9 @@ function AppContent() {
             path="/member/claims"
             element={
               <ProtectedRoute
-                allowedRoles={["member"]}
+                allowedRoles={[
+                  "member",
+                ]}
               >
                 <Claims />
               </ProtectedRoute>
@@ -365,7 +392,9 @@ function AppContent() {
             path="/member/announcements"
             element={
               <ProtectedRoute
-                allowedRoles={["member"]}
+                allowedRoles={[
+                  "member",
+                ]}
               >
                 <Announcements />
               </ProtectedRoute>
@@ -376,7 +405,9 @@ function AppContent() {
             path="/member/messages"
             element={
               <ProtectedRoute
-                allowedRoles={["member"]}
+                allowedRoles={[
+                  "member",
+                ]}
               >
                 <Messages />
               </ProtectedRoute>
@@ -387,7 +418,9 @@ function AppContent() {
             path="/member/notifications"
             element={
               <ProtectedRoute
-                allowedRoles={["member"]}
+                allowedRoles={[
+                  "member",
+                ]}
               >
                 <Notifications />
               </ProtectedRoute>
@@ -398,7 +431,9 @@ function AppContent() {
             path="/member/settings"
             element={
               <ProtectedRoute
-                allowedRoles={["member"]}
+                allowedRoles={[
+                  "member",
+                ]}
               >
                 <Settings />
               </ProtectedRoute>
@@ -409,7 +444,9 @@ function AppContent() {
             path="/member/support"
             element={
               <ProtectedRoute
-                allowedRoles={["member"]}
+                allowedRoles={[
+                  "member",
+                ]}
               >
                 <Support />
               </ProtectedRoute>
@@ -420,16 +457,19 @@ function AppContent() {
             path="/member/benefits"
             element={
               <ProtectedRoute
-                allowedRoles={["member"]}
+                allowedRoles={[
+                  "member",
+                ]}
               >
                 <Benefits />
               </ProtectedRoute>
             }
           />
 
-          {/* ==================================
+
+          {/* =================================================
               SUPERADMIN PORTAL
-          ================================== */}
+          ================================================= */}
 
           <Route
             path="/superadmin"
@@ -444,9 +484,27 @@ function AppContent() {
             }
           />
 
-          {/* ==================================
-              UNKNOWN ROUTE
-          ================================== */}
+          {/* -----------------------------------------------
+              SUPERADMIN → ADMIN MANAGEMENT
+          ----------------------------------------------- */}
+
+          <Route
+            path="/superadmin/admins"
+            element={
+              <ProtectedRoute
+                allowedRoles={[
+                  "superadmin",
+                ]}
+              >
+                <SuperAdminAdmins />
+              </ProtectedRoute>
+            }
+          />
+
+
+          {/* =================================================
+              UNKNOWN ROUTES
+          ================================================= */}
 
           <Route
             path="*"
@@ -459,16 +517,19 @@ function AppContent() {
           />
 
         </Routes>
+
       </Suspense>
 
       {!hideFooter && <Footer />}
+
     </>
   );
 }
 
-// ========================================
+
+// =====================================================
 // ROOT APP
-// ========================================
+// =====================================================
 
 function App() {
   return (

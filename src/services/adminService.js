@@ -293,6 +293,194 @@ export const resetAdminMemberPassword =
     return data;
   };
 
+// ========================================
+// SUPERADMIN - GET ADMINS
+// ========================================
+
+export const getSuperAdminAdmins = async ({
+  page = 1,
+  limit = 10,
+  search = "",
+} = {}) => {
+  const { data } = await API.get(
+    "/superadmin/admins",
+    {
+      params: {
+        page,
+        limit,
+        search,
+      },
+    }
+  );
+
+  return data;
+};
+
+
+// ========================================
+// SUPERADMIN - GET ADMIN
+// ========================================
+
+export const getSuperAdminAdmin = async (
+  adminId
+) => {
+  if (!adminId) {
+    throw new Error(
+      "Admin ID is required."
+    );
+  }
+
+  const { data } = await API.get(
+    `/superadmin/admins/${adminId}`
+  );
+
+  return data;
+};
+
+
+// ========================================
+// SUPERADMIN - CREATE ADMIN
+// ========================================
+
+export const createSuperAdminAdmin =
+  async (adminData) => {
+    if (!adminData) {
+      throw new Error(
+        "Administrator information is required."
+      );
+    }
+
+    const { data } = await API.post(
+      "/superadmin/admins",
+      adminData
+    );
+
+    return data;
+  };
+
+
+// ========================================
+// SUPERADMIN - UPDATE ADMIN
+// ========================================
+
+export const updateSuperAdminAdmin =
+  async (
+    adminId,
+    adminData
+  ) => {
+    if (!adminId) {
+      throw new Error(
+        "Admin ID is required."
+      );
+    }
+
+    if (!adminData) {
+      throw new Error(
+        "Administrator information is required."
+      );
+    }
+
+    const { data } = await API.put(
+      `/superadmin/admins/${adminId}`,
+      adminData
+    );
+
+    return data;
+  };
+
+
+// ========================================
+// SUPERADMIN - SUSPEND ADMIN
+// ========================================
+
+export const suspendSuperAdminAdmin =
+  async (adminId) => {
+    if (!adminId) {
+      throw new Error(
+        "Admin ID is required."
+      );
+    }
+
+    const { data } = await API.patch(
+      `/superadmin/admins/${adminId}/suspend`
+    );
+
+    return data;
+  };
+
+
+// ========================================
+// SUPERADMIN - ACTIVATE ADMIN
+// ========================================
+
+export const activateSuperAdminAdmin =
+  async (adminId) => {
+    if (!adminId) {
+      throw new Error(
+        "Admin ID is required."
+      );
+    }
+
+    const { data } = await API.patch(
+      `/superadmin/admins/${adminId}/activate`
+    );
+
+    return data;
+  };
+
+
+// ========================================
+// SUPERADMIN - RESET PASSWORD
+// ========================================
+
+export const resetSuperAdminAdminPassword =
+  async (adminId) => {
+    if (!adminId) {
+      throw new Error(
+        "Admin ID is required."
+      );
+    }
+
+    const { data } = await API.patch(
+      `/superadmin/admins/${adminId}/reset-password`
+    );
+
+    return data;
+  };
+
+
+// ========================================
+// SUPERADMIN - DELETE ADMIN
+// ========================================
+
+export const deleteSuperAdminAdmin =
+  async (adminId) => {
+    if (!adminId) {
+      throw new Error(
+        "Admin ID is required."
+      );
+    }
+
+    const { data } = await API.delete(
+      `/superadmin/admins/${adminId}`
+    );
+
+    return data;
+  };
+
+
+// ========================================
+// SUPERADMIN - STATISTICS
+// ========================================
+
+export const getSuperAdminAdminStatistics =
+  async () => {
+    const { data } = await API.get(
+      "/superadmin/admins/statistics"
+    );
+
+    return data;
+  };
 
 // ========================================
 // DEFAULT EXPORT
@@ -314,4 +502,15 @@ export default {
   activateAdminMember,
   restoreAdminMember,
   resetAdminMemberPassword,
+
+  // SUPERADMIN ADMIN MANAGEMENT
+  getSuperAdminAdmins,
+  getSuperAdminAdmin,
+  createSuperAdminAdmin,
+  updateSuperAdminAdmin,
+  suspendSuperAdminAdmin,
+  activateSuperAdminAdmin,
+  resetSuperAdminAdminPassword,
+  deleteSuperAdminAdmin,
+  getSuperAdminAdminStatistics,
 };

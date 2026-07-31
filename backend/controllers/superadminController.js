@@ -2,10 +2,10 @@ const bcrypt = require("bcryptjs");
 
 const Admin = require("../models/Admin");
 
-// ==========================================
+// ======================================================
 // CREATE ADMIN
 // SUPERADMIN ONLY
-// ==========================================
+// ======================================================
 
 exports.createAdmin = async (req, res) => {
   try {
@@ -21,9 +21,9 @@ exports.createAdmin = async (req, res) => {
       fullName?.trim() ||
       name?.trim();
 
-    // --------------------------------------
+    // -----------------------------------------------
     // VALIDATION
-    // --------------------------------------
+    // -----------------------------------------------
 
     if (
       !adminName ||
@@ -38,12 +38,20 @@ exports.createAdmin = async (req, res) => {
       });
     }
 
+    if (password.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Password must contain at least 6 characters.",
+      });
+    }
+
     const normalizedEmail =
       email.trim().toLowerCase();
 
-    // --------------------------------------
+    // -----------------------------------------------
     // CHECK EXISTING ADMIN
-    // --------------------------------------
+    // -----------------------------------------------
 
     const existingAdmin =
       await Admin.findOne({
@@ -59,16 +67,16 @@ exports.createAdmin = async (req, res) => {
       });
     }
 
-    // --------------------------------------
-    // HASH PASSWORD
-    // --------------------------------------
-
-    const hashedPassword =
-      await bcrypt.hash(password, 12);
-
-    // --------------------------------------
+    // -----------------------------------------------
     // CREATE ADMIN
-    // --------------------------------------
+    // -----------------------------------------------
+    //
+    // IMPORTANT:
+    // Admin.js already hashes passwords
+    // using the pre("save") middleware.
+    //
+    // Therefore we DO NOT hash here.
+    //
 
     const admin = await Admin.create({
       name: adminName,
@@ -78,7 +86,7 @@ exports.createAdmin = async (req, res) => {
 
       phone: phone.trim(),
 
-      password: hashedPassword,
+      password,
 
       role: "admin",
 
@@ -87,9 +95,9 @@ exports.createAdmin = async (req, res) => {
       mustChangePassword: true,
     });
 
-    // --------------------------------------
-    // REMOVE PASSWORD
-    // --------------------------------------
+    // -----------------------------------------------
+    // REMOVE SENSITIVE DATA
+    // -----------------------------------------------
 
     const adminResponse =
       admin.toObject();
@@ -100,9 +108,9 @@ exports.createAdmin = async (req, res) => {
 
     delete adminResponse.resetPasswordExpires;
 
-    // --------------------------------------
+    // -----------------------------------------------
     // RESPONSE
-    // --------------------------------------
+    // -----------------------------------------------
 
     return res.status(201).json({
       success: true,
@@ -119,7 +127,10 @@ exports.createAdmin = async (req, res) => {
       error
     );
 
-    // Mongo duplicate key
+    // -----------------------------------------------
+    // DUPLICATE EMAIL
+    // -----------------------------------------------
+
     if (error.code === 11000) {
       return res.status(409).json({
         success: false,
@@ -136,3 +147,555 @@ exports.createAdmin = async (req, res) => {
     });
   }
 };
+
+
+// ======================================================
+// GET ALL ADMINS
+// ======================================================
+
+exports.getAdmins = async (req, res) => {
+  try {
+    const {
+      page = 1,
+      limit = 10,
+      search = "",
+    } = req.query;
+
+    const currentPage =
+      Math.max(Number(page), 1);
+
+    const currentLimit =
+      Math.max(Number(limit), 1);
+
+    const skip =
+      (currentPage - 1) *
+      currentLimit;
+
+    // -----------------------------------------------
+    // SEARCH
+    // -----------------------------------------------
+
+    const query = {};
+
+    if (search.trim()) {
+      const searchRegex =
+        new RegExp(
+          search.trim(),
+          "i"
+        );
+
+      query.$or = [
+        {
+          fullName: searchRegex,
+        },
+        {
+          name: searchRegex,
+        },
+        {
+          email: searchRegex,
+        },
+        {
+          phone: searchRegex,
+        },
+      ];
+    }
+
+    // -----------------------------------------------
+    // FETCH
+    // -----------------------------------------------
+
+    const [
+      admins,
+      total,
+    ] = await Promise.all([
+      Admin.find(query)
+        .select(
+          "-password -resetPasswordToken -resetPasswordExpires"
+        )
+        .sort({
+          createdAt: -1,
+        })
+        .skip(skip)
+        .limit(currentLimit),
+
+      Admin.countDocuments(query),
+    ]);
+
+    const totalPages =
+      Math.max(
+        Math.ceil(
+          total / currentLimit
+        ),
+        1
+      );
+
+    return res.json({
+      success: true,
+
+      admins,
+
+      total,
+
+      page: currentPage,
+
+      limit: currentLimit,
+
+      totalPages,
+    });
+
+  } catch (error) {
+    console.error(
+      "Get Admins Error:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message:
+        "Unable to load administrators.",
+    });
+  }
+};
+
+
+// ======================================================
+// GET SINGLE ADMIN
+// ======================================================
+
+exports.getAdmin = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const admin =
+      await Admin.findById(id).select(
+        "-password -resetPasswordToken -resetPasswordExpires"
+      );
+
+    if (!admin) {
+      return res.status(404).json({
+        success: false,
+        message:
+          "Administrator not found.",
+      });
+    }
+
+    return res.json({
+      success: true,
+      admin,
+    });
+
+  } catch (error) {
+    console.error(
+      "Get Admin Error:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message:
+        "Unable to load administrator.",
+    });
+  }
+};
+
+
+// ======================================================
+// UPDATE ADMIN
+// ======================================================
+
+exports.updateAdmin = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const {
+      fullName,
+      name,
+      email,
+      phone,
+      status,
+    } = req.body;
+
+    const admin =
+      await Admin.findById(id);
+
+    if (!admin) {
+      return res.status(404).json({
+        success: false,
+        message:
+          "Administrator not found.",
+      });
+    }
+
+    // -----------------------------------------------
+    // UPDATE NAME
+    // -----------------------------------------------
+
+    if (fullName?.trim()) {
+      admin.fullName =
+        fullName.trim();
+
+      admin.name =
+        fullName.trim();
+    } else if (name?.trim()) {
+      admin.name =
+        name.trim();
+
+      admin.fullName =
+        name.trim();
+    }
+
+    // -----------------------------------------------
+    // UPDATE EMAIL
+    // -----------------------------------------------
+
+    if (email?.trim()) {
+      const normalizedEmail =
+        email.trim().toLowerCase();
+
+      const existing =
+        await Admin.findOne({
+          email: normalizedEmail,
+          _id: {
+            $ne: id,
+          },
+        });
+
+      if (existing) {
+        return res.status(409).json({
+          success: false,
+          message:
+            "Another administrator already uses this email.",
+        });
+      }
+
+      admin.email =
+        normalizedEmail;
+    }
+
+    // -----------------------------------------------
+    // UPDATE PHONE
+    // -----------------------------------------------
+
+    if (phone !== undefined) {
+      admin.phone =
+        phone.trim();
+    }
+
+    // -----------------------------------------------
+    // UPDATE STATUS
+    // -----------------------------------------------
+
+    if (
+      ["active", "inactive", "suspended"]
+        .includes(status)
+    ) {
+      admin.status = status;
+    }
+
+    await admin.save();
+
+    const response =
+      admin.toObject();
+
+    delete response.password;
+
+    delete response.resetPasswordToken;
+
+    delete response.resetPasswordExpires;
+
+    return res.json({
+      success: true,
+
+      message:
+        "Administrator updated successfully.",
+
+      admin: response,
+    });
+
+  } catch (error) {
+    console.error(
+      "Update Admin Error:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message:
+        "Unable to update administrator.",
+    });
+  }
+};
+
+
+// ======================================================
+// SUSPEND ADMIN
+// ======================================================
+
+exports.suspendAdmin = async (
+  req,
+  res
+) => {
+  try {
+    const { id } = req.params;
+
+    const admin =
+      await Admin.findById(id);
+
+    if (!admin) {
+      return res.status(404).json({
+        success: false,
+        message:
+          "Administrator not found.",
+      });
+    }
+
+    admin.status =
+      "suspended";
+
+    await admin.save();
+
+    return res.json({
+      success: true,
+
+      message:
+        "Administrator suspended successfully.",
+    });
+
+  } catch (error) {
+    console.error(
+      "Suspend Admin Error:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message:
+        "Unable to suspend administrator.",
+    });
+  }
+};
+
+
+// ======================================================
+// ACTIVATE ADMIN
+// ======================================================
+
+exports.activateAdmin = async (
+  req,
+  res
+) => {
+  try {
+    const { id } = req.params;
+
+    const admin =
+      await Admin.findById(id);
+
+    if (!admin) {
+      return res.status(404).json({
+        success: false,
+        message:
+          "Administrator not found.",
+      });
+    }
+
+    admin.status =
+      "active";
+
+    await admin.save();
+
+    return res.json({
+      success: true,
+
+      message:
+        "Administrator activated successfully.",
+    });
+
+  } catch (error) {
+    console.error(
+      "Activate Admin Error:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message:
+        "Unable to activate administrator.",
+    });
+  }
+};
+
+
+// ======================================================
+// RESET ADMIN PASSWORD
+// ======================================================
+
+exports.resetAdminPassword =
+  async (req, res) => {
+    try {
+      const { id } =
+        req.params;
+
+      const admin =
+        await Admin.findById(id);
+
+      if (!admin) {
+        return res.status(404).json({
+          success: false,
+          message:
+            "Administrator not found.",
+        });
+      }
+
+      // ---------------------------------------------
+      // GENERATE TEMPORARY PASSWORD
+      // ---------------------------------------------
+
+      const temporaryPassword =
+        `MIDAX@${Math.floor(
+          100000 +
+            Math.random() *
+              900000
+        )}`;
+
+      admin.password =
+        temporaryPassword;
+
+      admin.mustChangePassword =
+        true;
+
+      admin.passwordChangedAt =
+        null;
+
+      admin.resetPasswordToken =
+        null;
+
+      admin.resetPasswordExpires =
+        null;
+
+      await admin.save();
+
+      return res.json({
+        success: true,
+
+        message:
+          "Administrator password reset successfully.",
+
+        temporaryPassword,
+      });
+
+    } catch (error) {
+      console.error(
+        "Reset Admin Password Error:",
+        error
+      );
+
+      return res.status(500).json({
+        success: false,
+        message:
+          "Unable to reset administrator password.",
+      });
+    }
+  };
+
+
+// ======================================================
+// DELETE ADMIN
+// ======================================================
+
+exports.deleteAdmin = async (
+  req,
+  res
+) => {
+  try {
+    const { id } =
+      req.params;
+
+    const admin =
+      await Admin.findById(id);
+
+    if (!admin) {
+      return res.status(404).json({
+        success: false,
+        message:
+          "Administrator not found.",
+      });
+    }
+
+    await Admin.findByIdAndDelete(
+      id
+    );
+
+    return res.json({
+      success: true,
+
+      message:
+        "Administrator removed successfully.",
+    });
+
+  } catch (error) {
+    console.error(
+      "Delete Admin Error:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message:
+        "Unable to remove administrator.",
+    });
+  }
+};
+
+
+// ======================================================
+// ADMIN STATISTICS
+// ======================================================
+
+exports.getAdminStatistics =
+  async (req, res) => {
+    try {
+      const [
+        total,
+        active,
+        inactive,
+        suspended,
+      ] = await Promise.all([
+        Admin.countDocuments(),
+
+        Admin.countDocuments({
+          status: "active",
+        }),
+
+        Admin.countDocuments({
+          status: "inactive",
+        }),
+
+        Admin.countDocuments({
+          status: "suspended",
+        }),
+      ]);
+
+      return res.json({
+        success: true,
+
+        statistics: {
+          total,
+          active,
+          inactive,
+          suspended,
+        },
+      });
+
+    } catch (error) {
+      console.error(
+        "Admin Statistics Error:",
+        error
+      );
+
+      return res.status(500).json({
+        success: false,
+        message:
+          "Unable to load administrator statistics.",
+      });
+    }
+  };
