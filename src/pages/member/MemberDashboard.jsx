@@ -1,139 +1,382 @@
 import DashboardLayout from "../../layouts/DashboardLayout";
-import ProfileHeader from "../../components/member/ProfileHeader";
-import RecentChats from "../../components/member/RecentChats";
-import MemberStats from "../../components/member/MemberStats";
-import CommunityFeed from "../../components/member/CommunityFeed";
-import NotificationCenter from "../../components/member/NotificationCenter";
-import MembershipCard from "../../components/member/MembershipCard";
-import AnnouncementsCard from "../../components/member/AnnouncementsCard";
-import ContributionHistory from "../../components/member/ContributionHistory";
-import QuickActions from "../../components/member/QuickActions";
-import ContributionSummary from "../../components/member/ContributionSummary";
-import useMemberDashboard from "../../hooks/useMemberDashboard";
+
+import ProfileHeader
+  from "../../components/member/ProfileHeader";
+
+import MemberStats
+  from "../../components/member/MemberStats";
+
+import MembershipCard
+  from "../../components/member/MembershipCard";
+
+import AnnouncementsCard
+  from "../../components/member/AnnouncementsCard";
+
+import ContributionSummary
+  from "../../components/member/ContributionSummary";
+
+import QuickActions
+  from "../../components/member/QuickActions";
+
+import useMemberDashboard
+  from "../../hooks/useMemberDashboard";
 
 import "./MemberDashboard.css";
 
 function MemberDashboard() {
-
   const {
     member,
     statistics,
+    benefits,
+    announcements,
+    recentContributions,
+    profileCompletion,
     loading,
     error,
+    refreshDashboard,
   } = useMemberDashboard();
+
+  // =====================================
+  // LOADING
+  // =====================================
 
   if (loading) {
     return (
       <DashboardLayout>
-        <div className="dashboard-loading">
-          Loading Dashboard...
+        <div className="member-dashboard-loading">
+
+          <div className="loading-spinner"></div>
+
+          <h3>
+            Loading your dashboard...
+          </h3>
+
+          <p>
+            Please wait while we retrieve
+            your membership information.
+          </p>
+
         </div>
       </DashboardLayout>
     );
   }
+
+  // =====================================
+  // ERROR
+  // =====================================
 
   if (error) {
     return (
       <DashboardLayout>
-        <div className="dashboard-error">
-          {error}
+        <div className="member-dashboard-error">
+
+          <div className="error-icon">
+            !
+          </div>
+
+          <h2>
+            Unable to load dashboard
+          </h2>
+
+          <p>
+            {error}
+          </p>
+
+          <button
+            type="button"
+            onClick={refreshDashboard}
+          >
+            Try Again
+          </button>
+
         </div>
       </DashboardLayout>
     );
   }
 
-return (
+  const firstName =
+    member?.fullName
+      ?.trim()
+      ?.split(" ")[0] ||
+    "Member";
 
-<DashboardLayout>
+  const status =
+    member?.status || "active";
 
-<div className="member-dashboard">
+  const statusLabel =
+    status.charAt(0).toUpperCase() +
+    status.slice(1);
 
-<section className="member-hero">
+  const completion =
+    profileCompletion?.percentage ??
+    member?.profileCompletion ??
+    0;
 
-<div>
+  return (
+    <DashboardLayout>
 
-<h1>
+      <div className="member-dashboard">
 
-Welcome back,
+        {/* =================================
+            WELCOME
+        ================================= */}
 
-{" "}
+        <section className="member-welcome">
 
-<span>
+          <div className="welcome-content">
 
-{member?.fullName || "Member"}
+            <span className="welcome-label">
+              MEMBER PORTAL
+            </span>
 
-</span>
+            <h1>
+              Welcome back,{" "}
+              <span>
+                {firstName}
+              </span>
+              {" "}👋
+            </h1>
 
-👋
+            <p>
+              Stay connected with your
+              Benevolent Midax family.
+              Manage your membership,
+              contributions and benefits
+              from one place.
+            </p>
 
-</h1>
+          </div>
 
-<p>
+          <div className="welcome-status">
 
-Stay connected with your Benevolent Midax family.
+            <span
+              className={`status-dot ${status}`}
+            ></span>
 
-Receive announcements, messages,
+            <div>
+              <small>
+                Account Status
+              </small>
 
-claim updates and contribution reports
+              <strong>
+                {statusLabel}
+              </strong>
+            </div>
 
-in one place.
+          </div>
 
-</p>
+        </section>
 
-</div>
+        {/* =================================
+            PROFILE COMPLETION
+        ================================= */}
 
-<div className="status-pill">
+        {completion < 100 && (
+          <section className="profile-completion-card">
 
-🟢
+            <div className="completion-icon">
+              ✓
+            </div>
 
-{statistics?.activeStatus || "Active"}
+            <div className="completion-content">
 
-</div>
+              <div className="completion-heading">
 
-</section>
+                <div>
+                  <h3>
+                    Complete your profile
+                  </h3>
 
-<ProfileHeader
+                  <p>
+                    Complete your membership
+                    information to unlock all
+                    available benefits.
+                  </p>
+                </div>
 
-member={member}
+                <strong>
+                  {completion}%
+                </strong>
 
-/>
+              </div>
 
-<ContributionSummary
+              <div className="completion-track">
 
-statistics={statistics}
+                <div
+                  className="completion-progress"
+                  style={{
+                    width: `${completion}%`,
+                  }}
+                />
 
-/>
+              </div>
 
-<MemberStats
+            </div>
 
-statistics={statistics}
+          </section>
+        )}
 
-/>
+        {/* =================================
+            PROFILE HEADER
+        ================================= */}
 
-<div className="member-grid">
+        <ProfileHeader
+          member={member}
+        />
 
-<MembershipCard />
+        {/* =================================
+            MEMBER STATISTICS
+        ================================= */}
 
-<AnnouncementsCard />
+        <MemberStats
+          statistics={statistics}
+        />
 
-</div>
+        {/* =================================
+            CONTRIBUTIONS
+        ================================= */}
 
-<NotificationCenter />
+        <ContributionSummary
+          statistics={statistics}
+          recentContributions={
+            recentContributions
+          }
+        />
 
-<CommunityFeed />
+        {/* =================================
+            MEMBERSHIP + ANNOUNCEMENTS
+        ================================= */}
 
-<ContributionHistory />
+        <div className="member-dashboard-grid">
 
-<RecentChats />
+          <MembershipCard
+            member={member}
+          />
 
-<QuickActions />
+          <AnnouncementsCard
+            announcements={
+              announcements
+            }
+          />
 
-</div>
+        </div>
 
-</DashboardLayout>
+        {/* =================================
+            BENEFITS
+        ================================= */}
 
-);
+        <section className="benefits-section">
 
+          <div className="section-heading">
+
+            <div>
+              <span>
+                MEMBER BENEFITS
+              </span>
+
+              <h2>
+                Your benefit access
+              </h2>
+            </div>
+
+          </div>
+
+          <div className="benefits-grid">
+
+            <BenefitCard
+              title="Medical Support"
+              icon="🏥"
+              eligible={
+                benefits?.medicalSupport
+              }
+            />
+
+            <BenefitCard
+              title="Funeral Support"
+              icon="🕊️"
+              eligible={
+                benefits?.funeralSupport
+              }
+            />
+
+            <BenefitCard
+              title="Education Support"
+              icon="🎓"
+              eligible={
+                benefits?.educationSupport
+              }
+            />
+
+            <BenefitCard
+              title="Voting"
+              icon="🗳️"
+              eligible={
+                benefits?.voting
+              }
+            />
+
+          </div>
+
+        </section>
+
+        {/* =================================
+            QUICK ACTIONS
+        ================================= */}
+
+        <QuickActions />
+
+      </div>
+
+    </DashboardLayout>
+  );
+}
+
+// =========================================
+// BENEFIT CARD
+// =========================================
+
+function BenefitCard({
+  title,
+  icon,
+  eligible,
+}) {
+  return (
+    <div
+      className={`benefit-card ${
+        eligible
+          ? "eligible"
+          : "not-eligible"
+      }`}
+    >
+
+      <div className="benefit-icon">
+        {icon}
+      </div>
+
+      <div className="benefit-info">
+
+        <h3>
+          {title}
+        </h3>
+
+        <span>
+          {eligible
+            ? "Available"
+            : "Not currently available"}
+        </span>
+
+      </div>
+
+      <div className="benefit-status">
+
+        {eligible
+          ? "✓"
+          : "—"}
+
+      </div>
+
+    </div>
+  );
 }
 
 export default MemberDashboard;

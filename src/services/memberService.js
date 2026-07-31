@@ -1,108 +1,242 @@
 import API from "./api";
 
 // =======================================
-// DASHBOARD
+// MEMBER DASHBOARD
 // =======================================
 
 export const getMemberDashboard = async () => {
-  const { data } = await API.get("/member/dashboard");
+  const { data } = await API.get(
+    "/member/dashboard"
+  );
+
   return data;
 };
 
 // =======================================
-// PROFILE
+// MEMBER PROFILE
 // =======================================
 
 export const getMemberProfile = async () => {
-  const { data } = await API.get("/member/profile");
+  const { data } = await API.get(
+    "/member/profile"
+  );
+
   return data;
 };
 
-export const updateMemberProfile = async (profile) => {
+export const updateMemberProfile = async (
+  profile
+) => {
   const { data } = await API.put(
     "/member/profile",
     profile
   );
+
   return data;
 };
 
 // =======================================
-// SUMMARY
+// MEMBER SUMMARY
 // =======================================
 
 export const getMemberSummary = async () => {
-  const { data } = await API.get("/member/summary");
+  const { data } = await API.get(
+    "/member/summary"
+  );
+
   return data;
 };
+
+// =======================================
+// PROFILE STATUS
+// =======================================
+
+export const getMemberProfileStatus =
+  async () => {
+    const { data } = await API.get(
+      "/member/profile-status"
+    );
+
+    return data;
+  };
+
+// =======================================
+// BENEFIT ELIGIBILITY
+// =======================================
+
+export const getMemberEligibility =
+  async () => {
+    const { data } = await API.get(
+      "/member/eligibility"
+    );
+
+    return data;
+  };
 
 // =======================================
 // SETTINGS
 // =======================================
 
 export const getMemberSettings = async () => {
-  const { data } = await API.get("/member/settings");
-  return data;
-};
-
-export const updateMemberSettings = async (settings) => {
-  const { data } = await API.put(
-    "/member/settings",
-    settings
-  );
-  return data;
-};
-
-// =======================================
-// NOTIFICATIONS
-// =======================================
-
-export const getNotifications = async () => {
   const { data } = await API.get(
-    "/notifications"
+    "/member/settings"
   );
+
   return data;
 };
 
+export const updateMemberSettings =
+  async (settings) => {
+    const { data } = await API.put(
+      "/member/settings",
+      settings
+    );
+
+    return data;
+  };
+
 // =======================================
-// MESSAGES
+// CHANGE PASSWORD
 // =======================================
 
-export const getMessages = async () => {
-  const { data } = await API.get(
-    "/messages"
-  );
-  return data;
-};
+export const changeMemberPassword =
+  async ({
+    currentPassword,
+    newPassword,
+    confirmPassword,
+  }) => {
+    const { data } = await API.put(
+      "/member/change-password",
+      {
+        currentPassword,
+        newPassword,
+        confirmPassword,
+      }
+    );
+
+    return data;
+  };
 
 // =======================================
 // CONTRIBUTIONS
 // =======================================
 
-export const getContributions = async () => {
-  const { data } = await API.get(
-    "/member/contributions"
-  );
-  return data;
-};
+export const getMemberContributions =
+  async () => {
+    const { data } =
+      await API.get(
+        "/member/contributions"
+      );
+
+    return data;
+  };
+
 
 // =======================================
-// CLAIMS
+// MEMBER BENEFITS
 // =======================================
 
-export const getClaims = async () => {
-  const { data } = await API.get(
-    "/member/claims"
-  );
-  return data;
-};
+export const getMemberBenefits =
+  async () => {
+    const { data } =
+      await API.get(
+        "/member/benefits"
+      );
+
+    return data;
+  };
+
 
 // =======================================
-// ANNOUNCEMENTS
+// MEMBER ELIGIBILITY
 // =======================================
 
-export const getAnnouncements = async () => {
-  const { data } = await API.get(
-    "/announcements"
-  );
-  return data;
-};
+export const getMemberEligibilityDetails =
+  async () => {
+    const { data } =
+      await API.get(
+        "/member/eligibility"
+      );
+
+    return data;
+  };
+
+
+// =======================================
+// MEMBER CLAIMS / SUPPORT REQUESTS
+// =======================================
+
+export const getMemberClaims =
+  async () => {
+    const { data } =
+      await API.get(
+        "/member/claims"
+      );
+
+    return data;
+  };
+
+
+// =======================================
+// CREATE SUPPORT REQUEST
+// =======================================
+
+export const createMemberClaim =
+  async (claim) => {
+    const { data } =
+      await API.post(
+        "/member/claims",
+        claim
+      );
+
+    return data;
+  };
+
+
+// =======================================
+// MEMBER NEWS
+// =======================================
+
+export const getMemberNews =
+  async () => {
+    const { data } =
+      await API.get(
+        "/news"
+      );
+
+    return data;
+  };
+
+
+// =======================================
+// POLLS
+// =======================================
+
+export const getMemberPolls =
+  async () => {
+    const { data } =
+      await API.get(
+        "/poll"
+      );
+
+    return data;
+  };
+
+
+// =======================================
+// VOTE
+// =======================================
+
+export const voteInPoll =
+  async (pollId, optionId) => {
+    const { data } =
+      await API.post(
+        "/vote",
+        {
+          pollId,
+          optionId,
+        }
+      );
+
+    return data;
+  };

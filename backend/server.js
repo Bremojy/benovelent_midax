@@ -4,6 +4,8 @@ const cors = require("cors");
 const mongoose = require("mongoose");
 const path = require("path");
 const medicalSupportRoutes = require("./routes/medicalSupportRoutes");
+const superadminRoutes =
+  require("./routes/superadminRoutes");
 
 require("dotenv").config();
 
@@ -94,6 +96,7 @@ app.use(
     "/api/dependents",
     dependentRoutes
 );
+
 app.use(
     "/api/audit-logs",
     auditLogRoutes
@@ -106,6 +109,10 @@ app.use(
     funeralSupportRoutes
 );
 app.use("/api/admin", adminRoutes);
+app.use(
+  "/api/superadmin",
+  superadminRoutes
+);
 app.use("/api/member", memberRoutes);
 app.use("/api/leaders", leaderRoutes);
 app.use("/api/carousel", carouselRoutes);

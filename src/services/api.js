@@ -15,104 +15,162 @@ const BASE_URL =
 const API = axios.create({
   baseURL: `${BASE_URL}/api`,
   timeout: 15000,
+
   headers: {
     "Content-Type": "application/json",
   },
 });
 
 // ========================================
+// GET AUTH TOKEN
+// ========================================
+
+const getToken = () => {
+  const user = JSON.parse(
+    localStorage.getItem("user") || "null"
+  );
+
+  const role = (
+    user?.role || ""
+  ).toLowerCase();
+
+  // Prefer the token belonging
+  // to the currently logged-in role.
+
+  if (role === "superadmin") {
+    return localStorage.getItem(
+      "superAdminToken"
+    );
+  }
+
+  if (role === "admin") {
+    return localStorage.getItem(
+      "adminToken"
+    );
+  }
+
+  if (role === "member") {
+    return localStorage.getItem(
+      "memberToken"
+    );
+  }
+
+  // Fallback for older sessions
+  // where the user object may not exist.
+
+  return (
+    localStorage.getItem(
+      "superAdminToken"
+    ) ||
+    localStorage.getItem(
+      "adminToken"
+    ) ||
+    localStorage.getItem(
+      "memberToken"
+    )
+  );
+};
+
+// ========================================
 // REQUEST INTERCEPTOR
 // ========================================
 
 API.interceptors.request.use(
-
   (config) => {
-
-    const memberToken =
-      localStorage.getItem("memberToken");
-
-    const adminToken =
-      localStorage.getItem("adminToken");
-
-    const superAdminToken =
-      localStorage.getItem("superAdminToken");
-
-    const token =
-      superAdminToken ||
-      adminToken ||
-      memberToken;
+    const token = getToken();
 
     if (token) {
+      config.headers =
+        config.headers || {};
+
       config.headers.Authorization =
         `Bearer ${token}`;
     }
 
     return config;
-
   },
 
-  (error) => Promise.reject(error)
-
+  (error) =>
+    Promise.reject(error)
 );
+
+// ========================================
+// CLEAR AUTH SESSION
+// ========================================
+
+export const clearAuthSession = () => {
+  localStorage.removeItem(
+    "memberToken"
+  );
+
+  localStorage.removeItem(
+    "adminToken"
+  );
+
+  localStorage.removeItem(
+    "superAdminToken"
+  );
+
+  localStorage.removeItem(
+    "user"
+  );
+};
 
 // ========================================
 // RESPONSE INTERCEPTOR
 // ========================================
 
 API.interceptors.response.use(
-
-  (response) => response,
+  (response) =>
+    response,
 
   (error) => {
+    const status =
+      error.response?.status;
+
+    const code =
+      error.response?.data?.code;
 
     console.error(
       "API Error:",
       error.response?.data ||
-      error.message
+        error.message
     );
 
-    if (error.response?.status === 401) {
+    // ======================================
+    // AUTHENTICATION FAILURE
+    // ======================================
 
-      localStorage.removeItem("memberToken");
-      localStorage.removeItem("adminToken");
-      localStorage.removeItem("superAdminToken");
-      localStorage.removeItem("user");
+    if (
+      status === 401 &&
+      [
+        "TOKEN_EXPIRED",
+        "TOKEN_INVALID",
+        "TOKEN_MISSING",
+        "USER_NOT_FOUND",
+        "AUTH_FAILED",
+      ].includes(code)
+    ) {
+      clearAuthSession();
 
       if (
-        window.location.pathname !== "/login"
+        window.location.pathname !==
+        "/login"
       ) {
-        window.location.href = "/login";
+        window.location.href =
+          "/login";
       }
-
-    }
-
-    if (error.response?.status === 403) {
-
-      console.warn(
-        "Permission denied."
-      );
-
-    }
-
-    if (error.response?.status === 500) {
-
-      console.error(
-        "Server error."
-      );
-
     }
 
     return Promise.reject(error);
-
   }
-
 );
 
 // ========================================
-// EXPORTS
+// EXPORT
 // ========================================
 
 export default API;
 
-// Used by uploaded images
-export const UPLOAD_URL = BASE_URL;
+export const UPLOAD_URL =
+  BASE_URL;

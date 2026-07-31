@@ -6,75 +6,159 @@ import {
   useLocation,
 } from "react-router-dom";
 
-import { lazy, Suspense } from "react";
+import {
+  lazy,
+  Suspense,
+} from "react";
 
 import ScrollToTop from "./components/ScrollToTop";
 
-// ========================================
-// LAZY LOADED PAGES
-// ========================================
-
-const Home = lazy(() => import("./pages/Home"));
-const About = lazy(() => import("./pages/About"));
-const Services = lazy(() => import("./pages/Services"));
-const Leaders = lazy(() => import("./pages/Leaders"));
-const Members = lazy(() => import("./pages/Members"));
-const News = lazy(() => import("./pages/News"));
-const Contact = lazy(() => import("./pages/Contact"));
-const Login = lazy(() => import("./pages/Login"));
-
-const AdminDashboard = lazy(() =>
-  import("./pages/admin/AdminDashboard")
-);
-
-const MemberDashboard = lazy(() =>
-  import("./pages/member/MemberDashboard")
-);
-
-const SuperAdminDashboard = lazy(() =>
-  import("./pages/superadmin/SuperAdminDashboard")
-);
-
-const Notifications = lazy(() =>
-  import("./pages/member/Notifications")
-);
-
-const Messages = lazy(() =>
-  import("./pages/member/Messages")
-);
-
-const Profile = lazy(() =>
-  import("./pages/member/Profile")
-);
-
-const Contributions = lazy(() =>
-  import("./pages/member/Contributions")
-);
-
-const Claims = lazy(() =>
-  import("./pages/member/Claims")
-);
-
-const Announcements = lazy(() =>
-  import("./pages/member/Announcements")
-);
-
-const Settings = lazy(() =>
-  import("./pages/member/Settings")
-);
-
-// ========================================
-// COMPONENTS
-// ========================================
+import ProtectedRoute from "./components/auth/ProtectedRoute";
+import PublicOnlyRoute from "./components/auth/PublicOnlyRoute";
 
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 
+import "./App.css";
+
 // ========================================
-// GLOBAL CSS
+// PUBLIC PAGES
 // ========================================
 
-import "./App.css";
+const Home = lazy(
+  () => import("./pages/Home")
+);
+
+const About = lazy(
+  () => import("./pages/About")
+);
+
+const Services = lazy(
+  () => import("./pages/Services")
+);
+
+const Leaders = lazy(
+  () => import("./pages/Leaders")
+);
+
+const Members = lazy(
+  () => import("./pages/Members")
+);
+
+const News = lazy(
+  () => import("./pages/News")
+);
+
+const Contact = lazy(
+  () => import("./pages/Contact")
+);
+
+const Login = lazy(
+  () => import("./pages/Login")
+);
+
+// ========================================
+// ADMIN PAGES
+// ========================================
+
+const AdminDashboard = lazy(
+  () =>
+    import(
+      "./pages/admin/AdminDashboard"
+    )
+);
+
+const AdminMembers = lazy(
+  () =>
+    import(
+      "./pages/admin/AdminMembers"
+    )
+);
+
+// ========================================
+// MEMBER PAGES
+// ========================================
+
+const MemberDashboard = lazy(
+  () =>
+    import(
+      "./pages/member/MemberDashboard"
+    )
+);
+
+const Notifications = lazy(
+  () =>
+    import(
+      "./pages/member/Notifications"
+    )
+);
+
+const Messages = lazy(
+  () =>
+    import(
+      "./pages/member/Messages"
+    )
+);
+
+const Profile = lazy(
+  () =>
+    import(
+      "./pages/member/Profile"
+    )
+);
+
+const Contributions = lazy(
+  () =>
+    import(
+      "./pages/member/Contributions"
+    )
+);
+
+const Claims = lazy(
+  () =>
+    import(
+      "./pages/member/Claims"
+    )
+);
+
+const Announcements = lazy(
+  () =>
+    import(
+      "./pages/member/Announcements"
+    )
+);
+
+const Support = lazy(
+  () =>
+    import(
+      "./pages/member/Support"
+    )
+);
+
+const Benefits = lazy(
+  () =>
+    import(
+      "./pages/member/Benefits"
+    )
+);
+
+const Settings = lazy(
+  () =>
+    import(
+      "./pages/member/Settings"
+    )
+);
+
+// ========================================
+// SUPERADMIN PAGES
+// ========================================
+
+const SuperAdminDashboard = lazy(
+  () =>
+    import(
+      "./pages/superadmin/SuperAdminDashboard"
+    )
+);
 
 // ========================================
 // LOADING SCREEN
@@ -84,7 +168,7 @@ function LoadingScreen() {
   return (
     <div
       style={{
-        height: "100vh",
+        minHeight: "100vh",
         display: "flex",
         justifyContent: "center",
         alignItems: "center",
@@ -100,198 +184,284 @@ function LoadingScreen() {
 }
 
 // ========================================
-// PROTECTED ROUTES
-// ========================================
-
-function ProtectedAdmin({ children }) {
-  const token = localStorage.getItem("adminToken");
-
-  if (!token) {
-    return <Navigate to="/login" replace />;
-  }
-
-  return children;
-}
-
-function ProtectedMember({ children }) {
-  const token = localStorage.getItem("memberToken");
-
-  if (!token) {
-    return <Navigate to="/login" replace />;
-  }
-
-  return children;
-}
-
-function ProtectedSuperAdmin({ children }) {
-  const token = localStorage.getItem("superAdminToken");
-
-  if (!token) {
-    return <Navigate to="/login" replace />;
-  }
-
-  return children;
-}
-
-// ========================================
 // PUBLIC NAVBAR
 // ========================================
 
 function PublicNavbar() {
   const location = useLocation();
 
-  const hideNavbar =
+  const dashboardRoute =
     location.pathname.startsWith("/admin") ||
     location.pathname.startsWith("/member") ||
-    location.pathname.startsWith("/superadmin") ||
+    location.pathname.startsWith("/superadmin");
+
+  const isLogin =
     location.pathname === "/login";
 
-  if (hideNavbar) return null;
+  if (dashboardRoute || isLogin) {
+    return null;
+  }
 
   return <Navbar />;
 }
 
 // ========================================
-// MAIN CONTENT
+// APP CONTENT
 // ========================================
 
 function AppContent() {
   const location = useLocation();
 
-  const hideFooter =
+  const dashboardRoute =
     location.pathname.startsWith("/admin") ||
     location.pathname.startsWith("/member") ||
-    location.pathname.startsWith("/superadmin") ||
+    location.pathname.startsWith("/superadmin");
+
+  const isLogin =
     location.pathname === "/login";
+
+  const hideFooter =
+    dashboardRoute || isLogin;
 
   return (
     <>
       <PublicNavbar />
 
-      <Suspense fallback={<LoadingScreen />}>
-
+      <Suspense
+        fallback={<LoadingScreen />}
+      >
         <Routes>
 
-  {/* ================= PUBLIC ================= */}
+          {/* ==================================
+              PUBLIC ROUTES
+          ================================== */}
 
-  <Route path="/" element={<Home />} />
-  <Route path="/about" element={<About />} />
-  <Route path="/services" element={<Services />} />
-  <Route path="/leaders" element={<Leaders />} />
-  <Route path="/members" element={<Members />} />
-  <Route path="/news" element={<News />} />
-  <Route path="/contact" element={<Contact />} />
-  <Route path="/login" element={<Login />} />
+          <Route
+            path="/"
+            element={<Home />}
+          />
 
-  {/* ================= ADMIN ================= */}
+          <Route
+            path="/about"
+            element={<About />}
+          />
 
-  <Route
-    path="/admin"
-    element={
-      <ProtectedAdmin>
-        <AdminDashboard />
-      </ProtectedAdmin>
-    }
-  />
+          <Route
+            path="/services"
+            element={<Services />}
+          />
 
-  {/* ================= MEMBER ================= */}
+          <Route
+            path="/leaders"
+            element={<Leaders />}
+          />
 
-  <Route
-    path="/member"
-    element={
-      <ProtectedMember>
-        <MemberDashboard />
-      </ProtectedMember>
-    }
-  />
+          <Route
+            path="/members"
+            element={<Members />}
+          />
 
-  <Route
-    path="/member/profile"
-    element={
-      <ProtectedMember>
-        <Profile />
-      </ProtectedMember>
-    }
-  />
+          <Route
+            path="/news"
+            element={<News />}
+          />
 
-  <Route
-    path="/member/contributions"
-    element={
-      <ProtectedMember>
-        <Contributions />
-      </ProtectedMember>
-    }
-  />
+          <Route
+            path="/contact"
+            element={<Contact />}
+          />
 
-  <Route
-    path="/member/claims"
-    element={
-      <ProtectedMember>
-        <Claims />
-      </ProtectedMember>
-    }
-  />
+          {/* ==================================
+              LOGIN
+          ================================== */}
 
-  <Route
-    path="/member/announcements"
-    element={
-      <ProtectedMember>
-        <Announcements />
-      </ProtectedMember>
-    }
-  />
+          <Route
+            path="/login"
+            element={
+              <PublicOnlyRoute>
+                <Login />
+              </PublicOnlyRoute>
+            }
+          />
 
-  <Route
-    path="/member/messages"
-    element={
-      <ProtectedMember>
-        <Messages />
-      </ProtectedMember>
-    }
-  />
+          {/* ==================================
+              ADMIN PORTAL
+          ================================== */}
 
-  <Route
-    path="/member/notifications"
-    element={
-      <ProtectedMember>
-        <Notifications />
-      </ProtectedMember>
-    }
-  />
+          <Route
+            path="/admin"
+            element={
+              <ProtectedRoute
+                allowedRoles={["admin"]}
+              >
+                <AdminDashboard />
+              </ProtectedRoute>
+            }
+          />
 
-  <Route
-    path="/member/settings"
-    element={
-      <ProtectedMember>
-        <Settings />
-      </ProtectedMember>
-    }
-  />
+          <Route
+            path="/admin/members"
+            element={
+              <ProtectedRoute
+                allowedRoles={[
+                  "admin",
+                  "superadmin",
+                ]}
+              >
+                <AdminMembers />
+              </ProtectedRoute>
+            }
+          />
 
-  {/* ================= SUPER ADMIN ================= */}
+          {/* ==================================
+              MEMBER PORTAL
+          ================================== */}
 
-  <Route
-    path="/superadmin"
-    element={
-      <ProtectedSuperAdmin>
-        <SuperAdminDashboard />
-      </ProtectedSuperAdmin>
-    }
-  />
+          <Route
+            path="/member"
+            element={
+              <ProtectedRoute
+                allowedRoles={["member"]}
+              >
+                <MemberDashboard />
+              </ProtectedRoute>
+            }
+          />
 
-  {/* ================= 404 ================= */}
+          <Route
+            path="/member/profile"
+            element={
+              <ProtectedRoute
+                allowedRoles={["member"]}
+              >
+                <Profile />
+              </ProtectedRoute>
+            }
+          />
 
-  <Route
-    path="*"
-    element={<Navigate to="/" replace />}
-  />
+          <Route
+            path="/member/contributions"
+            element={
+              <ProtectedRoute
+                allowedRoles={["member"]}
+              >
+                <Contributions />
+              </ProtectedRoute>
+            }
+          />
 
-</Routes>
+          <Route
+            path="/member/claims"
+            element={
+              <ProtectedRoute
+                allowedRoles={["member"]}
+              >
+                <Claims />
+              </ProtectedRoute>
+            }
+          />
 
+          <Route
+            path="/member/announcements"
+            element={
+              <ProtectedRoute
+                allowedRoles={["member"]}
+              >
+                <Announcements />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/member/messages"
+            element={
+              <ProtectedRoute
+                allowedRoles={["member"]}
+              >
+                <Messages />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/member/notifications"
+            element={
+              <ProtectedRoute
+                allowedRoles={["member"]}
+              >
+                <Notifications />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/member/settings"
+            element={
+              <ProtectedRoute
+                allowedRoles={["member"]}
+              >
+                <Settings />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/member/support"
+            element={
+              <ProtectedRoute
+                allowedRoles={["member"]}
+              >
+                <Support />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/member/benefits"
+            element={
+              <ProtectedRoute
+                allowedRoles={["member"]}
+              >
+                <Benefits />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* ==================================
+              SUPERADMIN PORTAL
+          ================================== */}
+
+          <Route
+            path="/superadmin"
+            element={
+              <ProtectedRoute
+                allowedRoles={[
+                  "superadmin",
+                ]}
+              >
+                <SuperAdminDashboard />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* ==================================
+              UNKNOWN ROUTE
+          ================================== */}
+
+          <Route
+            path="*"
+            element={
+              <Navigate
+                to="/"
+                replace
+              />
+            }
+          />
+
+        </Routes>
       </Suspense>
 
       {!hideFooter && <Footer />}
-
     </>
   );
 }

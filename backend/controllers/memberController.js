@@ -406,15 +406,58 @@ exports.updateProfile = async (req, res) => {
         }
 
         // Update only supplied fields
-        Object.keys(req.body).forEach(key => {
+        // ==========================================
+// ALLOWED MEMBER PROFILE FIELDS
+// ==========================================
 
-            if (req.body[key] !== undefined) {
+const allowedFields = [
+    "fullName",
+    "username",
+    "email",
+    "phone",
+    "bio",
 
-                member[key] = req.body[key];
+    // Personal
+    "nationalId",
+    "gender",
+    "dateOfBirth",
+    "maritalStatus",
 
-            }
+    // Address
+    "county",
+    "subCounty",
+    "ward",
+    "village",
+    "postalAddress",
 
-        });
+    // Employment
+    "occupation",
+    "employer",
+    "monthlyIncome",
+
+    // Next of kin
+    "nextOfKin",
+
+    // Payment
+    "mpesaNumber",
+    "bankName",
+    "bankBranch",
+    "accountNumber",
+
+    // Emergency
+    "emergencyContact",
+];
+
+allowedFields.forEach((field) => {
+
+    if (
+        req.body[field] !== undefined
+    ) {
+        member[field] =
+            req.body[field];
+    }
+
+});
 
         member.lastSeen = new Date();
 

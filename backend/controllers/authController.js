@@ -6,150 +6,343 @@ const Member = require("../models/Member");
 
 const generateToken = require("../utils/generateToken");
 
-// ==============================
-// LOGIN (Super Admin/Admin/Member)
-// ==============================
+// ==========================================
+// LOGIN
+// MEMBER / ADMIN / SUPERADMIN
+// ==========================================
 
 exports.login = async (req, res) => {
-    try {
-        const { email, password } = req.body;
+  try {
+    let { email, password } = req.body;
 
-        if (!email || !password) {
-            return res.status(400).json({
-                success: false,
-                message: "Email and password are required."
-            });
-        }
+    // --------------------------------------
+    // VALIDATION
+    // --------------------------------------
 
-        let user = null;
-
-        // Look for user in order
-        user = await SuperAdmin.findOne({ email });
-
-        if (!user) {
-            user = await Admin.findOne({ email });
-        }
-
-        if (!user) {
-            user = await Member.findOne({ email });
-        }
-
-        if (!user) {
-            return res.status(401).json({
-                success: false,
-                message: "Invalid email or password."
-            });
-        }
-
-        // Account active?
-        if (user.status && user.status !== "active") {
-            return res.status(403).json({
-                success: false,
-                message: "Your account has been deactivated."
-            });
-        }
-
-        // Compare password
-        const passwordMatch = await bcrypt.compare(
-            password,
-            user.password
-        );
-
-        if (!passwordMatch) {
-            return res.status(401).json({
-                success: false,
-                message: "Invalid email or password."
-            });
-        }
-
-        // Update last seen
-        user.lastSeen = new Date();
-
-        await user.save();
-
-        // Generate JWT
-        const token = generateToken(user);
-
-        return res.status(200).json({
-            success: true,
-            message: "Login successful",
-
-            token,
-
-            user: {
-                id: user._id,
-                fullName: user.fullName,
-                email: user.email,
-                role: user.role,
-                profilePhoto: user.profilePhoto,
-                lastSeen: user.lastSeen
-            }
-        });
-
-    } catch (error) {
-        console.error(error);
-
-        return res.status(500).json({
-            success: false,
-            message: "Server Error"
-        });
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: "Email and password are required.",
+      });
     }
+
+    email = email.trim().toLowerCase();
+
+    // --------------------------------------
+    // FIND ACCOUNT
+    // --------------------------------------
+
+    let user = null;
+    let accountType = null;
+
+    // SUPERADMIN
+    user = await SuperAdmin.findOne({ email });
+
+    if (user) {
+      accountType = "superadmin";
+    }
+
+    // ADMIN
+    if (!user) {
+      user = await Admin.findOne({ email });
+
+      if (user) {
+        accountType = "admin";
+      }
+    }
+
+    // MEMBER
+    if (!user) {
+      user = await Member.findOne({ email });
+
+      if (user) {
+        accountType = "member";
+      }
+    }
+
+    // --------------------------------------
+    // ACCOUNT NOT FOUND
+    // --------------------------------------
+
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid email or password.",
+        code: "INVALID_CREDENTIALS",
+      });
+    }
+
+    // --------------------------------------
+    // ENSURE ROLE IS CORRECT
+    // --------------------------------------
+
+    if (!user.role) {
+      user.role = accountType;
+    }
+
+    if (user.role !== accountType) {
+      return res.status(403).json({
+        success: false,
+        message: "Account role configuration is invalid.",
+        code: "ROLE_MISMATCH",
+      });
+    }
+
+    // --------------------------------------
+    // ACCOUNT STATUS
+    // --------------------------------------
+
+    if (
+      user.status &&
+      user.status !== "active"
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: "Your account is not active.",
+        code: "ACCOUNT_INACTIVE",
+        status: user.status,
+      });
+    }
+
+    // --------------------------------------
+    // ACCOUNT LOCK
+    // --------------------------------------
+
+    if (
+      user.accountLockedUntil &&
+      new Date(user.accountLockedUntil) > new Date()
+    ) {
+      return res.status(403).json({
+        success: false,
+        message:
+          "Your account is temporarily locked. Please try again later.",
+        code: "ACCOUNT_LOCKED",
+        lockedUntil: user.accountLockedUntil,
+      });
+    }
+
+    // --------------------------------------
+    // PASSWORD
+    // --------------------------------------
+
+    const passwordMatch = await bcrypt.compare(
+      password,
+      user.password
+    );
+
+    if (!passwordMatch) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid email or password.",
+        code: "INVALID_CREDENTIALS",
+      });
+    }
+
+    // --------------------------------------
+    // SUCCESSFUL LOGIN
+    // --------------------------------------
+
+    user.failedLoginAttempts = 0;
+    user.accountLockedUntil = null;
+    user.lastLogin = new Date();
+    user.lastSeen = new Date();
+
+    await user.save();
+
+    // --------------------------------------
+    // GENERATE TOKEN
+    // --------------------------------------
+
+    const token = generateToken(user);
+
+    // --------------------------------------
+    // NORMALIZED NAME
+    // --------------------------------------
+
+    const fullName =
+      user.fullName ||
+      user.name ||
+      "";
+
+    // --------------------------------------
+    // RESPONSE
+    // --------------------------------------
+
+    return res.status(200).json({
+      success: true,
+
+      message: "Login successful.",
+
+      token,
+
+      user: {
+        id: user._id,
+        fullName,
+        email: user.email,
+        role: user.role,
+
+        profileImage:
+          user.profileImage ||
+          user.profilePhoto ||
+          "",
+
+        memberNumber:
+          user.memberNumber || null,
+
+        phone:
+          user.phone || "",
+
+        status:
+          user.status || "active",
+
+        verified:
+          user.verified ?? false,
+
+        mustChangePassword:
+          user.mustChangePassword ?? false,
+
+        profileCompletion:
+          user.profileCompletion ?? null,
+
+        lastLogin:
+          user.lastLogin,
+
+        lastSeen:
+          user.lastSeen,
+      },
+    });
+
+  } catch (error) {
+    console.error(
+      "Login Error:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message: "Server Error.",
+    });
+  }
 };
 
-
-// ==============================
+// ==========================================
 // GET CURRENT USER
-// ==============================
+// ==========================================
 
 exports.getMe = async (req, res) => {
-
-    try {
-
-        return res.status(200).json({
-            success: true,
-            user: req.user
-        });
-
-    } catch (error) {
-
-        return res.status(500).json({
-            success: false,
-            message: error.message
-        });
-
+  try {
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: "Authentication required.",
+      });
     }
 
+    const user = req.user;
+
+    return res.status(200).json({
+      success: true,
+
+      user: {
+        id: user._id,
+
+        fullName:
+          user.fullName ||
+          user.name ||
+          "",
+
+        name:
+          user.name ||
+          user.fullName ||
+          "",
+
+        email:
+          user.email,
+
+        role:
+          user.role,
+
+        phone:
+          user.phone || "",
+
+        status:
+          user.status || "active",
+
+        profileImage:
+          user.profileImage ||
+          user.profilePhoto ||
+          "",
+
+        memberNumber:
+          user.memberNumber || null,
+
+        verified:
+          user.verified ?? false,
+
+        profileCompletion:
+          user.profileCompletion ?? null,
+
+        mustChangePassword:
+          user.mustChangePassword ?? false,
+
+        lastLogin:
+          user.lastLogin,
+
+        lastSeen:
+          user.lastSeen,
+
+        createdAt:
+          user.createdAt,
+      },
+    });
+
+  } catch (error) {
+    console.error(
+      "Get Me Error:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message: "Unable to retrieve current user.",
+    });
+  }
 };
 
-
-// ==============================
+// ==========================================
 // LOGOUT
-// ==============================
+// ==========================================
 
 exports.logout = async (req, res) => {
+  try {
+    if (req.user) {
+      req.user.lastSeen = new Date();
 
-    try {
+      if ("online" in req.user) {
+        req.user.online = false;
+      }
 
-        if (req.user) {
+      if ("socketId" in req.user) {
+        req.user.socketId = "";
+      }
 
-            req.user.lastSeen = new Date();
-
-            await req.user.save();
-
-        }
-
-        return res.status(200).json({
-            success: true,
-            message: "Logged out successfully"
-        });
-
-    } catch (error) {
-
-        return res.status(500).json({
-            success: false,
-            message: error.message
-        });
-
+      await req.user.save();
     }
 
+    return res.status(200).json({
+      success: true,
+      message: "Logged out successfully.",
+    });
+
+  } catch (error) {
+    console.error(
+      "Logout Error:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message: "Logout failed.",
+    });
+  }
 };

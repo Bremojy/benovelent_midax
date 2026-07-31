@@ -1,7 +1,16 @@
-import { LogOut, X } from "lucide-react";
-import { NavLink } from "react-router-dom";
+import {
+  LogOut,
+  X,
+} from "lucide-react";
 
-import { dashboardMenus } from "../../config/dashboardMenu";
+import {
+  NavLink,
+} from "react-router-dom";
+
+import {
+  dashboardMenus,
+} from "../../config/dashboardMenu";
+
 import "../../styles/sidebar.css";
 
 function DashboardSidebar({
@@ -9,13 +18,90 @@ function DashboardSidebar({
   sidebarOpen,
   setSidebarOpen,
 }) {
-  // Get the correct menu based on role
-  const menu = dashboardMenus[role] || dashboardMenus.member;
+  // ========================================
+  // GET MENU FOR CURRENT ROLE
+  // ========================================
+
+  const currentRole =
+    role || "member";
+
+  const menu =
+    dashboardMenus[currentRole] ||
+    dashboardMenus.member;
+
+
+  // ========================================
+  // LOGOUT
+  // ========================================
 
   const logout = () => {
-    localStorage.clear();
-    window.location.href = "/login";
+    // Remove only dashboard authentication
+    // data instead of unnecessarily affecting
+    // unrelated localStorage values.
+
+    localStorage.removeItem(
+      "memberToken"
+    );
+
+    localStorage.removeItem(
+      "adminToken"
+    );
+
+    localStorage.removeItem(
+      "superAdminToken"
+    );
+
+    localStorage.removeItem(
+      "token"
+    );
+
+    localStorage.removeItem(
+      "role"
+    );
+
+    localStorage.removeItem(
+      "user"
+    );
+
+    localStorage.removeItem(
+      "member"
+    );
+
+    // Close sidebar before redirecting
+    if (setSidebarOpen) {
+      setSidebarOpen(false);
+    }
+
+    window.location.href =
+      "/login";
   };
+
+
+  // ========================================
+  // CLOSE MOBILE SIDEBAR
+  // ========================================
+
+  const handleNavigation = () => {
+    if (
+      window.innerWidth <= 900 &&
+      setSidebarOpen
+    ) {
+      setSidebarOpen(false);
+    }
+  };
+
+
+  // ========================================
+  // ROLE LABEL
+  // ========================================
+
+  const roleLabel =
+    currentRole === "superadmin"
+      ? "Super Admin"
+      : currentRole === "admin"
+      ? "Administrator"
+      : "Member";
+
 
   return (
     <aside
@@ -24,46 +110,129 @@ function DashboardSidebar({
           ? "dashboard-sidebar open"
           : "dashboard-sidebar"
       }
+      aria-label="Dashboard navigation"
     >
+
+      {/* ====================================
+          SIDEBAR HEADER
+      ==================================== */}
+
       <div className="sidebar-header">
-        <h2>Benevolent Midax</h2>
+
+        <div className="sidebar-brand">
+
+          <h2>
+            Benevolent Midax
+          </h2>
+
+          <span className="sidebar-role">
+            {roleLabel}
+          </span>
+
+        </div>
+
+
+        {/* MOBILE CLOSE BUTTON */}
 
         <button
+          type="button"
           className="close-sidebar"
-          onClick={() => setSidebarOpen(false)}
+          onClick={() => {
+            if (setSidebarOpen) {
+              setSidebarOpen(false);
+            }
+          }}
+          aria-label="Close sidebar"
         >
           <X size={22} />
         </button>
+
       </div>
 
-      <nav className="sidebar-menu">
-        {menu.map((item) => {
-          const Icon = item.icon;
 
-          return (
-            <NavLink
-              key={item.title}
-              to={item.path}
-              className={({ isActive }) =>
-                isActive
-                  ? "sidebar-link active"
-                  : "sidebar-link"
-              }
-            >
-              <Icon size={20} />
-              <span>{item.title}</span>
-            </NavLink>
-          );
-        })}
+      {/* ====================================
+          NAVIGATION
+      ==================================== */}
+
+      <nav
+        className="sidebar-menu"
+        aria-label={`${roleLabel} navigation`}
+      >
+
+        {menu.length > 0 ? (
+
+          menu.map((item) => {
+
+            const Icon =
+              item.icon;
+
+            return (
+              <NavLink
+                key={`${item.title}-${item.path}`}
+                to={item.path}
+                onClick={
+                  handleNavigation
+                }
+                className={({
+                  isActive,
+                }) =>
+                  isActive
+                    ? "sidebar-link active"
+                    : "sidebar-link"
+                }
+              >
+
+                {Icon && (
+                  <Icon
+                    size={20}
+                    strokeWidth={2}
+                  />
+                )}
+
+                <span>
+                  {item.title}
+                </span>
+
+              </NavLink>
+            );
+          })
+
+        ) : (
+
+          <div className="sidebar-empty">
+            No menu items available.
+          </div>
+
+        )}
+
       </nav>
 
-      <button
-        className="logout-btn"
-        onClick={logout}
-      >
-        <LogOut size={20} />
-        <span>Logout</span>
-      </button>
+
+      {/* ====================================
+          LOGOUT
+      ==================================== */}
+
+      <div className="sidebar-footer">
+
+        <button
+          type="button"
+          className="logout-btn"
+          onClick={logout}
+        >
+
+          <LogOut
+            size={20}
+            strokeWidth={2}
+          />
+
+          <span>
+            Logout
+          </span>
+
+        </button>
+
+      </div>
+
     </aside>
   );
 }

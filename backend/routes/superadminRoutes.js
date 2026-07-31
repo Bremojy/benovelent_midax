@@ -2,19 +2,27 @@ const express = require("express");
 
 const router = express.Router();
 
-const { verifyToken: protect } = require("../middleware/authMiddleware");
-
-const authorize = require("../middleware/roleMiddleware");
+const {
+  verifyToken: protect,
+} = require("../middleware/authMiddleware");
 
 const {
-    createAdmin
+  isSuperAdmin,
+} = require("../middleware/roleMiddleware");
+
+const {
+  createAdmin,
 } = require("../controllers/superadminController");
 
+// ==========================================
+// SUPERADMIN
+// ==========================================
+
 router.post(
-    "/create-admin",
-    protect,
-    authorize("superadmin"),
-    createAdmin
+  "/create-admin",
+  protect,
+  isSuperAdmin,
+  createAdmin
 );
 
 module.exports = router;

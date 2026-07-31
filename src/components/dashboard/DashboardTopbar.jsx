@@ -6,6 +6,8 @@ import {
   Settings,
 } from "lucide-react";
 
+import { useNavigate } from "react-router-dom";
+
 import "../../styles/topbar.css";
 
 function DashboardTopbar({
@@ -14,6 +16,7 @@ function DashboardTopbar({
   setSidebarOpen,
   user,
 }) {
+  const navigate = useNavigate();
 
   const unreadMessages =
     user?.unreadMessages || 0;
@@ -21,28 +24,107 @@ function DashboardTopbar({
   const unreadNotifications =
     user?.unreadNotifications || 0;
 
-  const initials =
-    (
-      user?.fullName ||
-      user?.name ||
-      "Member"
-    )
-      .charAt(0)
-      .toUpperCase();
+  const normalizedRole =
+    (role || user?.role || "member").toLowerCase();
+
+  const initials = (
+    user?.fullName ||
+    user?.name ||
+    "Member"
+  )
+    .trim()
+    .charAt(0)
+    .toUpperCase();
+
+  // ========================================
+  // ROLE BASE PATH
+  // ========================================
+
+  const basePath =
+    normalizedRole === "superadmin"
+      ? "/superadmin"
+      : normalizedRole === "admin"
+      ? "/admin"
+      : "/member";
+
+  // ========================================
+  // NAVIGATION
+  // ========================================
+
+  const goToMessages = () => {
+    if (normalizedRole === "member") {
+      navigate("/member/messages");
+      return;
+    }
+
+    if (normalizedRole === "admin") {
+      navigate("/admin/messages");
+      return;
+    }
+
+    if (normalizedRole === "superadmin") {
+      navigate("/superadmin/messages");
+      return;
+    }
+
+    navigate(basePath);
+  };
+
+  const goToNotifications = () => {
+    if (normalizedRole === "member") {
+      navigate("/member/notifications");
+      return;
+    }
+
+    if (normalizedRole === "admin") {
+      navigate("/admin/notifications");
+      return;
+    }
+
+    if (normalizedRole === "superadmin") {
+      navigate("/superadmin/notifications");
+      return;
+    }
+
+    navigate(basePath);
+  };
+
+  const goToSettings = () => {
+    if (normalizedRole === "member") {
+      navigate("/member/settings");
+      return;
+    }
+
+    if (normalizedRole === "admin") {
+      navigate("/admin/settings");
+      return;
+    }
+
+    if (normalizedRole === "superadmin") {
+      navigate("/superadmin/settings");
+      return;
+    }
+
+    navigate(basePath);
+  };
+
+  // ========================================
+  // RENDER
+  // ========================================
 
   return (
-
     <header className="dashboard-topbar">
 
       {/* LEFT */}
-
       <div className="topbar-left">
 
         <button
+          type="button"
           className="menu-btn"
           onClick={() =>
             setSidebarOpen(!sidebarOpen)
           }
+          aria-label="Toggle sidebar"
         >
           <Menu size={23} />
         </button>
@@ -54,6 +136,7 @@ function DashboardTopbar({
           <input
             type="text"
             placeholder="Search members, news, claims..."
+            aria-label="Search"
           />
 
         </div>
@@ -61,46 +144,61 @@ function DashboardTopbar({
       </div>
 
       {/* RIGHT */}
-
       <div className="topbar-right">
 
-        <button className="icon-btn">
+        {/* MESSAGES */}
 
+        <button
+          type="button"
+          className="icon-btn"
+          onClick={goToMessages}
+          aria-label="Messages"
+          title="Messages"
+        >
           <MessageCircle size={20} />
 
           {unreadMessages > 0 && (
-
             <span className="badge">
-
-              {unreadMessages}
-
+              {unreadMessages > 99
+                ? "99+"
+                : unreadMessages}
             </span>
-
           )}
-
         </button>
 
-        <button className="icon-btn">
+        {/* NOTIFICATIONS */}
 
+        <button
+          type="button"
+          className="icon-btn"
+          onClick={goToNotifications}
+          aria-label="Notifications"
+          title="Notifications"
+        >
           <Bell size={20} />
 
           {unreadNotifications > 0 && (
-
             <span className="badge">
-
-              {unreadNotifications}
-
+              {unreadNotifications > 99
+                ? "99+"
+                : unreadNotifications}
             </span>
-
           )}
-
         </button>
 
-        <button className="icon-btn">
+        {/* SETTINGS */}
 
+        <button
+          type="button"
+          className="icon-btn"
+          onClick={goToSettings}
+          aria-label="Settings"
+          title="Settings"
+        >
           <Settings size={20} />
-
         </button>
+
+        {/* USER */}
 
         <div className="user-box">
 
@@ -109,9 +207,7 @@ function DashboardTopbar({
             {initials}
 
             {user?.online && (
-
-              <span className="online-dot"></span>
-
+              <span className="online-dot" />
             )}
 
           </div>
@@ -119,25 +215,17 @@ function DashboardTopbar({
           <div className="user-info">
 
             <h4>
-
-              {
-                user?.fullName ||
+              {user?.fullName ||
                 user?.name ||
-                "Member"
-              }
-
+                "Member"}
             </h4>
 
             <p>
-
-              {
-                role === "superadmin"
-                  ? "Super Administrator"
-                  : role === "admin"
-                  ? "Administrator"
-                  : "Verified Member"
-              }
-
+              {normalizedRole === "superadmin"
+                ? "Super Administrator"
+                : normalizedRole === "admin"
+                ? "Administrator"
+                : "Verified Member"}
             </p>
 
           </div>
@@ -147,9 +235,7 @@ function DashboardTopbar({
       </div>
 
     </header>
-
   );
-
 }
 
 export default DashboardTopbar;
