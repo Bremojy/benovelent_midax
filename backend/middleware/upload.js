@@ -1,118 +1,81 @@
-const multer = require("multer");
-const path = require("path");
-const fs = require("fs");
+const { upload } = require("../config/uploadConfig");
 
-// Create folder automatically
-const ensureDir = (folder) => {
-    if (!fs.existsSync(folder)) {
-        fs.mkdirSync(folder, { recursive: true });
-    }
+// ======================================================
+// SET UPLOAD TYPE
+// This middleware tells Multer which folder to use.
+// ======================================================
+
+const setUploadType = (type) => {
+  return (req, res, next) => {
+    req.uploadType = type;
+    next();
+  };
 };
 
-const storage = (folderName) =>
-    multer.diskStorage({
-        destination(req, file, cb) {
+// ======================================================
+// SINGLE FILE UPLOAD
+// ======================================================
 
-            const folder = path.join(
-                __dirname,
-                "..",
-                "uploads",
-                folderName
-            );
+const uploadSingle = (fieldName = "file") => {
+  return (req, res, next) => {
+    upload.single(fieldName)(req, res, (err) => {
+      if (err) {
+        return res.status(400).json({
+          success: false,
+          message: err.message,
+        });
+      }
 
-            ensureDir(folder);
-
-            cb(null, folder);
-        },
-
-        filename(req, file, cb) {
-
-            const ext = path.extname(file.originalname);
-
-            cb(
-                null,
-                Date.now() +
-                    "-" +
-                    Math.round(Math.random() * 1e9) +
-                    ext
-            );
-        },
+      next();
     });
-
-const imageFilter = (req, file, cb) => {
-
-    if (file.mimetype.startsWith("image/")) {
-
-        cb(null, true);
-
-    } else {
-
-        cb(new Error("Only image files allowed"), false);
-
-    }
-
+  };
 };
+
+// ======================================================
+// MULTIPLE FILES
+// ======================================================
+
+const uploadArray = (fieldName = "files", maxCount = 10) => {
+  return (req, res, next) => {
+    upload.array(fieldName, maxCount)(req, res, (err) => {
+      if (err) {
+        return res.status(400).json({
+          success: false,
+          message: err.message,
+        });
+      }
+
+      next();
+    });
+  };
+};
+
+// ======================================================
+// MULTIPLE NAMED FIELDS
+// ======================================================
+
+const uploadFields = (fields = []) => {
+  return (req, res, next) => {
+    upload.fields(fields)(req, res, (err) => {
+      if (err) {
+        return res.status(400).json({
+          success: false,
+          message: err.message,
+        });
+      }
+
+      next();
+    });
+  };
+};
+
+// ======================================================
+// EXPORTS
+// ======================================================
 
 module.exports = {
-
-    carouselUpload: multer({
-
-        storage: storage("carousel"),
-
-        fileFilter: imageFilter,
-
-    }),
-
-    leaderUpload: multer({
-
-        storage: storage("leaders"),
-
-        fileFilter: imageFilter,
-
-    }),
-
-    memberUpload: multer({
-
-        storage: storage("members"),
-
-        fileFilter: imageFilter,
-
-    }),
-
-    newsUpload: multer({
-
-        storage: storage("news"),
-
-        fileFilter: imageFilter,
-
-    }),
-
-    galleryUpload: multer({
-
-        storage: storage("gallery"),
-
-        fileFilter: imageFilter,
-
-    }),
-
-    profileUpload: multer({
-
-        storage: storage("profiles"),
-
-        fileFilter: imageFilter,
-
-    }),
-
-    receiptUpload: multer({
-
-        storage: storage("receipts"),
-
-    }),
-
-    documentUpload: multer({
-
-        storage: storage("documents"),
-
-    })
-
+  setUploadType,
+  uploadSingle,
+  uploadArray,
+  uploadFields,
 };

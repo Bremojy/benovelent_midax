@@ -56,11 +56,14 @@ const memberSchema = new mongoose.Schema(
       trim: true,
     },
 
-    email: {
-      type: String,
-      trim: true,
-      lowercase: true,
-    },
+    email:{
+type:String,
+trim:true,
+lowercase:true,
+unique:true,
+sparse:true,
+index:true,
+},
 
     department: {
       type: String,
@@ -126,8 +129,15 @@ const memberSchema = new mongoose.Schema(
 
     isDeleted: {
       type: Boolean,
+      deletedAt:Date,
       default: false,
+      
     },
+    deletedBy: {
+  type: mongoose.Schema.Types.ObjectId,
+  ref: "SuperAdmin",
+  default: null,
+},
 
     notes: {
       type: String,
@@ -141,6 +151,9 @@ const memberSchema = new mongoose.Schema(
 nationalId: {
   type: String,
   trim: true,
+  unique:true,
+
+sparse:true,
 },
 
 gender: {
@@ -228,6 +241,8 @@ nextOfKin: {
   phone: {
     type: String,
     trim: true,
+    unique:true,
+index:true,
   },
 
   nationalId: {
@@ -362,6 +377,30 @@ emergencyContact: {
   },
 },
 
+deletedAt: {
+  type: Date,
+  default: null,
+},
+
+deletedBy: {
+  type: mongoose.Schema.Types.ObjectId,
+  ref: "Admin",
+  default: null,
+},
+
+createdBy: {
+  type: mongoose.Schema.Types.ObjectId,
+  ref: "Admin",
+  default: null,
+},
+
+updatedBy: {
+  type: mongoose.Schema.Types.ObjectId,
+  ref: "Admin",
+  default: null,
+},
+
+
 
 
     // =====================================
@@ -473,6 +512,16 @@ memberSchema.index({ username: 1 });
 memberSchema.index({ memberNumber: 1 });
 memberSchema.index({ status: 1 });
 memberSchema.index({ online: 1 });
+
+memberSchema.set("toJSON", {
+  transform(doc, ret) {
+    delete ret.password;
+    delete ret.resetPasswordToken;
+    delete ret.failedLoginAttempts;
+    delete ret.__v;
+    return ret;
+  },
+});
 
 // =====================================
 

@@ -1,5 +1,7 @@
 const express = require("express");
-
+const {
+  uploadFields,
+} = require("../middleware/upload");
 const router = express.Router();
 
 // =======================================
@@ -51,6 +53,21 @@ router.get(
   isAdmin,
   getDashboard
 );
+
+router.post(
+  "/members",
+  protect,
+  isAdminOrSuperAdmin,
+  uploadFields([
+    { name: "profileImage", maxCount: 1 },
+    { name: "passportPhoto", maxCount: 1 },
+    { name: "nationalIdFront", maxCount: 1 },
+    { name: "nationalIdBack", maxCount: 1 },
+    { name: "signature", maxCount: 1 },
+  ]),
+  createMember
+);
+
 
 // =======================================
 // MEMBER STATISTICS

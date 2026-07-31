@@ -1021,7 +1021,7 @@ exports.getEligibility = async (req,res)=>{
 
         const eligible =
 
-            member.status==="active" &&
+            MEMBER_STATUS.ACTIVE &&
 
             member.verified &&
 
@@ -1042,7 +1042,7 @@ exports.getEligibility = async (req,res)=>{
                     member.verified,
 
                 activeMember:
-                    member.status==="active"
+                    MEMBER_STATUS.ACTIVE
 
             },
 

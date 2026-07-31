@@ -90,6 +90,64 @@ const adminSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    profileImage: {
+    type: String,
+    default: "",
+},
+
+createdBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "SuperAdmin",
+    default: null,
+},
+
+updatedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "SuperAdmin",
+    default: null,
+},
+
+deletedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "SuperAdmin",
+    default: null,
+},
+
+deletedAt: {
+    type: Date,
+    default: null,
+},
+online: {
+    type: Boolean,
+    default: false,
+},
+
+socketId: {
+    type: String,
+    default: "",
+},
+unreadNotifications: {
+    type: Number,
+    default: 0,
+},
+
+unreadMessages: {
+    type: Number,
+    default: 0,
+},
+permissions: [{
+    type: String,
+}],
+
+lastLoginIP: {
+    type: String,
+    default: "",
+},
+
+lastDevice: {
+    type: String,
+    default: "",
+},
 
     // =====================================
     // ACTIVITY
@@ -121,6 +179,20 @@ adminSchema.methods.matchPassword =
       this.password
     );
   };
+
+
+adminSchema.index({ email: 1 });
+adminSchema.index({ status: 1 });
+adminSchema.index({ lastLogin: -1 });
+adminSchema.set("toJSON", {
+    transform(doc, ret) {
+        delete ret.password;
+        delete ret.resetPasswordToken;
+        delete ret.failedLoginAttempts;
+        delete ret.__v;
+        return ret;
+    },
+});
 
 // =====================================
 // HASH PASSWORD

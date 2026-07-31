@@ -2,16 +2,54 @@ const express = require("express");
 
 const router = express.Router();
 
-const { verifyToken: protect } = require("../middleware/authMiddleware");
+// =====================================================
+// CONTROLLERS
+// =====================================================
+
 const authController = require("../controllers/authController");
 
-// Login (SuperAdmin/Admin/Member)
-router.post("/login", authController.login);
+// =====================================================
+// MIDDLEWARE
+// =====================================================
 
-// Logged in user
-router.get("/me", protect, authController.getMe);
+const {
+    verifyToken: protect,
+} = require("../middleware/authMiddleware");
 
-// Logout
-router.post("/logout", protect, authController.logout);
+// =====================================================
+// AUTH ROUTES
+// =====================================================
+
+/**
+ * @route   POST /api/auth/login
+ * @desc    Authenticate Member/Admin/SuperAdmin
+ * @access  Public
+ */
+router.post(
+    "/login",
+    authController.login
+);
+
+/**
+ * @route   GET /api/auth/me
+ * @desc    Get currently authenticated user
+ * @access  Private
+ */
+router.get(
+    "/me",
+    protect,
+    authController.getMe
+);
+
+/**
+ * @route   POST /api/auth/logout
+ * @desc    Logout current user
+ * @access  Private
+ */
+router.post(
+    "/logout",
+    protect,
+    authController.logout
+);
 
 module.exports = router;

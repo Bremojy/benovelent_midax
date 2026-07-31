@@ -3,158 +3,201 @@ const http = require("http");
 const cors = require("cors");
 const mongoose = require("mongoose");
 const path = require("path");
-const medicalSupportRoutes = require("./routes/medicalSupportRoutes");
-const superadminRoutes =
-  require("./routes/superadminRoutes");
 
 require("dotenv").config();
 
-// ===============================
-// SOCKET
-// ===============================
-const { initSocket } = require("./sockets/socket");
+// ===============================================
+// APP
+// ===============================================
 
-// ===============================
+const app = express();
+const server = http.createServer(app);
+
+// ===============================================
+// SOCKET
+// ===============================================
+
+const { initSocket } = require("./sockets/socket");
+initSocket(server);
+
+// ===============================================
+// ERROR MIDDLEWARE
+// ===============================================
+
+const {
+    notFound,
+    errorHandler,
+} = require("./middleware/errorMiddleware");
+
+// ===============================================
 // ROUTES
-// ===============================
-const dependentRoutes =
-require("./routes/dependentRoutes");
+// ===============================================
+
 const authRoutes = require("./routes/authRoutes");
 const adminRoutes = require("./routes/adminRoutes");
+const superadminRoutes = require("./routes/superadminRoutes");
 const memberRoutes = require("./routes/memberRoutes");
+
 const leaderRoutes = require("./routes/leaderRoutes");
 const carouselRoutes = require("./routes/carouselRoutes");
 const websiteRoutes = require("./routes/websiteRoutes");
 const newsRoutes = require("./routes/newsRoutes");
-const pollRoutes = require("./routes/pollRoutes");
-const voteRoutes = require("./routes/voteRoutes");
+
 const financeRoutes = require("./routes/financeRoutes");
 const contributionRoutes = require("./routes/contributionRoutes");
+
+const medicalSupportRoutes = require("./routes/medicalSupportRoutes");
+const funeralSupportRoutes = require("./routes/funeralSupportRoutes");
+const educationSupportRoutes = require("./routes/educationSupportRoutes");
+
+const dependentRoutes = require("./routes/dependentRoutes");
+
+const pollRoutes = require("./routes/pollRoutes");
+const voteRoutes = require("./routes/voteRoutes");
+
 const conversationRoutes = require("./routes/conversationRoutes");
 const messageRoutes = require("./routes/messageRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
-const educationSupportRoutes =
-require("./routes/educationSupportRoutes");
-const auditLogRoutes =
-require("./routes/auditLogRoutes");
 
-const funeralSupportRoutes =
-require("./routes/funeralSupportRoutes");
+const auditLogRoutes = require("./routes/auditLogRoutes");
 
-// ===============================
-// APP
-// ===============================
-const app = express();
-const server = http.createServer(app);
-
-// ===============================
-// SOCKET INIT
-// ===============================
-initSocket(server);
-
-// ===============================
+// ===============================================
 // MIDDLEWARE
-// ===============================
+// ===============================================
+
 app.disable("x-powered-by");
 
 app.use(
-  cors({
-    origin: true,
-    credentials: true,
-  })
+    cors({
+        origin: true,
+        credentials: true,
+    })
 );
 
 app.use(express.json({ limit: "10mb" }));
-app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+app.use(express.urlencoded({
+    extended: true,
+    limit: "10mb",
+}));
 
-// ===============================
-// STATIC UPLOADS
-// ===============================
+// ===============================================
+// STATIC FILES
+// ===============================================
 
 app.use(
     "/uploads",
     express.static(path.join(__dirname, "uploads"))
 );
 
-// ===============================
-// ROOT
-// ===============================
+// ===============================================
+// ROOT ROUTE
+// ===============================================
 
 app.get("/", (req, res) => {
     res.status(200).json({
         success: true,
-        message: "Benevolent Midax API Running",
+        application: "Benevolent Midax API",
         version: "1.0.0",
+        status: "Running",
+        timestamp: new Date().toISOString(),
     });
 });
 
-
-// ===============================
+// ===============================================
 // API ROUTES
-// ===============================
-app.use(
-    "/api/dependents",
-    dependentRoutes
-);
+// ===============================================
 
-app.use(
-    "/api/audit-logs",
-    auditLogRoutes
-);
+// Authentication
+
+app.use("/api/auth", authRoutes);
+
+// Member
+
+app.use("/api/member", memberRoutes);
+app.use("/api/dependents", dependentRoutes);
+app.use("/api/contributions", contributionRoutes);
+
+// Support
 
 app.use("/api/medical", medicalSupportRoutes);
-app.use("/api/auth", authRoutes);
-app.use(
-    "/api/funeral",
-    funeralSupportRoutes
-);
-app.use("/api/admin", adminRoutes);
-app.use(
-  "/api/superadmin",
-  superadminRoutes
-);
-app.use("/api/member", memberRoutes);
-app.use("/api/leaders", leaderRoutes);
-app.use("/api/carousel", carouselRoutes);
-app.use("/api/website", websiteRoutes);
-app.use("/api/news", newsRoutes);
-app.use("/api/polls", pollRoutes);
-app.use("/api/votes", voteRoutes);
-app.use(
-  "/api/education",
-  educationSupportRoutes
-);
+app.use("/api/funeral", funeralSupportRoutes);
+app.use("/api/education", educationSupportRoutes);
+
+// Finance
+
 app.use("/api/finance", financeRoutes);
-app.use("/api/contributions", contributionRoutes);
+
+// Communication
+
 app.use("/api/conversations", conversationRoutes);
 app.use("/api/messages", messageRoutes);
 app.use("/api/notifications", notificationRoutes);
 
-// ===============================
-// 404
-// ===============================
-app.use((req, res) => {
-  res.status(404).json({
-    success: false,
-    message: "Route not found",
-  });
-});
+// News & Website
 
-// ===============================
+app.use("/api/news", newsRoutes);
+app.use("/api/leaders", leaderRoutes);
+app.use("/api/carousel", carouselRoutes);
+app.use("/api/website", websiteRoutes);
+
+// Polls
+
+app.use("/api/polls", pollRoutes);
+app.use("/api/votes", voteRoutes);
+
+// Administration
+
+app.use("/api/admin", adminRoutes);
+app.use("/api/superadmin", superadminRoutes);
+
+// Audit
+
+app.use("/api/audit-logs", auditLogRoutes);
+
+// ===============================================
+// NOT FOUND
+// ===============================================
+
+app.use(notFound);
+
+// ===============================================
+// GLOBAL ERROR HANDLER
+// ===============================================
+
+app.use(errorHandler);
+
+// ===============================================
 // DATABASE
-// ===============================
+// ===============================================
+
 mongoose
-  .connect(process.env.MONGO_URI)
-  .then(() => {
-    console.log("✅ MongoDB Connected");
+    .connect(process.env.MONGO_URI)
+    .then(() => {
 
-    const PORT = process.env.PORT || 5000;
+        console.log("======================================");
+        console.log("✅ MongoDB Connected");
+        console.log("======================================");
 
-    server.listen(PORT, "0.0.0.0", () => {
-      console.log(`🚀 Server running on port ${PORT}`);
-      console.log(`📁 Uploads available at http://localhost:${PORT}/uploads`);
+        const PORT = process.env.PORT || 5000;
+
+        server.listen(PORT, "0.0.0.0", () => {
+
+            console.log("======================================");
+            console.log(`🚀 Server Running`);
+            console.log(`🌍 Port          : ${PORT}`);
+            console.log(`📁 Upload Folder : /uploads`);
+            console.log(`🔌 Socket.IO     : Enabled`);
+            console.log(`🛡 Environment   : ${process.env.NODE_ENV || "development"}`);
+            console.log("======================================");
+
+        });
+
+    })
+    .catch((err) => {
+
+        console.error("======================================");
+        console.error("❌ MongoDB Connection Failed");
+        console.error(err.message);
+        console.error("======================================");
+
     });
-  })
-  .catch((err) => {
-    console.error("❌ MongoDB Connection Error:", err);
-  });

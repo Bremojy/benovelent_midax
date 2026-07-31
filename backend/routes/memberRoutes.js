@@ -1,4 +1,8 @@
 const express = require("express");
+const profileCompleted = require("../middleware/profileCompletionMiddleware");
+const {
+  uploadFields,
+} = require("../middleware/upload");
 const router = express.Router();
 const {
   getDashboard,
@@ -45,6 +49,19 @@ router.put(
   changePassword
 );
 
+router.put(
+    "/profile",
+    protect,
+    uploadFields([
+        { name: "profileImage", maxCount: 1 },
+        { name: "passportPhoto", maxCount: 1 },
+        { name: "nationalIdFront", maxCount: 1 },
+        { name: "nationalIdBack", maxCount: 1 },
+        { name: "signature", maxCount: 1 },
+    ]),
+    updateProfile
+);
+
 // Profile completion & benefit eligibility
 router.get(
   "/profile-status",
@@ -54,6 +71,7 @@ router.get(
 
 router.get(
     "/eligibility",
+    profileCompleted,
     protect,
     getEligibility
 );

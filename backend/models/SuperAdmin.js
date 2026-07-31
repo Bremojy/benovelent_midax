@@ -18,6 +18,49 @@ const superAdminSchema =
         trim: true,
         index: true,
       },
+profileImage:{
+type:String,
+default:"",
+},
+online:{
+type:Boolean,
+default:false,
+},
+
+socketId:{
+type:String,
+default:"",
+},
+unreadNotifications:{
+type:Number,
+default:0,
+},
+
+unreadMessages:{
+type:Number,
+default:0,
+},
+lastLoginIP:{
+type:String,
+default:"",
+},
+
+lastDevice:{
+type:String,
+default:"",
+},
+
+createdBy: {
+  type: mongoose.Schema.Types.ObjectId,
+  ref: "SuperAdmin",
+  default: null,
+},
+
+updatedBy: {
+  type: mongoose.Schema.Types.ObjectId,
+  ref: "SuperAdmin",
+  default: null,
+},
 
       password: {
         type: String,
@@ -104,6 +147,18 @@ const superAdminSchema =
 // =====================================
 // PASSWORD MATCH
 // =====================================
+superAdminSchema.set("toJSON", {
+  transform(doc, ret) {
+    delete ret.password;
+    delete ret.resetPasswordToken;
+    delete ret.failedLoginAttempts;
+    delete ret.__v;
+    return ret;
+  },
+});
+
+superAdminSchema.index({ status: 1 });
+superAdminSchema.index({ lastLogin: -1 });
 
 superAdminSchema.methods.matchPassword =
   async function (enteredPassword) {
