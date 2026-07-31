@@ -123,6 +123,7 @@ exports.getMember = async (req, res) => {
   }
 };
 
+
 /* =====================================================
    CREATE MEMBER
 ===================================================== */
@@ -140,62 +141,276 @@ exports.createMember = async (req, res) => {
       monthlyContribution,
     } = req.body;
 
-    if (!memberNumber || !fullName || !phone) {
+    // ==========================================
+    // CLEAN INPUT
+    // ==========================================
+
+    const cleanMemberNumber =
+      String(memberNumber || "").trim();
+
+    const cleanFullName =
+      String(fullName || "").trim();
+
+    const cleanUsername =
+      String(username || "").trim();
+
+    const cleanPhone =
+      String(phone || "").trim();
+
+    const cleanEmail =
+      String(email || "").trim().toLowerCase();
+
+    const cleanDepartment =
+      String(department || "").trim();
+
+    const cleanPosition =
+      String(position || "").trim();
+
+    const contribution =
+      Number(monthlyContribution) || 0;
+
+    // ==========================================
+    // REQUIRED FIELDS
+    // ==========================================
+
+    if (
+      !cleanMemberNumber ||
+      !cleanFullName ||
+      !cleanPhone
+    ) {
       return res.status(400).json({
         success: false,
-        message: "Member Number, Full Name and Phone are required.",
+        message:
+          "Member Number, Full Name and Phone are required.",
       });
     }
 
-    const existing = await Member.findOne({
-      $or: [
-        { memberNumber },
-        { email: email || null },
-        { username: username || null },
-      ],
-    });
+    // ==========================================
+    // CHECK MEMBER NUMBER
+    // ==========================================
 
-    if (existing) {
+    const existingMemberNumber =
+      await Member.findOne({
+        memberNumber: cleanMemberNumber,
+      });
+
+    if (existingMemberNumber) {
       return res.status(400).json({
         success: false,
-        message: "Member already exists.",
+        message:
+          "A member with this member number already exists.",
       });
     }
 
-    // Temporary password
-    const tempPassword = "MIDAX@123";
+    // ==========================================
+    // CHECK EMAIL ONLY IF PROVIDED
+    // ==========================================
 
-    const password = await bcrypt.hash(tempPassword, 10);
+    if (cleanEmail) {
+      const existingEmail =
+        await Member.findOne({
+          email: cleanEmail,
+        });
 
-    const member = await Member.create({
-      memberNumber,
-      fullName,
-      username,
-      phone,
-      email,
-      department,
-      position,
-      monthlyContribution: monthlyContribution || 0,
-      password,
-      role: "member",
-      mustChangePassword: true,
-    });
+      if (existingEmail) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "A member with this email already exists.",
+        });
+      }
+    }
 
-    res.status(201).json({
+    // ==========================================
+    // CHECK USERNAME ONLY IF PROVIDED
+    // ==========================================
+
+    if (cleanUsername) {
+      const existingUsername =
+        await Member.findOne({
+          username: cleanUsername,
+        });
+
+      if (existingUsername) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "A member with this username already exists.",
+        });
+      }
+    }
+
+    // ==========================================
+    // TEMPORARY PASSWORD
+    // ==========================================
+
+    const temporaryPassword =
+      "MIDAX@123";
+
+    const hashedPassword =
+      await bcrypt.hash(
+        temporaryPassword,
+        10
+      );
+
+    // ==========================================
+    // MEMBER DATA
+    // ==========================================
+
+    const memberData = {
+      memberNumber:
+        cleanMemberNumber,
+
+      fullName:
+        cleanFullName,
+
+      phone:
+        cleanPhone,
+
+      department:
+        cleanDepartment,
+
+      position:
+        cleanPosition,
+
+      monthlyContribution:
+        contribution,
+
+      password:
+        hashedPassword,
+
+      role:
+        "member",
+
+      status:
+        "active",
+
+      verified:
+        false,
+
+      online:
+        false,
+
+      isDeleted:
+        false,
+
+      mustChangePassword:
+        true,
+    };
+
+    // ==========================================
+    // OPTIONAL FIELDS
+    // ==========================================
+
+    if (cleanUsername) {
+      memberData.username =
+        cleanUsername;
+    }
+
+    if (cleanEmail) {
+      memberData.email =
+        cleanEmail;
+    }
+
+    // ==========================================
+    // CREATE MEMBER
+    // ==========================================
+
+    const member =
+      await Member.create(
+        memberData
+      );
+
+    // ==========================================
+    // REMOVE PASSWORD FROM RESPONSE
+    // ==========================================
+
+    const memberResponse =
+      member.toObject();
+
+    delete memberResponse.password;
+
+    // ==========================================
+    // SUCCESS
+    // ==========================================
+
+    return res.status(201).json({
       success: true,
-      message: "Member created successfully.",
-      temporaryPassword: tempPassword,
-      member,
-    });
-  } catch (error) {
-    console.error(error);
 
-    res.status(500).json({
+      message:
+        "Member account created successfully.",
+
+      temporaryPassword,
+
+      member:
+        memberResponse,
+    });
+
+  } catch (error) {
+
+    console.error(
+      "CREATE MEMBER ERROR:",
+      error
+    );
+
+    // ==========================================
+    // MONGOOSE DUPLICATE KEY
+    // ==========================================
+
+    if (error.code === 11000) {
+
+      const duplicateField =
+        Object.keys(
+          error.keyPattern || {}
+        )[0];
+
+      let message =
+        "A member with these details already exists.";
+
+      if (
+        duplicateField ===
+        "memberNumber"
+      ) {
+        message =
+          "A member with this member number already exists.";
+      }
+
+      if (
+        duplicateField ===
+        "email"
+      ) {
+        message =
+          "A member with this email already exists.";
+      }
+
+      if (
+        duplicateField ===
+        "username"
+      ) {
+        message =
+          "A member with this username already exists.";
+      }
+
+      return res.status(400).json({
+        success: false,
+        message,
+      });
+    }
+
+    // ==========================================
+    // GENERAL ERROR
+    // ==========================================
+
+    return res.status(500).json({
       success: false,
-      message: error.message,
+      message:
+        error.message ||
+        "Unable to create member account.",
     });
   }
 };
+
+
 
 /* =====================================================
    UPDATE MEMBER

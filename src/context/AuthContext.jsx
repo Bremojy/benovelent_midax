@@ -4,6 +4,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 
@@ -26,6 +27,18 @@ const TOKEN_KEYS = {
 };
 
 // ========================================
+// SESSION SETTINGS
+// ========================================
+
+// 30 minutes of inactivity
+const INACTIVITY_TIMEOUT = 30 * 60 * 1000;
+
+// Key used to synchronize logout
+// between multiple browser tabs/windows.
+const SESSION_EVENT_KEY =
+  "benevolentMidaxSessionEvent";
+
+// ========================================
 // CLEAR STORED SESSION
 // ========================================
 
@@ -35,6 +48,11 @@ const clearStoredSession = () => {
   });
 
   localStorage.removeItem("user");
+
+  // Also remove inactivity timestamp.
+  localStorage.removeItem(
+    "benevolentMidaxLastActivity"
+  );
 };
 
 // ========================================
@@ -155,6 +173,12 @@ const saveSession = (
       role,
     })
   );
+
+  // Start a fresh inactivity period.
+  localStorage.setItem(
+    "benevolentMidaxLastActivity",
+    String(Date.now())
+  );
 };
 
 // ========================================
@@ -174,16 +198,116 @@ export function AuthProvider({
     useState("");
 
   // ======================================
+  // INACTIVITY TIMER REF
+  // ======================================
+
+  const inactivityTimer =
+    useRef(null);
+
+  // ======================================
+  // CLEAR INACTIVITY TIMER
+  // ======================================
+
+  const clearInactivityTimer =
+    useCallback(() => {
+      if (
+        inactivityTimer.current
+      ) {
+        clearTimeout(
+          inactivityTimer.current
+        );
+
+        inactivityTimer.current =
+          null;
+      }
+    }, []);
+
+  // ======================================
   // CLEAR SESSION
   // ======================================
 
   const clearSession =
     useCallback(() => {
+      clearInactivityTimer();
+
       clearStoredSession();
 
       setUser(null);
       setAuthError("");
+    }, [
+      clearInactivityTimer,
+    ]);
+
+  // ======================================
+  // BROADCAST LOGOUT
+  // ======================================
+
+  const broadcastSessionLogout =
+    useCallback(() => {
+      localStorage.setItem(
+        SESSION_EVENT_KEY,
+        JSON.stringify({
+          type: "logout",
+          timestamp: Date.now(),
+        })
+      );
     }, []);
+
+  // ======================================
+  // AUTOMATIC INACTIVITY LOGOUT
+  // ======================================
+
+  const handleInactivityLogout =
+    useCallback(() => {
+      console.warn(
+        "Session expired because of inactivity."
+      );
+
+      clearSession();
+
+      setAuthError(
+        "You have been logged out due to inactivity."
+      );
+
+      broadcastSessionLogout();
+    }, [
+      clearSession,
+      broadcastSessionLogout,
+    ]);
+
+  // ======================================
+  // RESET INACTIVITY TIMER
+  // ======================================
+
+  const resetInactivityTimer =
+    useCallback(() => {
+      // No authenticated user
+      // means no timer is required.
+      if (!user) {
+        clearInactivityTimer();
+        return;
+      }
+
+      // Clear previous timer.
+      clearInactivityTimer();
+
+      const now = Date.now();
+
+      localStorage.setItem(
+        "benevolentMidaxLastActivity",
+        String(now)
+      );
+
+      inactivityTimer.current =
+        setTimeout(
+          handleInactivityLogout,
+          INACTIVITY_TIMEOUT
+        );
+    }, [
+      user,
+      clearInactivityTimer,
+      handleInactivityLogout,
+    ]);
 
   // ======================================
   // LOAD CURRENT USER
@@ -205,6 +329,36 @@ export function AuthProvider({
         try {
           setLoading(true);
           setAuthError("");
+
+          // --------------------------------
+          // Check inactivity timestamp
+          // --------------------------------
+
+          const lastActivity =
+            Number(
+              localStorage.getItem(
+                "benevolentMidaxLastActivity"
+              )
+            );
+
+          if (
+            lastActivity &&
+            Date.now() -
+              lastActivity >=
+              INACTIVITY_TIMEOUT
+          ) {
+            clearSession();
+
+            setAuthError(
+              "Your session expired due to inactivity."
+            );
+
+            return null;
+          }
+
+          // --------------------------------
+          // Verify backend session
+          // --------------------------------
 
           const response =
             await getCurrentUser();
@@ -288,6 +442,15 @@ export function AuthProvider({
               currentUser
             )
           );
+
+          // If there was no previous
+          // activity timestamp, create one.
+          if (!lastActivity) {
+            localStorage.setItem(
+              "benevolentMidaxLastActivity",
+              String(Date.now())
+            );
+          }
 
           setUser(currentUser);
 
@@ -433,10 +596,133 @@ export function AuthProvider({
           );
         } finally {
           clearSession();
+
+          broadcastSessionLogout();
         }
       },
-      [clearSession]
+      [
+        clearSession,
+        broadcastSessionLogout,
+      ]
     );
+
+  // ======================================
+  // ACTIVITY LISTENER
+  // ======================================
+
+  useEffect(() => {
+    if (!user) {
+      clearInactivityTimer();
+      return undefined;
+    }
+
+    const activityEvents = [
+      "mousedown",
+      "mousemove",
+      "keydown",
+      "scroll",
+      "touchstart",
+      "click",
+    ];
+
+    let lastActivityHandled = 0;
+
+    const handleActivity = () => {
+      const now = Date.now();
+
+      // Prevent excessive localStorage writes
+      // when mousemove fires continuously.
+      if (
+        now - lastActivityHandled <
+        5000
+      ) {
+        return;
+      }
+
+      lastActivityHandled = now;
+
+      resetInactivityTimer();
+    };
+
+    activityEvents.forEach(
+      (eventName) => {
+        window.addEventListener(
+          eventName,
+          handleActivity,
+          {
+            passive: true,
+          }
+        );
+      }
+    );
+
+    // Start timer immediately.
+    resetInactivityTimer();
+
+    return () => {
+      activityEvents.forEach(
+        (eventName) => {
+          window.removeEventListener(
+            eventName,
+            handleActivity
+          );
+        }
+      );
+
+      clearInactivityTimer();
+    };
+  }, [
+    user,
+    resetInactivityTimer,
+    clearInactivityTimer,
+  ]);
+
+  // ======================================
+  // CROSS-TAB SESSION SYNC
+  // ======================================
+
+  useEffect(() => {
+    const handleStorageChange =
+      (event) => {
+        if (
+          event.key !==
+          SESSION_EVENT_KEY
+        ) {
+          return;
+        }
+
+        try {
+          const eventData =
+            JSON.parse(
+              event.newValue || "{}"
+            );
+
+          if (
+            eventData.type ===
+            "logout"
+          ) {
+            clearSession();
+          }
+        } catch (error) {
+          console.error(
+            "Session sync error:",
+            error
+          );
+        }
+      };
+
+    window.addEventListener(
+      "storage",
+      handleStorageChange
+    );
+
+    return () => {
+      window.removeEventListener(
+        "storage",
+        handleStorageChange
+      );
+    };
+  }, [clearSession]);
 
   // ======================================
   // ROLE HELPERS
@@ -504,6 +790,10 @@ export function AuthProvider({
       clearSession,
     ]
   );
+
+  // ======================================
+  // PROVIDER
+  // ======================================
 
   return (
     <AuthContext.Provider

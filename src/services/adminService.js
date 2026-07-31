@@ -15,6 +15,86 @@ export const getAdminDashboard = async () => {
 
 
 // ========================================
+// MEMBER STATISTICS
+// ========================================
+
+export const getMemberStatistics = async () => {
+  const { data } = await API.get(
+    "/admin/members/statistics"
+  );
+
+  return data;
+};
+
+
+// ========================================
+// RECENT MEMBERS
+// ========================================
+
+export const getRecentMembers = async () => {
+  const { data } = await API.get(
+    "/admin/members/recent"
+  );
+
+  return data;
+};
+
+
+// ========================================
+// FILTER MEMBERS
+// ========================================
+
+export const filterAdminMembers = async ({
+  status = "",
+  department = "",
+  page = 1,
+  limit = 10,
+} = {}) => {
+  const { data } = await API.get(
+    "/admin/members/filter",
+    {
+      params: {
+        status,
+        department,
+        page,
+        limit,
+      },
+    }
+  );
+
+  return data;
+};
+
+
+// ========================================
+// MONTHLY REGISTRATIONS
+// ========================================
+
+export const getMonthlyRegistrations =
+  async () => {
+    const { data } = await API.get(
+      "/admin/members/monthly-registrations"
+    );
+
+    return data;
+  };
+
+
+// ========================================
+// CONTRIBUTION SUMMARY
+// ========================================
+
+export const getContributionSummary =
+  async () => {
+    const { data } = await API.get(
+      "/admin/members/contribution-summary"
+    );
+
+    return data;
+  };
+
+
+// ========================================
 // GET MEMBERS
 // ========================================
 
@@ -45,6 +125,12 @@ export const getAdminMembers = async ({
 export const getAdminMember = async (
   memberId
 ) => {
+  if (!memberId) {
+    throw new Error(
+      "Member ID is required."
+    );
+  }
+
   const { data } = await API.get(
     `/admin/members/${memberId}`
   );
@@ -60,6 +146,12 @@ export const getAdminMember = async (
 export const createAdminMember = async (
   memberData
 ) => {
+  if (!memberData) {
+    throw new Error(
+      "Member information is required."
+    );
+  }
+
   const { data } = await API.post(
     "/admin/members",
     memberData
@@ -77,6 +169,18 @@ export const updateAdminMember = async (
   memberId,
   memberData
 ) => {
+  if (!memberId) {
+    throw new Error(
+      "Member ID is required."
+    );
+  }
+
+  if (!memberData) {
+    throw new Error(
+      "Member information is required."
+    );
+  }
+
   const { data } = await API.put(
     `/admin/members/${memberId}`,
     memberData
@@ -93,9 +197,121 @@ export const updateAdminMember = async (
 export const deleteAdminMember = async (
   memberId
 ) => {
+  if (!memberId) {
+    throw new Error(
+      "Member ID is required."
+    );
+  }
+
   const { data } = await API.delete(
     `/admin/members/${memberId}`
   );
 
   return data;
+};
+
+
+// ========================================
+// SUSPEND MEMBER
+// ========================================
+
+export const suspendAdminMember = async (
+  memberId
+) => {
+  if (!memberId) {
+    throw new Error(
+      "Member ID is required."
+    );
+  }
+
+  const { data } = await API.patch(
+    `/admin/members/${memberId}/suspend`
+  );
+
+  return data;
+};
+
+
+// ========================================
+// ACTIVATE MEMBER
+// ========================================
+
+export const activateAdminMember = async (
+  memberId
+) => {
+  if (!memberId) {
+    throw new Error(
+      "Member ID is required."
+    );
+  }
+
+  const { data } = await API.patch(
+    `/admin/members/${memberId}/activate`
+  );
+
+  return data;
+};
+
+
+// ========================================
+// RESTORE MEMBER
+// ========================================
+
+export const restoreAdminMember = async (
+  memberId
+) => {
+  if (!memberId) {
+    throw new Error(
+      "Member ID is required."
+    );
+  }
+
+  const { data } = await API.patch(
+    `/admin/members/${memberId}/restore`
+  );
+
+  return data;
+};
+
+
+// ========================================
+// RESET MEMBER PASSWORD
+// ========================================
+
+export const resetAdminMemberPassword =
+  async (memberId) => {
+    if (!memberId) {
+      throw new Error(
+        "Member ID is required."
+      );
+    }
+
+    const { data } = await API.patch(
+      `/admin/members/${memberId}/reset-password`
+    );
+
+    return data;
+  };
+
+
+// ========================================
+// DEFAULT EXPORT
+// ========================================
+
+export default {
+  getAdminDashboard,
+  getMemberStatistics,
+  getRecentMembers,
+  filterAdminMembers,
+  getMonthlyRegistrations,
+  getContributionSummary,
+  getAdminMembers,
+  getAdminMember,
+  createAdminMember,
+  updateAdminMember,
+  deleteAdminMember,
+  suspendAdminMember,
+  activateAdminMember,
+  restoreAdminMember,
+  resetAdminMemberPassword,
 };

@@ -8,7 +8,12 @@ import DashboardLayout from "../../layouts/DashboardLayout";
 
 import {
   getAdminMembers,
+  createAdminMember,
+  updateAdminMember,
   deleteAdminMember,
+  suspendAdminMember,
+  activateAdminMember,
+  resetAdminMemberPassword,
 } from "../../services/adminService";
 
 import "./AdminMembers.css";
@@ -18,55 +23,60 @@ function AdminMembers() {
   // DATA
   // ========================================
 
-  const [members, setMembers] =
-    useState([]);
+  const [members, setMembers] = useState([]);
 
-  const [loading, setLoading] =
-    useState(true);
+  const [loading, setLoading] = useState(true);
 
-  const [error, setError] =
-    useState("");
+  const [error, setError] = useState("");
 
   // ========================================
   // SEARCH
   // ========================================
 
-  const [search, setSearch] =
-    useState("");
+  const [search, setSearch] = useState("");
 
-  const [searchInput, setSearchInput] =
-    useState("");
+  const [searchInput, setSearchInput] = useState("");
 
   // ========================================
   // PAGINATION
   // ========================================
 
-  const [page, setPage] =
-    useState(1);
+  const [page, setPage] = useState(1);
 
-  const [limit] =
-    useState(10);
+  const limit = 10;
 
-  const [total, setTotal] =
-    useState(0);
+  const [total, setTotal] = useState(0);
 
-  const [totalPages, setTotalPages] =
-    useState(1);
+  const [totalPages, setTotalPages] = useState(1);
 
   // ========================================
-  // SELECTED MEMBER
+  // MODALS
   // ========================================
 
   const [selectedMember, setSelectedMember] =
     useState(null);
 
+  const [showMemberForm, setShowMemberForm] =
+    useState(false);
+
+  const [editingMember, setEditingMember] =
+    useState(null);
+
+  const [credentialResult, setCredentialResult] =
+    useState(null);
+
   // ========================================
-  // DELETE STATE
+  // ACTION STATES
   // ========================================
 
   const [deletingId, setDeletingId] =
     useState(null);
 
+  const [statusId, setStatusId] =
+    useState(null);
+
+  const [resettingId, setResettingId] =
+    useState(null);
 
   // ========================================
   // LOAD MEMBERS
@@ -77,12 +87,11 @@ function AdminMembers() {
       setLoading(true);
       setError("");
 
-      const response =
-        await getAdminMembers({
-          page,
-          limit,
-          search,
-        });
+      const response = await getAdminMembers({
+        page,
+        limit,
+        search,
+      });
 
       if (!response?.success) {
         throw new Error(
@@ -97,14 +106,11 @@ function AdminMembers() {
           : []
       );
 
-      setTotal(
-        Number(response.total) || 0
-      );
+      setTotal(Number(response.total) || 0);
 
       setTotalPages(
         Number(response.totalPages) || 1
       );
-
     } catch (err) {
       console.error(
         "Admin members error:",
@@ -116,17 +122,14 @@ function AdminMembers() {
           err.message ||
           "Unable to load members."
       );
-
     } finally {
       setLoading(false);
     }
   };
 
-
   useEffect(() => {
     loadMembers();
   }, [page, search]);
-
 
   // ========================================
   // SEARCH
@@ -136,20 +139,101 @@ function AdminMembers() {
     event.preventDefault();
 
     setPage(1);
-
-    setSearch(
-      searchInput.trim()
-    );
+    setSearch(searchInput.trim());
   };
 
+  // ========================================
+  // ADD MEMBER
+  // ========================================
+
+  const handleAddMember = () => {
+    setEditingMember(null);
+    setError("");
+    setCredentialResult(null);
+    setShowMemberForm(true);
+  };
+
+  // ========================================
+  // EDIT MEMBER
+  // ========================================
+
+  const handleEditMember = (member) => {
+    setEditingMember(member);
+    setError("");
+    setCredentialResult(null);
+    setShowMemberForm(true);
+  };
+
+  // ========================================
+  // SAVE MEMBER
+  // ========================================
+
+  const handleSaveMember = async (formData) => {
+    try {
+      setError("");
+
+      let response;
+
+      if (editingMember) {
+        const memberId =
+          editingMember._id ||
+          editingMember.id;
+
+        response = await updateAdminMember(
+          memberId,
+          formData
+        );
+      } else {
+        response =
+          await createAdminMember(
+            formData
+          );
+      }
+
+      if (!response?.success) {
+        throw new Error(
+          response?.message ||
+            "Unable to save member."
+        );
+      }
+
+      setShowMemberForm(false);
+      setEditingMember(null);
+
+      if (!editingMember) {
+        setCredentialResult({
+          fullName:
+            formData.fullName,
+          memberNumber:
+            formData.memberNumber,
+          username:
+            formData.username,
+          temporaryPassword:
+            response.temporaryPassword ||
+            "MIDAX@123",
+        });
+      }
+
+      await loadMembers();
+    } catch (err) {
+      console.error(
+        "Save member error:",
+        err
+      );
+
+      setError(
+        err.response?.data?.message ||
+          err.message ||
+          "Unable to save member."
+      );
+    }
+  };
 
   // ========================================
   // DELETE MEMBER
   // ========================================
 
-  const handleDelete = async (
-    member
-  ) => {
+  const handleDelete = async (member) => {
     const memberId =
       member._id || member.id;
 
@@ -157,7 +241,10 @@ function AdminMembers() {
 
     const confirmed =
       window.confirm(
-        `Are you sure you want to remove ${member.fullName || "this member"}?`
+        `Are you sure you want to remove ${
+          member.fullName ||
+          "this member"
+        }?`
       );
 
     if (!confirmed) return;
@@ -174,7 +261,7 @@ function AdminMembers() {
       if (!response?.success) {
         throw new Error(
           response?.message ||
-            "Unable to delete member."
+            "Unable to remove member."
         );
       }
 
@@ -188,7 +275,6 @@ function AdminMembers() {
       }
 
       await loadMembers();
-
     } catch (err) {
       console.error(
         "Delete member error:",
@@ -198,14 +284,154 @@ function AdminMembers() {
       setError(
         err.response?.data?.message ||
           err.message ||
-          "Unable to delete member."
+          "Unable to remove member."
       );
-
     } finally {
       setDeletingId(null);
     }
   };
 
+  // ========================================
+  // STATUS CHANGE
+  // ========================================
+
+  const handleStatusChange = async (
+    member
+  ) => {
+    const memberId =
+      member._id || member.id;
+
+    if (!memberId) return;
+
+    const isSuspended =
+      String(
+        member.status || ""
+      ).toLowerCase() ===
+      "suspended";
+
+    const isInactive =
+      String(
+        member.status || ""
+      ).toLowerCase() ===
+      "inactive";
+
+    const action =
+      isSuspended || isInactive
+        ? "activate"
+        : "suspend";
+
+    const confirmed =
+      window.confirm(
+        `Are you sure you want to ${action} ${
+          member.fullName ||
+          "this member"
+        }?`
+      );
+
+    if (!confirmed) return;
+
+    try {
+      setStatusId(memberId);
+      setError("");
+
+      const response =
+        action === "suspend"
+          ? await suspendAdminMember(
+              memberId
+            )
+          : await activateAdminMember(
+              memberId
+            );
+
+      if (!response?.success) {
+        throw new Error(
+          response?.message ||
+            `Unable to ${action} member.`
+        );
+      }
+
+      await loadMembers();
+    } catch (err) {
+      console.error(
+        "Member status error:",
+        err
+      );
+
+      setError(
+        err.response?.data?.message ||
+          err.message ||
+          "Unable to change member status."
+      );
+    } finally {
+      setStatusId(null);
+    }
+  };
+
+  // ========================================
+  // RESET PASSWORD
+  // ========================================
+
+  const handleResetPassword = async (
+    member
+  ) => {
+    const memberId =
+      member._id || member.id;
+
+    if (!memberId) return;
+
+    const confirmed =
+      window.confirm(
+        `Reset the password for ${
+          member.fullName ||
+          "this member"
+        }?`
+      );
+
+    if (!confirmed) return;
+
+    try {
+      setResettingId(memberId);
+      setError("");
+
+      const response =
+        await resetAdminMemberPassword(
+          memberId
+        );
+
+      if (!response?.success) {
+        throw new Error(
+          response?.message ||
+            "Unable to reset password."
+        );
+      }
+
+      setCredentialResult({
+        fullName:
+          member.fullName,
+        memberNumber:
+          member.memberNumber,
+        username:
+          member.username,
+        temporaryPassword:
+          response.temporaryPassword ||
+          "MIDAX@123",
+        reset: true,
+      });
+    } catch (err) {
+      console.error(
+        "Reset password error:",
+        err
+      );
+
+      setError(
+        err.response?.data?.message ||
+          err.message ||
+          "Unable to reset password."
+      );
+    } finally {
+      setResettingId(null);
+    }
+  };
 
   // ========================================
   // SUMMARY
@@ -214,25 +440,29 @@ function AdminMembers() {
   const activeMembers =
     members.filter(
       (member) =>
-        member.status === "active"
+        String(
+          member.status
+        ).toLowerCase() ===
+        "active"
     ).length;
 
   const inactiveMembers =
     members.filter(
       (member) =>
-        member.status === "inactive"
+        String(
+          member.status
+        ).toLowerCase() ===
+        "inactive"
     ).length;
 
   const suspendedMembers =
     members.filter(
       (member) =>
-        member.status === "suspended"
+        String(
+          member.status
+        ).toLowerCase() ===
+        "suspended"
     ).length;
-
-
-  // ========================================
-  // DISPLAYED MEMBERS
-  // ========================================
 
   const displayedMembers =
     useMemo(
@@ -240,6 +470,9 @@ function AdminMembers() {
       [members]
     );
 
+  // ========================================
+  // RENDER
+  // ========================================
 
   return (
     <DashboardLayout>
@@ -253,7 +486,6 @@ function AdminMembers() {
         <section className="admin-page-header">
 
           <div>
-
             <span>
               ADMINISTRATION
             </span>
@@ -263,25 +495,38 @@ function AdminMembers() {
             </h1>
 
             <p>
-              Manage Benevolent Midax
-              member accounts.
+              Create and manage
+              Benevolent Midax member
+              accounts.
             </p>
+          </div>
+
+          <div className="admin-header-actions">
+
+            <button
+              type="button"
+              className="admin-refresh-button"
+              onClick={loadMembers}
+              disabled={loading}
+            >
+              {loading
+                ? "Loading..."
+                : "Refresh"}
+            </button>
+
+            <button
+              type="button"
+              className="admin-add-member-button"
+              onClick={
+                handleAddMember
+              }
+            >
+              + Add Member
+            </button>
 
           </div>
 
-          <button
-            type="button"
-            className="admin-refresh-button"
-            onClick={loadMembers}
-            disabled={loading}
-          >
-            {loading
-              ? "Loading..."
-              : "Refresh"}
-          </button>
-
         </section>
-
 
         {/* ==================================
             ERROR
@@ -305,7 +550,6 @@ function AdminMembers() {
 
           </div>
         )}
-
 
         {/* ==================================
             STATISTICS
@@ -335,7 +579,6 @@ function AdminMembers() {
 
         </section>
 
-
         {/* ==================================
             SEARCH
         ================================== */}
@@ -344,7 +587,9 @@ function AdminMembers() {
 
           <form
             className="admin-member-search"
-            onSubmit={handleSearch}
+            onSubmit={
+              handleSearch
+            }
           >
 
             <span>
@@ -354,7 +599,9 @@ function AdminMembers() {
             <input
               type="search"
               placeholder="Search by name, member number, email or phone..."
-              value={searchInput}
+              value={
+                searchInput
+              }
               onChange={(event) =>
                 setSearchInput(
                   event.target.value
@@ -362,16 +609,13 @@ function AdminMembers() {
               }
             />
 
-            <button
-              type="submit"
-            >
+            <button type="submit">
               Search
             </button>
 
           </form>
 
         </section>
-
 
         {/* ==================================
             MEMBER TABLE
@@ -382,7 +626,6 @@ function AdminMembers() {
           <div className="admin-members-card-header">
 
             <div>
-
               <span>
                 MEMBER DIRECTORY
               </span>
@@ -390,7 +633,6 @@ function AdminMembers() {
               <h2>
                 All Members
               </h2>
-
             </div>
 
             <strong>
@@ -399,12 +641,12 @@ function AdminMembers() {
 
           </div>
 
-
           {loading ? (
 
             <LoadingState />
 
-          ) : displayedMembers.length === 0 ? (
+          ) : displayedMembers.length ===
+            0 ? (
 
             <EmptyState
               search={search}
@@ -417,7 +659,6 @@ function AdminMembers() {
               <table className="admin-members-table">
 
                 <thead>
-
                   <tr>
 
                     <th>
@@ -445,9 +686,7 @@ function AdminMembers() {
                     </th>
 
                   </tr>
-
                 </thead>
-
 
                 <tbody>
 
@@ -468,8 +707,15 @@ function AdminMembers() {
                         deletingId ===
                         memberId;
 
-                      return (
+                      const changingStatus =
+                        statusId ===
+                        memberId;
 
+                      const resetting =
+                        resettingId ===
+                        memberId;
+
+                      return (
                         <tr
                           key={memberId}
                         >
@@ -481,11 +727,9 @@ function AdminMembers() {
                             <div className="admin-member-identity">
 
                               <div className="admin-member-avatar">
-
                                 {getInitials(
                                   member.fullName
                                 )}
-
                               </div>
 
                               <div>
@@ -506,20 +750,16 @@ function AdminMembers() {
 
                           </td>
 
-
-                          {/* MEMBER NUMBER */}
+                          {/* NUMBER */}
 
                           <td>
 
                             <span className="member-number">
-
                               {member.memberNumber ||
                                 "—"}
-
                             </span>
 
                           </td>
-
 
                           {/* CONTACT */}
 
@@ -541,14 +781,12 @@ function AdminMembers() {
 
                           </td>
 
-
                           {/* DEPARTMENT */}
 
                           <td>
                             {member.department ||
                               "—"}
                           </td>
-
 
                           {/* STATUS */}
 
@@ -563,7 +801,6 @@ function AdminMembers() {
                             </span>
 
                           </td>
-
 
                           {/* ACTIONS */}
 
@@ -581,6 +818,57 @@ function AdminMembers() {
                                 }
                               >
                                 View
+                              </button>
+
+                              <button
+                                type="button"
+                                className="edit-member-button"
+                                onClick={() =>
+                                  handleEditMember(
+                                    member
+                                  )
+                                }
+                              >
+                                Edit
+                              </button>
+
+                              <button
+                                type="button"
+                                className={`status-member-button ${status}`}
+                                disabled={
+                                  changingStatus
+                                }
+                                onClick={() =>
+                                  handleStatusChange(
+                                    member
+                                  )
+                                }
+                              >
+                                {changingStatus
+                                  ? "..."
+                                  : status ===
+                                      "suspended" ||
+                                    status ===
+                                      "inactive"
+                                  ? "Activate"
+                                  : "Suspend"}
+                              </button>
+
+                              <button
+                                type="button"
+                                className="reset-member-button"
+                                disabled={
+                                  resetting
+                                }
+                                onClick={() =>
+                                  handleResetPassword(
+                                    member
+                                  )
+                                }
+                              >
+                                {resetting
+                                  ? "..."
+                                  : "Reset"}
                               </button>
 
                               <button
@@ -605,7 +893,6 @@ function AdminMembers() {
                           </td>
 
                         </tr>
-
                       );
                     }
                   )}
@@ -617,7 +904,6 @@ function AdminMembers() {
             </div>
 
           )}
-
 
           {/* =================================
               PAGINATION
@@ -670,7 +956,6 @@ function AdminMembers() {
 
         </section>
 
-
         {/* ==================================
             MEMBER DETAILS
         ================================== */}
@@ -683,6 +968,60 @@ function AdminMembers() {
             }
             onClose={() =>
               setSelectedMember(
+                null
+              )
+            }
+            onEdit={() => {
+              setSelectedMember(
+                null
+              );
+
+              handleEditMember(
+                selectedMember
+              );
+            }}
+          />
+
+        )}
+
+        {/* ==================================
+            CREATE / EDIT MEMBER
+        ================================== */}
+
+        {showMemberForm && (
+
+          <MemberFormModal
+            member={
+              editingMember
+            }
+            onClose={() => {
+              setShowMemberForm(
+                false
+              );
+
+              setEditingMember(
+                null
+              );
+            }}
+            onSave={
+              handleSaveMember
+            }
+          />
+
+        )}
+
+        {/* ==================================
+            CREDENTIALS
+        ================================== */}
+
+        {credentialResult && (
+
+          <CredentialsModal
+            result={
+              credentialResult
+            }
+            onClose={() =>
+              setCredentialResult(
                 null
               )
             }
@@ -770,12 +1109,338 @@ function EmptyState({
 
 
 // ========================================
+// MEMBER FORM
+// ========================================
+
+function MemberFormModal({
+  member,
+  onClose,
+  onSave,
+}) {
+  const editing = Boolean(member);
+
+  const [form, setForm] = useState({
+    memberNumber:
+      member?.memberNumber || "",
+    fullName:
+      member?.fullName || "",
+    username:
+      member?.username || "",
+    phone:
+      member?.phone || "",
+    email:
+      member?.email || "",
+    department:
+      member?.department || "",
+    position:
+      member?.position || "",
+    monthlyContribution:
+      member?.monthlyContribution ??
+      "",
+  });
+
+  const [saving, setSaving] =
+    useState(false);
+
+  const [formError, setFormError] =
+    useState("");
+
+  const handleChange = (event) => {
+    const {
+      name,
+      value,
+    } = event.target;
+
+    setForm((current) => ({
+      ...current,
+      [name]: value,
+    }));
+  };
+
+  const handleSubmit = async (
+    event
+  ) => {
+    event.preventDefault();
+
+    if (
+      !form.memberNumber.trim() ||
+      !form.fullName.trim() ||
+      !form.phone.trim()
+    ) {
+      setFormError(
+        "Member Number, Full Name and Phone are required."
+      );
+
+      return;
+    }
+
+    try {
+      setSaving(true);
+      setFormError("");
+
+      await onSave({
+        ...form,
+        monthlyContribution:
+          Number(
+            form.monthlyContribution
+          ) || 0,
+      });
+    } catch (error) {
+      setFormError(
+        error.message ||
+          "Unable to save member."
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div
+      className="admin-member-modal-overlay"
+      onClick={onClose}
+    >
+
+      <div
+        className="admin-member-form-modal"
+        onClick={(event) =>
+          event.stopPropagation()
+        }
+      >
+
+        <div className="admin-member-modal-header">
+
+          <div>
+
+            <span>
+              {editing
+                ? "EDIT MEMBER"
+                : "CREATE MEMBER ACCOUNT"}
+            </span>
+
+            <h2>
+              {editing
+                ? "Edit Member"
+                : "Add New Member"}
+            </h2>
+
+          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+          >
+            ×
+          </button>
+
+        </div>
+
+        {!editing && (
+          <div className="admin-member-form-info">
+            <strong>
+              Account creation
+            </strong>
+
+            <p>
+              The member will receive a
+              temporary password after
+              the account is created.
+            </p>
+          </div>
+        )}
+
+        {formError && (
+          <div className="admin-form-error">
+            {formError}
+          </div>
+        )}
+
+        <form
+          className="admin-member-form"
+          onSubmit={
+            handleSubmit
+          }
+        >
+
+          <div className="admin-form-grid">
+
+            <FormField
+              label="Member Number *"
+              name="memberNumber"
+              value={
+                form.memberNumber
+              }
+              onChange={
+                handleChange
+              }
+              placeholder="e.g. BM001"
+            />
+
+            <FormField
+              label="Full Name *"
+              name="fullName"
+              value={
+                form.fullName
+              }
+              onChange={
+                handleChange
+              }
+              placeholder="Full member name"
+            />
+
+            <FormField
+              label="Username"
+              name="username"
+              value={
+                form.username
+              }
+              onChange={
+                handleChange
+              }
+              placeholder="Member username"
+            />
+
+            <FormField
+              label="Phone *"
+              name="phone"
+              value={
+                form.phone
+              }
+              onChange={
+                handleChange
+              }
+              placeholder="07XXXXXXXX"
+            />
+
+            <FormField
+              label="Email"
+              name="email"
+              type="email"
+              value={
+                form.email
+              }
+              onChange={
+                handleChange
+              }
+              placeholder="member@example.com"
+            />
+
+            <FormField
+              label="Department"
+              name="department"
+              value={
+                form.department
+              }
+              onChange={
+                handleChange
+              }
+              placeholder="Department"
+            />
+
+            <FormField
+              label="Position"
+              name="position"
+              value={
+                form.position
+              }
+              onChange={
+                handleChange
+              }
+              placeholder="Position"
+            />
+
+            <FormField
+              label="Monthly Contribution"
+              name="monthlyContribution"
+              type="number"
+              min="0"
+              value={
+                form.monthlyContribution
+              }
+              onChange={
+                handleChange
+              }
+              placeholder="0"
+            />
+
+          </div>
+
+          <div className="admin-member-form-actions">
+
+            <button
+              type="button"
+              className="admin-cancel-button"
+              onClick={onClose}
+              disabled={saving}
+            >
+              Cancel
+            </button>
+
+            <button
+              type="submit"
+              className="admin-save-member-button"
+              disabled={saving}
+            >
+              {saving
+                ? "Saving..."
+                : editing
+                ? "Save Changes"
+                : "Create Member"}
+            </button>
+
+          </div>
+
+        </form>
+
+      </div>
+
+    </div>
+  );
+}
+
+
+// ========================================
+// FORM FIELD
+// ========================================
+
+function FormField({
+  label,
+  name,
+  type = "text",
+  value,
+  onChange,
+  placeholder,
+  min,
+}) {
+  return (
+    <label className="admin-form-field">
+
+      <span>
+        {label}
+      </span>
+
+      <input
+        type={type}
+        name={name}
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+        min={min}
+      />
+
+    </label>
+  );
+}
+
+
+// ========================================
 // MEMBER DETAILS MODAL
 // ========================================
 
 function MemberDetailsModal({
   member,
   onClose,
+  onEdit,
 }) {
   return (
     <div
@@ -808,13 +1473,23 @@ function MemberDetailsModal({
           <button
             type="button"
             onClick={onClose}
-            aria-label="Close member profile"
           >
             ×
           </button>
 
         </div>
 
+        <div className="admin-member-modal-actions">
+
+          <button
+            type="button"
+            className="edit-member-button"
+            onClick={onEdit}
+          >
+            Edit Member
+          </button>
+
+        </div>
 
         <div className="admin-member-modal-body">
 
@@ -873,6 +1548,13 @@ function MemberDetailsModal({
           />
 
           <MemberDetail
+            label="Role"
+            value={
+              member.role
+            }
+          />
+
+          <MemberDetail
             label="Status"
             value={
               capitalize(
@@ -912,6 +1594,174 @@ function MemberDetailsModal({
         </div>
 
       </div>
+
+    </div>
+  );
+}
+
+
+// ========================================
+// CREDENTIALS MODAL
+// ========================================
+
+function CredentialsModal({
+  result,
+  onClose,
+}) {
+  const handleCopy = async () => {
+    const text = `
+Benevolent Midax Member Account
+
+Name: ${result.fullName || "—"}
+Member Number: ${
+      result.memberNumber || "—"
+    }
+Username: ${
+      result.username || "—"
+    }
+Temporary Password: ${
+      result.temporaryPassword
+    }
+    `.trim();
+
+    try {
+      await navigator.clipboard.writeText(
+        text
+      );
+
+      window.alert(
+        "Credentials copied."
+      );
+    } catch {
+      window.alert(
+        "Unable to copy credentials."
+      );
+    }
+  };
+
+  return (
+    <div
+      className="admin-member-modal-overlay"
+      onClick={onClose}
+    >
+
+      <div
+        className="admin-credentials-modal"
+        onClick={(event) =>
+          event.stopPropagation()
+        }
+      >
+
+        <div className="credentials-icon">
+          ✓
+        </div>
+
+        <span className="credentials-label">
+          {result.reset
+            ? "PASSWORD RESET"
+            : "ACCOUNT CREATED"}
+        </span>
+
+        <h2>
+          {result.reset
+            ? "Password Reset Successfully"
+            : "Member Account Created"}
+        </h2>
+
+        <p>
+          Give these credentials to the
+          member. They should change the
+          temporary password after logging
+          in.
+        </p>
+
+        <div className="credentials-box">
+
+          <CredentialRow
+            label="Name"
+            value={
+              result.fullName
+            }
+          />
+
+          <CredentialRow
+            label="Member Number"
+            value={
+              result.memberNumber
+            }
+          />
+
+          <CredentialRow
+            label="Username"
+            value={
+              result.username
+            }
+          />
+
+          <CredentialRow
+            label="Temporary Password"
+            value={
+              result.temporaryPassword
+            }
+            password
+          />
+
+        </div>
+
+        <div className="credentials-actions">
+
+          <button
+            type="button"
+            className="copy-credentials-button"
+            onClick={
+              handleCopy
+            }
+          >
+            Copy Credentials
+          </button>
+
+          <button
+            type="button"
+            className="admin-cancel-button"
+            onClick={onClose}
+          >
+            Done
+          </button>
+
+        </div>
+
+      </div>
+
+    </div>
+  );
+}
+
+
+// ========================================
+// CREDENTIAL ROW
+// ========================================
+
+function CredentialRow({
+  label,
+  value,
+  password,
+}) {
+  return (
+    <div className="credential-row">
+
+      <span>
+        {label}
+      </span>
+
+      <strong
+        className={
+          password
+            ? "temporary-password"
+            : ""
+        }
+      >
+        {value || "—"}
+      </strong>
 
     </div>
   );
@@ -964,8 +1814,7 @@ function getInitials(name) {
 
 
 function capitalize(value) {
-  const text =
-    String(value);
+  const text = String(value);
 
   return (
     text.charAt(0).toUpperCase() +
@@ -979,8 +1828,7 @@ function formatDate(value) {
     return "—";
   }
 
-  const date =
-    new Date(value);
+  const date = new Date(value);
 
   if (
     Number.isNaN(

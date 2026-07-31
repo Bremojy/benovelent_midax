@@ -715,3 +715,73 @@
     font-size: 30px;
   }
 }
+
+/* ========================================
+   DELETE MEMBER
+======================================== */
+
+.delete-member-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+
+  background: #fff0f0;
+  color: #b43c34;
+}
+
+.delete-member-button:hover {
+  background: #ffe1e1;
+}
+
+.delete-member-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ========================================
+   SUSPENDED STATUS
+======================================== */
+
+.admin-member-status.suspended {
+  background: #fff3e0;
+  color: #d66a00;
+}
+
+/* ========================================
+   SPINNING REFRESH ICON
+======================================== */
+
+.spinning {
+  animation: admin-refresh-spin 0.8s linear infinite;
+}
+
+@keyframes admin-refresh-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ========================================
+   SEARCH CLEAR BUTTON
+======================================== */
+
+.admin-member-search > button:first-of-type {
+  border: 0;
+  background: transparent;
+  color: #888;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+/* ========================================
+   QUICK ACTION BUTTONS
+======================================== */
+
+.admin-member-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}

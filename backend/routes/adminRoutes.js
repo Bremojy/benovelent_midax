@@ -7,7 +7,7 @@ const router = express.Router();
 // =======================================
 
 const {
-verifyToken: protect,
+  verifyToken: protect,
 } = require("../middleware/authMiddleware");
 
 // =======================================
@@ -15,8 +15,8 @@ verifyToken: protect,
 // =======================================
 
 const {
-isAdmin,
-isAdminOrSuperAdmin,
+  isAdmin,
+  isAdminOrSuperAdmin,
 } = require("../middleware/roleMiddleware");
 
 // =======================================
@@ -24,21 +24,21 @@ isAdminOrSuperAdmin,
 // =======================================
 
 const {
-getDashboard,
-getMembers,
-getMember,
-createMember,
-updateMember,
-suspendMember,
-activateMember,
-deleteMember,
-restoreMember,
-resetPassword,
-getRecentMembers,
-getStatistics,
-filterMembers,
-monthlyRegistrations,
-contributionSummary,
+  getDashboard,
+  getMembers,
+  getMember,
+  createMember,
+  updateMember,
+  suspendMember,
+  activateMember,
+  deleteMember,
+  restoreMember,
+  resetPassword,
+  getRecentMembers,
+  getStatistics,
+  filterMembers,
+  monthlyRegistrations,
+  contributionSummary,
 } = require("../controllers/adminController");
 
 // =======================================
@@ -46,127 +46,173 @@ contributionSummary,
 // =======================================
 
 router.get(
-"/dashboard",
-protect,
-isAdmin,
-getDashboard
+  "/dashboard",
+  protect,
+  isAdmin,
+  getDashboard
 );
 
 // =======================================
-// MEMBER MANAGEMENT
-// ADMIN + SUPERADMIN
+// MEMBER STATISTICS
 // =======================================
 
-// Get all members
+// Main statistics endpoint
 router.get(
-"/members",
-protect,
-isAdminOrSuperAdmin,
-getMembers
+  "/statistics",
+  protect,
+  isAdminOrSuperAdmin,
+  getStatistics
 );
 
-// Get recent members
+// Backward-compatible statistics endpoint
 router.get(
-"/members/recent",
-protect,
-isAdminOrSuperAdmin,
-getRecentMembers
+  "/members/statistics",
+  protect,
+  isAdminOrSuperAdmin,
+  getStatistics
 );
 
-// Get member statistics
+// =======================================
+// RECENT MEMBERS
+// =======================================
+
 router.get(
-"/members/statistics",
-protect,
-isAdminOrSuperAdmin,
-getStatistics
+  "/members/recent",
+  protect,
+  isAdminOrSuperAdmin,
+  getRecentMembers
 );
 
-// Filter members
+// =======================================
+// FILTER MEMBERS
+// =======================================
+
 router.get(
-"/members/filter",
-protect,
-isAdminOrSuperAdmin,
-filterMembers
+  "/members/filter",
+  protect,
+  isAdminOrSuperAdmin,
+  filterMembers
 );
 
-// Monthly registrations
+// =======================================
+// MONTHLY REGISTRATIONS
+// =======================================
+
 router.get(
-"/members/monthly-registrations",
-protect,
-isAdminOrSuperAdmin,
-monthlyRegistrations
+  "/members/monthly-registrations",
+  protect,
+  isAdminOrSuperAdmin,
+  monthlyRegistrations
 );
 
-// Contribution summary
+// =======================================
+// CONTRIBUTION SUMMARY
+// =======================================
+
 router.get(
-"/members/contribution-summary",
-protect,
-isAdminOrSuperAdmin,
-contributionSummary
+  "/members/contribution-summary",
+  protect,
+  isAdminOrSuperAdmin,
+  contributionSummary
 );
 
-// Get single member
+// =======================================
+// GET ALL MEMBERS
+// =======================================
+
 router.get(
-"/members/:id",
-protect,
-isAdminOrSuperAdmin,
-getMember
+  "/members",
+  protect,
+  isAdminOrSuperAdmin,
+  getMembers
 );
 
-// Create member
+// =======================================
+// GET SINGLE MEMBER
+// =======================================
+
+router.get(
+  "/members/:id",
+  protect,
+  isAdminOrSuperAdmin,
+  getMember
+);
+
+// =======================================
+// CREATE MEMBER
+// =======================================
+
 router.post(
-"/members",
-protect,
-isAdminOrSuperAdmin,
-createMember
+  "/members",
+  protect,
+  isAdminOrSuperAdmin,
+  createMember
 );
 
-// Update member
+// =======================================
+// UPDATE MEMBER
+// =======================================
+
 router.put(
-"/members/:id",
-protect,
-isAdminOrSuperAdmin,
-updateMember
+  "/members/:id",
+  protect,
+  isAdminOrSuperAdmin,
+  updateMember
 );
 
-// Suspend member
+// =======================================
+// SUSPEND MEMBER
+// =======================================
+
 router.patch(
-"/members/:id/suspend",
-protect,
-isAdminOrSuperAdmin,
-suspendMember
+  "/members/:id/suspend",
+  protect,
+  isAdminOrSuperAdmin,
+  suspendMember
 );
 
-// Activate member
+// =======================================
+// ACTIVATE MEMBER
+// =======================================
+
 router.patch(
-"/members/:id/activate",
-protect,
-isAdminOrSuperAdmin,
-activateMember
+  "/members/:id/activate",
+  protect,
+  isAdminOrSuperAdmin,
+  activateMember
 );
 
-// Soft delete member
+// =======================================
+// DELETE MEMBER
+// =======================================
+
 router.delete(
-"/members/:id",
-protect,
-isAdminOrSuperAdmin,
-deleteMember
+  "/members/:id",
+  protect,
+  isAdminOrSuperAdmin,
+  deleteMember
 );
 
-// Restore member
+// =======================================
+// RESTORE MEMBER
+// =======================================
+
 router.patch(
-"/members/:id/restore",
-protect,
-isAdminOrSuperAdmin,
-restoreMember
+  "/members/:id/restore",
+  protect,
+  isAdminOrSuperAdmin,
+  restoreMember
 );
 
-// Reset member password
+// =======================================
+// RESET MEMBER PASSWORD
+// =======================================
+
 router.patch(
-"/members/:id/reset-password",
-protect,
-isAdminOrSuperAdmin,
-resetPassword
+  "/members/:id/reset-password",
+  protect,
+  isAdminOrSuperAdmin,
+  resetPassword
 );
 
 // =======================================
