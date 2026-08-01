@@ -2,7 +2,7 @@ import { Link, useLocation } from "react-router-dom";
 import { Menu, X } from "lucide-react";
 import { useState } from "react";
 
-function Navbar() {
+function Navbar({ variant = "default" }) {
   const [menuOpen, setMenuOpen] = useState(false);
 
   const location = useLocation();
@@ -16,7 +16,7 @@ function Navbar() {
   };
 
   return (
-    <header className="navbar">
+    <header className={`navbar ${variant === "login" ? "navbar-login" : ""}`}>
 
       <div className="navbar-container">
 

@@ -23,7 +23,7 @@ function authHeader() {
 
 export async function getSettings() {
   const res = await axios.get(
-    `${API}/members/settings`,
+    `${API}/member/settings`,
     authHeader()
   );
 
@@ -36,7 +36,7 @@ export async function getSettings() {
 
 export async function updateSettings(data) {
   const res = await axios.put(
-    `${API}/members/settings`,
+    `${API}/member/settings`,
     data,
     authHeader()
   );

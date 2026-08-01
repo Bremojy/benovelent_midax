@@ -194,6 +194,14 @@ export const createMemberClaim =
 
 
 // =======================================
+// DEPENDENTS
+// =======================================
+export const getMemberDependents = async () => {
+  const { data } = await API.get("/dependents/my");
+  return data;
+};
+
+// =======================================
 // MEMBER NEWS
 // =======================================
 
@@ -216,7 +224,7 @@ export const getMemberPolls =
   async () => {
     const { data } =
       await API.get(
-        "/poll"
+        "/polls"
       );
 
     return data;
@@ -231,11 +239,8 @@ export const voteInPoll =
   async (pollId, optionId) => {
     const { data } =
       await API.post(
-        "/vote",
-        {
-          pollId,
-          optionId,
-        }
+        `/votes/${pollId}`,
+        { optionId }
       );
 
     return data;

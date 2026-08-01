@@ -2,6 +2,7 @@ import { useState } from "react";
 
 import DashboardLayout from "../../layouts/DashboardLayout";
 import useMemberDashboard from "../../hooks/useMemberDashboard";
+import { updateMemberProfile, changeMemberPassword } from "../../services/memberService";
 
 import {
   User,
@@ -55,12 +56,47 @@ function Settings() {
     });
   };
 
-  const saveSettings = (e) => {
-    e.preventDefault();
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState("");
+  const [saveError, setSaveError] = useState("");
 
-    alert(
-      "Backend profile update will be connected in the next step."
-    );
+  const saveSettings = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    setMessage("");
+    setSaveError("");
+
+    try {
+      await updateMemberProfile({
+        fullName: form.fullName,
+        phone: form.phone,
+        email: form.email,
+        bio: form.bio,
+      });
+
+      if (form.password || form.confirmPassword) {
+        if (form.password !== form.confirmPassword) {
+          throw new Error("New password and confirmation do not match.");
+        }
+        await changeMemberPassword({
+          currentPassword: form.currentPassword || "",
+          newPassword: form.password,
+          confirmPassword: form.confirmPassword,
+        });
+      }
+
+      setForm((current) => ({
+        ...current,
+        password: "",
+        confirmPassword: "",
+        currentPassword: "",
+      }));
+      setMessage("Your account settings were updated successfully.");
+    } catch (err) {
+      setSaveError(err.response?.data?.message || err.message || "Unable to save settings.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -194,6 +230,26 @@ function Settings() {
 
                 <Lock size={16} />
 
+                Current Password
+
+              </label>
+
+              <input
+                type="password"
+                name="currentPassword"
+                value={form.currentPassword || ""}
+                onChange={handleChange}
+                placeholder="Required when changing password"
+              />
+
+            </div>
+
+            <div className="input-box">
+
+              <label>
+
+                <Lock size={16} />
+
                 New Password
 
               </label>
@@ -228,8 +284,12 @@ function Settings() {
 
           </div>
 
+          {saveError && <div className="settings-alert error">{saveError}</div>}
+          {message && <div className="settings-alert success">{message}</div>}
+
           <button
             className="save-settings-btn"
+            disabled={saving}
             type="submit"
           >
 

@@ -52,60 +52,19 @@ function DashboardTopbar({
   // ========================================
 
   const goToMessages = () => {
-    if (normalizedRole === "member") {
-      navigate("/member/messages");
-      return;
-    }
-
-    if (normalizedRole === "admin") {
-      navigate("/admin/messages");
-      return;
-    }
-
-    if (normalizedRole === "superadmin") {
-      navigate("/superadmin/messages");
-      return;
-    }
-
-    navigate(basePath);
+    if (normalizedRole === "member") navigate("/member/messages");
+    else if (normalizedRole === "admin") navigate("/admin/members");
+    else navigate("/superadmin/admins");
   };
 
   const goToNotifications = () => {
-    if (normalizedRole === "member") {
-      navigate("/member/notifications");
-      return;
-    }
-
-    if (normalizedRole === "admin") {
-      navigate("/admin/notifications");
-      return;
-    }
-
-    if (normalizedRole === "superadmin") {
-      navigate("/superadmin/notifications");
-      return;
-    }
-
-    navigate(basePath);
+    if (normalizedRole === "member") navigate("/member/notifications");
+    else navigate(basePath);
   };
 
   const goToSettings = () => {
-    if (normalizedRole === "member") {
-      navigate("/member/settings");
-      return;
-    }
-
-    if (normalizedRole === "admin") {
-      navigate("/admin/settings");
-      return;
-    }
-
-    if (normalizedRole === "superadmin") {
-      navigate("/superadmin/settings");
-      return;
-    }
-
-    navigate(basePath);
+    if (normalizedRole === "member") navigate("/member/settings");
+    else navigate(basePath);
   };
 
   // ========================================

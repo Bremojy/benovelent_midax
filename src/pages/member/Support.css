@@ -329,3 +329,14 @@
   }
 
 }
+.support-two-col { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+.support-field small { color:#777; }
+.support-cancel-button, .support-mini-button {
+  border:1px solid #ddd; background:#fff; color:#333; border-radius:10px;
+  padding:11px 15px; font-weight:700; cursor:pointer;
+}
+.support-mini-button { padding:7px 10px; font-size:12px; }
+.support-mini-button.danger { color:#b42318; }
+.support-item-right { display:flex; align-items:center; gap:8px; }
+.support-item small { display:block; margin-top:5px; color:#666; }
+@media(max-width:650px){ .support-two-col { grid-template-columns:1fr; } }

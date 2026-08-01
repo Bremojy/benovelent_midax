@@ -5,156 +5,41 @@ import {
   HandHeart,
   Bell,
   MessageCircle,
-  FileText,
-  UserCog,
+  UserRound,
+  UserPlus,
+  ShieldCheck,
   Settings,
-  ShieldCheck
+  ClipboardList,
+  Headphones,
 } from "lucide-react";
 
 export const dashboardMenus = {
-
   member: [
-
-    {
-      title: "Dashboard",
-      icon: LayoutDashboard,
-      path: "/member",
-    },
-
-    {
-  title: "Settings",
-  icon: Settings,
-  path: "/member/settings",
-},
-
-    {
-  title: "Notifications",
-  icon: Bell,
-  path: "/member/notifications",
-},
-
-    {
-      title: "My Contributions",
-      icon: Wallet,
-      path: "/member/contributions",
-    },
-
-    {
-      title: "Claims",
-      icon: HandHeart,
-      path: "/member/claims",
-    },
-
-    {
-      title: "Announcements",
-      icon: Bell,
-      path: "/member/announcements",
-    },
-
-    {
-      title: "Messages",
-      icon: MessageCircle,
-      path: "/member/messages",
-    },
-
-    {
-      title: "Profile",
-      icon: Users,
-      path: "/member/profile",
-    }
-
+    { title: "Dashboard", icon: LayoutDashboard, path: "/member" },
+    { title: "Profile", icon: UserRound, path: "/member/profile" },
+    { title: "Finance & Contributions", icon: Wallet, path: "/member/contributions" },
+    { title: "Claims", icon: HandHeart, path: "/member/claims" },
+    { title: "Support Centre", icon: Headphones, path: "/member/support" },
+    { title: "Dependents", icon: Users, path: "/member/dependents" },
+    { title: "Notifications", icon: Bell, path: "/member/notifications" },
+    { title: "Messages", icon: MessageCircle, path: "/member/messages" },
   ],
 
   admin: [
-
-    {
-      title: "Dashboard",
-      icon: LayoutDashboard,
-      path: "/admin",
-    },
-
-    {
-      title: "Members",
-      icon: Users,
-      path: "/admin/members",
-    },
-
-    {
-      title: "Claims",
-      icon: HandHeart,
-      path: "/admin/claims",
-    },
-
-    {
-      title: "Contributions",
-      icon: Wallet,
-      path: "/admin/contributions",
-    },
-
-    {
-      title: "Announcements",
-      icon: Bell,
-      path: "/admin/announcements",
-    },
-
-    {
-      title: "Messages",
-      icon: MessageCircle,
-      path: "/admin/messages",
-    },
-
-    {
-      title: "Reports",
-      icon: FileText,
-      path: "/admin/reports",
-    }
-
+    { title: "Dashboard", icon: LayoutDashboard, path: "/admin" },
+    { title: "Members", icon: Users, path: "/admin/members" },
+    { title: "Finance", icon: Wallet, path: "/admin/finance" },
+    { title: "Claims", icon: HandHeart, path: "/admin/claims" },
+    { title: "Support", icon: Headphones, path: "/admin/support" },
   ],
 
   superadmin: [
-
-    {
-      title: "Dashboard",
-      icon: LayoutDashboard,
-      path: "/superadmin",
-    },
-
-    {
-      title: "Admins",
-      icon: UserCog,
-      path: "/superadmin/admins",
-    },
-
-    {
-      title: "Members",
-      icon: Users,
-      path: "/superadmin/members",
-    },
-
-    {
-      title: "Finance",
-      icon: Wallet,
-      path: "/superadmin/finance",
-    },
-
-    {
-      title: "Reports",
-      icon: FileText,
-      path: "/superadmin/reports",
-    },
-
-    {
-      title: "Settings",
-      icon: Settings,
-      path: "/superadmin/settings",
-    },
-
-    {
-      title: "System",
-      icon: ShieldCheck,
-      path: "/superadmin/system",
-    }
-
-  ]
-
+    { title: "Dashboard", icon: LayoutDashboard, path: "/superadmin" },
+    { title: "Administrators", icon: UserPlus, path: "/superadmin/admins" },
+    { title: "Members", icon: Users, path: "/superadmin/members" },
+    { title: "Finance", icon: Wallet, path: "/superadmin/finance" },
+    { title: "Audit", icon: ClipboardList, path: "/superadmin/audit" },
+    { title: "Settings", icon: Settings, path: "/superadmin/settings" },
+    { title: "System", icon: ShieldCheck, path: "/superadmin/system" },
+  ],
 };

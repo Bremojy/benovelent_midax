@@ -1,397 +1,173 @@
-import {
-  useEffect,
-  useState,
-} from "react";
-
-import {
-  Mail,
-  Lock,
-  Eye,
-  EyeOff,
-  Loader2,
-} from "lucide-react";
-
-import {
-  useLocation,
-  useNavigate,
-} from "react-router-dom";
-
-import {
-  useAuth,
-} from "../context/AuthContext";
-
+import { useEffect, useState } from "react";
+import { Mail, Lock, Eye, EyeOff, Loader2, ShieldCheck } from "lucide-react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 import "./Login.css";
 
 function getPortalPath(role) {
-  switch (
-    (role || "").toLowerCase()
-  ) {
-    case "superadmin":
-      return "/superadmin";
-
-    case "admin":
-      return "/admin";
-
-    case "member":
-      return "/member";
-
-    default:
-      return "/login";
+  switch ((role || "").toLowerCase()) {
+    case "superadmin": return "/superadmin";
+    case "admin": return "/admin";
+    case "member": return "/member";
+    default: return "/login";
   }
 }
 
-function Login() {
-  const navigate =
-    useNavigate();
+export default function Login() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { login, user, loading: authLoading, isAuthenticated } = useAuth();
 
-  const location =
-    useLocation();
-
-  const {
-    login,
-    user,
-    loading: authLoading,
-    isAuthenticated,
-  } = useAuth();
-
-  const [email, setEmail] =
-    useState("");
-
-  const [password, setPassword] =
-    useState("");
-
-  const [error, setError] =
-    useState("");
-
-  const [loading, setLoading] =
-    useState(false);
-
-  const [showPassword, setShowPassword] =
-    useState(false);
-
-  // ======================================
-  // REDIRECT IF ALREADY LOGGED IN
-  // ======================================
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (
-      !authLoading &&
-      isAuthenticated &&
-      user
-    ) {
-      navigate(
-        getPortalPath(user.role),
-        { replace: true }
-      );
+    if (!authLoading && isAuthenticated && user) {
+      navigate(getPortalPath(user.role), { replace: true });
     }
-  }, [
-    authLoading,
-    isAuthenticated,
-    user,
-    navigate,
-  ]);
+  }, [authLoading, isAuthenticated, user, navigate]);
 
-  // ======================================
-  // LOGIN
-  // ======================================
-
-  const handleLogin = async (e) => {
-    e.preventDefault();
-
+  const handleLogin = async (event) => {
+    event.preventDefault();
     setError("");
 
-    const cleanEmail =
-      email.trim().toLowerCase();
+    const cleanEmail = email.trim().toLowerCase();
 
     if (!cleanEmail) {
-      setError(
-        "Please enter your email address."
-      );
+      setError("Please enter your email address.");
       return;
     }
-
     if (!password) {
-      setError(
-        "Please enter your password."
-      );
+      setError("Please enter your password.");
       return;
     }
 
     setLoading(true);
-
     try {
-      const result =
-        await login(
-          cleanEmail,
-          password
-        );
+      const result = await login(cleanEmail, password);
+      const role = (result?.user?.role || "").toLowerCase();
+      const portal = getPortalPath(role);
+      const from = location.state?.from;
 
-      const role =
-        result.user.role;
-
-      const portal =
-        getPortalPath(role);
-
-      const from =
-        location.state?.from;
-
-      // Only use a previous protected
-      // location if it belongs to the
-      // authenticated user's portal.
       const validPreviousPath =
         typeof from === "string" &&
-        (
-          (role === "member" &&
-            from.startsWith(
-              "/member"
-            )) ||
-          (role === "admin" &&
-            from.startsWith(
-              "/admin"
-            )) ||
-          (role === "superadmin" &&
-            from.startsWith(
-              "/superadmin"
-            ))
-        );
+        ((role === "member" && from.startsWith("/member")) ||
+          (role === "admin" && from.startsWith("/admin")) ||
+          (role === "superadmin" && from.startsWith("/superadmin")));
 
-      navigate(
-        validPreviousPath
-          ? from
-          : portal,
-        { replace: true }
-      );
-
+      navigate(validPreviousPath ? from : portal, { replace: true });
     } catch (err) {
-      console.error(
-        "Login failed:",
-        err
-      );
-
       setError(
         err.response?.data?.message ||
         err.message ||
-        "Unable to sign in. Please try again."
+        "Unable to sign in. Please check your details and try again."
       );
     } finally {
       setLoading(false);
     }
   };
 
-  // ======================================
-  // UI
-  // ======================================
+  const videoUrl =
+    import.meta.env.VITE_LOGIN_VIDEO_URL ||
+    "https://videos.pexels.com/video-files/6740283/6740283-hd_1920_1080_25fps.mp4";
 
   return (
     <main className="modern-login-page">
+      <video
+        className="login-video"
+        autoPlay
+        muted
+        loop
+        playsInline
+        poster="/hero.jpg"
+        aria-hidden="true"
+      >
+        <source src={videoUrl} type="video/mp4" />
+      </video>
 
-      <div className="login-background">
+      <div className="login-video-overlay" />
+      <div className="login-glow login-glow-one" />
+      <div className="login-glow login-glow-two" />
 
-        <div className="login-blob blob1"></div>
+      <div className="login-card-shell">
+        <div className="login-brand-mark">B</div>
 
-        <div className="login-blob blob2"></div>
-
-        <div className="login-blob blob3"></div>
-
-      </div>
-
-      <div className="login-wrapper">
-
-        {/* LEFT SIDE */}
-
-        <div className="login-info">
-
-          <div className="brand-badge">
-            BENEVOLENT MIDAX
-          </div>
-
-          <h1>
-            Welcome Back
-          </h1>
-
-          <div className="portal-badges">
-            <span>Member</span>
-            <span>Admin</span>
-            <span>
-              Super Admin
-            </span>
-          </div>
-
-          <p className="login-subtitle">
-            Sign in to access your
-            Benevolent Midax account.
-          </p>
-
-          <p>
-            Secure access to the
-            Benevolent Midax
-            Management System.
-            Manage members,
-            finances, assistance
-            requests and administration
-            from one centralized
-            dashboard.
-          </p>
-
-          <div className="login-features">
-
-            <div>
-              ✓ Secure Authentication
-            </div>
-
-            <div>
-              ✓ Member Management
-            </div>
-
-            <div>
-              ✓ Financial Tracking
-            </div>
-
-            <div>
-              ✓ Website Administration
-            </div>
-
-          </div>
-
+        <div className="login-card-heading">
+          <span className="login-kicker">
+            <ShieldCheck size={15} />
+            SECURE MEMBER ACCESS
+          </span>
+          <h1>Welcome back</h1>
+          <p>Sign in to continue to Benevolent Midax.</p>
         </div>
 
-        {/* LOGIN CARD */}
+        {error && (
+          <div className="login-error" role="alert">
+            {error}
+          </div>
+        )}
 
-        <div className="modern-login-card">
-
-          <div className="login-header">
-
-            <p className="section-label">
-              SECURE LOGIN
-            </p>
-
-            <h2>
-              Welcome Back
-            </h2>
-
-            <span>
-              Members, Administrators
-              and Super Administrators
-              can sign in here.
-            </span>
-
+        <form onSubmit={handleLogin} className="login-form">
+          <label htmlFor="login-email">Email Address</label>
+          <div className="input-group">
+            <Mail size={19} aria-hidden="true" />
+            <input
+              id="login-email"
+              type="email"
+              placeholder="Enter your email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              autoComplete="email"
+              disabled={loading}
+              required
+            />
           </div>
 
-          {error && (
-            <div className="login-error">
-              ⚠ {error}
-            </div>
-          )}
-
-          <form
-            onSubmit={handleLogin}
-            className="login-form"
-          >
-
-            <label>
-              Email Address
-            </label>
-
-            <div className="input-group">
-
-              <Mail size={19} />
-
-              <input
-                type="email"
-                placeholder="Enter your email"
-                value={email}
-                onChange={(e) =>
-                  setEmail(
-                    e.target.value
-                  )
-                }
-                autoComplete="email"
-                disabled={loading}
-                required
-              />
-
-            </div>
-
-            <label>
-              Password
-            </label>
-
-            <div className="input-group">
-
-              <Lock size={19} />
-
-              <input
-                type={
-                  showPassword
-                    ? "text"
-                    : "password"
-                }
-                placeholder="Enter your password"
-                value={password}
-                onChange={(e) =>
-                  setPassword(
-                    e.target.value
-                  )
-                }
-                autoComplete="current-password"
-                disabled={loading}
-                required
-              />
-
-              <button
-                type="button"
-                className="password-toggle"
-                onClick={() =>
-                  setShowPassword(
-                    (current) =>
-                      !current
-                  )
-                }
-                aria-label={
-                  showPassword
-                    ? "Hide password"
-                    : "Show password"
-                }
-                disabled={loading}
-              >
-                {showPassword ? (
-                  <EyeOff size={18} />
-                ) : (
-                  <Eye size={18} />
-                )}
-              </button>
-
-            </div>
-
+          <label htmlFor="login-password">Password</label>
+          <div className="input-group">
+            <Lock size={19} aria-hidden="true" />
+            <input
+              id="login-password"
+              type={showPassword ? "text" : "password"}
+              placeholder="Enter your password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoComplete="current-password"
+              disabled={loading}
+              required
+            />
             <button
-              type="submit"
-              className="login-button"
+              type="button"
+              className="password-toggle"
+              onClick={() => setShowPassword((visible) => !visible)}
+              aria-label={showPassword ? "Hide password" : "Show password"}
+              title={showPassword ? "Hide password" : "Show password"}
               disabled={loading}
             >
-
-              {loading ? (
-                <>
-                  <Loader2
-                    size={19}
-                    className="login-spinner"
-                  />
-
-                  Signing in...
-                </>
-              ) : (
-                "Sign In"
-              )}
-
+              {showPassword ? <EyeOff size={19} /> : <Eye size={19} />}
             </button>
+          </div>
 
-          </form>
+          <button type="submit" className="login-button" disabled={loading}>
+            {loading ? (
+              <>
+                <Loader2 size={19} className="login-spinner" />
+                Signing in...
+              </>
+            ) : (
+              "Sign In Securely"
+            )}
+          </button>
+        </form>
 
+        <div className="login-trust">
+          <ShieldCheck size={17} />
+          <span>Your account and access are protected.</span>
         </div>
-
       </div>
-
     </main>
   );
 }
-
-export default Login;

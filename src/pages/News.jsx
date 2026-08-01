@@ -31,14 +31,14 @@ function News() {
     try {
       const response = await api.get("/news");
 
-      if (Array.isArray(response.data)) {
-        setNews(response.data);
-        setFilteredNews(response.data);
-
-        if (response.data.length > 0) {
-          setFeatured(response.data[0]);
-        }
-      }
+      const items = Array.isArray(response.data)
+        ? response.data
+        : Array.isArray(response.data?.news)
+          ? response.data.news
+          : [];
+      setNews(items);
+      setFilteredNews(items);
+      if (items.length > 0) setFeatured(items[0]);
     } catch (error) {
       console.error("Failed to load news", error);
     } finally {
@@ -61,8 +61,8 @@ function News() {
     setFilteredNews(
       news.filter(
         (item) =>
-          item.title.toLowerCase().includes(keyword) ||
-          item.content.toLowerCase().includes(keyword)
+          (item.title || "").toLowerCase().includes(keyword) ||
+          (item.content || "").toLowerCase().includes(keyword)
       )
     );
   }, [search, news]);
@@ -144,9 +144,9 @@ function News() {
 
           <img
             src={
-              featured.imageUrl?.startsWith("http")
-                ? featured.imageUrl
-                : `${UPLOAD_URL}${featured.imageUrl}`
+              (featured.coverImage || featured.imageUrl || "").startsWith("http")
+                ? (featured.coverImage || featured.imageUrl)
+                : `${UPLOAD_URL}${featured.coverImage || featured.imageUrl || ""}`
             }
             alt={featured.title}
           />
@@ -233,9 +233,9 @@ function News() {
         {filteredNews.map((item)=>{
 
           const image =
-            item.imageUrl?.startsWith("http")
-              ? item.imageUrl
-              : `${UPLOAD_URL}${item.imageUrl}`;
+            (item.coverImage || item.imageUrl || "").startsWith("http")
+              ? (item.coverImage || item.imageUrl)
+              : `${UPLOAD_URL}${item.coverImage || item.imageUrl || ""}`;
 
           return(
 
@@ -274,9 +274,9 @@ function News() {
 
                 <p>
 
-                  {item.content.length>160
+                  {(item.content || "").length>160
                     ? item.content.substring(0,160)+"..."
-                    : item.content}
+                    : (item.content || "")}
 
                 </p>
 

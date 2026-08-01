@@ -1,508 +1,244 @@
-import {
-  useEffect,
-  useState,
-} from "react";
-
-import DashboardLayout
-  from "../../layouts/DashboardLayout";
-
-import {
-  getMemberClaims,
-  createMemberClaim,
-} from "../../services/memberService";
-
+import { useEffect, useState } from "react";
+import DashboardLayout from "../../layouts/DashboardLayout";
+import API from "../../services/api";
+import { getMemberClaims } from "../../services/memberService";
 import "./Support.css";
 
+const initialForm = {
+  type: "medical",
+  dependentId: "",
+  hospitalName: "",
+  hospitalLocation: "",
+  diagnosis: "",
+  requestedAmount: "",
+  deceasedType: "Member",
+  deceasedName: "",
+  relationship: "",
+  dateOfDeath: "",
+  burialDate: "",
+  burialLocation: "",
+  purpose: "",
+  school: "",
+  admissionNumber: "",
+  repaymentPeriodMonths: 12,
+};
+
 export default function Support() {
-  const [claims, setClaims] =
-    useState([]);
+  const [form, setForm] = useState(initialForm);
+  const [dependents, setDependents] = useState([]);
+  const [claims, setClaims] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
 
-  const [loading, setLoading] =
-    useState(true);
+  const load = async () => {
+    try {
+      setLoading(true);
+      setError("");
+      const [claimsRes, dependentsRes] = await Promise.all([
+        getMemberClaims(),
+        API.get("/member/dependents"),
+      ]);
+      setClaims(Array.isArray(claimsRes?.claims) ? claimsRes.claims : []);
+      setDependents(Array.isArray(dependentsRes?.data?.dependents) ? dependentsRes.data.dependents : []);
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || "Unable to load your support centre.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  const [submitting, setSubmitting] =
-    useState(false);
+  useEffect(() => { load(); }, []);
 
-  const [error, setError] =
-    useState("");
+  const set = (field, value) => setForm((current) => ({ ...current, [field]: value }));
 
-  const [success, setSuccess] =
-    useState("");
+  const submit = async (event) => {
+    event.preventDefault();
+    setError("");
+    setSuccess("");
 
-  const [form, setForm] =
-    useState({
-      type: "",
-      amount: "",
-      description: "",
-    });
+    try {
+      setSubmitting(true);
+      let endpoint;
+      let payload;
 
-  const loadClaims =
-    async () => {
-      try {
-        setLoading(true);
-        setError("");
-
-        const response =
-          await getMemberClaims();
-
-        if (
-          !response?.success
-        ) {
-          throw new Error(
-            response?.message ||
-              "Unable to load support requests."
-          );
+      if (form.type === "medical") {
+        if (!form.dependentId || !form.hospitalName || !form.diagnosis || Number(form.requestedAmount) <= 0) {
+          throw new Error("Please provide the dependent, hospital, diagnosis and requested amount.");
         }
-
-        setClaims(
-          Array.isArray(
-            response.claims
-          )
-            ? response.claims
-            : []
-        );
-
-      } catch (err) {
-        console.error(
-          "Claims error:",
-          err
-        );
-
-        setError(
-          err.response?.data?.message ||
-          err.message ||
-          "Unable to load support requests."
-        );
-      } finally {
-        setLoading(false);
-      }
-    };
-
-  useEffect(() => {
-    loadClaims();
-  }, []);
-
-
-  const handleChange =
-    (field, value) => {
-      setForm(
-        (current) => ({
-          ...current,
-          [field]: value,
-        })
-      );
-    };
-
-
-  const handleSubmit =
-    async (e) => {
-
-      e.preventDefault();
-
-      if (!form.type) {
-        setError(
-          "Please select a support type."
-        );
-
-        return;
-      }
-
-      if (!form.description.trim()) {
-        setError(
-          "Please describe your request."
-        );
-
-        return;
-      }
-
-      try {
-        setSubmitting(true);
-
-        setError("");
-        setSuccess("");
-
-        const response =
-          await createMemberClaim({
-            type: form.type,
-            amount:
-              Number(
-                form.amount || 0
-              ),
-            description:
-              form.description.trim(),
-          });
-
-        if (
-          !response?.success
-        ) {
-          throw new Error(
-            response?.message ||
-              "Unable to submit request."
-          );
+        endpoint = "/medical/apply";
+        payload = {
+          dependent: form.dependentId,
+          hospitalName: form.hospitalName.trim(),
+          hospitalLocation: form.hospitalLocation.trim(),
+          diagnosis: form.diagnosis.trim(),
+          requestedAmount: Number(form.requestedAmount),
+        };
+      } else if (form.type === "funeral") {
+        if (!form.deceasedName || !form.relationship || !form.dateOfDeath || !form.burialDate || !form.burialLocation || Number(form.requestedAmount) <= 0) {
+          throw new Error("Please complete the funeral support details and requested amount.");
         }
-
-        setSuccess(
-          "Your support request has been submitted successfully."
-        );
-
-        setForm({
-          type: "",
-          amount: "",
-          description: "",
-        });
-
-        await loadClaims();
-
-      } catch (err) {
-        console.error(
-          "Submit claim error:",
-          err
-        );
-
-        setError(
-          err.response?.data?.message ||
-          err.message ||
-          "Unable to submit support request."
-        );
-
-      } finally {
-        setSubmitting(false);
+        endpoint = "/funeral/apply";
+        payload = {
+          deceasedType: form.deceasedType,
+          deceasedName: form.deceasedName.trim(),
+          relationship: form.relationship.trim(),
+          dateOfDeath: form.dateOfDeath,
+          burialDate: form.burialDate,
+          burialLocation: form.burialLocation.trim(),
+          requestedAmount: Number(form.requestedAmount),
+        };
+      } else {
+        if (!form.dependentId || !form.purpose || !form.school || !form.admissionNumber || Number(form.requestedAmount) < 1000) {
+          throw new Error("Please complete the education support details. Minimum requested amount is KES 1,000.");
+        }
+        endpoint = "/education/apply";
+        payload = {
+          dependentId: form.dependentId,
+          purpose: form.purpose.trim(),
+          school: form.school.trim(),
+          admissionNumber: form.admissionNumber.trim(),
+          requestedAmount: Number(form.requestedAmount),
+          repaymentPeriodMonths: Number(form.repaymentPeriodMonths) || 12,
+        };
       }
-    };
 
+      const { data } = await API.post(endpoint, payload);
+      if (!data?.success) throw new Error(data?.message || "Unable to submit the application.");
+
+      setSuccess("Your support application was submitted successfully.");
+      setForm({ ...initialForm, type: form.type });
+      await load();
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || "Unable to submit support application.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <DashboardLayout>
-
       <div className="member-support-page">
-
         <section className="member-page-header">
-
-          <span>
-            MEMBER SUPPORT
-          </span>
-
-          <h1>
-            Request Support
-          </h1>
-
-          <p>
-            Submit and track your
-            benevolent support requests.
-          </p>
-
+          <span>MEMBER SUPPORT</span>
+          <h1>Support Centre</h1>
+          <p>Request assistance and track every application from one secure place.</p>
         </section>
 
-
-        {error && (
-          <div className="support-alert error">
-            {error}
-          </div>
-        )}
-
-        {success && (
-          <div className="support-alert success">
-            {success}
-          </div>
-        )}
-
+        {error && <div className="support-alert error">{error}</div>}
+        {success && <div className="support-alert success">{success}</div>}
 
         <div className="support-layout">
-
-          {/* FORM */}
-
           <section className="support-form-card">
-
             <div className="support-section-heading">
-
-              <span>
-                NEW REQUEST
-              </span>
-
-              <h2>
-                Submit Support Request
-              </h2>
-
+              <span>NEW APPLICATION</span>
+              <h2>Request Assistance</h2>
             </div>
 
-
-            <form
-              onSubmit={
-                handleSubmit
-              }
-            >
-
+            <form onSubmit={submit}>
               <div className="support-field">
-
-                <label>
-                  Support Type
-                </label>
-
-                <select
-                  value={
-                    form.type
-                  }
-                  onChange={(e) =>
-                    handleChange(
-                      "type",
-                      e.target.value
-                    )
-                  }
-                >
-
-                  <option value="">
-                    Select support type
-                  </option>
-
-                  <option value="medical">
-                    Medical Support
-                  </option>
-
-                  <option value="funeral">
-                    Funeral Support
-                  </option>
-
-                  <option value="education">
-                    Education Support
-                  </option>
-
+                <label>Assistance Type</label>
+                <select value={form.type} onChange={(e) => set("type", e.target.value)}>
+                  <option value="medical">Medical Support</option>
+                  <option value="funeral">Funeral Support</option>
+                  <option value="education">Education Support</option>
                 </select>
-
               </div>
 
+              {form.type === "medical" && (
+                <>
+                  <Field label="Dependent">
+                    <select value={form.dependentId} onChange={(e) => set("dependentId", e.target.value)}>
+                      <option value="">Select dependent</option>
+                      {dependents.map((d) => <option key={d._id} value={d._id}>{d.fullName || d.name || "Dependent"}</option>)}
+                    </select>
+                  </Field>
+                  <Field label="Hospital Name"><input value={form.hospitalName} onChange={(e) => set("hospitalName", e.target.value)} /></Field>
+                  <Field label="Hospital Location"><input value={form.hospitalLocation} onChange={(e) => set("hospitalLocation", e.target.value)} /></Field>
+                  <Field label="Diagnosis"><textarea rows="4" value={form.diagnosis} onChange={(e) => set("diagnosis", e.target.value)} /></Field>
+                </>
+              )}
 
-              <div className="support-field">
+              {form.type === "funeral" && (
+                <>
+                  <Field label="Deceased Type">
+                    <select value={form.deceasedType} onChange={(e) => set("deceasedType", e.target.value)}>
+                      <option value="Member">Member</option>
+                      <option value="Dependent">Dependent</option>
+                    </select>
+                  </Field>
+                  <Field label="Deceased Name"><input value={form.deceasedName} onChange={(e) => set("deceasedName", e.target.value)} /></Field>
+                  <Field label="Relationship"><input value={form.relationship} onChange={(e) => set("relationship", e.target.value)} /></Field>
+                  <div className="support-two-col">
+                    <Field label="Date of Death"><input type="date" value={form.dateOfDeath} onChange={(e) => set("dateOfDeath", e.target.value)} /></Field>
+                    <Field label="Burial Date"><input type="date" value={form.burialDate} onChange={(e) => set("burialDate", e.target.value)} /></Field>
+                  </div>
+                  <Field label="Burial Location"><input value={form.burialLocation} onChange={(e) => set("burialLocation", e.target.value)} /></Field>
+                </>
+              )}
 
-                <label>
-                  Amount Requested
-                </label>
+              {form.type === "education" && (
+                <>
+                  <Field label="Dependent">
+                    <select value={form.dependentId} onChange={(e) => set("dependentId", e.target.value)}>
+                      <option value="">Select dependent</option>
+                      {dependents.map((d) => <option key={d._id} value={d._id}>{d.fullName || d.name || "Dependent"}</option>)}
+                    </select>
+                  </Field>
+                  <Field label="School"><input value={form.school} onChange={(e) => set("school", e.target.value)} /></Field>
+                  <Field label="Admission Number"><input value={form.admissionNumber} onChange={(e) => set("admissionNumber", e.target.value)} /></Field>
+                  <Field label="Purpose"><textarea rows="4" value={form.purpose} onChange={(e) => set("purpose", e.target.value)} /></Field>
+                  <Field label="Repayment Period (months)"><input type="number" min="1" value={form.repaymentPeriodMonths} onChange={(e) => set("repaymentPeriodMonths", e.target.value)} /></Field>
+                </>
+              )}
 
-                <input
-                  type="number"
-                  min="0"
-                  value={
-                    form.amount
-                  }
-                  onChange={(e) =>
-                    handleChange(
-                      "amount",
-                      e.target.value
-                    )
-                  }
-                  placeholder="KES 0"
-                />
+              <Field label="Requested Amount (KES)">
+                <input type="number" min="0" value={form.requestedAmount} onChange={(e) => set("requestedAmount", e.target.value)} />
+              </Field>
 
-              </div>
-
-
-              <div className="support-field">
-
-                <label>
-                  Description
-                </label>
-
-                <textarea
-                  rows="6"
-                  value={
-                    form.description
-                  }
-                  onChange={(e) =>
-                    handleChange(
-                      "description",
-                      e.target.value
-                    )
-                  }
-                  placeholder="Explain why you are requesting support..."
-                />
-
-              </div>
-
-
-              <button
-                className="support-submit-button"
-                type="submit"
-                disabled={
-                  submitting
-                }
-              >
-                {submitting
-                  ? "Submitting..."
-                  : "Submit Request"}
+              <button className="support-submit-button" type="submit" disabled={submitting}>
+                {submitting ? "Submitting..." : "Submit Application"}
               </button>
-
             </form>
-
           </section>
-
-
-          {/* HISTORY */}
 
           <section className="support-history-card">
-
             <div className="support-section-heading">
-
-              <span>
-                MY REQUESTS
-              </span>
-
-              <h2>
-                Support History
-              </h2>
-
+              <span>APPLICATION HISTORY</span>
+              <h2>My Requests</h2>
             </div>
 
-
             {loading ? (
-
-              <div className="support-loading">
-                Loading requests...
-              </div>
-
+              <div className="support-loading">Loading your applications...</div>
             ) : claims.length === 0 ? (
-
-              <div className="support-empty">
-
-                <h3>
-                  No requests yet
-                </h3>
-
-                <p>
-                  Your support requests
-                  will appear here.
-                </p>
-
-              </div>
-
+              <div className="support-empty"><h3>No applications yet</h3><p>Your submitted assistance requests will appear here.</p></div>
             ) : (
-
               <div className="support-list">
-
-                {claims.map(
-                  (claim, index) => (
-
-                    <div
-                      className="support-item"
-                      key={
-                        claim._id ||
-                        index
-                      }
-                    >
-
-                      <div>
-
-                        <strong>
-                          {formatType(
-                            claim.type
-                          )}
-                        </strong>
-
-                        <span>
-                          {formatDate(
-                            claim.createdAt ||
-                            claim.date
-                          )}
-                        </span>
-
-                      </div>
-
-
-                      <div className="support-item-right">
-
-                        <strong>
-                          {formatCurrency(
-                            claim.amount
-                          )}
-                        </strong>
-
-                        <span
-                          className={`claim-status ${
-                            String(
-                              claim.status ||
-                              "pending"
-                            ).toLowerCase()
-                          }`}
-                        >
-                          {
-                            claim.status ||
-                            "Pending"
-                          }
-                        </span>
-
-                      </div>
-
+                {claims.map((claim) => (
+                  <div className="support-item" key={`${claim.supportType}-${claim._id}`}>
+                    <div>
+                      <strong>{title(claim.supportType)} Support</strong>
+                      <span>{formatDate(claim.createdAt || claim.applicationDate)}</span>
                     </div>
-
-                  )
-                )}
-
+                    <div className="support-item-right">
+                      <strong>{money(claim.amount)}</strong>
+                      <span className={`claim-status ${String(claim.status || "pending").toLowerCase().replace(/\s+/g, "-")}`}>{claim.status || "Pending"}</span>
+                    </div>
+                  </div>
+                ))}
               </div>
-
             )}
-
           </section>
-
         </div>
-
       </div>
-
     </DashboardLayout>
   );
 }
 
-
-function formatType(type) {
-  const value =
-    String(type || "");
-
-  return value
-    .replace(
-      /^./,
-      (char) =>
-        char.toUpperCase()
-    )
-    .replace(
-      /_/g,
-      " "
-    );
+function Field({ label, children }) {
+  return <div className="support-field"><label>{label}</label>{children}</div>;
 }
-
-
-function formatCurrency(value) {
-  return new Intl.NumberFormat(
-    "en-KE",
-    {
-      style: "currency",
-      currency: "KES",
-      maximumFractionDigits: 2,
-    }
-  ).format(
-    Number(value || 0)
-  );
-}
-
-
-function formatDate(value) {
-  if (!value) {
-    return "—";
-  }
-
-  const date =
-    new Date(value);
-
-  if (
-    Number.isNaN(
-      date.getTime()
-    )
-  ) {
-    return "—";
-  }
-
-  return date.toLocaleDateString(
-    "en-KE",
-    {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    }
-  );
-}
+const title = (v) => String(v || "").replace(/^./, (c) => c.toUpperCase());
+const money = (v) => new Intl.NumberFormat("en-KE", { style: "currency", currency: "KES", maximumFractionDigits: 0 }).format(Number(v || 0));
+const formatDate = (v) => v ? new Date(v).toLocaleDateString("en-KE", { day: "2-digit", month: "short", year: "numeric" }) : "—";

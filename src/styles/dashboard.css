@@ -68,3 +68,15 @@ padding:16px;
 }
 
 }
+/* Modern application background - authenticated portals only */
+.dashboard-container {
+    position: relative;
+    background:
+      radial-gradient(circle at 12% 8%, rgba(255,122,0,.07), transparent 28%),
+      radial-gradient(circle at 92% 86%, rgba(80,90,100,.07), transparent 30%),
+      #f5f7fb;
+}
+
+.dashboard-page {
+    position: relative;
+}
