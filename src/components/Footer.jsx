@@ -76,6 +76,20 @@ function Footer() {
             Contact
           </Link>
 
+          <h3>Resources</h3>
+
+<Link to="/constitution">
+Constitution
+</Link>
+
+<Link to="/news">
+News
+</Link>
+
+<Link to="/gallery">
+Gallery
+</Link>
+
         </div>
 
 
@@ -144,7 +158,7 @@ function Footer() {
         <div className="footer-bottom-links">
 
           <Link to="/login">
-            Admin Login
+            Portal Login
           </Link>
 
           <button

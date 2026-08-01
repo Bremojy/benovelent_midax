@@ -87,7 +87,7 @@ function Services() {
           <strong>24/7</strong>
 
           <span>
-            Emergency Response
+            Education Response
           </span>
 
         </div>
@@ -246,7 +246,7 @@ function Services() {
   </div>
 
   {/* =====================================
-      EMERGENCY SUPPORT
+      Education Support
   ===================================== */}
 
   <div className="modern-service-card">
@@ -260,35 +260,41 @@ function Services() {
       </div>
 
       <span className="service-tag">
-        Emergency
+        Education
       </span>
 
     </div>
 
     <h2>
-      Emergency Support
+      Education Support
     </h2>
 
     <p>
 
-      Immediate assistance for urgent
-      situations where members require
-      additional support under the scheme.
+      Education Support provides affordable
+education assistance to eligible members
+and their dependents in accordance with
+the Benevolent Midax Constitution.
 
     </p>
+
 
     <ul>
 
       <li>
-        ✓ Urgent cases assessed quickly
+        ✓ Maximum KES 20,000
       </li>
 
       <li>
-        ✓ Assistance subject to resources
+        ✓ 10% repayment only
       </li>
 
       <li>
-        ✓ Transparent review process
+      ✓ Maximum four beneficiaries monthly
+      </li>
+
+      <li>
+        ✓ Subject to committee approval
       </li>
 
     </ul>
@@ -327,7 +333,7 @@ function Services() {
     <p>
 
       All benefits, financial assistance and
-      emergency support are provided in accordance
+      Education Support are provided in accordance
       with the Benevolent Midax Constitution,
       membership eligibility requirements,
       available funds and approved claim procedures.

@@ -41,8 +41,12 @@ const Leaders = lazy(
   () => import("./pages/Leaders")
 );
 
-const Members = lazy(
-  () => import("./pages/Members")
+const Constitution = lazy(
+  () => import("./pages/Constitution")
+);
+
+const Gallery = lazy(
+  () => import("./pages/Gallery")
 );
 
 const News = lazy(
@@ -269,11 +273,15 @@ function AppContent() {
             path="/leaders"
             element={<Leaders />}
           />
+        <Route
+  path="/constitution"
+  element={<Constitution />}
+/>
 
-          <Route
-            path="/members"
-            element={<Members />}
-          />
+<Route
+  path="/gallery"
+  element={<Gallery />}
+/>
 
           <Route
             path="/news"

@@ -94,7 +94,29 @@ function Navbar() {
           >
             Services
           </Link>
+  <Link
+  to="/constitution"
+  className={
+    isActive("/constitution")
+      ? "nav-link active"
+      : "nav-link"
+  }
+  onClick={closeMenu}
+>
+  Constitution
+</Link>
 
+<Link
+  to="/gallery"
+  className={
+    isActive("/gallery")
+      ? "nav-link active"
+      : "nav-link"
+  }
+  onClick={closeMenu}
+>
+  Gallery
+</Link>
           <Link
             to="/leaders"
             className={
@@ -104,19 +126,7 @@ function Navbar() {
             }
             onClick={closeMenu}
           >
-            Leaders
-          </Link>
-
-          <Link
-            to="/members"
-            className={
-              isActive("/members")
-                ? "nav-link active"
-                : "nav-link"
-            }
-            onClick={closeMenu}
-          >
-            Members
+            Leadership
           </Link>
 
           <Link
@@ -150,7 +160,7 @@ function Navbar() {
             className="admin-link"
             onClick={closeMenu}
           >
-            Member Login
+           Login
           </Link>
 
         </nav>

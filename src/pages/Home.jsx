@@ -1,4 +1,4 @@
-import { Heart, Stethoscope, Users } from "lucide-react";
+import { Heart, Stethoscope, GraduationCap } from "lucide-react";
 import { Link } from "react-router-dom";
 import Hero from "../components/Hero";
 
@@ -41,7 +41,7 @@ function Home() {
               <p>
                 Through our benevolent support scheme, we
                 aim to provide assistance for eligible
-                funeral and medical needs while promoting
+                funeral, medical and education support. while promoting
                 unity, accountability and compassion among
                 our members.
               </p>
@@ -133,11 +133,11 @@ function Home() {
             <div className="service-card">
 
               <div className="service-icon">
-                <Users size={32} />
+                <GraduationCap size={32} />
               </div>
 
               <h3>
-                Community Support
+                Education Support
               </h3>
 
               <p>
