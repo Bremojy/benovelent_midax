@@ -1,3 +1,4 @@
+import "./Constitution.css";
 import { Link } from "react-router-dom";
 import {
   ShieldCheck,
@@ -10,7 +11,22 @@ function Constitution() {
   return (
     <main className="constitution-page">
 
-      <section className="constitution-hero">
+      <section className="constitution-hero constitution-video-hero">
+        <video
+          className="constitution-background-video"
+          autoPlay
+          muted
+          loop
+          playsInline
+          poster="/hero.jpg"
+          aria-hidden="true"
+        >
+          <source
+            src={import.meta.env.VITE_CONSTITUTION_VIDEO_URL || "/videos/benevolent-community-loop.mp4"}
+            type="video/mp4"
+          />
+        </video>
+        <div className="constitution-video-overlay" />
 
         <div className="section-container">
 

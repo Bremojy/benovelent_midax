@@ -12,6 +12,8 @@ const {
     isSuperAdmin
 } = require("../middleware/roleMiddleware");
 
+const { uploadArray, setUploadType } = require("../middleware/upload");
+
 console.log("verifyToken:", typeof verifyToken);
 console.log("isMember:", typeof isMember);
 console.log("isAdmin:", typeof isAdmin);
@@ -42,6 +44,8 @@ router.post(
     "/apply",
     verifyToken,
     isMember,
+    setUploadType("support"),
+    uploadArray("documents", 10),
     medicalController.createMedicalApplication
 );
 

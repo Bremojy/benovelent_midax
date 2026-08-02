@@ -41,6 +41,8 @@ require("../middleware/profileCompletionMiddleware");
 const admin =
 require("../middleware/adminMiddleware");
 
+const { uploadFields, setUploadType } = require("../middleware/upload");
+
 const superAdmin =
 require("../middleware/superAdminMiddleware");
 
@@ -59,6 +61,13 @@ router.post(
     memberStatus,
 
     profileCompleted,
+    setUploadType("support"),
+    uploadFields([
+        { name: "deathCertificate", maxCount: 1 },
+        { name: "burialPermit", maxCount: 1 },
+        { name: "chiefLetter", maxCount: 1 },
+        { name: "supportingDocuments", maxCount: 10 },
+    ]),
 
     applyFuneralSupport
 

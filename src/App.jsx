@@ -61,6 +61,12 @@ const Login = lazy(
   () => import("./pages/Login")
 );
 
+const PortalSettings = lazy(
+  () => import("./pages/PortalSettings")
+);
+
+const Polls = lazy(() => import("./pages/Polls"));
+
 
 // =====================================================
 // ADMIN PAGES
@@ -350,6 +356,8 @@ function AppContent() {
           <Route path="/admin/finance" element={<ProtectedRoute allowedRoles={["admin"]}><AdminFinance /></ProtectedRoute>} />
           <Route path="/admin/claims" element={<ProtectedRoute allowedRoles={["admin"]}><AdminClaims /></ProtectedRoute>} />
           <Route path="/admin/support" element={<ProtectedRoute allowedRoles={["admin"]}><AdminSupport /></ProtectedRoute>} />
+          <Route path="/admin/settings" element={<ProtectedRoute allowedRoles={["admin"]}><PortalSettings /></ProtectedRoute>} />
+          <Route path="/admin/polls" element={<ProtectedRoute allowedRoles={["admin"]}><Polls mode="admin" /></ProtectedRoute>} />
 
 
           {/* =================================================
@@ -455,7 +463,7 @@ function AppContent() {
                   "member",
                 ]}
               >
-                <Settings />
+                <PortalSettings />
               </ProtectedRoute>
             }
           />
@@ -487,6 +495,7 @@ function AppContent() {
           />
 
           <Route path="/member/dependents" element={<ProtectedRoute allowedRoles={["member"]}><Dependents /></ProtectedRoute>} />
+          <Route path="/member/polls" element={<ProtectedRoute allowedRoles={["member"]}><Polls mode="member" /></ProtectedRoute>} />
 
 
           {/* =================================================
@@ -526,8 +535,9 @@ function AppContent() {
           <Route path="/superadmin/members" element={<ProtectedRoute allowedRoles={["superadmin"]}><AdminMembers /></ProtectedRoute>} />
           <Route path="/superadmin/finance" element={<ProtectedRoute allowedRoles={["superadmin"]}><AdminFinance /></ProtectedRoute>} />
           <Route path="/superadmin/audit" element={<ProtectedRoute allowedRoles={["superadmin"]}><SuperAdminAudit /></ProtectedRoute>} />
-          <Route path="/superadmin/settings" element={<ProtectedRoute allowedRoles={["superadmin"]}><SuperAdminSettings /></ProtectedRoute>} />
+          <Route path="/superadmin/settings" element={<ProtectedRoute allowedRoles={["superadmin"]}><PortalSettings /></ProtectedRoute>} />
           <Route path="/superadmin/system" element={<ProtectedRoute allowedRoles={["superadmin"]}><SuperAdminSystem /></ProtectedRoute>} />
+          <Route path="/superadmin/polls" element={<ProtectedRoute allowedRoles={["superadmin"]}><Polls mode="superadmin" /></ProtectedRoute>} />
 
 
           {/* =================================================

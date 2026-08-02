@@ -198,6 +198,10 @@ exports.login = async (req, res) => {
           user.profilePhoto ||
           "",
 
+        themeColor:
+          user.themeColor ||
+          "#ff7a00",
+
         memberNumber:
           user.memberNumber || null,
 

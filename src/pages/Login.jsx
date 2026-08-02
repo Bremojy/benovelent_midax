@@ -23,6 +23,7 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [videoFailed, setVideoFailed] = useState(false);
 
   useEffect(() => {
     if (!authLoading && isAuthenticated && user) {
@@ -72,22 +73,22 @@ export default function Login() {
 
   const videoUrl =
     import.meta.env.VITE_LOGIN_VIDEO_URL ||
-    "https://videos.pexels.com/video-files/6740283/6740283-hd_1920_1080_25fps.mp4";
+    "/videos/benevolent-community-loop.mp4";
 
   return (
-    <main className="modern-login-page">
-      <video
+    <main className={`modern-login-page ${videoFailed ? "video-failed" : ""}`}>
+      {!videoFailed && <video
         className="login-video"
         autoPlay
         muted
         loop
         playsInline
         poster="/hero.jpg"
+        onError={() => setVideoFailed(true)}
         aria-hidden="true"
       >
         <source src={videoUrl} type="video/mp4" />
-      </video>
-
+      </video>}
       <div className="login-video-overlay" />
       <div className="login-glow login-glow-one" />
       <div className="login-glow login-glow-two" />

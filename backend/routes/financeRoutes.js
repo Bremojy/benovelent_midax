@@ -14,19 +14,20 @@ const {
 } = require("../controllers/financeController");
 
 const { verifyToken: protect } = require("../middleware/authMiddleware");
+const { isAdminOrSuperAdmin, isMember } = require("../middleware/roleMiddleware");
 
 // ==========================================
 // FINANCE ROUTES
 // ==========================================
 
 // Create a transaction (Admin / Super Admin)
-router.post("/", protect, createTransaction);
+router.post("/", protect, isAdminOrSuperAdmin, createTransaction);
 
 // Get all transactions
-router.get("/", protect, getTransactions);
+router.get("/", protect, isAdminOrSuperAdmin, getTransactions);
 
 // Finance dashboard summary
-router.get("/summary/dashboard", protect, getFinanceSummary);
+router.get("/summary/dashboard", protect, isAdminOrSuperAdmin, getFinanceSummary);
 
 // Get member transaction history
 router.get("/member/:memberId", protect, getMemberTransactions);
@@ -35,15 +36,15 @@ router.get("/member/:memberId", protect, getMemberTransactions);
 router.get("/:id", protect, getTransaction);
 
 // Update transaction
-router.put("/:id", protect, updateTransaction);
+router.put("/:id", protect, isAdminOrSuperAdmin, updateTransaction);
 
 // Delete transaction
-router.delete("/:id", protect, deleteTransaction);
+router.delete("/:id", protect, isAdminOrSuperAdmin, deleteTransaction);
 
 // Approve transaction
-router.put("/:id/approve", protect, approveTransaction);
+router.put("/:id/approve", protect, isAdminOrSuperAdmin, approveTransaction);
 
 // Reject transaction
-router.put("/:id/reject", protect, rejectTransaction);
+router.put("/:id/reject", protect, isAdminOrSuperAdmin, rejectTransaction);
 
 module.exports = router;

@@ -1,6 +1,7 @@
 const express = require("express");
 const {
   uploadFields,
+  setUploadType,
 } = require("../middleware/upload");
 const router = express.Router();
 
@@ -41,6 +42,11 @@ const {
   filterMembers,
   monthlyRegistrations,
   contributionSummary,
+  getProfile,
+  updateProfile,
+  changePassword,
+  getSettings,
+  updateSettings,
 } = require("../controllers/adminController");
 
 // =======================================
@@ -54,10 +60,31 @@ router.get(
   getDashboard
 );
 
+// =======================================
+// ADMIN PROFILE / SECURITY / PREFERENCES
+// =======================================
+
+router.get("/profile", protect, isAdmin, getProfile);
+
+router.put(
+  "/profile",
+  protect,
+  isAdmin,
+  setUploadType("profiles"),
+  uploadFields([{ name: "profileImage", maxCount: 1 }]),
+  updateProfile
+);
+
+router.put("/change-password", protect, isAdmin, changePassword);
+
+router.get("/settings", protect, isAdmin, getSettings);
+router.put("/settings", protect, isAdmin, updateSettings);
+
 router.post(
   "/members",
   protect,
   isAdminOrSuperAdmin,
+  setUploadType("member-documents"),
   uploadFields([
     { name: "profileImage", maxCount: 1 },
     { name: "passportPhoto", maxCount: 1 },
@@ -153,17 +180,6 @@ router.get(
   protect,
   isAdminOrSuperAdmin,
   getMember
-);
-
-// =======================================
-// CREATE MEMBER
-// =======================================
-
-router.post(
-  "/members",
-  protect,
-  isAdminOrSuperAdmin,
-  createMember
 );
 
 // =======================================

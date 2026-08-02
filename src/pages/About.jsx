@@ -16,7 +16,22 @@ function About() {
 
       {/* HERO */}
 
-      <section className="about-hero">
+      <section className="about-hero about-video-hero">
+        <video
+          className="about-background-video"
+          autoPlay
+          muted
+          loop
+          playsInline
+          poster="/hero.jpg"
+          aria-hidden="true"
+        >
+          <source
+            src={import.meta.env.VITE_ABOUT_VIDEO_URL || "/videos/benevolent-community-loop.mp4"}
+            type="video/mp4"
+          />
+        </video>
+        <div className="about-video-overlay" />
 
         <div className="about-hero-content">
 
@@ -92,8 +107,9 @@ function About() {
             <div className="about-image">
 
               <img
-                src="/about.jpg"
-                alt="Benevolent Midax"
+                src="/about-welcome.svg"
+                alt="Benevolent Midax community welcome"
+                onError={(e) => { e.currentTarget.src = "/hero.jpg"; }}
               />
 
             </div>

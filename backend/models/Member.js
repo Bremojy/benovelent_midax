@@ -129,9 +129,7 @@ index:true,
 
     isDeleted: {
       type: Boolean,
-      deletedAt:Date,
       default: false,
-      
     },
     deletedBy: {
   type: mongoose.Schema.Types.ObjectId,
@@ -420,6 +418,12 @@ updatedBy: {
     darkMode: {
       type: Boolean,
       default: false,
+    },
+
+    themeColor: {
+      type: String,
+      default: "#ff7a00",
+      match: /^#[0-9a-fA-F]{6}$/,
     },
 
     language: {

@@ -8,6 +8,7 @@ import DashboardLayout
 
 import {
   getMemberContributions,
+  getMemberFinance,
 } from "../../services/memberService";
 
 import "./Contributions.css";
@@ -15,6 +16,7 @@ import "./Contributions.css";
 export default function Contributions() {
   const [data, setData] =
     useState(null);
+  const [finance, setFinance] = useState([]);
 
   const [loading, setLoading] =
     useState(true);
@@ -28,8 +30,10 @@ export default function Contributions() {
         setLoading(true);
         setError("");
 
-        const response =
-          await getMemberContributions();
+        const [response, financeResponse] = await Promise.all([
+          getMemberContributions(),
+          getMemberFinance(),
+        ]);
 
         if (
           !response?.success
@@ -40,9 +44,8 @@ export default function Contributions() {
           );
         }
 
-        setData(
-          response
-        );
+        setData(response);
+        setFinance(Array.isArray(financeResponse?.transactions) ? financeResponse.transactions : []);
 
       } catch (err) {
         console.error(
@@ -325,6 +328,26 @@ export default function Contributions() {
 
           )}
 
+        </section>
+
+        <section className="contribution-history-card finance-ledger-card">
+          <div className="member-section-heading">
+            <div>
+              <span>SUPPORT & FINANCE LEDGER</span>
+              <h2>Transactions linked to your membership</h2>
+            </div>
+            <strong>{finance.length}</strong>
+          </div>
+          {finance.length === 0 ? (
+            <div className="empty-member-state"><h3>No support transactions recorded</h3><p>Approved support and finance transactions will appear here.</p></div>
+          ) : (
+            <div className="contribution-table-wrapper">
+              <table className="contribution-table">
+                <thead><tr><th>Date</th><th>Type</th><th>Description</th><th>Amount</th><th>Status</th></tr></thead>
+                <tbody>{finance.map((item,index)=><tr key={item._id||index}><td>{formatDate(item.transactionDate||item.createdAt)}</td><td>{item.type||"—"}</td><td>{item.description||item.category||"—"}</td><td className="amount-cell">{formatCurrency(item.amount)}</td><td><span className={`payment-status ${String(item.status||"pending").toLowerCase()}`}>{item.status||"Pending"}</span></td></tr>)}</tbody>
+              </table>
+            </div>
+          )}
         </section>
 
       </div>

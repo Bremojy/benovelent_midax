@@ -95,6 +95,12 @@ const adminSchema = new mongoose.Schema(
     default: "",
 },
 
+    themeColor: {
+      type: String,
+      default: "#ff7a00",
+      match: /^#[0-9a-fA-F]{6}$/,
+    },
+
 createdBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "SuperAdmin",

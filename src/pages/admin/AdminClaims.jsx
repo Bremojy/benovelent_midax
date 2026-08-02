@@ -54,10 +54,24 @@ export default function AdminClaims() {
   return <DashboardLayout><div className="portal-module">
     <header className="portal-module-header"><div><span>ASSISTANCE PROCESSING</span><h1>Claims</h1><p>Review and process medical, funeral and education assistance applications.</p></div><button className="portal-btn" onClick={load}>Refresh</button></header>
     {error&&<div className="portal-alert">{error}</div>}
+    <section className="portal-panel claim-guide">
+      <h2>Administrator processing guide</h2>
+      <div className="claim-guide-grid">
+        <div><b>1. Review</b><span>Open the application and verify the member details and supporting documents.</span></div>
+        <div><b>2. Decide</b><span>Move the application through review, approval or rejection using the controls below.</span></div>
+        <div><b>3. Disburse</b><span>After approval, record payment/disbursement so the member portal reflects the live status.</span></div>
+        <div><b>4. Communicate</b><span>Member notifications are generated from the backend workflow.</span></div>
+      </div>
+    </section>
     <section className="portal-panel">
       {loading?<div className="portal-empty">Loading applications...</div>:items.length===0?<div className="portal-empty">No assistance applications found.</div>:
-      <div className="portal-table-wrap"><table className="portal-table"><thead><tr><th>Type</th><th>Applicant</th><th>Amount</th><th>Date</th><th>Status</th><th>Actions</th></tr></thead><tbody>
-      {items.map((x,i)=><tr key={`${x.supportType}-${x._id||i}`}><td>{x.supportType}</td><td>{x.member?.fullName||x.contributorName||x.memberNumber||"Member"}</td><td>{money(x.requestedAmount||x.amount)}</td><td>{date(x.createdAt||x.applicationDate)}</td><td><span className="portal-badge">{x.status||"Pending"}</span></td><td><div className="portal-actions">{!["Approved","Paid","Closed","Disbursed","Completed"].includes(x.status)&&<><button className="portal-btn" disabled={busy===`approve-${x._id}`} onClick={()=>action(x,"approve")}>Approve</button><button className="portal-btn danger" disabled={busy===`reject-${x._id}`} onClick={()=>action(x,"reject")}>Reject</button></>}</div></td></tr>)}
+      <div className="portal-table-wrap"><table className="portal-table"><thead><tr><th>Type</th><th>Applicant</th><th>Amount</th><th>Date</th><th>Status</th><th>Documents</th><th>Actions</th></tr></thead><tbody>
+      {items.map((x,i)=><tr key={`${x.supportType}-${x._id||i}`}><td>{x.supportType}</td><td>{x.member?.fullName||x.contributorName||x.memberNumber||"Member"}</td><td>{money(x.requestedAmount||x.amount)}</td><td>{date(x.createdAt||x.applicationDate)}</td><td><span className="portal-badge">{x.status||"Pending"}</span></td><td>{Array.isArray(x.documents) && x.documents.length ? x.documents.map((doc, index) => {
+  const url = typeof doc === "string" ? doc : doc?.fileUrl;
+  if (!url) return null;
+  const full = url.startsWith("http") ? url : `${import.meta.env.VITE_API_URL || "http://localhost:5000"}${url.startsWith("/") ? "" : "/"}${url}`;
+  return <a key={`${url}-${index}`} href={full} target="_blank" rel="noreferrer">Doc {index + 1}</a>;
+}) : "—"}</td><td><div className="portal-actions">{!["Approved","Paid","Closed","Disbursed","Completed"].includes(x.status)&&<><button className="portal-btn" disabled={busy===`approve-${x._id}`} onClick={()=>action(x,"approve")}>Approve</button><button className="portal-btn danger" disabled={busy===`reject-${x._id}`} onClick={()=>action(x,"reject")}>Reject</button></>}</div></td></tr>)}
       </tbody></table></div>}
     </section>
   </div></DashboardLayout>

@@ -232,3 +232,6 @@
     font-size: 29px;
   }
 }
+
+.modern-login-page.video-failed{background:linear-gradient(135deg,#1b1e22 0%,#5b320d 55%,#ff7a00 140%)}
+.modern-login-page.video-failed::before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 70% 30%,rgba(255,190,100,.2),transparent 35%),linear-gradient(135deg,rgba(255,122,0,.15),transparent 55%);z-index:-2}

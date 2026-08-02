@@ -22,6 +22,12 @@ profileImage:{
 type:String,
 default:"",
 },
+
+themeColor:{
+type:String,
+default:"#ff7a00",
+match:/^#[0-9a-fA-F]{6}$/,
+},
 online:{
 type:Boolean,
 default:false,

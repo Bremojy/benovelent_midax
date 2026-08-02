@@ -103,6 +103,27 @@ app.get("/", (req, res) => {
     });
 });
 
+app.get("/api/health", (req, res) => {
+    const readyState = mongoose.connection.readyState;
+    const database =
+        readyState === 1
+            ? "connected"
+            : readyState === 2
+                ? "connecting"
+                : readyState === 3
+                    ? "disconnecting"
+                    : "disconnected";
+
+    res.status(200).json({
+        success: true,
+        application: "Benevolent Midax API",
+        status: "Running",
+        database,
+        environment: process.env.NODE_ENV || "development",
+        timestamp: new Date().toISOString(),
+    });
+});
+
 // ===============================================
 // API ROUTES
 // ===============================================
@@ -170,8 +191,15 @@ app.use(errorHandler);
 // DATABASE
 // ===============================================
 
+if (!process.env.MONGO_URI) {
+    console.error("❌ MONGO_URI is missing. Create backend/.env before starting.");
+    process.exit(1);
+}
+
 mongoose
-    .connect(process.env.MONGO_URI)
+    .connect(process.env.MONGO_URI, {
+        serverSelectionTimeoutMS: 15000,
+    })
     .then(() => {
 
         console.log("======================================");

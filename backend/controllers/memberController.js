@@ -6,6 +6,9 @@ const News = require("../models/News");
 const Message = require("../models/Message");
 const Notification = require("../models/Notification");
 const Dependent = require("../models/Dependent");
+const MedicalSupport = require("../models/MedicalSupport");
+const FuneralSupport = require("../models/FuneralSupport");
+const EducationSupport = require("../models/EducationSupport");
 
 const calculateProfileCompletion =
 require("../utils/calculateProfileCompletion");
@@ -459,6 +462,38 @@ allowedFields.forEach((field) => {
 
 });
 
+        // ------------------------------------------
+        // PROFILE PHOTO / DOCUMENT UPLOADS
+        // Files are stored locally in backend/uploads.
+        // ------------------------------------------
+        if (req.files?.profileImage?.[0]) {
+            const file = req.files.profileImage[0];
+            member.profileImage = `/uploads/${req.uploadType || "profiles"}/${file.filename}`;
+        }
+
+        if (req.files?.passportPhoto?.[0]) {
+            const file = req.files.passportPhoto[0];
+            member.passportPhoto = `/uploads/${req.uploadType || "profiles"}/${file.filename}`;
+        }
+
+        if (req.files?.nationalIdFront?.[0]) {
+            const file = req.files.nationalIdFront[0];
+            member.documents = member.documents || {};
+            member.documents.nationalIdFront = `/uploads/${req.uploadType || "profiles"}/${file.filename}`;
+        }
+
+        if (req.files?.nationalIdBack?.[0]) {
+            const file = req.files.nationalIdBack[0];
+            member.documents = member.documents || {};
+            member.documents.nationalIdBack = `/uploads/${req.uploadType || "profiles"}/${file.filename}`;
+        }
+
+        if (req.files?.signature?.[0]) {
+            const file = req.files.signature[0];
+            member.documents = member.documents || {};
+            member.documents.signature = `/uploads/${req.uploadType || "profiles"}/${file.filename}`;
+        }
+
         member.lastSeen = new Date();
 
         await member.save();
@@ -841,7 +876,7 @@ exports.getSettings = async (req, res) => {
         const member =
             await Member.findById(req.user._id)
             .select(
-                "notifications emailNotifications darkMode language"
+                "notifications emailNotifications darkMode language themeColor"
             );
 
         if (!member) {
@@ -872,7 +907,10 @@ exports.getSettings = async (req, res) => {
                     member.darkMode,
 
                 language:
-                    member.language
+                    member.language,
+
+                themeColor:
+                    member.themeColor || "#ff7a00"
 
             }
 
@@ -933,6 +971,9 @@ exports.updateSettings = async (req, res) => {
         if(req.body.language)
             member.language=req.body.language;
 
+        if(req.body.themeColor)
+            member.themeColor = String(req.body.themeColor).trim();
+
         await member.save();
 
         await createAuditLog({
@@ -969,7 +1010,10 @@ exports.updateSettings = async (req, res) => {
                     member.darkMode,
 
                 language:
-                    member.language
+                    member.language,
+
+                themeColor:
+                    member.themeColor || "#ff7a00"
 
             }
 
@@ -1078,4 +1122,78 @@ exports.getEligibility = async (req,res)=>{
 
     }
 
+};
+
+
+// ==========================================
+// MEMBER CLAIMS / SUPPORT AGGREGATOR
+// ==========================================
+
+exports.getClaims = async (req, res) => {
+    try {
+        const memberId = req.user._id;
+
+        const [medical, funeral, education] = await Promise.all([
+            MedicalSupport.find({ member: memberId, isDeleted: { $ne: true } })
+                .populate("dependent", "fullName relationship")
+                .sort({ createdAt: -1 })
+                .lean(),
+
+            FuneralSupport.find({ member: memberId })
+                .populate("dependent", "fullName relationship")
+                .sort({ createdAt: -1 })
+                .lean(),
+
+            EducationSupport.find({ member: memberId })
+                .populate("dependent", "fullName relationship")
+                .sort({ createdAt: -1 })
+                .lean(),
+        ]);
+
+        const claims = [
+            ...medical.map(item => ({
+                ...item,
+                supportType: "medical",
+                amount: item.requestedAmount || 0,
+                documents: Array.isArray(item.documents) ? item.documents : [],
+            })),
+            ...funeral.map(item => ({
+                ...item,
+                supportType: "funeral",
+                amount: item.requestedAmount || 0,
+                documents: [
+                    item.deathCertificate,
+                    item.burialPermit,
+                    item.chiefLetter,
+                    ...(item.supportingDocuments || []),
+                ].filter(Boolean),
+            })),
+            ...education.map(item => ({
+                ...item,
+                supportType: "education",
+                amount: item.requestedAmount || 0,
+                documents: [
+                    item.feeStructure,
+                    item.admissionLetter,
+                    ...(item.supportingDocuments || []),
+                ].filter(Boolean),
+            })),
+        ].sort(
+            (a, b) =>
+                new Date(b.createdAt || b.applicationDate) -
+                new Date(a.createdAt || a.applicationDate)
+        );
+
+        return res.json({
+            success: true,
+            count: claims.length,
+            claims,
+        });
+    } catch (error) {
+        console.error("Get Member Claims Error:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Unable to load your support applications.",
+        });
+    }
 };

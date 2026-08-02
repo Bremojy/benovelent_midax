@@ -3,6 +3,7 @@ const router = express.Router();
 
 const {
     getNotifications,
+    getUnreadCount,
     getNotification,
     createNotification,
     markAsRead,
@@ -19,6 +20,9 @@ const { verifyToken: protect } = require("../middleware/authMiddleware");
 
 // Get all notifications for logged-in user
 router.get("/", protect, getNotifications);
+
+// Unread notification count
+router.get("/unread-count", protect, getUnreadCount);
 
 // Get single notification
 router.get("/:id", protect, getNotification);

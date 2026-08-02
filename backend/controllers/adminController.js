@@ -176,12 +176,13 @@ exports.createMember = async (req, res) => {
     if (
       !cleanMemberNumber ||
       !cleanFullName ||
-      !cleanPhone
+      !cleanPhone ||
+      !cleanEmail
     ) {
       return res.status(400).json({
         success: false,
         message:
-          "Member Number, Full Name and Phone are required.",
+          "Member Number, Full Name, Phone and Email are required for portal access.",
       });
     }
 
@@ -245,13 +246,9 @@ exports.createMember = async (req, res) => {
     // ==========================================
 
     const temporaryPassword =
-      "MIDAX@123";
+      `MIDAX@${Math.floor(100000 + Math.random() * 900000)}`;
 
-    const hashedPassword =
-      await bcrypt.hash(
-        temporaryPassword,
-        10
-      );
+    // Member schema hashes plaintext passwords in its pre-save hook.
 
     // ==========================================
     // MEMBER DATA
@@ -277,7 +274,7 @@ exports.createMember = async (req, res) => {
         contribution,
 
       password:
-        hashedPassword,
+        temporaryPassword,
 
       role:
         "member",
@@ -310,6 +307,25 @@ exports.createMember = async (req, res) => {
     if (cleanEmail) {
       memberData.email =
         cleanEmail;
+    }
+
+    if (req.files?.profileImage?.[0]) {
+      memberData.profileImage = `/uploads/${req.uploadType || "member-documents"}/${req.files.profileImage[0].filename}`;
+    }
+    if (req.files?.passportPhoto?.[0]) {
+      memberData.passportPhoto = `/uploads/${req.uploadType || "member-documents"}/${req.files.passportPhoto[0].filename}`;
+    }
+    if (req.files?.nationalIdFront?.[0]) {
+      memberData.documents = memberData.documents || {};
+      memberData.documents.nationalIdFront = `/uploads/${req.uploadType || "member-documents"}/${req.files.nationalIdFront[0].filename}`;
+    }
+    if (req.files?.nationalIdBack?.[0]) {
+      memberData.documents = memberData.documents || {};
+      memberData.documents.nationalIdBack = `/uploads/${req.uploadType || "member-documents"}/${req.files.nationalIdBack[0].filename}`;
+    }
+    if (req.files?.signature?.[0]) {
+      memberData.documents = memberData.documents || {};
+      memberData.documents.signature = `/uploads/${req.uploadType || "member-documents"}/${req.files.signature[0].filename}`;
     }
 
     // ==========================================
@@ -747,13 +763,10 @@ exports.resetPassword = async (req,res)=>{
 
     }
 
-    const temporaryPassword = "MIDAX@123";
+    const temporaryPassword = `MIDAX@${Math.floor(100000 + Math.random() * 900000)}`;
 
-    member.password =
-      await bcrypt.hash(
-        temporaryPassword,
-        10
-      );
+    // Member schema hashes the plaintext password on save.
+    member.password = temporaryPassword;
 
     member.mustChangePassword = true;
 
@@ -1114,3 +1127,146 @@ exports.contributionSummary = async (req, res) => {
 
 };
 
+
+
+// ======================================================
+// ADMIN PROFILE / SECURITY / PREFERENCES
+// ======================================================
+
+exports.getProfile = async (req, res) => {
+  try {
+    const admin = await require("../models/Admin")
+      .findById(req.user._id)
+      .select("-password -resetPasswordToken -resetPasswordExpires -failedLoginAttempts");
+
+    if (!admin) {
+      return res.status(404).json({ success: false, message: "Administrator not found." });
+    }
+
+    return res.json({ success: true, profile: admin });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+exports.updateProfile = async (req, res) => {
+  try {
+    const Admin = require("../models/Admin");
+    const admin = await Admin.findById(req.user._id);
+
+    if (!admin) {
+      return res.status(404).json({ success: false, message: "Administrator not found." });
+    }
+
+    if (req.body.fullName !== undefined) admin.fullName = String(req.body.fullName).trim();
+    if (req.body.name !== undefined) admin.name = String(req.body.name).trim();
+    if (req.body.phone !== undefined) admin.phone = String(req.body.phone).trim();
+
+    if (req.body.email && req.body.email.toLowerCase() !== admin.email) {
+      const exists = await Admin.findOne({
+        email: req.body.email.toLowerCase(),
+        _id: { $ne: admin._id },
+      });
+      if (exists) {
+        return res.status(409).json({ success: false, message: "Email already exists." });
+      }
+      admin.email = req.body.email.toLowerCase().trim();
+    }
+
+    if (req.file) {
+      admin.profileImage = `/uploads/${req.uploadType || "profiles"}/${req.file.filename}`;
+    }
+
+    if (req.files?.profileImage?.[0]) {
+      admin.profileImage = `/uploads/${req.uploadType || "profiles"}/${req.files.profileImage[0].filename}`;
+    }
+
+    await admin.save();
+
+    return res.json({
+      success: true,
+      message: "Administrator profile updated.",
+      profile: admin,
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+exports.changePassword = async (req, res) => {
+  try {
+    const Admin = require("../models/Admin");
+    const admin = await Admin.findById(req.user._id);
+
+    if (!admin) {
+      return res.status(404).json({ success: false, message: "Administrator not found." });
+    }
+
+    const { currentPassword, newPassword, confirmPassword } = req.body;
+
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      return res.status(400).json({ success: false, message: "All password fields are required." });
+    }
+
+    if (!(await bcrypt.compare(currentPassword, admin.password))) {
+      return res.status(400).json({ success: false, message: "Current password is incorrect." });
+    }
+
+    if (newPassword.length < 8) {
+      return res.status(400).json({ success: false, message: "New password must be at least 8 characters." });
+    }
+
+    if (newPassword !== confirmPassword) {
+      return res.status(400).json({ success: false, message: "New passwords do not match." });
+    }
+
+    admin.password = newPassword;
+    admin.mustChangePassword = false;
+    admin.passwordChangedAt = new Date();
+    admin.failedLoginAttempts = 0;
+    admin.accountLockedUntil = null;
+    await admin.save();
+
+    return res.json({ success: true, message: "Administrator password changed successfully." });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+exports.getSettings = async (req, res) => {
+  try {
+    const Admin = require("../models/Admin");
+    const admin = await Admin.findById(req.user._id).select("themeColor");
+    return res.json({
+      success: true,
+      settings: { themeColor: admin?.themeColor || "#ff7a00" },
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+exports.updateSettings = async (req, res) => {
+  try {
+    const Admin = require("../models/Admin");
+    const admin = await Admin.findById(req.user._id);
+    if (!admin) {
+      return res.status(404).json({ success: false, message: "Administrator not found." });
+    }
+
+    const allowed = ["#ff7a00", "#7c3aed", "#0ea5e9", "#10b981", "#e11d48", "#f59e0b"];
+    if (req.body.themeColor && allowed.includes(req.body.themeColor)) {
+      admin.themeColor = req.body.themeColor;
+    }
+
+    await admin.save();
+
+    return res.json({
+      success: true,
+      message: "Portal preferences saved.",
+      settings: { themeColor: admin.themeColor || "#ff7a00" },
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};

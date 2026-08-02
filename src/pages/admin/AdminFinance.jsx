@@ -46,7 +46,7 @@ export default function AdminFinance() {
           <Stat label="Total Income" value={number(first("totalIncome","income","totalContributions"))} />
           <Stat label="Total Expenses" value={number(first("totalExpenses","expenses"))} />
           <Stat label="Balance" value={number(first("balance","netBalance","currentBalance"))} />
-          <Stat label="Transactions" value={transactions.length} />
+          <Stat label="Support Disbursed / Claims" value={number(first("totalClaims","claims"))} />
         </div>
 
         <section className="portal-panel">

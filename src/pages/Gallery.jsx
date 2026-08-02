@@ -1,3 +1,4 @@
+import "./Gallery.css";
 function Gallery() {
 
 const images=[
@@ -13,7 +14,22 @@ return(
 
 <main className="gallery-page">
 
-<section className="gallery-hero">
+<section className="gallery-hero gallery-video-hero">
+<video
+  className="gallery-background-video"
+  autoPlay
+  muted
+  loop
+  playsInline
+  poster="/hero.jpg"
+  aria-hidden="true"
+>
+  <source
+    src={import.meta.env.VITE_GALLERY_VIDEO_URL || "/videos/benevolent-community-loop.mp4"}
+    type="video/mp4"
+  />
+</video>
+<div className="gallery-video-overlay" />
 
 <div className="section-container">
 
@@ -48,7 +64,8 @@ key={index}
 
 <img
 src={img}
-alt="gallery"
+alt="Benevolent Midax community moment"
+onError={(e)=>{e.currentTarget.src="/gallery-placeholder.svg";}}
 />
 
 </div>

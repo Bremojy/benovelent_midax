@@ -4,9 +4,14 @@ import {
   MessageCircle,
   Search,
   Settings,
+  LogOut,
 } from "lucide-react";
 
+import { useEffect, useState } from "react";
+import API, { UPLOAD_URL } from "../../services/api";
+
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
 
 import "../../styles/topbar.css";
 
@@ -17,15 +22,38 @@ function DashboardTopbar({
   user,
 }) {
   const navigate = useNavigate();
+  const { logout: authLogout } = useAuth();
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
 
-  const unreadMessages =
-    user?.unreadMessages || 0;
+  const [unreadNotifications, setUnreadNotifications] = useState(
+    Number(user?.unreadNotifications || 0)
+  );
 
-  const unreadNotifications =
-    user?.unreadNotifications || 0;
+  const unreadMessages = Number(user?.unreadMessages || 0);
 
   const normalizedRole =
     (role || user?.role || "member").toLowerCase();
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadUnread = async () => {
+      try {
+        const { data } = await API.get("/notifications/unread-count");
+        if (mounted) setUnreadNotifications(Number(data?.unread || 0));
+      } catch (error) {
+        // Non-blocking.
+      }
+    };
+
+    loadUnread();
+    const interval = window.setInterval(loadUnread, 30000);
+
+    return () => {
+      mounted = false;
+      window.clearInterval(interval);
+    };
+  }, [user?.unreadNotifications, normalizedRole]);
 
   const initials = (
     user?.fullName ||
@@ -64,7 +92,17 @@ function DashboardTopbar({
 
   const goToSettings = () => {
     if (normalizedRole === "member") navigate("/member/settings");
-    else navigate(basePath);
+    else if (normalizedRole === "admin") navigate("/admin/settings");
+    else navigate("/superadmin/settings");
+  };
+
+  const handleLogout = async () => {
+    setProfileMenuOpen(false);
+    try {
+      await authLogout();
+    } finally {
+      window.location.href = "/login";
+    }
   };
 
   // ========================================
@@ -159,16 +197,33 @@ function DashboardTopbar({
 
         {/* USER */}
 
-        <div className="user-box">
+        <div className={`user-menu ${profileMenuOpen ? "open" : ""}`}>
+          <button
+            type="button"
+            className="user-box"
+            onClick={() => setProfileMenuOpen((open) => !open)}
+            aria-expanded={profileMenuOpen}
+            aria-haspopup="menu"
+            title="Account menu"
+          >
 
           <div className="avatar">
-
-            {initials}
+            {user?.profileImage ? (
+              <img
+                src={
+                  String(user.profileImage).startsWith("http")
+                    ? user.profileImage
+                    : `${UPLOAD_URL}${user.profileImage.startsWith("/") ? "" : "/"}${user.profileImage}`
+                }
+                alt={user?.fullName || user?.name || "Profile"}
+              />
+            ) : (
+              initials
+            )}
 
             {user?.online && (
               <span className="online-dot" />
             )}
-
           </div>
 
           <div className="user-info">
@@ -188,7 +243,20 @@ function DashboardTopbar({
             </p>
 
           </div>
+          </button>
 
+          {profileMenuOpen && (
+            <div className="profile-dropdown" role="menu">
+              <button type="button" onClick={goToSettings} role="menuitem">
+                <Settings size={17} />
+                Account settings
+              </button>
+              <button type="button" className="profile-logout" onClick={handleLogout} role="menuitem">
+                <LogOut size={17} />
+                Logout
+              </button>
+            </div>
+          )}
         </div>
 
       </div>

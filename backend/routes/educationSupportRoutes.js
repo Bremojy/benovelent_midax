@@ -19,6 +19,8 @@ require("../middleware/adminMiddleware");
 const requireSuperAdmin =
 require("../middleware/superAdminMiddleware");
 
+const { uploadFields, setUploadType } = require("../middleware/upload");
+
 const {
     applyEducationSupport,
     getMyApplications,
@@ -43,6 +45,12 @@ router.post(
     requireVerifiedMember,
     profileCompleted,
     requireActiveMember,
+    setUploadType("support"),
+    uploadFields([
+        { name: "feeStructure", maxCount: 1 },
+        { name: "admissionLetter", maxCount: 1 },
+        { name: "supportingDocuments", maxCount: 10 },
+    ]),
     applyEducationSupport
 );
 

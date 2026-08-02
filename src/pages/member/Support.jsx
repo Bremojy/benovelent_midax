@@ -31,6 +31,7 @@ export default function Support() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [documents, setDocuments] = useState([]);
 
   const load = async () => {
     try {
@@ -38,7 +39,7 @@ export default function Support() {
       setError("");
       const [claimsRes, dependentsRes] = await Promise.all([
         getMemberClaims(),
-        API.get("/member/dependents"),
+        API.get("/dependents/my"),
       ]);
       setClaims(Array.isArray(claimsRes?.claims) ? claimsRes.claims : []);
       setDependents(Array.isArray(dependentsRes?.data?.dependents) ? dependentsRes.data.dependents : []);
@@ -60,27 +61,29 @@ export default function Support() {
 
     try {
       setSubmitting(true);
+
       let endpoint;
-      let payload;
+      const formData = new FormData();
 
       if (form.type === "medical") {
         if (!form.dependentId || !form.hospitalName || !form.diagnosis || Number(form.requestedAmount) <= 0) {
           throw new Error("Please provide the dependent, hospital, diagnosis and requested amount.");
         }
+
         endpoint = "/medical/apply";
-        payload = {
-          dependent: form.dependentId,
-          hospitalName: form.hospitalName.trim(),
-          hospitalLocation: form.hospitalLocation.trim(),
-          diagnosis: form.diagnosis.trim(),
-          requestedAmount: Number(form.requestedAmount),
-        };
+        formData.append("dependent", form.dependentId);
+        formData.append("hospitalName", form.hospitalName.trim());
+        formData.append("hospitalLocation", form.hospitalLocation.trim());
+        formData.append("diagnosis", form.diagnosis.trim());
+        formData.append("requestedAmount", String(Number(form.requestedAmount)));
+        documents.forEach((file) => formData.append("documents", file));
       } else if (form.type === "funeral") {
         if (!form.deceasedName || !form.relationship || !form.dateOfDeath || !form.burialDate || !form.burialLocation || Number(form.requestedAmount) <= 0) {
           throw new Error("Please complete the funeral support details and requested amount.");
         }
+
         endpoint = "/funeral/apply";
-        payload = {
+        Object.entries({
           deceasedType: form.deceasedType,
           deceasedName: form.deceasedName.trim(),
           relationship: form.relationship.trim(),
@@ -88,27 +91,41 @@ export default function Support() {
           burialDate: form.burialDate,
           burialLocation: form.burialLocation.trim(),
           requestedAmount: Number(form.requestedAmount),
-        };
+        }).forEach(([key, value]) => formData.append(key, String(value)));
+
+        if (documents[0]) formData.append("deathCertificate", documents[0]);
+        documents.slice(1, 2).forEach((file) => formData.append("burialPermit", file));
+        documents.slice(2, 3).forEach((file) => formData.append("chiefLetter", file));
+        documents.slice(3).forEach((file) => formData.append("supportingDocuments", file));
       } else {
         if (!form.dependentId || !form.purpose || !form.school || !form.admissionNumber || Number(form.requestedAmount) < 1000) {
           throw new Error("Please complete the education support details. Minimum requested amount is KES 1,000.");
         }
+
         endpoint = "/education/apply";
-        payload = {
+        Object.entries({
           dependentId: form.dependentId,
           purpose: form.purpose.trim(),
           school: form.school.trim(),
           admissionNumber: form.admissionNumber.trim(),
           requestedAmount: Number(form.requestedAmount),
           repaymentPeriodMonths: Number(form.repaymentPeriodMonths) || 12,
-        };
+        }).forEach(([key, value]) => formData.append(key, String(value)));
+
+        if (documents[0]) formData.append("feeStructure", documents[0]);
+        if (documents[1]) formData.append("admissionLetter", documents[1]);
+        documents.slice(2).forEach((file) => formData.append("supportingDocuments", file));
       }
 
-      const { data } = await API.post(endpoint, payload);
+      const { data } = await API.post(endpoint, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+
       if (!data?.success) throw new Error(data?.message || "Unable to submit the application.");
 
-      setSuccess("Your support application was submitted successfully.");
+      setSuccess("Your support application and supporting documents were submitted successfully.");
       setForm({ ...initialForm, type: form.type });
+      setDocuments([]);
       await load();
     } catch (err) {
       setError(err.response?.data?.message || err.message || "Unable to submit support application.");
@@ -192,6 +209,24 @@ export default function Support() {
                   <Field label="Repayment Period (months)"><input type="number" min="1" value={form.repaymentPeriodMonths} onChange={(e) => set("repaymentPeriodMonths", e.target.value)} /></Field>
                 </>
               )}
+
+              <Field label="Supporting documents">
+                <input
+                  type="file"
+                  multiple
+                  accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx"
+                  onChange={(e) => setDocuments(Array.from(e.target.files || []))}
+                />
+                <small className="support-file-hint">
+                  {documents.length
+                    ? `${documents.length} document(s) selected`
+                    : form.type === "funeral"
+                      ? "Order: death certificate, burial permit, chief letter, then other documents."
+                      : form.type === "education"
+                        ? "Order: fee structure, admission letter, then other documents."
+                        : "You can select multiple medical supporting documents. Maximum 8MB each."}
+                </small>
+              </Field>
 
               <Field label="Requested Amount (KES)">
                 <input type="number" min="0" value={form.requestedAmount} onChange={(e) => set("requestedAmount", e.target.value)} />

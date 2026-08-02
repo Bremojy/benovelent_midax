@@ -725,6 +725,16 @@ export function AuthProvider({
   }, [clearSession]);
 
   // ======================================
+  // PORTAL THEME
+  // ======================================
+
+  useEffect(() => {
+    const color = user?.themeColor || "#ff7a00";
+    document.documentElement.style.setProperty("--portal-accent", color);
+    document.documentElement.style.setProperty("--portal-accent-soft", `${color}18`);
+  }, [user?.themeColor]);
+
+  // ======================================
   // ROLE HELPERS
   // ======================================
 

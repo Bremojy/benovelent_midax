@@ -588,9 +588,18 @@ exports.getMemberTransactions = async (req, res) => {
 
     try {
 
+        const requestedMemberId = req.params.memberId || req.user._id;
+
+        if (req.user?.role === "member" && String(requestedMemberId) !== String(req.user._id)) {
+            return res.status(403).json({
+                success: false,
+                message: "You can only view your own finance records."
+            });
+        }
+
         const transactions = await Finance.find({
 
-            member: req.params.memberId
+            member: requestedMemberId
 
         })
 

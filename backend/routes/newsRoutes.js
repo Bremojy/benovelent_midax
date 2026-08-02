@@ -5,6 +5,7 @@ const {
     createNews,
     getNews,
     getSingleNews,
+    getLatestNews,
     updateNews,
     deleteNews,
     likeNews,
@@ -17,9 +18,6 @@ const {
 
 const { verifyToken: protect } = require("../middleware/authMiddleware");
 
-console.log("protect =", protect);
-console.log("createNews =", createNews);
-
 // =======================================
 // NEWS ROUTES
 // =======================================
@@ -27,7 +25,10 @@ console.log("createNews =", createNews);
 // Create news (Admin / Super Admin)
 router.post("/", protect, createNews);
 
-// Get all news
+// Public published news feed (used by the public website)
+router.get("/public", getLatestNews);
+
+// Get all news (authenticated management/member feed)
 router.get("/", protect, getNews);
 
 // Get one news article

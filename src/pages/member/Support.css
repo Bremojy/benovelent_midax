@@ -340,3 +340,7 @@
 .support-item-right { display:flex; align-items:center; gap:8px; }
 .support-item small { display:block; margin-top:5px; color:#666; }
 @media(max-width:650px){ .support-two-col { grid-template-columns:1fr; } }
+
+.support-file-hint{display:block;margin-top:7px;color:#74777d;font-size:11px;line-height:1.5}
+
+.claim-documents{display:flex;gap:8px;flex-wrap:wrap;margin-top:9px}.claim-documents a{font-size:11px;color:#c65f00;background:#fff3e7;padding:5px 8px;border-radius:8px;text-decoration:none;font-weight:700}

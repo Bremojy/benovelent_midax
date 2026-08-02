@@ -482,6 +482,44 @@ export const getSuperAdminAdminStatistics =
     return data;
   };
 
+
+// ========================================
+// ADMIN PROFILE / SETTINGS
+// ========================================
+
+export const getAdminProfile = async () => {
+  const { data } = await API.get("/admin/profile");
+  return data;
+};
+
+export const updateAdminProfile = async (profile, photo) => {
+  const formData = new FormData();
+  Object.entries(profile || {}).forEach(([key, value]) => {
+    if (value !== undefined && value !== null) formData.append(key, value);
+  });
+  if (photo) formData.append("profileImage", photo);
+
+  const { data } = await API.put("/admin/profile", formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  return data;
+};
+
+export const changeAdminPassword = async (payload) => {
+  const { data } = await API.put("/admin/change-password", payload);
+  return data;
+};
+
+export const getAdminSettings = async () => {
+  const { data } = await API.get("/admin/settings");
+  return data;
+};
+
+export const updateAdminSettings = async (settings) => {
+  const { data } = await API.put("/admin/settings", settings);
+  return data;
+};
+
 // ========================================
 // DEFAULT EXPORT
 // ========================================
@@ -513,4 +551,9 @@ export default {
   resetSuperAdminAdminPassword,
   deleteSuperAdminAdmin,
   getSuperAdminAdminStatistics,
+  getAdminProfile,
+  updateAdminProfile,
+  changeAdminPassword,
+  getAdminSettings,
+  updateAdminSettings,
 };

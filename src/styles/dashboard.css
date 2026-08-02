@@ -80,3 +80,20 @@ padding:16px;
 .dashboard-page {
     position: relative;
 }
+
+:root{
+  --portal-accent:#ff7a00;
+  --portal-accent-soft:#ff7a0018;
+}
+.dashboard-container .portal-btn,
+.dashboard-container .primary-btn{
+  background:var(--portal-accent,#ff7a00);
+}
+.dashboard-container a:focus-visible,
+.dashboard-container button:focus-visible,
+.dashboard-container input:focus-visible,
+.dashboard-container select:focus-visible,
+.dashboard-container textarea:focus-visible{
+  outline:3px solid var(--portal-accent-soft,#ff7a0018);
+  outline-offset:2px;
+}

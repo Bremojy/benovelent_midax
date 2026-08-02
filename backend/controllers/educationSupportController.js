@@ -144,6 +144,19 @@ exports.applyEducationSupport = async (req, res) => {
     }
 
     // =====================================
+    // LOCAL DOCUMENT UPLOADS
+    // =====================================
+
+    const fileUrl = (file) =>
+      file ? `/uploads/${req.uploadType || "support"}/${file.filename}` : "";
+
+    const feeStructureFile = req.files?.feeStructure?.[0];
+    const admissionLetterFile = req.files?.admissionLetter?.[0];
+    const supportingFiles = (req.files?.supportingDocuments || []).map(
+      file => fileUrl(file)
+    );
+
+    // =====================================
     // CREATE APPLICATION
     // =====================================
 
@@ -170,11 +183,14 @@ exports.applyEducationSupport = async (req, res) => {
         repaymentPeriodMonths:
           repaymentPeriodMonths || 12,
 
-        feeStructure,
+        feeStructure: fileUrl(feeStructureFile) || feeStructure,
 
-        admissionLetter,
+        admissionLetter: fileUrl(admissionLetterFile) || admissionLetter,
 
-        supportingDocuments,
+        supportingDocuments: [
+          ...(Array.isArray(supportingDocuments) ? supportingDocuments : []),
+          ...supportingFiles,
+        ].filter(Boolean),
 
         createdBy: member._id,
       });

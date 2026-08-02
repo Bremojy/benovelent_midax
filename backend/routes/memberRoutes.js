@@ -2,6 +2,7 @@ const express = require("express");
 const profileCompleted = require("../middleware/profileCompletionMiddleware");
 const {
   uploadFields,
+  setUploadType,
 } = require("../middleware/upload");
 const router = express.Router();
 const {
@@ -14,7 +15,11 @@ const {
   getSettings,
   getEligibility,
   updateSettings,
+  getClaims,
 } = require("../controllers/memberController");
+
+const { getMemberContributions } = require("../controllers/contributionController");
+const { getMemberTransactions } = require("../controllers/financeController");
 
 
 const { verifyToken: protect } = require("../middleware/authMiddleware");
@@ -30,13 +35,52 @@ router.get("/dashboard", protect, getDashboard);
 // ===============================
 
 router.get("/profile", protect, getProfile);
-router.put("/profile", protect, updateProfile);
+
+router.put(
+  "/profile",
+  protect,
+  setUploadType("profiles"),
+  uploadFields([
+    { name: "profileImage", maxCount: 1 },
+    { name: "passportPhoto", maxCount: 1 },
+    { name: "nationalIdFront", maxCount: 1 },
+    { name: "nationalIdBack", maxCount: 1 },
+    { name: "signature", maxCount: 1 },
+  ]),
+  updateProfile
+);
 
 // ===============================
 // SUMMARY
 // ===============================
 
 router.get("/summary", protect, getSummary);
+
+// ===============================
+// MEMBER CONTRIBUTIONS / FINANCE
+// ===============================
+
+router.get(
+  "/contributions",
+  protect,
+  getMemberContributions
+);
+
+router.get(
+  "/finance",
+  protect,
+  getMemberTransactions
+);
+
+// ===============================
+// MEMBER CLAIMS / SUPPORT HISTORY
+// ===============================
+
+router.get(
+  "/claims",
+  protect,
+  getClaims
+);
 
 // ===============================
 // SETTINGS
@@ -49,19 +93,6 @@ router.put(
   changePassword
 );
 
-router.put(
-    "/profile",
-    protect,
-    uploadFields([
-        { name: "profileImage", maxCount: 1 },
-        { name: "passportPhoto", maxCount: 1 },
-        { name: "nationalIdFront", maxCount: 1 },
-        { name: "nationalIdBack", maxCount: 1 },
-        { name: "signature", maxCount: 1 },
-    ]),
-    updateProfile
-);
-
 // Profile completion & benefit eligibility
 router.get(
   "/profile-status",
@@ -71,9 +102,16 @@ router.get(
 
 router.get(
     "/eligibility",
-    profileCompleted,
     protect,
+    profileCompleted,
     getEligibility
+);
+
+router.get(
+  "/benefits",
+  protect,
+  profileCompleted,
+  getEligibility
 );
 
 router.get("/settings", protect, getSettings);

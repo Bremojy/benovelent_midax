@@ -7,6 +7,8 @@ import {
   NavLink,
 } from "react-router-dom";
 
+import { useAuth } from "../../context/AuthContext";
+
 import {
   dashboardMenus,
 } from "../../config/dashboardMenu";
@@ -34,46 +36,12 @@ function DashboardSidebar({
   // LOGOUT
   // ========================================
 
-  const logout = () => {
-    // Remove only dashboard authentication
-    // data instead of unnecessarily affecting
-    // unrelated localStorage values.
+  const { logout: authLogout } = useAuth();
 
-    localStorage.removeItem(
-      "memberToken"
-    );
-
-    localStorage.removeItem(
-      "adminToken"
-    );
-
-    localStorage.removeItem(
-      "superAdminToken"
-    );
-
-    localStorage.removeItem(
-      "token"
-    );
-
-    localStorage.removeItem(
-      "role"
-    );
-
-    localStorage.removeItem(
-      "user"
-    );
-
-    localStorage.removeItem(
-      "member"
-    );
-
-    // Close sidebar before redirecting
-    if (setSidebarOpen) {
-      setSidebarOpen(false);
-    }
-
-    window.location.href =
-      "/login";
+  const logout = async () => {
+    if (setSidebarOpen) setSidebarOpen(false);
+    await authLogout();
+    window.location.href = "/login";
   };
 
 

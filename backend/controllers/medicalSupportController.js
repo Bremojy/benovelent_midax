@@ -146,6 +146,12 @@ exports.createMedicalApplication = async (req, res) => {
 
 
 
+        const uploadedDocuments = (req.files || []).map(file => ({
+            fileName: file.originalname,
+            fileUrl: `/uploads/${req.uploadType || "support"}/${file.filename}`,
+            uploadedAt: new Date(),
+        }));
+
         const application = await MedicalSupport.create({
 
             member: req.user._id,
@@ -173,6 +179,8 @@ exports.createMedicalApplication = async (req, res) => {
             emergencyLevel,
 
             requestedAmount,
+
+            documents: uploadedDocuments,
 
             createdBy: req.user._id
 

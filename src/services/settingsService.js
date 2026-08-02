@@ -1,45 +1,27 @@
-import axios from "axios";
+import API from "./api";
 
-const API =
-  import.meta.env.VITE_API_URL ||
-  "https://benovelent-midax.onrender.com/api";
+export async function getSettings(role) {
+  const normalized = String(role || "member").toLowerCase();
+  const endpoint =
+    normalized === "superadmin"
+      ? "/superadmin/settings"
+      : normalized === "admin"
+        ? "/admin/settings"
+        : "/member/settings";
 
-function authHeader() {
-  const token =
-    localStorage.getItem("memberToken") ||
-    localStorage.getItem("adminToken") ||
-    localStorage.getItem("superAdminToken");
-
-  return {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  };
+  const { data } = await API.get(endpoint);
+  return data;
 }
 
-// ================================
-// GET SETTINGS
-// ================================
+export async function updateSettings(role, settings) {
+  const normalized = String(role || "member").toLowerCase();
+  const endpoint =
+    normalized === "superadmin"
+      ? "/superadmin/settings"
+      : normalized === "admin"
+        ? "/admin/settings"
+        : "/member/settings";
 
-export async function getSettings() {
-  const res = await axios.get(
-    `${API}/member/settings`,
-    authHeader()
-  );
-
-  return res.data;
-}
-
-// ================================
-// UPDATE SETTINGS
-// ================================
-
-export async function updateSettings(data) {
-  const res = await axios.put(
-    `${API}/member/settings`,
-    data,
-    authHeader()
-  );
-
-  return res.data;
+  const { data } = await API.put(endpoint, settings);
+  return data;
 }

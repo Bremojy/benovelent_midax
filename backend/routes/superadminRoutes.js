@@ -1,4 +1,5 @@
 const express = require("express");
+const { uploadFields, setUploadType } = require("../middleware/upload");
 
 const router =
   express.Router();
@@ -21,6 +22,11 @@ const {
   resetAdminPassword,
   deleteAdmin,
   getAdminStatistics,
+  getProfile,
+  updateProfile,
+  changePassword,
+  getSettings,
+  updateSettings,
 } = require("../controllers/superadminController");
 
 
@@ -32,6 +38,24 @@ router.use(
   protect,
   isSuperAdmin
 );
+
+// ======================================================
+// SUPERADMIN PROFILE / SECURITY / PREFERENCES
+// ======================================================
+
+router.get("/profile", getProfile);
+
+router.put(
+  "/profile",
+  setUploadType("profiles"),
+  uploadFields([{ name: "profileImage", maxCount: 1 }]),
+  updateProfile
+);
+
+router.put("/change-password", changePassword);
+
+router.get("/settings", getSettings);
+router.put("/settings", updateSettings);
 
 
 // ======================================================

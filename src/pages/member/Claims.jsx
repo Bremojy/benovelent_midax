@@ -49,6 +49,19 @@ export default function Claims() {
                     <strong>{String(claim.supportType || "support").toUpperCase()} SUPPORT</strong>
                     <span>{formatDate(claim.createdAt || claim.applicationDate)}</span>
                     {claim.remarks && <small>{claim.remarks}</small>}
+                    {Array.isArray(claim.documents) && claim.documents.length > 0 && (
+                      <div className="claim-documents">
+                        <strong>Documents:</strong>
+                        {claim.documents.map((doc, index) => {
+                          const url = typeof doc === "string" ? doc : doc?.fileUrl;
+                          if (!url) return null;
+                          const fullUrl = url.startsWith("http")
+                            ? url
+                            : `${import.meta.env.VITE_API_URL || "http://localhost:5000"}${url.startsWith("/") ? "" : "/"}${url}`;
+                          return <a href={fullUrl} target="_blank" rel="noreferrer" key={`${url}-${index}`}>View document {index + 1}</a>;
+                        })}
+                      </div>
+                    )}
                   </div>
                   <div className="support-item-right">
                     <strong>{money(claim.amount)}</strong>

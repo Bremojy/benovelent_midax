@@ -159,7 +159,11 @@ exports.getAllPolls = async (req, res) => {
 
         const filter = {};
 
-        if (req.query.active !== undefined) {
+        // Members only see currently active polls.
+        if (req.user?.role === "member") {
+            filter.active = true;
+            filter.endDate = { $gte: new Date() };
+        } else if (req.query.active !== undefined) {
 
             filter.active = req.query.active === "true";
 
@@ -893,6 +897,36 @@ exports.getPollSummary = async (req, res) => {
 /* =====================================================
    COMPATIBILITY EXPORTS
 ===================================================== */
+
+
+// =====================================================
+// PUBLIC ACTIVE POLLS
+// =====================================================
+
+exports.getPublicPolls = async (req, res) => {
+    try {
+        const polls = await Poll.find({
+            active: true,
+            endDate: { $gte: new Date() },
+        })
+            .populate("createdBy", "fullName profileImage")
+            .populate("news", "title")
+            .sort({ createdAt: -1 })
+            .limit(10)
+            .lean();
+
+        return res.json({
+            success: true,
+            count: polls.length,
+            polls,
+        });
+    } catch (error) {
+        return res.status(500).json({
+            success: false,
+            message: error.message,
+        });
+    }
+};
 
 exports.getPolls = exports.getAllPolls;
 

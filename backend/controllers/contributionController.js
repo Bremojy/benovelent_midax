@@ -257,14 +257,34 @@ exports.getContributions = async (req,res)=>{
 
         });
 
+        const totalContributed = contributions.reduce(
+            (sum, item) => sum + Number(item.paidAmount || item.amount || 0),
+            0
+        );
+
+        const outstanding = contributions.reduce(
+            (sum, item) =>
+                sum + Math.max(0, Number(item.expectedAmount || 0) - Number(item.paidAmount || 0)),
+            0
+        );
+
+        const currentYear = new Date().getFullYear();
+        const currentYearTotal = contributions
+            .filter(item => Number(item.year) === currentYear)
+            .reduce((sum, item) => sum + Number(item.paidAmount || item.amount || 0), 0);
+
+        const member = await Member.findById(requestedMemberId).select("monthlyContribution").lean();
+
         res.json({
-
             success:true,
-
             count:contributions.length,
-
+            summary: {
+                monthlyContribution: Number(member?.monthlyContribution || 0),
+                totalContributed,
+                currentYear: currentYearTotal,
+                outstanding,
+            },
             contributions
-
         });
 
     }
@@ -295,9 +315,18 @@ exports.getMemberContributions = async (req,res)=>{
 
     try{
 
+        const requestedMemberId = req.params.memberId || req.user._id;
+
+        if (req.user?.role === "member" && String(requestedMemberId) !== String(req.user._id)) {
+            return res.status(403).json({
+                success: false,
+                message: "You can only view your own contributions."
+            });
+        }
+
         const contributions=await Contribution.find({
 
-            member:req.params.memberId
+            member:requestedMemberId
 
         })
 

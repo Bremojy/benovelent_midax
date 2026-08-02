@@ -74,6 +74,16 @@ exports.applyFuneralSupport = async (req, res) => {
         const member =
         eligibility.member;
 
+        const fileUrl = (file) =>
+            file ? `/uploads/${req.uploadType || "support"}/${file.filename}` : "";
+
+        const deathCertificateFile = req.files?.deathCertificate?.[0];
+        const burialPermitFile = req.files?.burialPermit?.[0];
+        const chiefLetterFile = req.files?.chiefLetter?.[0];
+        const supportingFiles = (req.files?.supportingDocuments || []).map(
+            file => fileUrl(file)
+        );
+
         // ==========================================
         // VALIDATE DEPENDENT
         // ==========================================
@@ -138,13 +148,16 @@ exports.applyFuneralSupport = async (req, res) => {
 
             requestedAmount,
 
-            deathCertificate,
+            deathCertificate: fileUrl(deathCertificateFile) || deathCertificate,
 
-            burialPermit,
+            burialPermit: fileUrl(burialPermitFile) || burialPermit,
 
-            chiefLetter,
+            chiefLetter: fileUrl(chiefLetterFile) || chiefLetter,
 
-            supportingDocuments,
+            supportingDocuments: [
+                ...(Array.isArray(supportingDocuments) ? supportingDocuments : []),
+                ...supportingFiles,
+            ].filter(Boolean),
 
             memberVerified:member.verified,
 

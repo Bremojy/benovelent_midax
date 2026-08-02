@@ -11,6 +11,7 @@ import {
   Settings,
   ClipboardList,
   Headphones,
+  Vote,
 } from "lucide-react";
 
 export const dashboardMenus = {
@@ -23,6 +24,8 @@ export const dashboardMenus = {
     { title: "Dependents", icon: Users, path: "/member/dependents" },
     { title: "Notifications", icon: Bell, path: "/member/notifications" },
     { title: "Messages", icon: MessageCircle, path: "/member/messages" },
+    { title: "Polls & Community Voice", icon: Vote, path: "/member/polls" },
+    { title: "Settings", icon: Settings, path: "/member/settings" },
   ],
 
   admin: [
@@ -31,6 +34,8 @@ export const dashboardMenus = {
     { title: "Finance", icon: Wallet, path: "/admin/finance" },
     { title: "Claims", icon: HandHeart, path: "/admin/claims" },
     { title: "Support", icon: Headphones, path: "/admin/support" },
+    { title: "Polls", icon: Vote, path: "/admin/polls" },
+    { title: "Settings", icon: Settings, path: "/admin/settings" },
   ],
 
   superadmin: [
@@ -41,5 +46,6 @@ export const dashboardMenus = {
     { title: "Audit", icon: ClipboardList, path: "/superadmin/audit" },
     { title: "Settings", icon: Settings, path: "/superadmin/settings" },
     { title: "System", icon: ShieldCheck, path: "/superadmin/system" },
+    { title: "Polls", icon: Vote, path: "/superadmin/polls" },
   ],
 };

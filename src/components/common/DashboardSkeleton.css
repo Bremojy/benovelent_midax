@@ -1,0 +1,1 @@
+.dashboard-skeleton{display:grid;gap:14px}.skeleton-block{height:90px;border-radius:16px;background:linear-gradient(90deg,#eef0f2 25%,#f8f9fa 50%,#eef0f2 75%);background-size:200% 100%;animation:skeleton-shimmer 1.4s infinite}@keyframes skeleton-shimmer{to{background-position:-200% 0}}

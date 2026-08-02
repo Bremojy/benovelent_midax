@@ -24,13 +24,27 @@ export const getMemberProfile = async () => {
   return data;
 };
 
-export const updateMemberProfile = async (
-  profile
-) => {
-  const { data } = await API.put(
-    "/member/profile",
-    profile
-  );
+export const updateMemberProfile = async (profile) => {
+  const { data } = await API.put("/member/profile", profile);
+  return data;
+};
+
+export const updateMemberProfileWithPhoto = async (profile, photo) => {
+  const formData = new FormData();
+
+  Object.entries(profile || {}).forEach(([key, value]) => {
+    if (value !== undefined && value !== null) {
+      formData.append(key, value);
+    }
+  });
+
+  if (photo) {
+    formData.append("profileImage", photo);
+  }
+
+  const { data } = await API.put("/member/profile", formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
 
   return data;
 };
@@ -131,6 +145,11 @@ export const getMemberContributions =
     return data;
   };
 
+
+export const getMemberFinance = async () => {
+  const { data } = await API.get("/member/finance");
+  return data;
+};
 
 // =======================================
 // MEMBER BENEFITS
@@ -240,7 +259,7 @@ export const voteInPoll =
     const { data } =
       await API.post(
         `/votes/${pollId}`,
-        { optionId }
+        { selectedOptions: [optionId] }
       );
 
     return data;

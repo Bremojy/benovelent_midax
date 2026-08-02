@@ -2,10 +2,6 @@ const News = require("../models/News");
 const Member = require("../models/Member");
 const Notification = require("../models/Notification");
 
-const newsController = require("../controllers/newsController");
-
-console.log(newsController);
-
 /* =====================================================
    CREATE NEWS
 ===================================================== */

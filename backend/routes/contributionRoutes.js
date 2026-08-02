@@ -14,16 +14,17 @@ const {
 } = require("../controllers/contributionController");
 
 const { verifyToken: protect } = require("../middleware/authMiddleware");
+const { isAdminOrSuperAdmin, isMember } = require("../middleware/roleMiddleware");
 
 // ==========================================
 // CONTRIBUTION ROUTES
 // ==========================================
 
 // Create a contribution
-router.post("/", protect, createContribution);
+router.post("/", protect, isAdminOrSuperAdmin, createContribution);
 
 // Get all contributions
-router.get("/", protect, getContributions);
+router.get("/", protect, isAdminOrSuperAdmin, getContributions);
 
 
 // Get all contributions for one member
@@ -33,15 +34,15 @@ router.get("/member/:memberId", protect, getMemberContributions);
 router.get("/:id", protect, getContribution);
 
 // Update contribution
-router.put("/:id", protect, updateContribution);
+router.put("/:id", protect, isAdminOrSuperAdmin, updateContribution);
 
 // Delete contribution
-router.delete("/:id", protect, deleteContribution);
+router.delete("/:id", protect, isAdminOrSuperAdmin, deleteContribution);
 
 // Approve contribution
-router.put("/:id/approve", protect, approveContribution);
+router.put("/:id/approve", protect, isAdminOrSuperAdmin, approveContribution);
 
 // Reject contribution
-router.put("/:id/reject", protect, rejectContribution);
+router.put("/:id/reject", protect, isAdminOrSuperAdmin, rejectContribution);
 
 module.exports = router;
