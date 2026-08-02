@@ -69,7 +69,7 @@ export default function AdminClaims() {
       {items.map((x,i)=><tr key={`${x.supportType}-${x._id||i}`}><td>{x.supportType}</td><td>{x.member?.fullName||x.contributorName||x.memberNumber||"Member"}</td><td>{money(x.requestedAmount||x.amount)}</td><td>{date(x.createdAt||x.applicationDate)}</td><td><span className="portal-badge">{x.status||"Pending"}</span></td><td>{Array.isArray(x.documents) && x.documents.length ? x.documents.map((doc, index) => {
   const url = typeof doc === "string" ? doc : doc?.fileUrl;
   if (!url) return null;
-  const full = url.startsWith("http") ? url : `${import.meta.env.VITE_API_URL || "https://benovelent-midax.onrender.com"}${url.startsWith("/") ? "" : "/"}${url}`;
+  const full = url.startsWith("http") ? url : `${import.meta.env.VITE_API_URL || "http://localhost:5000"}${url.startsWith("/") ? "" : "/"}${url}`;
   return <a key={`${url}-${index}`} href={full} target="_blank" rel="noreferrer">Doc {index + 1}</a>;
 }) : "—"}</td><td><div className="portal-actions">{!["Approved","Paid","Closed","Disbursed","Completed"].includes(x.status)&&<><button className="portal-btn" disabled={busy===`approve-${x._id}`} onClick={()=>action(x,"approve")}>Approve</button><button className="portal-btn danger" disabled={busy===`reject-${x._id}`} onClick={()=>action(x,"reject")}>Reject</button></>}</div></td></tr>)}
       </tbody></table></div>}

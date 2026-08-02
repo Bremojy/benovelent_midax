@@ -221,7 +221,7 @@ export default function PortalSettings() {
   const imageSrc = photoPreview
     ? String(photoPreview).startsWith("http") || String(photoPreview).startsWith("blob:")
       ? photoPreview
-      : `${import.meta.env.VITE_API_URL || "https://benovelent-midax.onrender.com"}${String(photoPreview).startsWith("/") ? "" : "/"}${photoPreview}`
+      : `${import.meta.env.VITE_API_URL || "http://localhost:5000"}${String(photoPreview).startsWith("/") ? "" : "/"}${photoPreview}`
     : "";
 
   return (
