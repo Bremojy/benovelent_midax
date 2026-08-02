@@ -76,9 +76,10 @@ export default function SuperAdminSettings() {
     const load = async () => {
       try {
         setLoading(true);
-        const [websiteRes, carouselRes] = await Promise.allSettled([
+        const [websiteRes, carouselRes, settingsRes] = await Promise.allSettled([
           API.get("/website"),
           API.get("/carousel"),
+          API.get("/website/settings"),
         ]);
 
         if (!active) return;
@@ -110,6 +111,12 @@ export default function SuperAdminSettings() {
           });
 
           setSections(nextSections);
+        }
+
+        if (settingsRes.status === "fulfilled") {
+          const settingsContent = settingsRes.value.data?.section?.content || settingsRes.value.data?.settings || {};
+          const color = settingsContent.themeColor || settingsContent.accentColor;
+          if (color) setThemeColor(color);
         }
 
         if (carouselRes.status === "fulfilled") {

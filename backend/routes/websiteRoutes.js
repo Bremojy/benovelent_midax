@@ -3,6 +3,7 @@ const router = express.Router();
 
 const {
   getWebsiteContent,
+  getWebsiteSettings,
   getSection,
   createSection,
   updateSection,
@@ -21,6 +22,9 @@ const { verifyToken: protect } = require("../middleware/authMiddleware");
 // Public website content
 router.get("/", getWebsiteContent);
 
+// Explicit website settings endpoint used by the frontend theme bootstrap
+router.get("/settings", getWebsiteSettings);
+
 // Website statistics
 // Uncomment after getWebsiteStatistics exists
 // router.get("/statistics", protect, getWebsiteStatistics);
@@ -30,6 +34,12 @@ router.get("/:section", getSection);
 
 // Create new section (Admin/Super Admin)
 router.post("/", protect, createSection);
+
+// Update website settings directly
+router.put("/settings", protect, (req, res) => {
+  req.params.section = "settings";
+  return updateSection(req, res);
+});
 
 // Update section
 router.put("/:section", protect, updateSection);

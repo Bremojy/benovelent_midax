@@ -16,7 +16,8 @@ export default function ThemeBootstrap() {
     const loadTheme = async () => {
       try {
         const { data } = await API.get("/website/settings");
-        const settings = data?.section?.content || data?.section?.settings || data?.content || {};
+        const section = data?.section || data?.settings || {};
+        const settings = section?.content || section?.settings || data?.content || data?.settings || {};
         const color =
           settings?.themeColor ||
           settings?.accentColor ||

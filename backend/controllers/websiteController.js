@@ -41,6 +41,44 @@ exports.getWebsiteContent = async (req, res) => {
 
 };
 
+/* =====================================================
+   GET WEBSITE SETTINGS
+===================================================== */
+
+exports.getWebsiteSettings = async (req, res) => {
+    try {
+        let section = await WebsiteContent.findOne({ section: "settings" });
+
+        if (!section) {
+            section = await WebsiteContent.create({
+                section: "settings",
+                title: "Website Settings",
+                subtitle: "Brand color and public website preferences",
+                description: "Managed by the superadmin portal.",
+                content: {
+                    themeColor: "#ff7a00",
+                    accentColor: "#ff7a00",
+                },
+                images: [],
+                published: true,
+                updatedBy: req.user?._id,
+            });
+        }
+
+        res.json({
+            success: true,
+            section,
+            settings: section.content || {},
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({
+            success: false,
+            message: error.message,
+        });
+    }
+};
+
 
 /* =====================================================
    GET SINGLE SECTION
@@ -194,8 +232,14 @@ exports.updateSection = async (req, res) => {
         section.description =
             req.body.description ?? section.description;
 
-        section.content =
-            req.body.content ?? section.content;
+        if (req.params.section === "settings") {
+            section.content = {
+                ...(typeof section.content === "object" && section.content ? section.content : {}),
+                ...(typeof req.body.content === "object" && req.body.content ? req.body.content : {}),
+            };
+        } else {
+            section.content = req.body.content ?? section.content;
+        }
 
         section.images =
             req.body.images ?? section.images;
