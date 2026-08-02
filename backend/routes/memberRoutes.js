@@ -16,6 +16,7 @@ const {
   getEligibility,
   updateSettings,
   getClaims,
+  getChatMembers,
 } = require("../controllers/memberController");
 
 const { getMemberContributions } = require("../controllers/contributionController");
@@ -81,6 +82,13 @@ router.get(
   protect,
   getClaims
 );
+
+
+// ===============================
+// CHAT MEMBERS
+// ===============================
+
+router.get("/chat-members", protect, getChatMembers);
 
 // ===============================
 // SETTINGS

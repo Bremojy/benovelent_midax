@@ -58,6 +58,7 @@ const voteRoutes = require("./routes/voteRoutes");
 const conversationRoutes = require("./routes/conversationRoutes");
 const messageRoutes = require("./routes/messageRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
+const contactRoutes = require("./routes/contactRoutes");
 
 const auditLogRoutes = require("./routes/auditLogRoutes");
 
@@ -153,6 +154,7 @@ app.use("/api/finance", financeRoutes);
 app.use("/api/conversations", conversationRoutes);
 app.use("/api/messages", messageRoutes);
 app.use("/api/notifications", notificationRoutes);
+app.use("/api/contact", contactRoutes);
 
 // News & Website
 

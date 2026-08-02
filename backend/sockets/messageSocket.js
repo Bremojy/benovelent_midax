@@ -59,104 +59,32 @@ module.exports = (io, socket) => {
     =========================================== */
 
     socket.on("send-message", async (data) => {
-
         try {
-
             const {
-
                 conversationId,
-
                 sender,
-
-                receiver,
-
                 text,
-
                 image,
-
                 file,
-
-                replyTo
-
-            } = data;
-
-            const message = await Message.create({
-
-                conversation: conversationId,
-
-                sender,
-
-                receiver,
-
-                text,
-
-                image,
-
-                file,
-
                 replyTo,
+            } = data || {};
 
-                delivered: false,
+            if (!conversationId) return;
 
-                seen: false
-
+            io.to(conversationId).emit("new-message", {
+                conversation: conversationId,
+                sender,
+                message: text || "",
+                attachment: image || file || "",
+                messageType: image || file ? "image" : "text",
+                replyTo,
+                createdAt: new Date(),
             });
-
-            await Conversation.findByIdAndUpdate(
-
-                conversationId,
-
-                {
-
-                    lastMessage: message._id,
-
-                    updatedAt: new Date()
-
-                }
-
-            );
-
-            io.to(conversationId).emit(
-
-                "new-message",
-
-                message
-
-            );
-
-            const receiverSocket = getSocket(receiver);
-
-            if (receiverSocket) {
-
-                io.to(receiverSocket).emit(
-
-                    "message-delivered",
-
-                    {
-
-                        messageId: message._id
-
-                    }
-
-                );
-
-                message.delivered = true;
-
-                await message.save();
-
-            }
-
         }
-
         catch (err) {
-
             console.log(err);
-
         }
-
     });
-
-
 
     /* ===========================================
        TYPING

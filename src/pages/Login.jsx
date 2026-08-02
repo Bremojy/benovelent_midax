@@ -6,12 +6,21 @@ import "./Login.css";
 
 function getPortalPath(role) {
   switch ((role || "").toLowerCase()) {
-    case "superadmin": return "/superadmin";
-    case "admin": return "/admin";
-    case "member": return "/member";
-    default: return "/login";
+    case "superadmin":
+      return "/superadmin";
+    case "admin":
+      return "/admin";
+    case "member":
+      return "/member";
+    default:
+      return "/login";
   }
 }
+
+const loginVideoSources = [
+  import.meta.env.VITE_LOGIN_VIDEO_URL,
+  "/videos/benevolent-community-loop.mp4",
+].filter(Boolean);
 
 export default function Login() {
   const navigate = useNavigate();
@@ -41,6 +50,7 @@ export default function Login() {
       setError("Please enter your email address.");
       return;
     }
+
     if (!password) {
       setError("Please enter your password.");
       return;
@@ -63,32 +73,33 @@ export default function Login() {
     } catch (err) {
       setError(
         err.response?.data?.message ||
-        err.message ||
-        "Unable to sign in. Please check your details and try again."
+          err.message ||
+          "Unable to sign in. Please check your details and try again."
       );
     } finally {
       setLoading(false);
     }
   };
 
-  const videoUrl =
-    import.meta.env.VITE_LOGIN_VIDEO_URL ||
-    "/videos/benevolent-community-loop.mp4";
-
   return (
     <main className={`modern-login-page ${videoFailed ? "video-failed" : ""}`}>
-      {!videoFailed && <video
-        className="login-video"
-        autoPlay
-        muted
-        loop
-        playsInline
-        poster="/hero.jpg"
-        onError={() => setVideoFailed(true)}
-        aria-hidden="true"
-      >
-        <source src={videoUrl} type="video/mp4" />
-      </video>}
+      {!videoFailed && (
+        <video
+          className="login-video"
+          autoPlay
+          muted
+          loop
+          playsInline
+          preload="auto"
+          poster="/hero.jpg"
+          onError={() => setVideoFailed(true)}
+          aria-hidden="true"
+        >
+          {loginVideoSources.map((src) => (
+            <source key={src} src={src} type="video/mp4" />
+          ))}
+        </video>
+      )}
       <div className="login-video-overlay" />
       <div className="login-glow login-glow-one" />
       <div className="login-glow login-glow-two" />

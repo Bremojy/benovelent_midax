@@ -5,6 +5,7 @@ const Contribution = require("../models/Contribution");
 const News = require("../models/News");
 const Message = require("../models/Message");
 const Notification = require("../models/Notification");
+const Conversation = require("../models/Conversation");
 const Dependent = require("../models/Dependent");
 const MedicalSupport = require("../models/MedicalSupport");
 const FuneralSupport = require("../models/FuneralSupport");
@@ -1194,6 +1195,62 @@ exports.getClaims = async (req, res) => {
         return res.status(500).json({
             success: false,
             message: "Unable to load your support applications.",
+        });
+    }
+};
+
+
+// ==========================================
+// CHAT MEMBERS
+// ==========================================
+
+exports.getChatMembers = async (req, res) => {
+    try {
+        const currentUserId = req.user._id;
+
+        const members = await Member.find({
+            _id: { $ne: currentUserId },
+            isDeleted: { $ne: true },
+            status: { $in: ["active", "inactive", "suspended"] },
+        })
+            .select("fullName username profileImage online lastSeen status memberNumber department position")
+            .sort({ fullName: 1 })
+            .lean();
+
+        const conversations = await Conversation.find({
+            participants: currentUserId,
+            deletedFor: { $ne: currentUserId },
+        })
+            .select("participants _id")
+            .lean();
+
+        const conversationMap = new Map();
+
+        conversations.forEach((conversation) => {
+            const partnerId = (conversation.participants || [])
+                .map((id) => id?.toString?.() || String(id))
+                .find((id) => id !== currentUserId.toString());
+
+            if (partnerId) {
+                conversationMap.set(partnerId, conversation._id.toString());
+            }
+        });
+
+        const contacts = members.map((member) => ({
+            ...member,
+            conversationId: conversationMap.get(member._id.toString()) || null,
+        }));
+
+        return res.json({
+            success: true,
+            count: contacts.length,
+            members: contacts,
+        });
+    } catch (error) {
+        console.error("Get Chat Members Error:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Unable to load chat members.",
         });
     }
 };

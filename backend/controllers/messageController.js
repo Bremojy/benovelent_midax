@@ -1,3 +1,4 @@
+const { getIO } = require("../sockets/socket");
 const Message = require("../models/Message");
 const Conversation = require("../models/Conversation");
 
@@ -5,93 +6,89 @@ const Conversation = require("../models/Conversation");
 SEND MESSAGE
 ===================================================== */
 
-exports.sendMessage = async (req,res)=>{
+exports.sendMessage = async (req, res) => {
+    try {
+        const {
+            conversationId,
+            message,
+            text,
+            messageType,
+            attachment,
+            image,
+            replyTo,
+        } = req.body;
 
-try{
+        if (!conversationId) {
+            return res.status(400).json({
+                success: false,
+                message: "conversationId is required.",
+            });
+        }
 
-const {
+        const conversation = await Conversation.findById(conversationId);
 
-conversationId,
+        if (!conversation) {
+            return res.status(404).json({
+                success: false,
+                message: "Conversation not found.",
+            });
+        }
 
-message,
+        const bodyText = String(message ?? text ?? "").trim();
+        const bodyAttachment = String(attachment ?? image ?? "").trim();
 
-messageType,
+        let inferredType = String(messageType || "").toLowerCase();
 
-attachment,
+        if (!inferredType) {
+            if (bodyAttachment) {
+                if (/\.(mp4|mov|webm|m4v)(\?|$)/i.test(bodyAttachment)) {
+                    inferredType = "video";
+                } else if (/\.(mp3|wav|ogg|m4a)(\?|$)/i.test(bodyAttachment)) {
+                    inferredType = "audio";
+                } else if (/\.(pdf|doc|docx|xls|xlsx|ppt|pptx)(\?|$)/i.test(bodyAttachment)) {
+                    inferredType = "document";
+                } else {
+                    inferredType = "image";
+                }
+            } else {
+                inferredType = "text";
+            }
+        }
 
-replyTo
+        const newMessage = await Message.create({
+            conversation: conversationId,
+            sender: req.user._id,
+            message: bodyText,
+            messageType: inferredType,
+            attachment: bodyAttachment,
+            replyTo: replyTo || undefined,
+        });
 
-}=req.body;
+        await newMessage.populate("sender", "fullName profileImage online lastSeen");
+        await newMessage.populate("replyTo");
 
-const conversation=
-await Conversation.findById(conversationId);
+        conversation.lastMessage = newMessage._id;
+        conversation.lastMessageText = bodyText || bodyAttachment || "New message";
+        conversation.lastMessageSender = req.user._id;
+        conversation.lastMessageTime = new Date();
 
-if(!conversation){
+        await conversation.save();
 
-return res.status(404).json({
+        const io = getIO();
+        if (io) {
+            io.to(conversationId).emit("new-message", newMessage);
+        }
 
-success:false,
-
-message:"Conversation not found."
-
-});
-
-}
-
-const newMessage=
-await Message.create({
-
-conversation:conversationId,
-
-sender:req.user._id,
-
-message,
-
-messageType:messageType||"text",
-
-attachment:attachment||"",
-
-replyTo
-
-});
-
-conversation.lastMessage=newMessage._id;
-
-conversation.lastMessageText=message;
-
-conversation.lastMessageSender=req.user._id;
-
-conversation.lastMessageTime=new Date();
-
-await conversation.save();
-
-await newMessage.populate(
-"sender",
-"fullName profileImage"
-);
-
-res.status(201).json({
-
-success:true,
-
-message:newMessage
-
-});
-
-}
-
-catch(error){
-
-res.status(500).json({
-
-success:false,
-
-message:error.message
-
-});
-
-}
-
+        return res.status(201).json({
+            success: true,
+            message: newMessage,
+        });
+    } catch (error) {
+        return res.status(500).json({
+            success: false,
+            message: error.message,
+        });
+    }
 };
 
 
@@ -515,4 +512,33 @@ exports.getMessage = async (req, res) => {
 
     }
 
+};
+
+
+/* =====================================================
+UPLOAD MESSAGE ASSET
+===================================================== */
+
+exports.uploadMessageAsset = async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({
+                success: false,
+                message: "Please select a file.",
+            });
+        }
+
+        const assetUrl = `/uploads/${req.uploadType || "messages"}/${req.file.filename}`;
+
+        return res.status(201).json({
+            success: true,
+            imageUrl: assetUrl,
+            fileUrl: assetUrl,
+        });
+    } catch (error) {
+        return res.status(500).json({
+            success: false,
+            message: error.message,
+        });
+    }
 };

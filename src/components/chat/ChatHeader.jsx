@@ -1,166 +1,69 @@
 import {
-    Phone,
-    Video,
-    Info,
-    Circle,
+  Phone,
+  Video,
+  Info,
+  Circle,
 } from "lucide-react";
 
 import "./ChatHeader.css";
 
 function ChatHeader({
-
-    conversation,
-
-    typingUser,
-
+  conversation,
+  partner,
+  typingUser,
+  onAudioCall,
+  onVideoCall,
 }) {
+  const user = partner || conversation?.partner || conversation?.user || conversation?.participants?.find((member) => member?._id !== conversation?.currentUserId) || {};
 
-    if (!conversation) {
-
-        return (
-
-            <div className="chat-header empty">
-
-                Select a conversation
-
-            </div>
-
-        );
-
-    }
-
-    const user = conversation.user || {};
-
+  if (!conversation) {
     return (
+      <div className="chat-header empty">
+        Select a conversation
+      </div>
+    );
+  }
 
-        <div className="chat-header">
-
-            <div className="chat-user">
-
-                <div className="chat-avatar">
-
-                    <img
-
-                        src={
-
-                            user.profileImage ||
-
-                            "/default-avatar.png"
-
-                        }
-
-                        alt={user.fullName}
-
-                    />
-
-                    {
-
-                        user.online && (
-
-                            <span className="online-indicator">
-
-                                <Circle
-
-                                    size={10}
-
-                                    fill="#22c55e"
-
-                                    stroke="#22c55e"
-
-                                />
-
-                            </span>
-
-                        )
-
-                    }
-
-                </div>
-
-                <div className="chat-user-info">
-
-                    <h3>
-
-                        {user.fullName || "Member"}
-
-                    </h3>
-
-                    {
-
-                        typingUser ? (
-
-                            <p className="typing-status">
-
-                                Typing...
-
-                            </p>
-
-                        ) : (
-
-                            <p>
-
-                                {
-
-                                    user.online
-
-                                    ?
-
-                                    "Online"
-
-                                    :
-
-                                    "Offline"
-
-                                }
-
-                            </p>
-
-                        )
-
-                    }
-
-                </div>
-
-            </div>
-
-            <div className="chat-actions">
-
-                <button
-
-                    title="Voice Call"
-
-                >
-
-                    <Phone size={20}/>
-
-                </button>
-
-                <button
-
-                    title="Video Call"
-
-                >
-
-                    <Video size={20}/>
-
-                </button>
-
-                <button
-
-                    title="Profile"
-
-                >
-
-                    <Info size={20}/>
-
-                </button>
-
-            </div>
-
+  return (
+    <div className="chat-header">
+      <div className="chat-user">
+        <div className="chat-avatar">
+          <img
+            src={user.profileImage || "/default-avatar.svg"}
+            alt={user.fullName || "Member"}
+          />
+          {user.online && (
+            <span className="online-indicator">
+              <Circle size={10} fill="#22c55e" stroke="#22c55e" />
+            </span>
+          )}
         </div>
 
-    );
+        <div className="chat-user-info">
+          <h3>{user.fullName || "Member"}</h3>
+          {typingUser ? (
+            <p className="typing-status">Typing...</p>
+          ) : (
+            <p>{user.online ? "Online" : "Offline"}</p>
+          )}
+        </div>
+      </div>
 
+      <div className="chat-actions">
+        <button type="button" title="Voice Call" onClick={onAudioCall}>
+          <Phone size={20} />
+        </button>
+        <button type="button" title="Video Call" onClick={onVideoCall}>
+          <Video size={20} />
+        </button>
+        <button type="button" title="Profile" onClick={() => {
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        }}>
+          <Info size={20} />
+        </button>
+      </div>
+    </div>
+  );
 }
 
 export default ChatHeader;

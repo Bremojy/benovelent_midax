@@ -10,9 +10,11 @@ import {
 import api, { UPLOAD_URL } from "../services/api";
 import "./News.css";
 
-const NEWS_VIDEO =
-  import.meta.env.VITE_NEWS_VIDEO_URL ||
-  "/videos/benevolent-news-loop.mp4";
+const newsVideoSources = [
+  import.meta.env.VITE_NEWS_VIDEO_URL,
+  "/videos/benevolent-news-loop.mp4",
+  "/videos/benevolent-community-loop.mp4",
+].filter(Boolean);
 
 function News() {
   const [news, setNews] = useState([]);
@@ -40,7 +42,9 @@ function News() {
         const items = Array.isArray(data?.news) ? data.news : [];
         setNews(items);
         setFilteredNews(items);
-        setFeatured(items.find((item) => item.featured || item.pinned) || items[0] || null);
+        setFeatured(
+          items.find((item) => item.featured || item.pinned) || items[0] || null
+        );
       }
 
       if (pollResponse.status === "fulfilled") {
@@ -97,11 +101,14 @@ function News() {
             muted
             loop
             playsInline
+            preload="auto"
             poster="/hero.jpg"
             onError={() => setVideoFailed(true)}
             aria-hidden="true"
           >
-            <source src={NEWS_VIDEO} type="video/mp4" />
+            {newsVideoSources.map((src) => (
+              <source key={src} src={src} type="video/mp4" />
+            ))}
           </video>
         )}
         <div className="news-video-overlay" />
@@ -110,8 +117,7 @@ function News() {
           <span className="news-kicker">BENEVOLENT MIDAX • NEWSROOM</span>
           <h1>Stories, Updates & Community Voice</h1>
           <p>
-            Stay informed about support activities, announcements, community
-            decisions and the people behind Benevolent Midax.
+            Stay informed about support activities, announcements, community decisions and the people behind Benevolent Midax.
           </p>
         </div>
       </section>
@@ -137,35 +143,64 @@ function News() {
           <>
             {featured && (
               <article className="featured-news">
-                <img src={imageFor(featured)} alt={featured.title} onError={(e) => { e.currentTarget.src = "/news-placeholder.svg"; }} />
+                <img
+                  src={imageFor(featured)}
+                  alt={featured.title}
+                  onError={(e) => {
+                    e.currentTarget.src = "/news-placeholder.svg";
+                  }}
+                />
                 <div className="featured-content">
                   <span className="featured-tag">Featured update</span>
                   <h2>{featured.title}</h2>
                   <p>{featured.summary || featured.content}</p>
-                  <div className="featured-date"><Calendar size={17} /> {formatDate(featured.publishDate || featured.createdAt)}</div>
+                  <div className="featured-date">
+                    <Calendar size={17} /> {formatDate(featured.publishDate || featured.createdAt)}
+                  </div>
                 </div>
               </article>
             )}
 
             <div className="news-section-title">
-              <div><span>FROM THE NEWSROOM</span><h2>Latest updates</h2></div>
+              <div>
+                <span>FROM THE NEWSROOM</span>
+                <h2>Latest updates</h2>
+              </div>
               <strong>{filteredNews.length}</strong>
             </div>
 
             {filteredNews.length === 0 ? (
-              <div className="empty-news"><Newspaper size={38} /><h2>No published news yet</h2><p>When an administrator publishes an update, it will appear here automatically.</p></div>
+              <div className="empty-news">
+                <Newspaper size={38} />
+                <h2>No published news yet</h2>
+                <p>When an administrator publishes an update, it will appear here automatically.</p>
+              </div>
             ) : (
               <div className="news-grid">
                 {filteredNews.map((item) => (
                   <article className="news-card" key={item._id}>
                     <div className="news-image">
-                      <img src={imageFor(item)} alt={item.title} loading="lazy" onError={(e) => { e.currentTarget.src = "/news-placeholder.svg"; }} />
+                      <img
+                        src={imageFor(item)}
+                        alt={item.title}
+                        loading="lazy"
+                        onError={(e) => {
+                          e.currentTarget.src = "/news-placeholder.svg";
+                        }}
+                      />
                     </div>
                     <div className="news-content">
-                      <div className="news-date"><Calendar size={15} /> {formatDate(item.publishDate || item.createdAt)}</div>
+                      <div className="news-date">
+                        <Calendar size={15} /> {formatDate(item.publishDate || item.createdAt)}
+                      </div>
                       <h3>{item.title}</h3>
-                      <p>{(item.summary || item.content || "").slice(0, 170)}{(item.summary || item.content || "").length > 170 ? "..." : ""}</p>
-                      <button className="read-more-btn" type="button">Read More <ArrowRight size={17} /></button>
+                      <p>
+                        {(item.summary || item.content || "").slice(0, 170)}
+                        {(item.summary || item.content || "").length > 170 ? "..." : ""}
+                      </p>
+                      <button className="read-more-btn" type="button">
+                        Read More <ArrowRight size={17} />
+                      </button>
                     </div>
                   </article>
                 ))}
@@ -176,22 +211,42 @@ function News() {
 
         <section className="public-polls-section">
           <div className="news-section-title">
-            <div><span>MEMBER VOICE</span><h2>Live community polls</h2></div>
+            <div>
+              <span>MEMBER VOICE</span>
+              <h2>Live community polls</h2>
+            </div>
             <Vote size={25} />
           </div>
 
           {polls.length === 0 ? (
-            <div className="empty-news compact"><Vote size={32} /><p>No active community poll right now.</p></div>
+            <div className="empty-news compact">
+              <Vote size={32} />
+              <p>No active community poll right now.</p>
+            </div>
           ) : (
             <div className="public-poll-grid">
               {polls.map((poll) => (
                 <article className="public-poll-card" key={poll._id}>
-                  <div className="public-poll-title"><BarChart3 size={22} /><div><span>LIVE POLL</span><h3>{poll.title}</h3></div></div>
+                  <div className="public-poll-title">
+                    <BarChart3 size={22} />
+                    <div>
+                      <span>LIVE POLL</span>
+                      <h3>{poll.title}</h3>
+                    </div>
+                  </div>
                   <p>{poll.description}</p>
                   <div className="public-poll-options">
                     {(poll.options || []).map((option) => {
                       const percent = poll.totalVotes ? Math.round((option.votes / poll.totalVotes) * 100) : 0;
-                      return <div className="public-poll-option" key={option._id}><div><span>{option.text}</span><b>{percent}%</b></div><i><em style={{ width: `${percent}%` }} /></i></div>;
+                      return (
+                        <div className="public-poll-option" key={option._id}>
+                          <div>
+                            <span>{option.text}</span>
+                            <b>{percent}%</b>
+                          </div>
+                          <i><em style={{ width: `${percent}%` }} /></i>
+                        </div>
+                      );
                     })}
                   </div>
                   <small>{poll.totalVotes || 0} votes • Members vote inside the secure portal</small>

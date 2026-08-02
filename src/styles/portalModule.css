@@ -33,3 +33,30 @@
 .system-health-banner{display:flex;align-items:center;gap:14px;padding:18px;border-radius:15px;margin-top:18px}.system-health-banner.online{background:#eaf8ef;color:#13733a}.system-health-banner.offline{background:#fff0f0;color:#a51c1c}.system-health-banner p{margin:4px 0 0;color:#5d6369;font-size:13px;line-height:1.5}.system-health-banner svg:last-child{margin-left:auto}
 @media(max-width:600px){.system-health-banner{align-items:flex-start}.system-health-banner svg:last-child{display:none}}
 .claim-guide h2{margin-top:0}.claim-guide-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.claim-guide-grid div{padding:14px;border-radius:12px;background:#fafafa;border:1px solid #ececec}.claim-guide-grid b{display:block;color:var(--portal-accent,#ff7a00);margin-bottom:6px}.claim-guide-grid span{display:block;color:#666;font-size:12px;line-height:1.5}@media(max-width:850px){.claim-guide-grid{grid-template-columns:repeat(2,1fr)}}@media(max-width:560px){.claim-guide-grid{grid-template-columns:1fr}}
+
+
+.settings-tabs{display:flex;flex-wrap:wrap;gap:10px}
+.settings-tabs .light{background:#f4f5f7;color:#333}
+.portal-section-title{display:flex;align-items:center;gap:12px;margin-bottom:18px}
+.portal-section-title span{font-size:11px;font-weight:800;letter-spacing:1.5px;color:var(--portal-accent,#ff7a00)}
+.portal-section-title h2{margin:4px 0 0}
+.theme-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-bottom:16px}
+.theme-swatch{border:1px solid #e3e6ea;background:#fff;border-radius:16px;padding:14px;text-align:left;display:flex;flex-direction:column;gap:5px}
+.theme-swatch span{display:block;width:100%;height:28px;border-radius:999px}
+.theme-swatch.selected{border-color:var(--portal-accent,#ff7a00);box-shadow:0 0 0 3px var(--portal-accent-soft,#ff7a0018)}
+.portal-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+.carousel-admin-list{display:grid;gap:14px}
+.carousel-admin-card{border:1px solid #eceff2;border-radius:18px;padding:14px;background:#fff;display:grid;grid-template-columns:140px 1fr;gap:14px}
+.carousel-admin-card img{width:140px;height:140px;object-fit:cover;border-radius:14px;background:#f4f4f4}
+.carousel-admin-card input,.carousel-admin-card textarea{width:100%;box-sizing:border-box;border:1px solid #dfe2e6;border-radius:11px;padding:11px;margin-bottom:10px;background:#fbfbfc;font:inherit;outline:none}
+.carousel-admin-card input:focus,.carousel-admin-card textarea:focus{border-color:var(--portal-accent,#ff7a00);box-shadow:0 0 0 3px var(--portal-accent-soft,#ff7a0018)}
+.portal-actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:14px}
+.portal-btn{display:inline-flex;align-items:center;gap:8px}
+.portal-btn.light{background:#f4f5f7;color:#333}
+.portal-btn.danger{background:#b42318;color:#fff}
+@media (max-width: 900px){
+  .portal-grid{grid-template-columns:1fr}
+  .carousel-admin-card{grid-template-columns:1fr}
+  .theme-grid{grid-template-columns:1fr}
+}
+

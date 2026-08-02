@@ -18,6 +18,7 @@ import PublicOnlyRoute from "./components/auth/PublicOnlyRoute";
 
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
+import ThemeBootstrap from "./components/ThemeBootstrap";
 
 import "./App.css";
 
@@ -256,6 +257,7 @@ function AppContent() {
 
   return (
     <>
+      <ThemeBootstrap />
       <PublicNavbar />
 
       <Suspense
@@ -535,7 +537,7 @@ function AppContent() {
           <Route path="/superadmin/members" element={<ProtectedRoute allowedRoles={["superadmin"]}><AdminMembers /></ProtectedRoute>} />
           <Route path="/superadmin/finance" element={<ProtectedRoute allowedRoles={["superadmin"]}><AdminFinance /></ProtectedRoute>} />
           <Route path="/superadmin/audit" element={<ProtectedRoute allowedRoles={["superadmin"]}><SuperAdminAudit /></ProtectedRoute>} />
-          <Route path="/superadmin/settings" element={<ProtectedRoute allowedRoles={["superadmin"]}><PortalSettings /></ProtectedRoute>} />
+          <Route path="/superadmin/settings" element={<ProtectedRoute allowedRoles={["superadmin"]}><SuperAdminSettings /></ProtectedRoute>} />
           <Route path="/superadmin/system" element={<ProtectedRoute allowedRoles={["superadmin"]}><SuperAdminSystem /></ProtectedRoute>} />
           <Route path="/superadmin/polls" element={<ProtectedRoute allowedRoles={["superadmin"]}><Polls mode="superadmin" /></ProtectedRoute>} />
 

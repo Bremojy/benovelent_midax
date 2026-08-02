@@ -8,6 +8,21 @@ const BASE_URL =
   import.meta.env.VITE_API_URL ||
   "https://benovelent-midax.onrender.com";
 
+export const API_BASE_URL = BASE_URL;
+
+export const resolveApiUrl = (path = "") => {
+  if (!path) return BASE_URL;
+  if (
+    path.startsWith("http://") ||
+    path.startsWith("https://") ||
+    path.startsWith("blob:") ||
+    path.startsWith("data:")
+  ) {
+    return path;
+  }
+  return `${BASE_URL}${path.startsWith("/") ? "" : "/"}${path}`;
+};
+
 // ========================================
 // AXIOS INSTANCE
 // ========================================

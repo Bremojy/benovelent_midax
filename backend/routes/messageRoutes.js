@@ -3,6 +3,7 @@ const router = express.Router();
 
 const {
     sendMessage,
+    uploadMessageAsset,
     getConversationMessages,
     getMessage,
     editMessage,
@@ -12,10 +13,15 @@ const {
 } = require("../controllers/messageController");
 
 const { verifyToken: protect } = require("../middleware/authMiddleware");
+const { uploadSingle, setUploadType } = require("../middleware/upload");
 
 // =======================================
 // MESSAGE ROUTES
 // =======================================
+
+
+// Upload a chat asset
+router.post("/upload", protect, setUploadType("messages"), uploadSingle("image"), uploadMessageAsset);
 
 // Send a message
 router.post("/", protect, sendMessage);

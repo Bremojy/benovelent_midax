@@ -1,331 +1,185 @@
+import { useMemo, useRef, useState } from "react";
 import {
-    useState,
-    useRef,
-} from "react";
-
-import {
-    Send,
-    Image,
-    Paperclip,
-    Smile,
-    Mic,
+  Send,
+  Image,
+  Paperclip,
+  Smile,
+  Mic,
+  X,
 } from "lucide-react";
 
 import "./MessageInput.css";
 
-const API = import.meta.env.VITE_API_URL;
+const API = import.meta.env.VITE_API_URL || "https://benovelent-midax.onrender.com";
+
+const QUICK_EMOJIS = ["😊", "😂", "❤️", "🙏", "👍", "🎉", "😎", "😢", "🔥", "🥰", "🤝", "✨"];
 
 function MessageInput({
-
-    onSend,
-    socket,
-    conversation,
-
+  onSend,
+  socket,
+  conversation,
 }) {
+  const [message, setMessage] = useState("");
+  const [image, setImage] = useState("");
+  const [emojiOpen, setEmojiOpen] = useState(false);
+  const fileInput = useRef(null);
 
-    const [message, setMessage] =
-        useState("");
+  const canSend = useMemo(() => Boolean(String(message).trim() || image), [message, image]);
 
-    const [image, setImage] =
-        useState("");
+  async function uploadImage(file) {
+    const formData = new FormData();
+    formData.append("image", file);
 
-    const fileInput =
-        useRef(null);
+    try {
+      const token = localStorage.getItem("memberToken");
+      const response = await fetch(`${API}/api/messages/upload`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: formData,
+      });
 
-    async function uploadImage(file) {
+      const data = await response.json();
 
-        const formData =
-            new FormData();
+      if (!response.ok) {
+        throw new Error(data?.message || "Upload failed");
+      }
 
-        formData.append(
-            "image",
-            file
-        );
-
-        try {
-
-            const token =
-                localStorage.getItem(
-                    "memberToken"
-                );
-
-            const response =
-                await fetch(
-
-                    `${API}/api/messages/upload`,
-
-                    {
-
-                        method:"POST",
-
-                        headers:{
-
-                            Authorization:
-                            `Bearer ${token}`,
-
-                        },
-
-                        body:formData,
-
-                    }
-
-                );
-
-            const data =
-                await response.json();
-
-            setImage(
-
-                data.imageUrl
-
-            );
-
-        }
-
-        catch(error){
-
-            console.error(error);
-
-        }
-
+      setImage(data.imageUrl || data.fileUrl || "");
+    } catch (error) {
+      console.error(error);
+      alert(error.message || "Unable to upload file.");
     }
+  }
 
-    function handleKeyDown(e){
-
-        if(
-
-            e.key==="Enter"
-
-            &&
-
-            !e.shiftKey
-
-        ){
-
-            e.preventDefault();
-
-            send();
-
-        }
-
+  function handleKeyDown(e) {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      send();
     }
+  }
 
-    function send(){
+  async function send() {
+    if (!canSend) return;
 
-        if(
-
-            !message.trim()
-
-            &&
-
-            !image
-
-        ) return;
-
-        onSend(
-
-            message,
-
-            image
-
-        );
-
-        socket?.emit(
-
-            "typing_stop",
-
-            {
-
-                conversationId:
-
-                conversation._id,
-
-            }
-
-        );
-
-        setMessage("");
-
-        setImage("");
-
+    try {
+      await onSend(message, image, image ? "image" : "text");
+      socket?.emit("stop-typing", {
+        conversationId: conversation._id,
+        sender: localStorage.getItem("user") ? JSON.parse(localStorage.getItem("user"))._id : undefined,
+      });
+      setMessage("");
+      setImage("");
+      setEmojiOpen(false);
+    } catch (error) {
+      console.error(error);
     }
-
-    function typing(){
-
-        socket?.emit(
-
-            "typing",
-
-            {
-
-                conversationId:
-
-                conversation._id,
-
-            }
-
-        );
-
-    }
-
-    return(
-
-        <div className="message-input-container">
-
-            {
-
-                image &&
-
-                (
-
-                    <div className="preview-image">
-
-                        <img
-
-                            src={image}
-
-                            alt=""
-
-                        />
-
-                        <button
-
-                            onClick={()=>
-
-                                setImage("")
-
-                            }
-
-                        >
-
-                            ✕
-
-                        </button>
-
-                    </div>
-
-                )
-
-            }
-
-            <div className="message-toolbar">
-
-                <button
-
-                    title="Emoji"
-
-                >
-
-                    <Smile size={21}/>
-
-                </button>
-
-                <button
-
-                    onClick={()=>
-
-                        fileInput.current.click()
-
-                    }
-
-                    title="Image"
-
-                >
-
-                    <Image size={21}/>
-
-                </button>
-
-                <button
-
-                    title="Attachment"
-
-                >
-
-                    <Paperclip size={21}/>
-
-                </button>
-
-                <button
-
-                    title="Voice"
-
-                >
-
-                    <Mic size={21}/>
-
-                </button>
-
-                <input
-
-                    ref={fileInput}
-
-                    hidden
-
-                    type="file"
-
-                    accept="image/*"
-
-                    onChange={(e)=>{
-
-                        if(
-
-                            e.target.files[0]
-
-                        ){
-
-                            uploadImage(
-
-                                e.target.files[0]
-
-                            );
-
-                        }
-
-                    }}
-
-                />
-
-                <textarea
-
-                    placeholder="Type a message..."
-
-                    value={message}
-
-                    onChange={(e)=>{
-
-                        setMessage(
-
-                            e.target.value
-
-                        );
-
-                        typing();
-
-                    }}
-
-                    onKeyDown={handleKeyDown}
-
-                />
-
-                <button
-
-                    className="send-button"
-
-                    onClick={send}
-
-                >
-
-                    <Send size={20}/>
-
-                </button>
-
-            </div>
-
+  }
+
+  function typing() {
+    socket?.emit("typing", {
+      conversationId: conversation._id,
+      sender: localStorage.getItem("user") ? JSON.parse(localStorage.getItem("user"))._id : undefined,
+    });
+  }
+
+  function addEmoji(emoji) {
+    setMessage((previous) => `${previous}${emoji}`);
+    setEmojiOpen(false);
+  }
+
+  return (
+    <div className="message-input-container">
+      {image && (
+        <div className="preview-image">
+          <img src={image} alt="" />
+          <button type="button" onClick={() => setImage("")}>
+            <X size={14} />
+          </button>
         </div>
+      )}
 
-    );
+      {emojiOpen && (
+        <div className="emoji-popover">
+          {QUICK_EMOJIS.map((emoji) => (
+            <button
+              key={emoji}
+              type="button"
+              className="emoji-chip"
+              onClick={() => addEmoji(emoji)}
+            >
+              {emoji}
+            </button>
+          ))}
+        </div>
+      )}
 
+      <div className="message-toolbar">
+        <button
+          type="button"
+          title="Emoji"
+          onClick={() => setEmojiOpen((open) => !open)}
+        >
+          <Smile size={21} />
+        </button>
+
+        <button
+          type="button"
+          onClick={() => fileInput.current?.click()}
+          title="Image"
+        >
+          <Image size={21} />
+        </button>
+
+        <button type="button" title="Attachment" onClick={() => fileInput.current?.click()}>
+          <Paperclip size={21} />
+        </button>
+
+        <button type="button" title="Voice note (coming soon)">
+          <Mic size={21} />
+        </button>
+
+        <input
+          ref={fileInput}
+          hidden
+          type="file"
+          accept="image/*"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) {
+              uploadImage(file);
+            }
+          }}
+        />
+
+        <textarea
+          placeholder="Type a message..."
+          value={message}
+          onChange={(e) => {
+            setMessage(e.target.value);
+            typing();
+          }}
+          onKeyDown={handleKeyDown}
+          onBlur={() => {
+            socket?.emit("stop-typing", {
+              conversationId: conversation._id,
+              sender: localStorage.getItem("user") ? JSON.parse(localStorage.getItem("user"))._id : undefined,
+            });
+          }}
+        />
+
+        <button
+          type="button"
+          className="send-button"
+          onClick={send}
+          disabled={!canSend}
+        >
+          <Send size={20} />
+        </button>
+      </div>
+    </div>
+  );
 }
 
 export default MessageInput;

@@ -4,6 +4,8 @@ const path = require("path");
 const fs = require("fs");
 
 const Carousel = require("../models/Carousel");
+const { verifyToken: protect } = require("../middleware/authMiddleware");
+const { isSuperAdmin } = require("../middleware/roleMiddleware");
 
 const router = express.Router();
 
@@ -89,7 +91,7 @@ router.get("/active", async (req, res) => {
 // UPLOAD CAROUSEL IMAGE
 // ========================================
 
-router.post("/upload", upload.single("image"), async (req, res) => {
+router.post("/upload", protect, isSuperAdmin, upload.single("image"), async (req, res) => {
     try {
         if (!req.file) {
             return res.status(400).json({
@@ -134,7 +136,7 @@ router.post("/upload", upload.single("image"), async (req, res) => {
 // CREATE CAROUSEL USING IMAGE URL
 // ========================================
 
-router.post("/", async (req, res) => {
+router.post("/", protect, isSuperAdmin, async (req, res) => {
     try {
         const {
             imageUrl,
@@ -180,7 +182,7 @@ router.post("/", async (req, res) => {
 // UPDATE CAROUSEL
 // ========================================
 
-router.put("/:id", upload.single("image"), async (req, res) => {
+router.put("/:id", protect, isSuperAdmin, upload.single("image"), async (req, res) => {
     try {
         const updateData = {
             ...req.body,
@@ -228,7 +230,7 @@ router.put("/:id", upload.single("image"), async (req, res) => {
 // DELETE CAROUSEL
 // ========================================
 
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", protect, isSuperAdmin, async (req, res) => {
     try {
         const slide = await Carousel.findByIdAndDelete(req.params.id);
 

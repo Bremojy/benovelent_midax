@@ -42,7 +42,7 @@ transition:.5s;
 transform:scale(1.08);
 }
 .gallery-video-hero{position:relative;isolation:isolate;overflow:hidden}
-.gallery-background-video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:-2}
-.gallery-video-overlay{position:absolute;inset:0;background:linear-gradient(135deg,rgba(15,17,19,.78),rgba(15,17,19,.42)),rgba(255,122,0,.13);z-index:-1}
+.gallery-background-video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;pointer-events:none}
+.gallery-video-overlay{position:absolute;inset:0;background:linear-gradient(135deg,rgba(15,17,19,.78),rgba(15,17,19,.42)),rgba(255,122,0,.13);z-index:1}
 .gallery-video-hero .section-container{position:relative;z-index:2}
 .gallery-card{background:#fff}

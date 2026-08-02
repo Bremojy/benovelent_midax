@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import DashboardLayout from "../../layouts/DashboardLayout";
 import { getMemberClaims } from "../../services/memberService";
+import { resolveApiUrl } from "../../services/api";
 import "./Support.css";
 
 export default function Claims() {
@@ -57,7 +58,7 @@ export default function Claims() {
                           if (!url) return null;
                           const fullUrl = url.startsWith("http")
                             ? url
-                            : `${import.meta.env.VITE_API_URL || "http://localhost:5000"}${url.startsWith("/") ? "" : "/"}${url}`;
+                            : resolveApiUrl(url);
                           return <a href={fullUrl} target="_blank" rel="noreferrer" key={`${url}-${index}`}>View document {index + 1}</a>;
                         })}
                       </div>
