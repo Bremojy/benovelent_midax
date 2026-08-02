@@ -57,7 +57,7 @@ export default function Claims() {
                           if (!url) return null;
                           const fullUrl = url.startsWith("http")
                             ? url
-                            : `${import.meta.env.VITE_API_URL || "http://localhost:5000"}${url.startsWith("/") ? "" : "/"}${url}`;
+                            : `${import.meta.env.VITE_API_URL || "https://benovelent-midax.onrender.com"}${url.startsWith("/") ? "" : "/"}${url}`;
                           return <a href={fullUrl} target="_blank" rel="noreferrer" key={`${url}-${index}`}>View document {index + 1}</a>;
                         })}
                       </div>
