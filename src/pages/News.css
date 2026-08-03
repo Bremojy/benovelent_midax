@@ -555,3 +555,77 @@
 .public-poll-title{display:flex;gap:12px;align-items:flex-start}.public-poll-title>svg{color:#ff7900;margin-top:2px}.public-poll-title span{font-size:10px;font-weight:800;letter-spacing:1.2px;color:#ff7900}.public-poll-title h3{margin:4px 0;font-size:20px;color:#24272b}
 .public-poll-card>p{color:#70757b;line-height:1.6}.public-poll-options{display:grid;gap:12px;margin:18px 0}.public-poll-option>div{display:flex;justify-content:space-between;gap:10px;font-size:13px}.public-poll-option b{color:#ff7900}.public-poll-option>i{display:block;height:7px;background:#e7e8ea;border-radius:999px;margin-top:7px;overflow:hidden}.public-poll-option em{display:block;height:100%;background:#ff7900;border-radius:999px}.public-poll-card small{color:#888}
 @media(max-width:700px){.news-video-hero{min-height:430px}.news-content-wrap{width:94%;margin-top:-28px}.public-poll-grid{grid-template-columns:1fr}.news-section-title h2{font-size:23px}}
+
+
+.news-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: rgba(7, 10, 18, 0.72);
+  backdrop-filter: blur(10px);
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.news-modal {
+  position: relative;
+  width: min(920px, 100%);
+  max-height: min(85vh, 900px);
+  overflow: auto;
+  background: #fff;
+  border-radius: 28px;
+  padding: 24px;
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.28);
+}
+
+.news-modal img {
+  width: 100%;
+  height: 320px;
+  object-fit: cover;
+  border-radius: 20px;
+  margin-bottom: 18px;
+}
+
+.news-modal h2 {
+  margin: 10px 0 12px;
+  font-size: clamp(1.5rem, 3vw, 2.1rem);
+}
+
+.news-modal p {
+  color: #51606f;
+  line-height: 1.8;
+}
+
+.news-modal-close {
+  position: sticky;
+  top: 0;
+  margin-left: auto;
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border: 0;
+  border-radius: 999px;
+  background: #fff3e4;
+  color: #ff7a00;
+  font-size: 1.5rem;
+  cursor: pointer;
+}
+
+.news-attachments {
+  margin-top: 18px;
+  display: grid;
+  gap: 10px;
+}
+
+.news-attachments a {
+  display: inline-flex;
+  width: fit-content;
+  padding: 10px 14px;
+  border-radius: 999px;
+  text-decoration: none;
+  background: #f3f6fb;
+  color: #1f2937;
+  font-weight: 600;
+}

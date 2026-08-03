@@ -10,14 +10,7 @@ import {
 import api, { UPLOAD_URL } from "../services/api";
 import "./News.css";
 
-const newsVideoSources = [
-  import.meta.env.VITE_NEWS_VIDEO_URL,
-  "https://videos.pexels.com/video-files/34163494/14483720_1920_1080_30fps.mp4",
-  "https://videos.pexels.com/video-files/34848129/14483720_1920_1080_30fps.mp4",
-  "https://videos.pexels.com/video-files/6774382/6774382-uhd_2160_3840_30fps.mp4",
-  "/videos/benevolent-news-loop.mp4",
-  "/videos/benevolent-community-loop.mp4",
-].filter(Boolean);
+const newsVideoSources = ["/videos/benevolent-news-loop.mp4", "/videos/benevolent-community-loop.mp4"];
 
 function News() {
   const [news, setNews] = useState([]);
@@ -27,6 +20,7 @@ function News() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [videoFailed, setVideoFailed] = useState(false);
+  const [selectedNews, setSelectedNews] = useState(null);
 
   useEffect(() => {
     fetchNews();
@@ -104,7 +98,7 @@ function News() {
             muted
             loop
             playsInline
-            preload="auto"
+            preload="metadata"
             poster="/hero.jpg"
             onError={() => setVideoFailed(true)}
             aria-hidden="true"
@@ -201,7 +195,7 @@ function News() {
                         {(item.summary || item.content || "").slice(0, 170)}
                         {(item.summary || item.content || "").length > 170 ? "..." : ""}
                       </p>
-                      <button className="read-more-btn" type="button">
+                      <button className="read-more-btn" type="button" onClick={() => setSelectedNews(item)}>
                         Read More <ArrowRight size={17} />
                       </button>
                     </div>
@@ -258,6 +252,33 @@ function News() {
             </div>
           )}
         </section>
+
+        {selectedNews && (
+          <div className="news-modal-backdrop" onClick={() => setSelectedNews(null)}>
+            <div className="news-modal" onClick={(e) => e.stopPropagation()}>
+              <button type="button" className="news-modal-close" onClick={() => setSelectedNews(null)}>×</button>
+              <img src={imageFor(selectedNews)} alt={selectedNews.title} onError={(e) => { e.currentTarget.src = "/news-placeholder.svg"; }} />
+              <span className="featured-tag">Full update</span>
+              <h2>{selectedNews.title}</h2>
+              <p>{selectedNews.content}</p>
+              {Array.isArray(selectedNews.attachments) && selectedNews.attachments.length > 0 && (
+                <div className="news-attachments">
+                  <strong>Attachments</strong>
+                  {selectedNews.attachments.map((attachment, index) => {
+                    const url = typeof attachment === "string" ? attachment : attachment?.fileUrl || attachment?.url;
+                    if (!url) return null;
+                    const fullUrl = url.startsWith("http") ? url : `${UPLOAD_URL}${url.startsWith("/") ? "" : "/"}${url}`;
+                    return (
+                      <a href={fullUrl} target="_blank" rel="noreferrer" key={`${fullUrl}-${index}`}>
+                        Open attachment {index + 1}
+                      </a>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </main>
   );

@@ -1,6 +1,7 @@
 const News = require("../models/News");
 const Member = require("../models/Member");
 const Notification = require("../models/Notification");
+const { notifyMembers } = require("../services/memberBroadcastService");
 
 /* =====================================================
    CREATE NEWS
@@ -124,6 +125,14 @@ exports.createNews = async (req, res) => {
                 await Notification.insertMany(notifications);
 
             }
+
+            await notifyMembers({
+                subject: `New announcement: ${title}`,
+                text: summary || content,
+                html: `<h2>${title}</h2><p>${(summary || content || "").replace(/\n/g, "<br>")}</p><p>Open the Benevolent Midax portal for the full update.</p>`,
+                smsText: `${title} - Open the Benevolent Midax portal for the latest announcement.`,
+                broadcastSms: true,
+            });
 
         }
 

@@ -2,13 +2,7 @@ import { useEffect, useState } from "react";
 import api, { resolveApiUrl } from "../services/api";
 import "./Gallery.css";
 
-const galleryVideoSources = [
-  import.meta.env.VITE_GALLERY_VIDEO_URL,
-  "https://videos.pexels.com/video-files/36410725/15439556_2160_3840_30fps.mp4",
-  "https://videos.pexels.com/video-files/6774382/6774382-uhd_2160_3840_30fps.mp4",
-  "https://videos.pexels.com/video-files/34163494/14483720_1920_1080_30fps.mp4",
-  "/videos/benevolent-community-loop.mp4",
-].filter(Boolean);
+const galleryVideoSources = ["/videos/benevolent-community-loop.mp4"];
 
 function Gallery() {
   const [videoFailed, setVideoFailed] = useState(false);
@@ -50,7 +44,7 @@ function Gallery() {
           muted
           loop
           playsInline
-          preload="auto"
+          preload="metadata"
           poster="/hero.jpg"
           onError={() => setVideoFailed(true)}
           aria-hidden="true"

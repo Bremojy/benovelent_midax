@@ -3,13 +3,7 @@ import { ArrowRight, Eye, HeartHandshake, ShieldCheck, Sparkles, Target, LockKey
 import { Link } from "react-router-dom";
 import "../styles/public-modern.css";
 
-const aboutVideos = [
-  "https://videos.pexels.com/video-files/36410725/15439556_2160_3840_30fps.mp4",
-  "https://videos.pexels.com/video-files/6774382/6774382-uhd_2160_3840_30fps.mp4",
-  "https://videos.pexels.com/video-files/34848129/14483720_1920_1080_30fps.mp4",
-  "https://videos.pexels.com/video-files/34163494/14483720_1920_1080_30fps.mp4",
-];
-
+const aboutVideos = ["/videos/benevolent-community-loop.mp4"];
 export default function About() {
   const [videoError, setVideoError] = useState(false);
   const [videoIndex, setVideoIndex] = useState(0);
@@ -34,7 +28,7 @@ export default function About() {
             muted
             loop
             playsInline
-            preload="auto"
+            preload="metadata"
             poster="/hero.jpg"
             onError={() => setVideoError(true)}
             aria-hidden="true"

@@ -6,6 +6,7 @@ const {
     getUnreadCount,
     getNotification,
     createNotification,
+    broadcastToMembers,
     markAsRead,
     markAllAsRead,
     deleteNotification,
@@ -29,6 +30,7 @@ router.get("/:id", protect, getNotification);
 
 // Create notification (Admin/Super Admin/System)
 router.post("/", protect, createNotification);
+router.post("/broadcast", protect, broadcastToMembers);
 
 // Mark one notification as read
 router.put("/:id/read", protect, markAsRead);

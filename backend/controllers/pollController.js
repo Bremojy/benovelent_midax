@@ -2,6 +2,7 @@ const Poll = require("../models/Poll");
 const Member = require("../models/Member");
 const Notification = require("../models/Notification");
 const News = require("../models/News");
+const { notifyMembers } = require("../services/memberBroadcastService");
 
 /* =====================================================
    CREATE POLL
@@ -112,6 +113,14 @@ exports.createPoll = async (req, res) => {
             await Notification.insertMany(notifications);
 
         }
+
+        await notifyMembers({
+            subject: `New poll: ${title}`,
+            text: description || title,
+            html: `<h2>${title}</h2><p>${(description || "").replace(/\n/g, "<br>")}</p><p>Vote securely inside the portal.</p>`,
+            smsText: `${title} - A new poll is live in Benevolent Midax.`,
+            broadcastSms: true,
+        });
 
         res.status(201).json({
 

@@ -17,13 +17,7 @@ function getPortalPath(role) {
   }
 }
 
-const loginVideoSources = [
-  import.meta.env.VITE_LOGIN_VIDEO_URL,
-  "https://videos.pexels.com/video-files/34848129/14483720_1920_1080_30fps.mp4",
-  "https://videos.pexels.com/video-files/34163494/14483720_1920_1080_30fps.mp4",
-  "https://videos.pexels.com/video-files/6774382/6774382-uhd_2160_3840_30fps.mp4",
-  "/videos/benevolent-community-loop.mp4",
-].filter(Boolean);
+const loginVideoSources = ["/videos/benevolent-community-loop.mp4"];
 
 export default function Login() {
   const navigate = useNavigate();
@@ -93,7 +87,7 @@ export default function Login() {
           muted
           loop
           playsInline
-          preload="auto"
+          preload="metadata"
           poster="/hero.jpg"
           onError={() => setVideoFailed(true)}
           aria-hidden="true"

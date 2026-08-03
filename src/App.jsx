@@ -330,6 +330,14 @@ function AppContent() {
           />
 
 
+
+          <Route
+            path="/members"
+            element={
+              <Navigate to="/login" replace />
+            }
+          />
+
           {/* =================================================
               LOGIN
           ================================================= */}

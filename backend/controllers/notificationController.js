@@ -1,3 +1,4 @@
+const { notifyMembers } = require("../services/memberBroadcastService");
 const Notification=require("../models/Notification");
 
 /* =====================================================
@@ -371,4 +372,41 @@ exports.getNotification = async (req, res) => {
             message: error.message
         });
     }
+};
+
+/* =====================================================
+BROADCAST TO MEMBERS
+===================================================== */
+
+exports.broadcastToMembers = async (req, res) => {
+  try {
+    const { title, message, smsText, emailHtml, broadcastSms = true } = req.body || {};
+
+    if (!title?.trim() || !message?.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "Title and message are required.",
+      });
+    }
+
+    const result = await notifyMembers({
+      subject: title.trim(),
+      text: message.trim(),
+      html: emailHtml || `<h2>${title.trim()}</h2><p>${message.trim().replace(/\n/g, "<br>")}</p>`,
+      smsText: smsText || message.trim(),
+      broadcastSms: Boolean(broadcastSms),
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: "Broadcast sent successfully.",
+      result,
+    });
+  } catch (error) {
+    console.error("Broadcast notification error:", error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Unable to broadcast message.",
+    });
+  }
 };

@@ -8,13 +8,7 @@ import {
   Users,
 } from "lucide-react";
 
-const constitutionVideoSources = [
-  import.meta.env.VITE_CONSTITUTION_VIDEO_URL,
-  "https://videos.pexels.com/video-files/36410725/15439556_2160_3840_30fps.mp4",
-  "https://videos.pexels.com/video-files/6774382/6774382-uhd_2160_3840_30fps.mp4",
-  "https://videos.pexels.com/video-files/34848129/14483720_1920_1080_30fps.mp4",
-  "/videos/benevolent-community-loop.mp4",
-].filter(Boolean);
+const constitutionVideoSources = ["/videos/benevolent-community-loop.mp4"];
 
 function Constitution() {
   const [videoFailed, setVideoFailed] = useState(false);
@@ -27,7 +21,7 @@ function Constitution() {
           muted
           loop
           playsInline
-          preload="auto"
+          preload="metadata"
           poster="/hero.jpg"
           onError={() => setVideoFailed(true)}
           aria-hidden="true"
