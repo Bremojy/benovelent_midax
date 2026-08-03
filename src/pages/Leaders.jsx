@@ -146,10 +146,11 @@ function Leaders() {
 
         {filteredLeaders.map((leader) => {
 
-          const image =
-            leader.imageUrl?.startsWith("http")
+          const image = leader.imageUrl
+            ? leader.imageUrl.startsWith("http")
               ? leader.imageUrl
-              : `${UPLOAD_URL}${leader.imageUrl}`;
+              : `${UPLOAD_URL}${leader.imageUrl}`
+            : "/default-avatar.svg";
 
           return (
 

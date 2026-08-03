@@ -12,7 +12,8 @@ const websiteContentSchema = new mongoose.Schema(
         "services",
         "contact",
         "footer",
-        "settings"
+        "settings",
+        "gallery"
       ]
     },
 

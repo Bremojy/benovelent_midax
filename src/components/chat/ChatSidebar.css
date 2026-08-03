@@ -211,3 +211,38 @@
 }
 
 }
+
+.chat-sidebar {
+  width: 390px;
+  background: rgba(255,255,255,.98);
+}
+
+.chat-sidebar-top {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  backdrop-filter: blur(14px);
+  background: rgba(255,255,255,.92);
+}
+
+.conversation,
+.member-row {
+  border-radius: 18px;
+  margin: 8px 12px;
+}
+
+.conversation.active {
+  background: linear-gradient(90deg, rgba(255,122,0,.10), rgba(255,122,0,.03));
+}
+
+.member-row {
+  width: calc(100% - 24px);
+  text-align: left;
+  border: 1px solid transparent;
+  background: transparent;
+}
+
+.member-row:hover {
+  background: #fff7ef;
+  border-color: rgba(255,122,0,.15);
+}

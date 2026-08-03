@@ -41,48 +41,38 @@ const API = axios.create({
 // ========================================
 
 const getToken = () => {
-  const user = JSON.parse(
-    localStorage.getItem("user") || "null"
-  );
+  const user = JSON.parse(localStorage.getItem("user") || "null");
+  const pathname = typeof window !== "undefined" ? window.location.pathname : "";
+  const role = String(user?.role || "").toLowerCase();
 
-  const role = (
-    user?.role || ""
-  ).toLowerCase();
+  const byPortal = pathname.startsWith("/superadmin")
+    ? localStorage.getItem("superAdminToken")
+    : pathname.startsWith("/admin")
+      ? localStorage.getItem("adminToken")
+      : pathname.startsWith("/member")
+        ? localStorage.getItem("memberToken")
+        : null;
 
-  // Prefer the token belonging
-  // to the currently logged-in role.
+  if (byPortal) {
+    return byPortal;
+  }
 
   if (role === "superadmin") {
-    return localStorage.getItem(
-      "superAdminToken"
-    );
+    return localStorage.getItem("superAdminToken");
   }
 
   if (role === "admin") {
-    return localStorage.getItem(
-      "adminToken"
-    );
+    return localStorage.getItem("adminToken");
   }
 
   if (role === "member") {
-    return localStorage.getItem(
-      "memberToken"
-    );
+    return localStorage.getItem("memberToken");
   }
 
-  // Fallback for older sessions
-  // where the user object may not exist.
-
   return (
-    localStorage.getItem(
-      "superAdminToken"
-    ) ||
-    localStorage.getItem(
-      "adminToken"
-    ) ||
-    localStorage.getItem(
-      "memberToken"
-    )
+    localStorage.getItem("memberToken") ||
+    localStorage.getItem("adminToken") ||
+    localStorage.getItem("superAdminToken")
   );
 };
 

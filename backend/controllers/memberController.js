@@ -433,6 +433,7 @@ const allowedFields = [
     "ward",
     "village",
     "postalAddress",
+    "physicalAddress",
 
     // Employment
     "occupation",
@@ -450,15 +451,27 @@ const allowedFields = [
 
     // Emergency
     "emergencyContact",
+
+    // Acceptances
+    "acceptedConstitution",
+    "acceptedPrivacyPolicy",
+    "acceptedDeclaration",
 ];
 
 allowedFields.forEach((field) => {
 
-    if (
-        req.body[field] !== undefined
-    ) {
-        member[field] =
-            req.body[field];
+    if (req.body[field] !== undefined) {
+        let value = req.body[field];
+
+        if ((field === "nextOfKin" || field === "emergencyContact") && typeof value === "string") {
+            try {
+                value = JSON.parse(value);
+            } catch {
+                // Keep the raw value if it is not valid JSON.
+            }
+        }
+
+        member[field] = value;
     }
 
 });
@@ -474,7 +487,10 @@ allowedFields.forEach((field) => {
 
         if (req.files?.passportPhoto?.[0]) {
             const file = req.files.passportPhoto[0];
-            member.passportPhoto = `/uploads/${req.uploadType || "profiles"}/${file.filename}`;
+            const filePath = `/uploads/${req.uploadType || "profiles"}/${file.filename}`;
+            member.passportPhoto = filePath;
+            member.documents = member.documents || {};
+            member.documents.passportPhoto = filePath;
         }
 
         if (req.files?.nationalIdFront?.[0]) {
@@ -1209,9 +1225,8 @@ exports.getChatMembers = async (req, res) => {
         const members = await Member.find({
             _id: { $ne: currentUserId },
             isDeleted: { $ne: true },
-            status: { $in: ["active", "inactive", "suspended"] },
         })
-            .select("fullName username profileImage online lastSeen status memberNumber department position")
+            .select("fullName username profileImage online lastSeen status memberNumber department position phone email")
             .sort({ fullName: 1 })
             .lean();
 

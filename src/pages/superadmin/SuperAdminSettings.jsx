@@ -1,5 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlertCircle, Check, ChevronDown, Upload, Palette, Save, Trash2, RefreshCw } from "lucide-react";
+import {
+  Check,
+  ChevronDown,
+  Palette,
+  Plus,
+  RefreshCw,
+  Save,
+  Settings2,
+  Trash2,
+  Upload,
+  Users,
+  ImagePlus,
+  Edit3,
+} from "lucide-react";
 import DashboardLayout from "../../layouts/DashboardLayout";
 import API, { resolveApiUrl } from "../../services/api";
 import { useAuth } from "../../context/AuthContext";
@@ -11,6 +24,7 @@ const SECTION_FIELDS = [
   { key: "services", label: "Services" },
   { key: "contact", label: "Contact" },
   { key: "footer", label: "Footer" },
+  { key: "gallery", label: "Gallery" },
   { key: "settings", label: "Website Settings" },
 ];
 
@@ -23,16 +37,14 @@ const THEMES = [
   { name: "Golden", value: "#f59e0b" },
 ];
 
-function emptySection(section) {
-  return {
-    section,
-    title: "",
-    subtitle: "",
-    description: "",
-    content: "",
-    published: true,
-  };
-}
+const EMPTY_SECTION = (section) => ({
+  section,
+  title: "",
+  subtitle: "",
+  description: "",
+  content: "",
+  published: true,
+});
 
 function normalizeContent(value) {
   if (!value) return "";
@@ -45,20 +57,41 @@ function normalizeContent(value) {
   return String(value);
 }
 
+function normalizeImagePath(src) {
+  if (!src) return "";
+  if (src.startsWith("http")) return src;
+  return resolveApiUrl(src);
+}
+
 export default function SuperAdminSettings() {
   const { user } = useAuth();
+
   const [activeTab, setActiveTab] = useState("website");
   const [sections, setSections] = useState(() =>
-    Object.fromEntries(SECTION_FIELDS.map((item) => [item.key, emptySection(item.key)]))
+    Object.fromEntries(SECTION_FIELDS.map((item) => [item.key, EMPTY_SECTION(item.key)]))
   );
   const [themeColor, setThemeColor] = useState("#ff7a00");
   const [slides, setSlides] = useState([]);
+  const [leaders, setLeaders] = useState([]);
+  const [gallery, setGallery] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [savingSection, setSavingSection] = useState("");
+  const [savingKey, setSavingKey] = useState("");
   const [savingCarousel, setSavingCarousel] = useState(false);
+  const [savingLeader, setSavingLeader] = useState(false);
+  const [savingGallery, setSavingGallery] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [uploadFile, setUploadFile] = useState(null);
+  const [galleryFile, setGalleryFile] = useState(null);
+  const [leaderFile, setLeaderFile] = useState(null);
+  const [leaderDraft, setLeaderDraft] = useState({
+    _id: "",
+    name: "",
+    position: "",
+    bio: "",
+    order: 0,
+    isActive: true,
+  });
   const [carouselForm, setCarouselForm] = useState({
     title: "",
     description: "",
@@ -76,24 +109,21 @@ export default function SuperAdminSettings() {
     const load = async () => {
       try {
         setLoading(true);
-        const [websiteRes, carouselRes, settingsRes] = await Promise.allSettled([
+        const [websiteRes, carouselRes, leadersRes, galleryRes, settingsRes] = await Promise.allSettled([
           API.get("/website"),
           API.get("/carousel"),
+          API.get("/leaders"),
+          API.get("/website/gallery"),
           API.get("/website/settings"),
         ]);
 
         if (!active) return;
 
         if (websiteRes.status === "fulfilled") {
-          const rows = Array.isArray(websiteRes.value.data?.content)
-            ? websiteRes.value.data.content
-            : [];
-          const nextSections = Object.fromEntries(
-            SECTION_FIELDS.map((item) => [item.key, emptySection(item.key)])
-          );
-
+          const rows = Array.isArray(websiteRes.value.data?.content) ? websiteRes.value.data.content : [];
+          const nextSections = Object.fromEntries(SECTION_FIELDS.map((item) => [item.key, EMPTY_SECTION(item.key)]));
           rows.forEach((row) => {
-            if (!row?.section) return;
+            if (!row?.section || !nextSections[row.section]) return;
             nextSections[row.section] = {
               section: row.section,
               title: row.title || "",
@@ -102,14 +132,7 @@ export default function SuperAdminSettings() {
               content: normalizeContent(row.content),
               published: row.published !== false,
             };
-
-            if (row.section === "settings") {
-              const content = row.content || {};
-              const color = content.themeColor || content.accentColor || row.themeColor;
-              if (color) setThemeColor(color);
-            }
           });
-
           setSections(nextSections);
         }
 
@@ -121,6 +144,15 @@ export default function SuperAdminSettings() {
 
         if (carouselRes.status === "fulfilled") {
           setSlides(Array.isArray(carouselRes.value.data) ? carouselRes.value.data : []);
+        }
+
+        if (leadersRes.status === "fulfilled") {
+          setLeaders(Array.isArray(leadersRes.value.data) ? leadersRes.value.data : []);
+        }
+
+        if (galleryRes.status === "fulfilled") {
+          const images = galleryRes.value.data?.section?.images || galleryRes.value.data?.gallery || [];
+          setGallery(Array.isArray(images) ? images : []);
         }
       } catch (err) {
         if (active) setError(err.response?.data?.message || err.message || "Unable to load website settings.");
@@ -147,38 +179,31 @@ export default function SuperAdminSettings() {
 
   const saveSection = async (key) => {
     try {
-      setSavingSection(key);
+      setSavingKey(key);
       setError("");
-      const item = sections[key] || emptySection(key);
+      const item = sections[key] || EMPTY_SECTION(key);
       const payload = {
         title: item.title,
         subtitle: item.subtitle,
         description: item.description,
         published: item.published,
-        content:
-          key === "settings"
-            ? {
-                themeColor,
-                accentColor: themeColor,
-              }
-            : { body: item.content },
+        content: key === "settings" ? { themeColor, accentColor: themeColor } : { body: item.content },
       };
 
       const exists = Boolean(item.title || item.subtitle || item.description || item.content);
       const request = exists ? API.put(`/website/${key}`, payload) : API.post("/website", { section: key, ...payload });
-
       const { data } = await request;
       setMessage(data?.message || "Section saved.");
     } catch (err) {
       setError(err.response?.data?.message || err.message || "Unable to save section.");
     } finally {
-      setSavingSection("");
+      setSavingKey("");
     }
   };
 
   const saveTheme = async () => {
     try {
-      setSavingSection("settings");
+      setSavingKey("settings");
       setError("");
       const payload = {
         title: "Website Settings",
@@ -205,7 +230,7 @@ export default function SuperAdminSettings() {
     } catch (err) {
       setError(err.response?.data?.message || err.message || "Unable to save theme.");
     } finally {
-      setSavingSection("");
+      setSavingKey("");
     }
   };
 
@@ -251,7 +276,6 @@ export default function SuperAdminSettings() {
   const updateSlide = async (slideId, patch) => {
     try {
       setError("");
-      setMessage("");
       const current = slides.find((slide) => slide._id === slideId);
       const form = new FormData();
       if (current?.title !== undefined) form.append("title", patch.title ?? current.title);
@@ -284,73 +308,157 @@ export default function SuperAdminSettings() {
     }
   };
 
+  const uploadGallery = async (e) => {
+    e.preventDefault();
+    if (!galleryFile) {
+      setError("Please choose a gallery image first.");
+      return;
+    }
+    try {
+      setSavingGallery(true);
+      setError("");
+      const form = new FormData();
+      form.append("image", galleryFile);
+      form.append("caption", galleryFile.name);
+      const { data } = await API.post("/website/gallery/upload", form, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      const images = data?.section?.images || [];
+      setGallery(Array.isArray(images) ? images : gallery);
+      setGalleryFile(null);
+      setMessage("Gallery image saved locally and published to the public gallery.");
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || "Unable to upload gallery image.");
+    } finally {
+      setSavingGallery(false);
+    }
+  };
+
+  const saveLeader = async (e) => {
+    e.preventDefault();
+    if (!leaderDraft.name.trim() || !leaderDraft.position.trim()) {
+      setError("Leader name and position are required.");
+      return;
+    }
+
+    try {
+      setSavingLeader(true);
+      setError("");
+      const form = new FormData();
+      form.append("name", leaderDraft.name.trim());
+      form.append("position", leaderDraft.position.trim());
+      form.append("bio", leaderDraft.bio || "");
+      form.append("order", String(leaderDraft.order || 0));
+      if (leaderFile) form.append("image", leaderFile);
+
+      const response = leaderDraft._id
+        ? await API.put(`/leaders/${leaderDraft._id}`, form, { headers: { "Content-Type": "multipart/form-data" } })
+        : await API.post("/leaders/upload", form, { headers: { "Content-Type": "multipart/form-data" } });
+
+      const saved = response.data?.leader;
+      if (saved) {
+        setLeaders((prev) => {
+          const next = leaderDraft._id
+            ? prev.map((item) => (item._id === saved._id ? saved : item))
+            : [saved, ...prev];
+          return next;
+        });
+      }
+
+      setLeaderDraft({ _id: "", name: "", position: "", bio: "", order: 0, isActive: true });
+      setLeaderFile(null);
+      setMessage(leaderDraft._id ? "Leader updated." : "Leader added and published.");
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || "Unable to save leader.");
+    } finally {
+      setSavingLeader(false);
+    }
+  };
+
+  const editLeader = (leader) => {
+    setLeaderDraft({
+      _id: leader._id,
+      name: leader.name || "",
+      position: leader.position || "",
+      bio: leader.bio || "",
+      order: leader.order || 0,
+      isActive: leader.isActive !== false,
+    });
+    setLeaderFile(null);
+    setActiveTab("leaders");
+  };
+
+  const deleteLeader = async (leaderId) => {
+    if (!window.confirm("Delete this leader?")) return;
+    try {
+      setError("");
+      await API.delete(`/leaders/${leaderId}`);
+      setLeaders((prev) => prev.filter((item) => item._id !== leaderId));
+      setMessage("Leader removed.");
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || "Unable to delete leader.");
+    }
+  };
+
+  const sectionCards = useMemo(
+    () => SECTION_FIELDS.map((item) => ({
+      ...item,
+      section: sections[item.key] || EMPTY_SECTION(item.key),
+    })),
+    [sections]
+  );
+
   return (
     <DashboardLayout>
       <div className="portal-module">
         <header className="portal-module-header">
           <div>
             <span>PUBLIC WEBSITE CONTROL</span>
-            <h1>Website Settings</h1>
-            <p>Update your public pages, brand color, and carousel slides from one secure place.</p>
+            <h1>SuperAdmin website editor</h1>
+            <p>See what the public website contains, then edit pages, leaders, gallery images and theme settings from one place.</p>
           </div>
           <div className="portal-actions">
-            <button className="portal-btn" onClick={() => window.location.reload()}>
-              <RefreshCw size={16} /> Refresh
-            </button>
+            <button className={activeTab === "website" ? "portal-btn" : "portal-btn light"} onClick={() => setActiveTab("website")} type="button">Website content</button>
+            <button className={activeTab === "carousel" ? "portal-btn" : "portal-btn light"} onClick={() => setActiveTab("carousel")} type="button">Carousel</button>
+            <button className={activeTab === "leaders" ? "portal-btn" : "portal-btn light"} onClick={() => setActiveTab("leaders")} type="button">Leaders</button>
+            <button className={activeTab === "gallery" ? "portal-btn" : "portal-btn light"} onClick={() => setActiveTab("gallery")} type="button">Gallery</button>
+            <button className={activeTab === "settings" ? "portal-btn" : "portal-btn light"} onClick={() => setActiveTab("settings")} type="button">Theme</button>
           </div>
         </header>
 
-        {(message || error) && (
-          <div className={error ? "portal-alert" : "portal-alert success"}>
-            {error || message}
-          </div>
-        )}
-
         <section className="portal-panel">
-          <div className="settings-tabs">
-            <button className={activeTab === "website" ? "portal-btn" : "portal-btn light"} onClick={() => setActiveTab("website")}>Website content</button>
-            <button className={activeTab === "theme" ? "portal-btn" : "portal-btn light"} onClick={() => setActiveTab("theme")}>Theme color</button>
-            <button className={activeTab === "carousel" ? "portal-btn" : "portal-btn light"} onClick={() => setActiveTab("carousel")}>Carousels</button>
+          <div className="portal-section-title">
+            <Settings2 size={20} />
+            <div>
+              <span>WHAT SUPERADMIN CAN EDIT</span>
+              <h2>Current website inventory</h2>
+            </div>
+          </div>
+          <div className="portal-stat-grid">
+            {sectionCards.map((item) => (
+              <div className="portal-stat" key={item.key}>
+                <span>{item.label}</span>
+                <strong>{item.section.title || "Empty"}</strong>
+                <small>{item.section.subtitle || item.section.description || "Ready for content"}</small>
+              </div>
+            ))}
+          </div>
+          <div className="portal-form-grid">
+            <div className="portal-field" style={{ gridColumn: "1 / -1" }}>
+              <p style={{ margin: 0, color: "#666", lineHeight: 1.6 }}>
+                The public site can be edited through the Website content tab. Carousel slides are what show on the home hero. Leaders are shown on the public leadership page. Gallery images are saved locally on the backend and reflected on the public gallery page.
+              </p>
+            </div>
           </div>
         </section>
 
+        {error && <div className="portal-alert">{error}</div>}
+        {message && <div className="portal-alert success">{message}</div>}
+
         {loading ? (
-          <section className="portal-panel">
-            <div className="portal-empty">Loading website settings...</div>
-          </section>
+          <div className="portal-panel portal-empty">Loading website settings...</div>
         ) : (
           <>
-            {activeTab === "theme" && (
-              <section className="portal-panel">
-                <div className="portal-section-title">
-                  <Palette size={20} />
-                  <div>
-                    <span>BRANDING</span>
-                    <h2>Public Website Color</h2>
-                  </div>
-                </div>
-
-                <div className="theme-grid">
-                  {THEMES.map((theme) => (
-                    <button
-                      key={theme.value}
-                      type="button"
-                      className={themeColor === theme.value ? "theme-swatch selected" : "theme-swatch"}
-                      onClick={() => setThemeColor(theme.value)}
-                    >
-                      <span style={{ background: theme.value }} />
-                      <strong>{theme.name}</strong>
-                      <small>{theme.value}</small>
-                    </button>
-                  ))}
-                </div>
-
-                <button className="portal-btn" onClick={saveTheme} disabled={savingSection === "settings"}>
-                  <Save size={16} /> {savingSection === "settings" ? "Saving..." : "Save theme"}
-                </button>
-              </section>
-            )}
-
             {activeTab === "website" && (
               <div className="portal-grid">
                 {SECTION_FIELDS.filter((item) => item.key !== "settings").map((item) => (
@@ -366,48 +474,60 @@ export default function SuperAdminSettings() {
                     <div className="portal-form-grid">
                       <div className="portal-field">
                         <label>Title</label>
-                        <input
-                          value={sections[item.key]?.title || ""}
-                          onChange={(e) => patchSection(item.key, { title: e.target.value })}
-                        />
+                        <input value={sections[item.key]?.title || ""} onChange={(e) => patchSection(item.key, { title: e.target.value })} />
                       </div>
                       <div className="portal-field">
                         <label>Subtitle</label>
-                        <input
-                          value={sections[item.key]?.subtitle || ""}
-                          onChange={(e) => patchSection(item.key, { subtitle: e.target.value })}
-                        />
+                        <input value={sections[item.key]?.subtitle || ""} onChange={(e) => patchSection(item.key, { subtitle: e.target.value })} />
                       </div>
                       <div className="portal-field" style={{ gridColumn: "1 / -1" }}>
                         <label>Description</label>
-                        <textarea
-                          rows="4"
-                          value={sections[item.key]?.description || ""}
-                          onChange={(e) => patchSection(item.key, { description: e.target.value })}
-                        />
+                        <textarea rows="4" value={sections[item.key]?.description || ""} onChange={(e) => patchSection(item.key, { description: e.target.value })} />
                       </div>
                       <div className="portal-field" style={{ gridColumn: "1 / -1" }}>
                         <label>Extra content</label>
-                        <textarea
-                          rows="6"
-                          value={sections[item.key]?.content || ""}
-                          onChange={(e) => patchSection(item.key, { content: e.target.value })}
-                          placeholder="Optional body text, JSON or notes for this page."
-                        />
+                        <textarea rows="6" value={sections[item.key]?.content || ""} onChange={(e) => patchSection(item.key, { content: e.target.value })} placeholder="Optional body text, JSON or notes for this page." />
                       </div>
                     </div>
 
                     <div className="portal-actions">
-                      <button
-                        className="portal-btn"
-                        onClick={() => saveSection(item.key)}
-                        disabled={savingSection === item.key}
-                      >
-                        <Save size={16} /> {savingSection === item.key ? "Saving..." : "Save section"}
+                      <button className="portal-btn" onClick={() => saveSection(item.key)} disabled={savingKey === item.key} type="button">
+                        <Save size={16} /> {savingKey === item.key ? "Saving..." : "Save section"}
                       </button>
                     </div>
                   </section>
                 ))}
+              </div>
+            )}
+
+            {activeTab === "settings" && (
+              <div className="portal-panel">
+                <div className="portal-section-title">
+                  <Palette size={20} />
+                  <div>
+                    <span>THEME CONTROL</span>
+                    <h2>Choose the public brand color</h2>
+                  </div>
+                </div>
+
+                <div className="theme-grid">
+                  {THEMES.map((theme) => (
+                    <button key={theme.value} type="button" className={themeColor === theme.value ? "theme-swatch selected" : "theme-swatch"} onClick={() => setThemeColor(theme.value)}>
+                      <span style={{ background: theme.value }} />
+                      <strong>{theme.name}</strong>
+                      <small>{theme.value}</small>
+                    </button>
+                  ))}
+                </div>
+
+                <div className="portal-actions">
+                  <button className="portal-btn" type="button" onClick={saveTheme} disabled={savingKey === "settings"}>
+                    <Save size={16} /> {savingKey === "settings" ? "Saving..." : "Save theme"}
+                  </button>
+                  <button className="portal-btn light" type="button" onClick={() => setThemeColor("#ff7a00")}>
+                    <RefreshCw size={16} /> Reset to orange
+                  </button>
+                </div>
               </div>
             )}
 
@@ -468,7 +588,7 @@ export default function SuperAdminSettings() {
                     <div className="carousel-admin-list">
                       {slides.map((slide) => (
                         <article key={slide._id} className="carousel-admin-card">
-                          <img src={resolveApiUrl(slide.imageUrl)} alt={slide.title || "Carousel"} />
+                          <img src={normalizeImagePath(slide.imageUrl)} alt={slide.title || "Carousel"} />
                           <div>
                             <input value={slide.title || ""} onChange={(e) => setSlides((prev) => prev.map((x) => x._id === slide._id ? { ...x, title: e.target.value } : x))} />
                             <textarea rows="3" value={slide.description || ""} onChange={(e) => setSlides((prev) => prev.map((x) => x._id === slide._id ? { ...x, description: e.target.value } : x))} />
@@ -487,8 +607,8 @@ export default function SuperAdminSettings() {
                               </div>
                             </div>
                             <div className="portal-actions">
-                              <button className="portal-btn" onClick={() => updateSlide(slide._id, slide)}>Save</button>
-                              <button className="portal-btn danger" onClick={() => deleteSlide(slide._id)}>
+                              <button className="portal-btn" type="button" onClick={() => updateSlide(slide._id, slide)}>Save</button>
+                              <button className="portal-btn danger" type="button" onClick={() => deleteSlide(slide._id)}>
                                 <Trash2 size={16} /> Delete
                               </button>
                             </div>
@@ -500,12 +620,142 @@ export default function SuperAdminSettings() {
                 </section>
               </div>
             )}
+
+            {activeTab === "leaders" && (
+              <div className="portal-grid">
+                <section className="portal-panel">
+                  <div className="portal-section-title">
+                    <Users size={20} />
+                    <div>
+                      <span>ADD / EDIT LEADER</span>
+                      <h2>Leadership details</h2>
+                    </div>
+                  </div>
+
+                  <form className="portal-form-grid" onSubmit={saveLeader}>
+                    <div className="portal-field">
+                      <label>Name</label>
+                      <input value={leaderDraft.name} onChange={(e) => setLeaderDraft((p) => ({ ...p, name: e.target.value }))} />
+                    </div>
+                    <div className="portal-field">
+                      <label>Position</label>
+                      <input value={leaderDraft.position} onChange={(e) => setLeaderDraft((p) => ({ ...p, position: e.target.value }))} />
+                    </div>
+                    <div className="portal-field">
+                      <label>Order</label>
+                      <input type="number" value={leaderDraft.order} onChange={(e) => setLeaderDraft((p) => ({ ...p, order: Number(e.target.value) }))} />
+                    </div>
+                    <div className="portal-field">
+                      <label>Photo</label>
+                      <input type="file" accept="image/*" onChange={(e) => setLeaderFile(e.target.files?.[0] || null)} />
+                    </div>
+                    <div className="portal-field" style={{ gridColumn: "1 / -1" }}>
+                      <label>Bio</label>
+                      <textarea rows="4" value={leaderDraft.bio} onChange={(e) => setLeaderDraft((p) => ({ ...p, bio: e.target.value }))} />
+                    </div>
+                    <div className="portal-actions">
+                      <button className="portal-btn" type="submit" disabled={savingLeader}>
+                        <Plus size={16} /> {savingLeader ? "Saving..." : (leaderDraft._id ? "Update leader" : "Add leader")}
+                      </button>
+                      {leaderDraft._id && (
+                        <button className="portal-btn light" type="button" onClick={() => setLeaderDraft({ _id: "", name: "", position: "", bio: "", order: 0, isActive: true })}>
+                          Cancel edit
+                        </button>
+                      )}
+                    </div>
+                  </form>
+                </section>
+
+                <section className="portal-panel">
+                  <div className="portal-section-title">
+                    <Edit3 size={20} />
+                    <div>
+                      <span>EXISTING LEADERS</span>
+                      <h2>Public leadership page content</h2>
+                    </div>
+                  </div>
+
+                  {leaders.length === 0 ? (
+                    <div className="portal-empty">No leaders found yet.</div>
+                  ) : (
+                    <div className="carousel-admin-list">
+                      {leaders.map((leader) => (
+                        <article key={leader._id} className="carousel-admin-card">
+                          <img src={normalizeImagePath(leader.imageUrl) || "/default-avatar.svg"} alt={leader.name || "Leader"} />
+                          <div>
+                            <input value={leader.name || ""} readOnly />
+                            <input value={leader.position || ""} readOnly />
+                            <textarea rows="3" value={leader.bio || ""} readOnly />
+                            <div className="portal-actions">
+                              <button className="portal-btn" type="button" onClick={() => editLeader(leader)}>Edit</button>
+                              <button className="portal-btn danger" type="button" onClick={() => deleteLeader(leader._id)}>
+                                <Trash2 size={16} /> Delete
+                              </button>
+                            </div>
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                  )}
+                </section>
+              </div>
+            )}
+
+            {activeTab === "gallery" && (
+              <div className="portal-grid">
+                <section className="portal-panel">
+                  <div className="portal-section-title">
+                    <ImagePlus size={20} />
+                    <div>
+                      <span>UPLOAD</span>
+                      <h2>Add a gallery image</h2>
+                    </div>
+                  </div>
+
+                  <form className="portal-form-grid" onSubmit={uploadGallery}>
+                    <div className="portal-field" style={{ gridColumn: "1 / -1" }}>
+                      <label>Gallery image</label>
+                      <input type="file" accept="image/*" onChange={(e) => setGalleryFile(e.target.files?.[0] || null)} />
+                    </div>
+                    <div className="portal-field" style={{ gridColumn: "1 / -1" }}>
+                      <label>Optional caption</label>
+                      <input value={galleryFile ? galleryFile.name : ""} readOnly placeholder="Selected file name appears here" />
+                    </div>
+                    <button className="portal-btn" type="submit" disabled={savingGallery}>
+                      <Save size={16} /> {savingGallery ? "Uploading..." : "Upload image"}
+                    </button>
+                  </form>
+                </section>
+
+                <section className="portal-panel">
+                  <div className="portal-section-title">
+                    <Check size={20} />
+                    <div>
+                      <span>PUBLIC GALLERY</span>
+                      <h2>Images saved locally</h2>
+                    </div>
+                  </div>
+
+                  {gallery.length === 0 ? (
+                    <div className="portal-empty">No gallery images yet.</div>
+                  ) : (
+                    <div className="portal-grid" style={{ gridTemplateColumns: "repeat(2, minmax(0, 1fr))" }}>
+                      {gallery.map((img, index) => (
+                        <div key={`${img}-${index}`} className="portal-panel" style={{ padding: 12, marginBottom: 0 }}>
+                          <img src={normalizeImagePath(img)} alt={`Gallery ${index + 1}`} style={{ width: "100%", height: 180, objectFit: "cover", borderRadius: 14 }} />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </section>
+              </div>
+            )}
           </>
         )}
 
         <section className="portal-panel">
           <p style={{ color: "#666" }}>
-            Signed in as <strong>{user?.fullName || user?.name || "Super Administrator"}</strong> ({roleLabel}). Carousel uploads are stored locally by the backend in <code>/uploads/carousel</code> and served statically by the server.
+            Signed in as <strong>{user?.fullName || user?.name || "Super Administrator"}</strong> ({roleLabel}). Carousel, leader and gallery uploads are stored locally on the backend and served statically by the server.
           </p>
         </section>
       </div>

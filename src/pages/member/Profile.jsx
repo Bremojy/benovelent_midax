@@ -8,7 +8,7 @@ import DashboardLayout
 
 import {
   getMemberProfile,
-  updateMemberProfile,
+  updateMemberProfileWithPhoto,
 } from "../../services/memberService";
 
 import "./Profile.css";
@@ -34,6 +34,9 @@ export default function Profile() {
 
   const [success, setSuccess] =
     useState("");
+
+  const [profileFiles, setProfileFiles] =
+    useState({});
 
   // =====================================
   // LOAD PROFILE
@@ -125,6 +128,13 @@ export default function Profile() {
     );
   };
 
+  const updateFile = (field, file) => {
+    setProfileFiles((current) => ({
+      ...current,
+      [field]: file || null,
+    }));
+  };
+
   // =====================================
   // SAVE
   // =====================================
@@ -184,6 +194,9 @@ export default function Profile() {
         postalAddress:
           member.postalAddress,
 
+        physicalAddress:
+          member.physicalAddress,
+
         occupation:
           member.occupation,
 
@@ -208,13 +221,23 @@ export default function Profile() {
         accountNumber:
           member.accountNumber,
 
+        acceptedConstitution:
+          Boolean(member.acceptedConstitution),
+
+        acceptedPrivacyPolicy:
+          Boolean(member.acceptedPrivacyPolicy),
+
+        acceptedDeclaration:
+          Boolean(member.acceptedDeclaration),
+
         emergencyContact:
           member.emergencyContact,
       };
 
       const response =
-        await updateMemberProfile(
-          payload
+        await updateMemberProfileWithPhoto(
+          payload,
+          profileFiles
         );
 
       if (
@@ -632,6 +655,69 @@ export default function Profile() {
                 }
               />
 
+              <FormField
+                label="Physical Address"
+                value={
+                  member?.physicalAddress
+                }
+                onChange={(value) =>
+                  updateField(
+                    "physicalAddress",
+                    value
+                  )
+                }
+              />
+
+            </div>
+
+          </ProfileSection>
+
+          {/* ================================
+              DOCUMENTS
+          ================================= */}
+
+          <ProfileSection
+            title="Documents & Verification"
+            description="Upload the items needed to complete your profile."
+          >
+
+            <div className="profile-form-grid">
+
+              <FileField
+                label="Profile Photo"
+                value={profileFiles.profileImage}
+                existing={member?.profileImage}
+                onChange={(file) => updateFile("profileImage", file)}
+              />
+
+              <FileField
+                label="Passport Photo"
+                value={profileFiles.passportPhoto}
+                existing={member?.passportPhoto || member?.documents?.passportPhoto}
+                onChange={(file) => updateFile("passportPhoto", file)}
+              />
+
+              <FileField
+                label="National ID Front Copy"
+                value={profileFiles.nationalIdFront}
+                existing={member?.documents?.nationalIdFront}
+                onChange={(file) => updateFile("nationalIdFront", file)}
+              />
+
+              <FileField
+                label="National ID Back Copy"
+                value={profileFiles.nationalIdBack}
+                existing={member?.documents?.nationalIdBack}
+                onChange={(file) => updateFile("nationalIdBack", file)}
+              />
+
+              <FileField
+                label="Signature"
+                value={profileFiles.signature}
+                existing={member?.documents?.signature}
+                onChange={(file) => updateFile("signature", file)}
+              />
+
             </div>
 
           </ProfileSection>
@@ -821,6 +907,39 @@ export default function Profile() {
                     value
                   )
                 }
+              />
+
+            </div>
+
+          </ProfileSection>
+
+          {/* ================================
+              AGREEMENTS
+          ================================= */}
+
+          <ProfileSection
+            title="Agreements"
+            description="Accept the constitution and policy documents to unlock full access."
+          >
+
+            <div className="profile-checklist-grid agreement-grid">
+
+              <CheckboxField
+                label="Constitution acceptance"
+                checked={Boolean(member?.acceptedConstitution)}
+                onChange={(checked) => updateField("acceptedConstitution", checked)}
+              />
+
+              <CheckboxField
+                label="Privacy policy acceptance"
+                checked={Boolean(member?.acceptedPrivacyPolicy)}
+                onChange={(checked) => updateField("acceptedPrivacyPolicy", checked)}
+              />
+
+              <CheckboxField
+                label="Declaration acceptance"
+                checked={Boolean(member?.acceptedDeclaration)}
+                onChange={(checked) => updateField("acceptedDeclaration", checked)}
               />
 
             </div>
@@ -1138,5 +1257,43 @@ function FormTextarea({
       />
 
     </div>
+  );
+}
+
+function FileField({
+  label,
+  value,
+  existing,
+  onChange,
+}) {
+  return (
+    <div className="profile-field full">
+      <label>{label}</label>
+      <input
+        type="file"
+        accept="image/*"
+        onChange={(e) => onChange(e.target.files?.[0] || null)}
+      />
+      <small className="profile-file-note">
+        {value?.name || (existing ? "Saved on file" : "No file selected")}
+      </small>
+    </div>
+  );
+}
+
+function CheckboxField({
+  label,
+  checked,
+  onChange,
+}) {
+  return (
+    <label className="profile-checkbox">
+      <input
+        type="checkbox"
+        checked={Boolean(checked)}
+        onChange={(e) => onChange(e.target.checked)}
+      />
+      <span>{label}</span>
+    </label>
   );
 }

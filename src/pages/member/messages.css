@@ -457,3 +457,24 @@
 
 }
 @media (max-width: 900px){.messages-summary-bar{grid-template-columns:1fr}}
+
+
+.messages-page {
+  background: linear-gradient(180deg, #fff, #fbfbfc);
+}
+
+.messages-summary-bar div {
+  border-radius: 18px;
+}
+
+.messages-sidebar-container {
+  background: linear-gradient(180deg, #fff, #fafafa);
+}
+
+.messages-chat-container {
+  background: linear-gradient(180deg, #fefefe, #f7f7f8);
+}
+
+.messages-page .chat-window-empty {
+  background: radial-gradient(circle at top, rgba(255, 122, 0, 0.06), transparent 55%), #fafafa;
+}

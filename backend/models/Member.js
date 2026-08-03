@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
+const calculateProfileCompletion = require("../utils/calculateProfileCompletion");
 
 const memberSchema = new mongoose.Schema(
   {
@@ -202,6 +203,11 @@ postalAddress: {
   trim: true,
 },
 
+physicalAddress: {
+  type: String,
+  trim: true,
+},
+
 // =====================================
 // EMPLOYMENT
 // =====================================
@@ -380,12 +386,6 @@ deletedAt: {
   default: null,
 },
 
-deletedBy: {
-  type: mongoose.Schema.Types.ObjectId,
-  ref: "Admin",
-  default: null,
-},
-
 createdBy: {
   type: mongoose.Schema.Types.ObjectId,
   ref: "Admin",
@@ -534,38 +534,10 @@ memberSchema.set("toJSON", {
 // =====================================
 
 memberSchema.methods.calculateProfileCompletion = function () {
+  const completion = calculateProfileCompletion(this);
 
-  let completed = 0;
-
-  const total = 20;
-
-  if (this.fullName) completed++;
-  if (this.phone) completed++;
-  if (this.email) completed++;
-  if (this.memberNumber) completed++;
-  if (this.nationalId) completed++;
-  if (this.gender) completed++;
-  if (this.dateOfBirth) completed++;
-  if (this.maritalStatus) completed++;
-  if (this.county) completed++;
-  if (this.subCounty) completed++;
-  if (this.ward) completed++;
-  if (this.village) completed++;
-  if (this.occupation) completed++;
-  if (this.nextOfKin?.fullName) completed++;
-  if (this.mpesaNumber || this.accountNumber) completed++;
-  if (this.documents?.nationalIdFront) completed++;
-  if (this.documents?.nationalIdBack) completed++;
-  if (this.documents?.passportPhoto) completed++;
-  if (this.acceptedConstitution) completed++;
-  if (this.acceptedDeclaration) completed++;
-
-  this.profileCompletion = Math.round(
-    (completed / total) * 100
-  );
-
-  this.profileCompleted =
-    this.profileCompletion === 100;
+  this.profileCompletion = completion.percentage;
+  this.profileCompleted = completion.percentage === 100;
 
   return this.profileCompletion;
 };

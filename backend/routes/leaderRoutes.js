@@ -6,6 +6,8 @@ const fs = require("fs");
 const Leader = require("../models/Leader");
 
 const router = express.Router();
+const { verifyToken: protect } = require("../middleware/authMiddleware");
+const { isSuperAdmin } = require("../middleware/roleMiddleware");
 
 // ========================================
 // CREATE UPLOAD FOLDER IF IT DOESN'T EXIST
@@ -88,7 +90,7 @@ router.get("/active", async (req, res) => {
 // ADD LEADER
 // ========================================
 
-router.post("/upload", upload.single("image"), async (req, res) => {
+router.post("/upload", protect, isSuperAdmin, upload.single("image"), async (req, res) => {
     try {
         const { name, position, bio, order } = req.body;
 
@@ -127,7 +129,7 @@ router.post("/upload", upload.single("image"), async (req, res) => {
 // UPDATE LEADER
 // ========================================
 
-router.put("/:id", upload.single("image"), async (req, res) => {
+router.put("/:id", protect, isSuperAdmin, upload.single("image"), async (req, res) => {
     try {
         const updateData = {
             ...req.body,
@@ -174,7 +176,7 @@ router.put("/:id", upload.single("image"), async (req, res) => {
 // DELETE LEADER
 // ========================================
 
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", protect, isSuperAdmin, async (req, res) => {
     try {
         const leader = await Leader.findByIdAndDelete(req.params.id);
 

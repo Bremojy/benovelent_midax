@@ -4,30 +4,27 @@ const router = express.Router();
 const {
   getWebsiteContent,
   getWebsiteSettings,
+  getGallery,
   getSection,
   createSection,
   updateSection,
   deleteSection,
-  uploadHeroImage,
   uploadGalleryImage,
-  getWebsiteStatistics,
 } = require("../controllers/websiteController");
 
 const { verifyToken: protect } = require("../middleware/authMiddleware");
+const { isSuperAdmin } = require("../middleware/roleMiddleware");
+const { uploadSingle, setUploadType } = require("../middleware/upload");
 
 // ==========================================
 // WEBSITE ROUTES
 // ==========================================
 
-// Public website content
 router.get("/", getWebsiteContent);
-
-// Explicit website settings endpoint used by the frontend theme bootstrap
 router.get("/settings", getWebsiteSettings);
+router.get("/gallery", getGallery);
 
-// Website statistics
-// Uncomment after getWebsiteStatistics exists
-// router.get("/statistics", protect, getWebsiteStatistics);
+router.post("/gallery/upload", protect, isSuperAdmin, setUploadType("gallery"), uploadSingle("image"), uploadGalleryImage);
 
 // Get one section
 router.get("/:section", getSection);
@@ -46,13 +43,5 @@ router.put("/:section", protect, updateSection);
 
 // Delete section
 router.delete("/:section", protect, deleteSection);
-
-// Upload Hero Image
-// Uncomment after uploadHeroImage exists
-// router.post("/hero/upload", protect, uploadHeroImage);
-
-// Upload Gallery Image
-// Uncomment after uploadGalleryImage exists
-// router.post("/gallery/upload", protect, uploadGalleryImage);
 
 module.exports = router;

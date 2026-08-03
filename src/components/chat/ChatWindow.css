@@ -57,3 +57,18 @@
 }
 
 }
+
+.chat-window {
+  background:
+    radial-gradient(circle at top right, rgba(255,122,0,.08), transparent 40%),
+    linear-gradient(180deg, #fcfcfd, #f7f7f8);
+}
+
+.messages-container {
+  padding: 28px;
+}
+
+.chat-window-empty {
+  background: transparent;
+  color: #777;
+}

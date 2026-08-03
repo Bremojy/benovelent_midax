@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import api, { resolveApiUrl } from "../services/api";
 import "./Gallery.css";
 
 const galleryVideoSources = [
@@ -8,14 +9,34 @@ const galleryVideoSources = [
 
 function Gallery() {
   const [videoFailed, setVideoFailed] = useState(false);
-  const images = [
-    "/uploads/gallery/1.jpg",
-    "/uploads/gallery/2.jpg",
-    "/uploads/gallery/3.jpg",
-    "/uploads/gallery/4.jpg",
-    "/uploads/gallery/5.jpg",
-    "/uploads/gallery/6.jpg",
-  ];
+  const [images, setImages] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const { data } = await api.get("/website/gallery");
+        const sectionImages = data?.section?.images || data?.gallery || [];
+        if (active) setImages(Array.isArray(sectionImages) && sectionImages.length ? sectionImages : [
+          "/gallery-placeholder.svg",
+          "/gallery-placeholder.svg",
+          "/gallery-placeholder.svg",
+          "/gallery-placeholder.svg",
+        ]);
+      } catch {
+        if (active) setImages([
+          "/gallery-placeholder.svg",
+          "/gallery-placeholder.svg",
+          "/gallery-placeholder.svg",
+          "/gallery-placeholder.svg",
+        ]);
+      } finally {
+        if (active) setLoading(false);
+      }
+    })();
+    return () => { active = false; };
+  }, []);
 
   return (
     <main className="gallery-page">
@@ -50,17 +71,21 @@ function Gallery() {
 
       <section className="gallery-grid">
         <div className="section-container">
-          {images.map((img, index) => (
-            <div className="gallery-card" key={index}>
-              <img
-                src={img}
-                alt="Benevolent Midax community moment"
-                onError={(e) => {
-                  e.currentTarget.src = "/gallery-placeholder.svg";
-                }}
-              />
-            </div>
-          ))}
+          {loading ? (
+            <div className="portal-empty">Loading gallery...</div>
+          ) : (
+            images.map((img, index) => (
+              <div className="gallery-card" key={index}>
+                <img
+                  src={img.startsWith("/uploads/") || img.startsWith("http") ? resolveApiUrl(img) : img}
+                  alt="Benevolent Midax community moment"
+                  onError={(e) => {
+                    e.currentTarget.src = "/gallery-placeholder.svg";
+                  }}
+                />
+              </div>
+            ))
+          )}
         </div>
       </section>
     </main>

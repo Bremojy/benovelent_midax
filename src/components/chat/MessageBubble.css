@@ -119,3 +119,12 @@
 }
 
 }
+
+.message-content {
+  border: 1px solid rgba(0,0,0,.04);
+}
+
+.message.own .message-content {
+  background: linear-gradient(135deg, #ff7a00, #ff9a2f);
+  border-color: transparent;
+}

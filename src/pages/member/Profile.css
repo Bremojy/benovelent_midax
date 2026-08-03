@@ -606,3 +606,46 @@
 .profile-checklist-item span{font-size:12px;color:#666}
 .profile-checklist-note{margin:12px 0 0;color:#6b5b49;font-size:13px}
 @media(max-width:760px){.profile-checklist-grid{grid-template-columns:1fr}}
+
+
+.profile-file-note {
+  display: block;
+  margin-top: 8px;
+  color: #73767c;
+  font-size: 12px;
+}
+
+.profile-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 15px;
+  border-radius: 12px;
+  background: #fff;
+  border: 1px solid #e4e6ea;
+  cursor: pointer;
+}
+
+.profile-checkbox input {
+  width: 18px;
+  height: 18px;
+  accent-color: #ff7a00;
+}
+
+.profile-checkbox span {
+  color: #1f2328;
+  font-weight: 650;
+  font-size: 14px;
+}
+
+.agreement-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+@media (max-width: 720px) {
+  .agreement-grid {
+    grid-template-columns: 1fr;
+  }
+}

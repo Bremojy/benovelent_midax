@@ -27,7 +27,7 @@ const PROFILE_FIELDS = [
   { key: "accountNumber", label: "Account number" },
   { key: "documents.nationalIdFront", label: "National ID front copy" },
   { key: "documents.nationalIdBack", label: "National ID back copy" },
-  { key: "documents.passportPhoto", label: "Passport photo" },
+  { key: "passportPhoto", label: "Passport photo" },
   { key: "documents.signature", label: "Signature" },
   { key: "profileImage", label: "Profile photo" },
   { key: "acceptedConstitution", label: "Constitution acceptance" },

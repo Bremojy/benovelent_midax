@@ -29,17 +29,37 @@ export const updateMemberProfile = async (profile) => {
   return data;
 };
 
-export const updateMemberProfileWithPhoto = async (profile, photo) => {
+export const updateMemberProfileWithPhoto = async (profile, files = {}) => {
   const formData = new FormData();
 
   Object.entries(profile || {}).forEach(([key, value]) => {
     if (value !== undefined && value !== null) {
-      formData.append(key, value);
+      if (typeof value === "boolean") {
+        formData.append(key, value ? "true" : "false");
+      } else if (value instanceof Date) {
+        formData.append(key, value.toISOString());
+      } else if (typeof value === "object" && value !== null) {
+        formData.append(key, JSON.stringify(value));
+      } else {
+        formData.append(key, value);
+      }
     }
   });
 
-  if (photo) {
-    formData.append("profileImage", photo);
+  const appendFile = (fieldName, file) => {
+    if (file) {
+      formData.append(fieldName, file);
+    }
+  };
+
+  if (files && typeof files === "object") {
+    appendFile("profileImage", files.profileImage);
+    appendFile("passportPhoto", files.passportPhoto);
+    appendFile("nationalIdFront", files.nationalIdFront);
+    appendFile("nationalIdBack", files.nationalIdBack);
+    appendFile("signature", files.signature);
+  } else {
+    appendFile("profileImage", files);
   }
 
   const { data } = await API.put("/member/profile", formData, {
