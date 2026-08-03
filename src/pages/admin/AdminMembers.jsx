@@ -1445,10 +1445,20 @@ function MemberDetailsModal({
 }) {
   const safeDocs = member?.documents || {};
   const profileImage = resolveUploadUrl(member?.profileImage || safeDocs?.profilePhoto || "");
+  const coverImage = resolveUploadUrl(member?.coverImage || safeDocs?.coverImage || "");
   const passportPhoto = resolveUploadUrl(member?.passportPhoto || safeDocs?.passportPhoto || "");
   const nationalFront = resolveUploadUrl(safeDocs?.nationalIdFront || "");
   const nationalBack = resolveUploadUrl(safeDocs?.nationalIdBack || "");
   const signature = resolveUploadUrl(safeDocs?.signature || "");
+
+  const documentLinks = [
+    { label: "Profile Photo", src: member?.profileImage || safeDocs?.profilePhoto },
+    { label: "Cover Image", src: member?.coverImage || safeDocs?.coverImage },
+    { label: "Passport Photo", src: member?.passportPhoto || safeDocs?.passportPhoto },
+    { label: "National ID Front", src: safeDocs?.nationalIdFront },
+    { label: "National ID Back", src: safeDocs?.nationalIdBack },
+    { label: "Signature", src: safeDocs?.signature },
+  ].filter((item) => String(item.src || "").trim());
 
   return (
     <div
@@ -1553,6 +1563,10 @@ function MemberDetailsModal({
           <MemberDetail label="Emergency Relationship" value={member.emergencyContact?.relationship} />
           <MemberDetail label="Emergency Phone" value={member.emergencyContact?.phone} />
           <MemberDetail label="Profile Completion" value={`${Number(member.profileCompletion || 0)}%`} />
+          <MemberDetail label="Profile Completed" value={member.profileCompleted ? "Yes" : "No"} />
+          <MemberDetail label="Profile Verified" value={member.profileVerified ? "Yes" : "No"} />
+          <MemberDetail label="Last Login" value={formatDate(member.lastLogin)} />
+          <MemberDetail label="Last Seen" value={formatDate(member.lastSeen)} />
           <MemberDetail label="Constitution Accepted" value={member.acceptedConstitution ? "Yes" : "No"} />
           <MemberDetail label="Privacy Accepted" value={member.acceptedPrivacyPolicy ? "Yes" : "No"} />
           <MemberDetail label="Declaration Accepted" value={member.acceptedDeclaration ? "Yes" : "No"} />
@@ -1567,6 +1581,9 @@ function MemberDetailsModal({
           {profileImage && (
             <UploadPreview label="Profile Photo" src={profileImage} />
           )}
+          {coverImage && (
+            <UploadPreview label="Cover Image" src={coverImage} />
+          )}
           {passportPhoto && (
             <UploadPreview label="Passport Photo" src={passportPhoto} />
           )}
@@ -1580,6 +1597,23 @@ function MemberDetailsModal({
             <UploadPreview label="Signature" src={signature} />
           )}
         </div>
+
+        {documentLinks.length > 0 && (
+          <div className="admin-member-file-list">
+            {documentLinks.map((file) => (
+              <a
+                key={file.label}
+                className="admin-member-file-link"
+                href={resolveUploadUrl(file.src)}
+                target="_blank"
+                rel="noreferrer"
+              >
+                <strong>{file.label}</strong>
+                <span>Open uploaded file</span>
+              </a>
+            ))}
+          </div>
+        )}
 
       </div>
 

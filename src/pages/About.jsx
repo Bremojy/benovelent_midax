@@ -4,8 +4,10 @@ import { Link } from "react-router-dom";
 import "../styles/public-modern.css";
 
 const aboutVideos = [
-  "/videos/benevolent-community-loop.mp4",
-  "/videos/benevolent-news-loop.mp4",
+  "https://videos.pexels.com/video-files/36410725/15439556_2160_3840_30fps.mp4",
+  "https://videos.pexels.com/video-files/6774382/6774382-uhd_2160_3840_30fps.mp4",
+  "https://videos.pexels.com/video-files/34848129/14483720_1920_1080_30fps.mp4",
+  "https://videos.pexels.com/video-files/34163494/14483720_1920_1080_30fps.mp4",
 ];
 
 export default function About() {
@@ -17,7 +19,7 @@ export default function About() {
 
     const timer = window.setInterval(() => {
       setVideoIndex((current) => (current + 1) % aboutVideos.length);
-    }, 12000);
+    }, 10000);
 
     return () => window.clearInterval(timer);
   }, [videoError]);

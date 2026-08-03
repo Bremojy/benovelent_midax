@@ -990,7 +990,7 @@
 
 .admin-member-modal {
   width: 100%;
-  max-width: 650px;
+  max-width: 920px;
 
   max-height: 90vh;
 
@@ -2305,5 +2305,41 @@ input[type="number"]::-webkit-outer-spin-button {
   }
   .admin-member-uploads {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+
+.admin-member-file-list {
+  margin-top: 14px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.admin-member-file-link {
+  display: block;
+  padding: 14px;
+  border-radius: 16px;
+  background: #f8faf9;
+  border: 1px solid rgba(0,0,0,.05);
+  text-decoration: none;
+}
+
+.admin-member-file-link strong {
+  display: block;
+  color: #14171b;
+  margin-bottom: 4px;
+  font-size: 13px;
+}
+
+.admin-member-file-link span {
+  color: #0b7d58;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+@media (max-width: 900px) {
+  .admin-member-file-list {
+    grid-template-columns: 1fr;
   }
 }

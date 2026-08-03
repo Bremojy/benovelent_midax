@@ -700,3 +700,138 @@
     width: 100%;
   }
 }
+
+
+/* =========================================
+   UNLOCKED PROFILE SUMMARY
+========================================= */
+
+.profile-unlocked-panel {
+  padding: 24px;
+  margin: 0 0 20px;
+  border-radius: 20px;
+  background: linear-gradient(180deg, #ffffff, #fff9f2);
+  border: 1px solid #f1e2d2;
+  box-shadow: 0 12px 35px rgba(24, 24, 24, 0.05);
+}
+
+.profile-unlocked-copy {
+  margin-bottom: 18px;
+}
+
+.profile-unlocked-kicker {
+  display: inline-flex;
+  align-items: center;
+  padding: 7px 12px;
+  border-radius: 999px;
+  background: #fff1e6;
+  color: #cc5f00;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1.3px;
+}
+
+.profile-unlocked-copy h2 {
+  margin: 12px 0 6px;
+  color: #222;
+  font-size: 23px;
+}
+
+.profile-unlocked-copy p {
+  margin: 0;
+  color: #666;
+  line-height: 1.75;
+}
+
+.profile-unlocked-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.profile-unlocked-card {
+  padding: 18px;
+  border-radius: 18px;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.profile-unlocked-card > strong {
+  display: block;
+  margin-bottom: 12px;
+  color: #222;
+  font-size: 15px;
+}
+
+.profile-unlocked-card ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.profile-unlocked-card li {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(0,0,0,.05);
+}
+
+.profile-unlocked-card li:last-child {
+  border-bottom: 0;
+}
+
+.profile-unlocked-card li span {
+  color: #76808b;
+  font-size: 12px;
+}
+
+.profile-unlocked-card li b {
+  color: #1d232a;
+  text-align: right;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.profile-unlocked-files {
+  margin-top: 18px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.profile-unlocked-file {
+  display: block;
+  padding: 15px;
+  border-radius: 16px;
+  background: #fff;
+  border: 1px solid rgba(0,0,0,.06);
+  text-decoration: none;
+}
+
+.profile-unlocked-file strong {
+  display: block;
+  margin-bottom: 6px;
+  color: #222;
+}
+
+.profile-unlocked-file span {
+  color: #cc5f00;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.profile-file-note {
+  display: block;
+  margin-top: 8px;
+  color: #808992;
+  font-size: 12px;
+}
+
+@media (max-width: 900px) {
+  .profile-unlocked-grid,
+  .profile-unlocked-files {
+    grid-template-columns: 1fr;
+  }
+}

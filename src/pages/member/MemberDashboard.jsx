@@ -10,6 +10,10 @@ import MemberStats
 import MembershipCard
   from "../../components/member/MembershipCard";
 
+
+  import QuickActions
+  from "../../components/member/QuickActions";
+
 import AnnouncementsCard
   from "../../components/member/AnnouncementsCard";
 

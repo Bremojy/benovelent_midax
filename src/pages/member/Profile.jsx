@@ -10,6 +10,7 @@ import {
   getMemberProfile,
   updateMemberProfileWithPhoto,
 } from "../../services/memberService";
+import { resolveApiUrl } from "../../services/api";
 
 import "./Profile.css";
 
@@ -339,6 +340,19 @@ export default function Profile() {
     member?.profileCompletion ??
     0;
 
+  const isUnlocked = completion >= 100;
+
+  const safeDocs = member?.documents || {};
+
+  const submittedFiles = [
+    { label: "Profile photo", src: member?.profileImage },
+    { label: "Cover image", src: member?.coverImage },
+    { label: "Passport photo", src: member?.passportPhoto || safeDocs.passportPhoto },
+    { label: "National ID front", src: safeDocs.nationalIdFront },
+    { label: "National ID back", src: safeDocs.nationalIdBack },
+    { label: "Signature", src: safeDocs.signature },
+  ].filter((item) => String(item.src || "").trim());
+
   return (
     <DashboardLayout>
 
@@ -397,6 +411,77 @@ export default function Profile() {
 )}
 
         </section>
+
+        {isUnlocked && (
+          <section className="profile-unlocked-panel">
+            <div className="profile-unlocked-copy">
+              <span className="profile-unlocked-kicker">PROFILE COMPLETE</span>
+              <h2>Your profile is fully unlocked.</h2>
+              <p>
+                Admins and superadmins can review your submitted details, documents and uploads. Keep this information current whenever it changes.
+              </p>
+            </div>
+
+            <div className="profile-unlocked-grid">
+              <div className="profile-unlocked-card">
+                <strong>Identity</strong>
+                <ul>
+                  <li><span>Full name</span><b>{member?.fullName || "—"}</b></li>
+                  <li><span>Member number</span><b>{member?.memberNumber || "—"}</b></li>
+                  <li><span>National ID</span><b>{member?.nationalId || "—"}</b></li>
+                  <li><span>Gender</span><b>{member?.gender || "—"}</b></li>
+                  <li><span>Date of birth</span><b>{member?.dateOfBirth ? new Date(member.dateOfBirth).toLocaleDateString() : "—"}</b></li>
+                  <li><span>Marital status</span><b>{member?.maritalStatus || "—"}</b></li>
+                </ul>
+              </div>
+
+              <div className="profile-unlocked-card">
+                <strong>Residence</strong>
+                <ul>
+                  <li><span>County</span><b>{member?.county || "—"}</b></li>
+                  <li><span>Sub-county</span><b>{member?.subCounty || "—"}</b></li>
+                  <li><span>Ward</span><b>{member?.ward || "—"}</b></li>
+                  <li><span>Village</span><b>{member?.village || "—"}</b></li>
+                  <li><span>Postal address</span><b>{member?.postalAddress || "—"}</b></li>
+                  <li><span>Physical address</span><b>{member?.physicalAddress || "—"}</b></li>
+                </ul>
+              </div>
+
+              <div className="profile-unlocked-card">
+                <strong>Contacts & Payments</strong>
+                <ul>
+                  <li><span>Phone</span><b>{member?.phone || "—"}</b></li>
+                  <li><span>Email</span><b>{member?.email || "—"}</b></li>
+                  <li><span>Occupation</span><b>{member?.occupation || "—"}</b></li>
+                  <li><span>Employer</span><b>{member?.employer || "—"}</b></li>
+                  <li><span>M-Pesa</span><b>{member?.mpesaNumber || "—"}</b></li>
+                  <li><span>Monthly income</span><b>{member?.monthlyIncome !== undefined && member?.monthlyIncome !== null ? `KES ${Number(member.monthlyIncome || 0).toLocaleString()}` : "—"}</b></li>
+                </ul>
+              </div>
+
+              <div className="profile-unlocked-card">
+                <strong>Family & Uploads</strong>
+                <ul>
+                  <li><span>Next of kin</span><b>{member?.nextOfKin?.fullName || "—"}</b></li>
+                  <li><span>Kin phone</span><b>{member?.nextOfKin?.phone || "—"}</b></li>
+                  <li><span>Kin relationship</span><b>{member?.nextOfKin?.relationship || "—"}</b></li>
+                  <li><span>Passport photo</span><b>{safeDocs.passportPhoto || member?.passportPhoto ? "Uploaded" : "Missing"}</b></li>
+                  <li><span>ID front / back</span><b>{safeDocs.nationalIdFront && safeDocs.nationalIdBack ? "Uploaded" : "Missing"}</b></li>
+                  <li><span>Signature</span><b>{safeDocs.signature ? "Uploaded" : "Missing"}</b></li>
+                </ul>
+              </div>
+            </div>
+
+            <div className="profile-unlocked-files">
+              {submittedFiles.map((file) => (
+                <a key={file.label} className="profile-unlocked-file" href={resolveApiUrl(file.src)} target="_blank" rel="noreferrer">
+                  <strong>{file.label}</strong>
+                  <span>Open uploaded file</span>
+                </a>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* =================================
             MESSAGES
