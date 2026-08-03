@@ -18,8 +18,12 @@ export default function Messages() {
           API.get("/conversations"),
         ]);
 
-        const members = membersResponse.status === "fulfilled" ? membersResponse.value.data?.members || [] : [];
-        const conversations = conversationsResponse.status === "fulfilled" ? conversationsResponse.value.data?.conversations || [] : [];
+        const members = membersResponse.status === "fulfilled"
+          ? (membersResponse.value?.data?.members || membersResponse.value?.members || [])
+          : [];
+        const conversations = conversationsResponse.status === "fulfilled"
+          ? (conversationsResponse.value?.data?.conversations || conversationsResponse.value?.conversations || [])
+          : [];
 
         return { members, conversations };
       }}

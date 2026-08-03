@@ -1,8 +1,8 @@
 .message-input-container{
-  background: rgba(255,255,255,.94);
+  background: rgba(255,255,255,.95);
   border-top:1px solid rgba(0,0,0,.06);
-  padding:16px;
-  backdrop-filter: blur(12px);
+  padding:14px;
+  backdrop-filter: blur(14px);
 }
 
 .preview-image{
@@ -51,6 +51,10 @@
   display:flex;
   align-items:flex-end;
   gap:10px;
+  background: rgba(244,246,248,.82);
+  border: 1px solid rgba(0,0,0,.05);
+  border-radius: 24px;
+  padding: 10px;
 }
 
 .message-toolbar button{
@@ -58,16 +62,17 @@
   height:42px;
   border:none;
   border-radius:50%;
-  background:#f4f6f8;
+  background:#ffffff;
   cursor:pointer;
   display:flex;
   justify-content:center;
   align-items:center;
   transition:.22s ease;
+  box-shadow: 0 8px 18px rgba(20,20,20,.04);
 }
 
 .message-toolbar button:hover{
-  background:#ff7a00;
+  background:#0d8f63;
   color:white;
 }
 
@@ -78,7 +83,7 @@
   max-height:130px;
   border:none;
   outline:none;
-  background:#f4f6f8;
+  background:transparent;
   border-radius:20px;
   padding:12px 16px;
   font-size:15px;
@@ -87,12 +92,12 @@
 }
 
 .send-button{
-  background: linear-gradient(135deg, #ff7a00, #ff9d3e) !important;
+  background: linear-gradient(135deg, #0d8f63, #19a36f) !important;
   color:white;
 }
 
 .send-button:hover{
-  background: linear-gradient(135deg, #ef6f00, #ff8d1c) !important;
+  background: linear-gradient(135deg, #0b7d58, #12925f) !important;
 }
 
 @media(max-width:768px){
@@ -102,6 +107,7 @@
 
   .message-toolbar{
     gap:6px;
+    padding: 8px;
   }
 
   .message-toolbar button{

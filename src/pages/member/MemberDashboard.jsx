@@ -1,4 +1,5 @@
 import DashboardLayout from "../../layouts/DashboardLayout";
+import { Link } from "react-router-dom";
 
 import ProfileHeader
   from "../../components/member/ProfileHeader";
@@ -15,8 +16,6 @@ import AnnouncementsCard
 import ContributionSummary
   from "../../components/member/ContributionSummary";
 
-import QuickActions
-  from "../../components/member/QuickActions";
 
 import useMemberDashboard
   from "../../hooks/useMemberDashboard";
@@ -252,6 +251,25 @@ function MemberDashboard() {
     </div>
   </div>
 </section>
+
+        {completion >= 100 && (
+          <section className="profile-unlocked-card">
+            <div>
+              <span className="profile-unlocked-kicker">PROFILE COMPLETE</span>
+              <h2>Your profile is fully complete.</h2>
+              <p>
+                Welcome to the full member experience. You can now access the complete portal, communicate freely and use the support features with confidence.
+              </p>
+            </div>
+
+            <div className="profile-unlocked-actions">
+              <Link className="profile-unlocked-link" to="/member/messages">Open messages</Link>
+              <Link className="profile-unlocked-link" to="/member/benefits">View benefits</Link>
+              <Link className="profile-unlocked-link" to="/member/contributions">See contributions</Link>
+            </div>
+          </section>
+        )}
+
         {/* =================================
             PROFILE HEADER
         ================================= */}

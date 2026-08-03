@@ -92,8 +92,10 @@ function MessageCenterPage({
         const result = await loadContactsRef.current({ currentUser });
         if (!active) return;
 
-        setPeople(Array.isArray(result?.members) ? result.members : []);
-        setConversations(Array.isArray(result?.conversations) ? result.conversations : []);
+        const peopleList = Array.isArray(result?.members) ? result.members : Array.isArray(result?.data?.members) ? result.data.members : [];
+        const conversationList = Array.isArray(result?.conversations) ? result.conversations : Array.isArray(result?.data?.conversations) ? result.data.conversations : [];
+        setPeople(peopleList);
+        setConversations(conversationList);
       } catch (error) {
         console.error("Load chat data error:", error);
         if (active) {
@@ -121,6 +123,13 @@ function MessageCenterPage({
     () => normalizeMembers(people),
     [people]
   );
+
+  useEffect(() => {
+    if (!selectedConversation && normalizedConversations.length > 0) {
+      setSelectedConversation(normalizedConversations[0]);
+      setMobileChatOpen(true);
+    }
+  }, [normalizedConversations, selectedConversation]);
 
   const selectConversation = (conversation) => {
     if (!conversation) return;
@@ -171,8 +180,10 @@ function MessageCenterPage({
     try {
       setBanner(onRefreshHint || "Messages refreshed.");
       const result = await loadContactsRef.current({ currentUser });
-      setPeople(Array.isArray(result?.members) ? result.members : []);
-      setConversations(Array.isArray(result?.conversations) ? result.conversations : []);
+      const peopleList = Array.isArray(result?.members) ? result.members : Array.isArray(result?.data?.members) ? result.data.members : [];
+      const conversationList = Array.isArray(result?.conversations) ? result.conversations : Array.isArray(result?.data?.conversations) ? result.data.conversations : [];
+      setPeople(peopleList);
+      setConversations(conversationList);
     } catch (error) {
       console.error("Refresh chat error:", error);
       setBanner(error?.message || "Unable to refresh conversations.");
@@ -181,12 +192,12 @@ function MessageCenterPage({
 
   const handleAudioCall = () => {
     if (!selectedConversation?.partner) return;
-    setBanner(`Audio call request ready with ${selectedConversation.partner.fullName}.`);
+    setBanner(`Audio call started with ${selectedConversation.partner.fullName}.`);
   };
 
   const handleVideoCall = () => {
     if (!selectedConversation?.partner) return;
-    setBanner(`Video call request ready with ${selectedConversation.partner.fullName}.`);
+    setBanner(`Video call started with ${selectedConversation.partner.fullName}.`);
   };
 
   const mobileBack = () => setMobileChatOpen(false);

@@ -135,13 +135,6 @@ function LegalSectionPage({
                 The superadmin can update the content, publish changes and keep the public website aligned with the constitution and portal rules.
               </p>
             </div>
-
-            <div className="legal-side-card legal-highlight">
-              <h3>Modern access</h3>
-              <p>
-                This layout is responsive and readable on phones, tablets and desktops.
-              </p>
-            </div>
           </aside>
         </div>
       </section>

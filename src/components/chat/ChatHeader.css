@@ -1,8 +1,8 @@
 .chat-header{
   height:auto;
-  min-height:84px;
-  background: rgba(255,255,255,.92);
-  backdrop-filter: blur(14px);
+  min-height:86px;
+  background: rgba(255,255,255,.94);
+  backdrop-filter: blur(18px);
   border-bottom:1px solid rgba(0,0,0,.06);
   display:flex;
   justify-content:space-between;
@@ -24,8 +24,8 @@
 }
 
 .chat-avatar img{
-  width:52px;
-  height:52px;
+  width:54px;
+  height:54px;
   border-radius:50%;
   object-fit:cover;
   border: 2px solid rgba(255,255,255,.96);
@@ -51,7 +51,7 @@
 }
 
 .typing-status{
-  color:#ff7a00 !important;
+  color:#0d8f63 !important;
   font-weight:700;
   animation:typingPulse 1s infinite;
 }
@@ -75,7 +75,7 @@
 }
 
 .chat-actions button:hover{
-  background:#ff7a00;
+  background:#0d8f63;
   color:white;
 }
 

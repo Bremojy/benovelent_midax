@@ -1,6 +1,7 @@
 const { getIO } = require("../sockets/socket");
 const Message = require("../models/Message");
 const Conversation = require("../models/Conversation");
+const Notification = require("../models/Notification");
 
 /* =====================================================
 SEND MESSAGE
@@ -75,8 +76,38 @@ exports.sendMessage = async (req, res) => {
         await conversation.save();
 
         const io = getIO();
+        const recipients = (conversation.participants || [])
+            .map((participant) => participant?.toString?.() || String(participant))
+            .filter((participantId) => participantId && participantId !== req.user._id.toString());
+
         if (io) {
             io.to(conversationId).emit("new-message", newMessage);
+        }
+
+        if (recipients.length) {
+            const title = req.user?.fullName ? `New message from ${req.user.fullName}` : "New message received";
+            const notificationMessage = bodyText || "You received a new attachment.";
+            const senderModel = String(req.user?.role || "member")
+                .toLowerCase()
+                .replace(/^./, (char) => char.toUpperCase());
+            const notifications = await Notification.insertMany(
+                recipients.map((recipient) => ({
+                    recipient,
+                    recipientModel: "Member",
+                    sender: req.user._id,
+                    senderModel,
+                    title,
+                    message: notificationMessage,
+                    type: "message",
+                    referenceId: newMessage._id,
+                    referenceModel: "Message",
+                    icon: "message-circle",
+                }))
+            );
+
+            notifications.forEach((notification) => {
+                io?.to(notification.recipient.toString()).emit("new-notification", notification);
+            });
         }
 
         return res.status(201).json({

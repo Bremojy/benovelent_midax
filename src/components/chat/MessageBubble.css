@@ -10,18 +10,20 @@
 
 .message-content{
   max-width:72%;
-  background:white;
-  border-radius:22px;
+  background: rgba(255,255,255,.92);
+  backdrop-filter: blur(12px);
+  border-radius:22px 22px 22px 6px;
   padding:14px 16px;
-  box-shadow:0 10px 28px rgba(0,0,0,.06);
+  box-shadow:0 10px 24px rgba(0,0,0,.06);
   word-break:break-word;
   border: 1px solid rgba(0,0,0,.05);
 }
 
 .message.own .message-content{
-  background: linear-gradient(135deg, #ff7a00, #ff9d3e);
+  background: linear-gradient(135deg, #0d8f63, #19a36f);
   color:white;
   border-color: transparent;
+  border-radius:22px 22px 6px 22px;
 }
 
 .message-content p{

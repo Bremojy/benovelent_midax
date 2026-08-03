@@ -4,8 +4,8 @@ import { Link } from "react-router-dom";
 import "../styles/public-modern.css";
 
 const aboutVideos = [
-  "/videos/benevolent-news-loop.mp4",
   "/videos/benevolent-community-loop.mp4",
+  "/videos/benevolent-news-loop.mp4",
 ];
 
 export default function About() {
@@ -51,7 +51,7 @@ export default function About() {
             <h1>A trusted community built for care and confidentiality.</h1>
 
             <p>
-              Benevolent Midax is designed to protect the dignity of every member by combining support, communication and a modern digital experience that works beautifully on every device.
+              Benevolent Midax combines support, communication and a modern digital experience that works beautifully on every device.
             </p>
 
             <div className="modern-hero-actions">

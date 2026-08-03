@@ -100,7 +100,7 @@ function Hero() {
     slides.length > 0
       ? slides[currentSlide]
       : {
-          imageUrl: "/hero-default.jpg",
+          imageUrl: "/hero.jpg",
           title: "Standing Together.",
           description:
             "A community dedicated to supporting our members and their families during life's most difficult moments.",
@@ -109,9 +109,10 @@ function Hero() {
         };
 
   // Build full image URL
-  const backgroundImage = current.imageUrl.startsWith("http")
-    ? current.imageUrl
-    : `${UPLOAD_URL}${current.imageUrl}`;
+  const imageUrl = String(current.imageUrl || "/hero.jpg");
+  const backgroundImage = imageUrl.startsWith("http")
+    ? imageUrl
+    : `${UPLOAD_URL}${imageUrl}`;
 
   return (
     <section

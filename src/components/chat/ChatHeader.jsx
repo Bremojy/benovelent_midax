@@ -50,10 +50,10 @@ function ChatHeader({
       </div>
 
       <div className="chat-actions">
-        <button type="button" title="Voice Call" onClick={onAudioCall}>
+        <button type="button" title="Audio call" aria-label="Audio call" onClick={onAudioCall}>
           <Phone size={20} />
         </button>
-        <button type="button" title="Video Call" onClick={onVideoCall}>
+        <button type="button" title="Video call" aria-label="Video call" onClick={onVideoCall}>
           <Video size={20} />
         </button>
         <button type="button" title="Profile" onClick={() => {

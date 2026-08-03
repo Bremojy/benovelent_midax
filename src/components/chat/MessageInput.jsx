@@ -12,7 +12,7 @@ import "./MessageInput.css";
 
 import API from "../../services/api";
 
-const QUICK_EMOJIS = ["😊", "😂", "❤️", "🙏", "👍", "🎉", "😎", "😢", "🔥", "🥰", "🤝", "✨"];
+const QUICK_EMOJIS = ["😊", "😂", "❤️", "🙏", "👍", "🎉", "😎", "😢", "🔥", "🥰", "🤝", "✨", "💬", "📎", "📷"];
 
 function getCurrentUserId(currentUser) {
   if (currentUser?._id) return currentUser._id;
@@ -154,7 +154,7 @@ setImage(data.imageUrl || data.fileUrl || "");
         />
 
         <textarea
-          placeholder="Type a message..."
+          placeholder="Write a private message..."
           value={message}
           onChange={(e) => {
             setMessage(e.target.value);

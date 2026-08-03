@@ -5,6 +5,7 @@ import {
 } from "react";
 
 import DashboardLayout from "../../layouts/DashboardLayout";
+import { resolveApiUrl } from "../../services/api";
 
 import {
   getAdminMembers,
@@ -1442,6 +1443,13 @@ function MemberDetailsModal({
   onClose,
   onEdit,
 }) {
+  const safeDocs = member?.documents || {};
+  const profileImage = resolveUploadUrl(member?.profileImage || safeDocs?.profilePhoto || "");
+  const passportPhoto = resolveUploadUrl(member?.passportPhoto || safeDocs?.passportPhoto || "");
+  const nationalFront = resolveUploadUrl(safeDocs?.nationalIdFront || "");
+  const nationalBack = resolveUploadUrl(safeDocs?.nationalIdBack || "");
+  const signature = resolveUploadUrl(safeDocs?.signature || "");
+
   return (
     <div
       className="admin-member-modal-overlay"
@@ -1468,6 +1476,10 @@ function MemberDetailsModal({
                 "Member"}
             </h2>
 
+            <p className="admin-member-modal-subtitle">
+              Full record, profile details and uploads visible for secure review.
+            </p>
+
           </div>
 
           <button
@@ -1491,106 +1503,82 @@ function MemberDetailsModal({
 
         </div>
 
-        <div className="admin-member-modal-body">
+        <div className="admin-member-hero">
+          <div className="admin-member-hero-avatar">
+            <img src={profileImage || "/default-avatar.svg"} alt={member.fullName || "Member"} />
+          </div>
+          <div className="admin-member-hero-copy">
+            <strong>{member.memberNumber || "—"}</strong>
+            <span>{member.department || "No department"}</span>
+            <p>{member.bio || "No bio provided."}</p>
+          </div>
+        </div>
 
-          <MemberDetail
-            label="Member Number"
-            value={
-              member.memberNumber
-            }
-          />
+        <div className="admin-member-modal-body admin-member-modal-body-grid">
 
-          <MemberDetail
-            label="Username"
-            value={
-              member.username
-            }
-          />
+          <MemberDetail label="Full Name" value={member.fullName} />
+          <MemberDetail label="Username" value={member.username} />
+          <MemberDetail label="Email" value={member.email} />
+          <MemberDetail label="Phone" value={member.phone} />
+          <MemberDetail label="Department" value={member.department} />
+          <MemberDetail label="Position" value={member.position} />
+          <MemberDetail label="Monthly Contribution" value={member.monthlyContribution !== undefined ? `KES ${Number(member.monthlyContribution).toLocaleString()}` : "—"} />
+          <MemberDetail label="Role" value={member.role} />
+          <MemberDetail label="Status" value={capitalize(member.status || "active")} />
+          <MemberDetail label="Verified" value={member.verified ? "Yes" : "No"} />
+          <MemberDetail label="Online" value={member.online ? "Online" : "Offline"} />
+          <MemberDetail label="Join Date" value={formatDate(member.joinDate)} />
+          <MemberDetail label="National ID" value={member.nationalId} />
+          <MemberDetail label="Gender" value={member.gender} />
+          <MemberDetail label="Date of Birth" value={formatDate(member.dateOfBirth)} />
+          <MemberDetail label="Marital Status" value={member.maritalStatus} />
+          <MemberDetail label="County" value={member.county} />
+          <MemberDetail label="Sub-County" value={member.subCounty} />
+          <MemberDetail label="Ward" value={member.ward} />
+          <MemberDetail label="Village" value={member.village} />
+          <MemberDetail label="Postal Address" value={member.postalAddress} />
+          <MemberDetail label="Physical Address" value={member.physicalAddress} />
+          <MemberDetail label="Occupation" value={member.occupation} />
+          <MemberDetail label="Employer" value={member.employer} />
+          <MemberDetail label="Monthly Income" value={member.monthlyIncome !== undefined ? `KES ${Number(member.monthlyIncome || 0).toLocaleString()}` : "—"} />
+          <MemberDetail label="M-Pesa Number" value={member.mpesaNumber} />
+          <MemberDetail label="Bank Name" value={member.bankName} />
+          <MemberDetail label="Bank Branch" value={member.bankBranch} />
+          <MemberDetail label="Account Number" value={member.accountNumber} />
+          <MemberDetail label="Next of Kin" value={member.nextOfKin?.fullName} />
+          <MemberDetail label="Kin Relationship" value={member.nextOfKin?.relationship} />
+          <MemberDetail label="Kin Phone" value={member.nextOfKin?.phone} />
+          <MemberDetail label="Kin ID" value={member.nextOfKin?.nationalId} />
+          <MemberDetail label="Emergency Contact" value={member.emergencyContact?.fullName} />
+          <MemberDetail label="Emergency Relationship" value={member.emergencyContact?.relationship} />
+          <MemberDetail label="Emergency Phone" value={member.emergencyContact?.phone} />
+          <MemberDetail label="Profile Completion" value={`${Number(member.profileCompletion || 0)}%`} />
+          <MemberDetail label="Constitution Accepted" value={member.acceptedConstitution ? "Yes" : "No"} />
+          <MemberDetail label="Privacy Accepted" value={member.acceptedPrivacyPolicy ? "Yes" : "No"} />
+          <MemberDetail label="Declaration Accepted" value={member.acceptedDeclaration ? "Yes" : "No"} />
+          <MemberDetail label="Passport Photo" value={passportPhoto ? "Uploaded" : "—"} />
+          <MemberDetail label="National ID Front" value={nationalFront ? "Uploaded" : "—"} />
+          <MemberDetail label="National ID Back" value={nationalBack ? "Uploaded" : "—"} />
+          <MemberDetail label="Signature" value={signature ? "Uploaded" : "—"} />
 
-          <MemberDetail
-            label="Email"
-            value={
-              member.email
-            }
-          />
+        </div>
 
-          <MemberDetail
-            label="Phone"
-            value={
-              member.phone
-            }
-          />
-
-          <MemberDetail
-            label="Department"
-            value={
-              member.department
-            }
-          />
-
-          <MemberDetail
-            label="Position"
-            value={
-              member.position
-            }
-          />
-
-          <MemberDetail
-            label="Monthly Contribution"
-            value={
-              member.monthlyContribution !==
-              undefined
-                ? `KES ${Number(
-                    member.monthlyContribution
-                  ).toLocaleString()}`
-                : "—"
-            }
-          />
-
-          <MemberDetail
-            label="Role"
-            value={
-              member.role
-            }
-          />
-
-          <MemberDetail
-            label="Status"
-            value={
-              capitalize(
-                member.status ||
-                  "active"
-              )
-            }
-          />
-
-          <MemberDetail
-            label="Verified"
-            value={
-              member.verified
-                ? "Yes"
-                : "No"
-            }
-          />
-
-          <MemberDetail
-            label="Online"
-            value={
-              member.online
-                ? "Online"
-                : "Offline"
-            }
-          />
-
-          <MemberDetail
-            label="Join Date"
-            value={
-              formatDate(
-                member.joinDate
-              )
-            }
-          />
-
+        <div className="admin-member-uploads">
+          {profileImage && (
+            <UploadPreview label="Profile Photo" src={profileImage} />
+          )}
+          {passportPhoto && (
+            <UploadPreview label="Passport Photo" src={passportPhoto} />
+          )}
+          {nationalFront && (
+            <UploadPreview label="ID Front" src={nationalFront} />
+          )}
+          {nationalBack && (
+            <UploadPreview label="ID Back" src={nationalBack} />
+          )}
+          {signature && (
+            <UploadPreview label="Signature" src={signature} />
+          )}
         </div>
 
       </div>
@@ -1599,6 +1587,18 @@ function MemberDetailsModal({
   );
 }
 
+
+
+function UploadPreview({ label, src }) {
+  return (
+    <div className="admin-upload-preview">
+      <span>{label}</span>
+      <a href={src} target="_blank" rel="noreferrer">
+        <img src={resolveUploadUrl(src)} alt={label} />
+      </a>
+    </div>
+  );
+}
 
 // ========================================
 // CREDENTIALS MODAL
@@ -1795,6 +1795,12 @@ function MemberDetail({
 // ========================================
 // HELPERS
 // ========================================
+
+function resolveUploadUrl(src) {
+  if (!src) return "";
+  if (src.startsWith("http")) return src;
+  return resolveApiUrl(src);
+}
 
 function getInitials(name) {
   if (!name) {
