@@ -90,6 +90,7 @@ const AdminMembers = lazy(
 const AdminFinance = lazy(() => import("./pages/admin/AdminFinance"));
 const AdminClaims = lazy(() => import("./pages/admin/AdminClaims"));
 const AdminSupport = lazy(() => import("./pages/admin/AdminSupport"));
+const AdminMessages = lazy(() => import("./pages/admin/AdminMessages"));
 
 
 // =====================================================
@@ -358,6 +359,7 @@ function AppContent() {
           <Route path="/admin/finance" element={<ProtectedRoute allowedRoles={["admin"]}><AdminFinance /></ProtectedRoute>} />
           <Route path="/admin/claims" element={<ProtectedRoute allowedRoles={["admin"]}><AdminClaims /></ProtectedRoute>} />
           <Route path="/admin/support" element={<ProtectedRoute allowedRoles={["admin"]}><AdminSupport /></ProtectedRoute>} />
+          <Route path="/admin/messages" element={<ProtectedRoute allowedRoles={["admin", "superadmin"]}><AdminMessages /></ProtectedRoute>} />
           <Route path="/admin/settings" element={<ProtectedRoute allowedRoles={["admin"]}><PortalSettings /></ProtectedRoute>} />
           <Route path="/admin/polls" element={<ProtectedRoute allowedRoles={["admin"]}><Polls mode="admin" /></ProtectedRoute>} />
 

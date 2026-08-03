@@ -44,6 +44,30 @@ exports.getDashboard = async (req, res) => {
   }
 };
 
+
+/* =====================================================
+   GET COLLEAGUES
+===================================================== */
+
+exports.getColleagues = async (req, res) => {
+  try {
+    const Admin = require("../models/Admin");
+    const colleagues = await Admin.find({ status: { $ne: "deleted" } })
+      .select("-password -resetPasswordToken -resetPasswordExpires -failedLoginAttempts")
+      .sort({ lastLogin: -1, createdAt: -1 })
+      .lean();
+
+    res.json({
+      success: true,
+      count: colleagues.length,
+      colleagues,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 /* =====================================================
    GET ALL MEMBERS
 ===================================================== */

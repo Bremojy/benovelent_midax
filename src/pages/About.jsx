@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import {
   Target,
@@ -15,9 +16,10 @@ const aboutVideoSources = [
 ].filter(Boolean);
 
 function About() {
+  const [videoFailed, setVideoFailed] = useState(false);
   return (
     <main className="about-page">
-      <section className="about-hero about-video-hero">
+      <section className={`about-hero about-video-hero ${videoFailed ? "video-failed" : ""}`}>
         <video
           className="about-background-video"
           autoPlay
@@ -26,6 +28,7 @@ function About() {
           playsInline
           preload="auto"
           poster="/hero.jpg"
+          onError={() => setVideoFailed(true)}
           aria-hidden="true"
         >
           {aboutVideoSources.map((src) => (

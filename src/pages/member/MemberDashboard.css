@@ -607,3 +607,124 @@
   }
 
 }
+
+/* =========================================
+   PROFILE CHECKLIST
+========================================= */
+
+.completion-checklist{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:12px;
+  margin-top:18px;
+}
+
+.checklist-item{
+  display:flex;
+  gap:12px;
+  align-items:flex-start;
+  padding:12px 14px;
+  border-radius:14px;
+  background:#fafafa;
+  border:1px solid #ececec;
+}
+
+.checklist-item.complete{
+  background:#eefaf1;
+  border-color:#d8f0dd;
+}
+
+.checklist-item span{
+  display:grid;
+  place-items:center;
+  width:24px;
+  height:24px;
+  border-radius:50%;
+  background:#fff;
+  color:#ff7a00;
+  font-weight:900;
+  flex-shrink:0;
+}
+
+.checklist-item.complete span{
+  color:#137333;
+}
+
+.checklist-item strong{
+  display:block;
+  font-size:13px;
+  color:#202124;
+}
+
+.checklist-item p{
+  margin:2px 0 0;
+  font-size:12px;
+  color:#6e7379;
+}
+
+.completion-missing{
+  margin-top:14px;
+  padding:12px 14px;
+  border-radius:14px;
+  background:#fff7ef;
+  border:1px solid #ffd9b9;
+}
+
+.completion-missing strong{display:block;margin-bottom:4px;color:#8a4b0f}
+.completion-missing p{margin:0;color:#6d5a48;line-height:1.5}
+
+.trust-strip{
+  margin-top:24px;
+  padding:22px;
+  border-radius:18px;
+  background:linear-gradient(135deg,#1f2328,#2e3137);
+  color:#fff;
+}
+
+.trust-strip span{
+  font-size:11px;
+  letter-spacing:1.4px;
+  font-weight:800;
+  color:#ffb56b;
+}
+
+.trust-strip h2{
+  margin:6px 0 0;
+  font-size:22px;
+}
+
+.trust-strip-grid{
+  margin-top:16px;
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:12px;
+}
+
+.trust-strip-grid div{
+  padding:15px;
+  border-radius:14px;
+  background:rgba(255,255,255,.06);
+  border:1px solid rgba(255,255,255,.09);
+}
+
+.trust-strip-grid strong{
+  display:block;
+  font-size:24px;
+  line-height:1.1;
+}
+
+.trust-strip-grid span{
+  display:block;
+  margin-top:6px;
+  color:rgba(255,255,255,.76);
+  font-size:12px;
+  letter-spacing:0;
+  font-weight:600;
+}
+
+@media (max-width: 850px){
+  .completion-checklist,
+  .trust-strip-grid{
+    grid-template-columns:1fr;
+  }
+}

@@ -10,7 +10,7 @@ import {
 
 import "./MessageInput.css";
 
-const API = import.meta.env.VITE_API_URL || "https://benovelent-midax.onrender.com";
+import API from "../../services/api";
 
 const QUICK_EMOJIS = ["😊", "😂", "❤️", "🙏", "👍", "🎉", "😎", "😢", "🔥", "🥰", "🤝", "✨"];
 
@@ -31,22 +31,12 @@ function MessageInput({
     formData.append("image", file);
 
     try {
-      const token = localStorage.getItem("memberToken");
-      const response = await fetch(`${API}/api/messages/upload`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        body: formData,
-      });
 
-      const data = await response.json();
+const { data } = await API.post("/messages/upload", formData, {
+  headers: { "Content-Type": "multipart/form-data" },
+});
 
-      if (!response.ok) {
-        throw new Error(data?.message || "Upload failed");
-      }
-
-      setImage(data.imageUrl || data.fileUrl || "");
+setImage(data.imageUrl || data.fileUrl || "");
     } catch (error) {
       console.error(error);
       alert(error.message || "Unable to upload file.");
@@ -67,7 +57,7 @@ function MessageInput({
       await onSend(message, image, image ? "image" : "text");
       socket?.emit("stop-typing", {
         conversationId: conversation._id,
-        sender: localStorage.getItem("user") ? JSON.parse(localStorage.getItem("user"))._id : undefined,
+        sender: JSON.parse(localStorage.getItem("user") || "null")?._id,
       });
       setMessage("");
       setImage("");
@@ -164,7 +154,7 @@ function MessageInput({
           onBlur={() => {
             socket?.emit("stop-typing", {
               conversationId: conversation._id,
-              sender: localStorage.getItem("user") ? JSON.parse(localStorage.getItem("user"))._id : undefined,
+              sender: JSON.parse(localStorage.getItem("user") || "null")?._id,
             });
           }}
         />

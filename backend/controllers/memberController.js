@@ -751,7 +751,8 @@ exports.getSummary = async (req, res) => {
                 online:
                     member.online,
 
-                profileCompletion:
+                profileCompletion: completion,
+                profileCompletionPercentage:
                     completion.percentage,
 
                 dependents,
@@ -814,11 +815,8 @@ exports.getProfileStatus = async (req, res) => {
             calculateProfileCompletion(member);
 
         const eligible =
-
             completion.percentage === 100 &&
-
             member.verified &&
-
             member.status === "active";
 
         res.json({

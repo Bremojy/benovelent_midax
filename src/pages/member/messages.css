@@ -3,6 +3,22 @@
    Benevolent Midax
 ========================================================= */
 
+.messages-summary-bar{
+  grid-column:1/-1;
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:12px;
+  margin-bottom:16px;
+}
+.messages-summary-bar div{
+  background:#fff;
+  border:1px solid #ececec;
+  border-radius:16px;
+  padding:14px 16px;
+  box-shadow:0 8px 20px rgba(0,0,0,.04);
+}
+.messages-summary-bar strong{display:block;font-size:24px;color:#202124;line-height:1}
+.messages-summary-bar span{display:block;margin-top:4px;font-size:12px;color:#6d7278}
 .messages-page {
   width: 100%;
   height: calc(100vh - 120px);
@@ -168,7 +184,23 @@
 
 @media (max-width: 1100px) {
 
-  .messages-page {
+  .messages-summary-bar{
+  grid-column:1/-1;
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:12px;
+  margin-bottom:16px;
+}
+.messages-summary-bar div{
+  background:#fff;
+  border:1px solid #ececec;
+  border-radius:16px;
+  padding:14px 16px;
+  box-shadow:0 8px 20px rgba(0,0,0,.04);
+}
+.messages-summary-bar strong{display:block;font-size:24px;color:#202124;line-height:1}
+.messages-summary-bar span{display:block;margin-top:4px;font-size:12px;color:#6d7278}
+.messages-page {
     grid-template-columns: 300px minmax(0, 1fr);
 
     height: calc(100vh - 105px);
@@ -185,7 +217,23 @@
 
 @media (max-width: 900px) {
 
-  .messages-page {
+  .messages-summary-bar{
+  grid-column:1/-1;
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:12px;
+  margin-bottom:16px;
+}
+.messages-summary-bar div{
+  background:#fff;
+  border:1px solid #ececec;
+  border-radius:16px;
+  padding:14px 16px;
+  box-shadow:0 8px 20px rgba(0,0,0,.04);
+}
+.messages-summary-bar strong{display:block;font-size:24px;color:#202124;line-height:1}
+.messages-summary-bar span{display:block;margin-top:4px;font-size:12px;color:#6d7278}
+.messages-page {
     height: calc(100vh - 90px);
     min-height: 500px;
 
@@ -239,7 +287,23 @@
 
 @media (max-width: 600px) {
 
-  .messages-page {
+  .messages-summary-bar{
+  grid-column:1/-1;
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:12px;
+  margin-bottom:16px;
+}
+.messages-summary-bar div{
+  background:#fff;
+  border:1px solid #ececec;
+  border-radius:16px;
+  padding:14px 16px;
+  box-shadow:0 8px 20px rgba(0,0,0,.04);
+}
+.messages-summary-bar strong{display:block;font-size:24px;color:#202124;line-height:1}
+.messages-summary-bar span{display:block;margin-top:4px;font-size:12px;color:#6d7278}
+.messages-page {
     width: 100%;
 
     height: calc(100dvh - 75px);
@@ -287,7 +351,23 @@
 
 @media (max-width: 380px) {
 
-  .messages-page {
+  .messages-summary-bar{
+  grid-column:1/-1;
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:12px;
+  margin-bottom:16px;
+}
+.messages-summary-bar div{
+  background:#fff;
+  border:1px solid #ececec;
+  border-radius:16px;
+  padding:14px 16px;
+  box-shadow:0 8px 20px rgba(0,0,0,.04);
+}
+.messages-summary-bar strong{display:block;font-size:24px;color:#202124;line-height:1}
+.messages-summary-bar span{display:block;margin-top:4px;font-size:12px;color:#6d7278}
+.messages-page {
     height: calc(100dvh - 68px);
   }
 
@@ -304,7 +384,23 @@
   orientation: landscape
 ) {
 
-  .messages-page {
+  .messages-summary-bar{
+  grid-column:1/-1;
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:12px;
+  margin-bottom:16px;
+}
+.messages-summary-bar div{
+  background:#fff;
+  border:1px solid #ececec;
+  border-radius:16px;
+  padding:14px 16px;
+  box-shadow:0 8px 20px rgba(0,0,0,.04);
+}
+.messages-summary-bar strong{display:block;font-size:24px;color:#202124;line-height:1}
+.messages-summary-bar span{display:block;margin-top:4px;font-size:12px;color:#6d7278}
+.messages-page {
     height: calc(100dvh - 60px);
   }
 
@@ -317,7 +413,23 @@
 
 @media (min-width: 1600px) {
 
-  .messages-page {
+  .messages-summary-bar{
+  grid-column:1/-1;
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:12px;
+  margin-bottom:16px;
+}
+.messages-summary-bar div{
+  background:#fff;
+  border:1px solid #ececec;
+  border-radius:16px;
+  padding:14px 16px;
+  box-shadow:0 8px 20px rgba(0,0,0,.04);
+}
+.messages-summary-bar strong{display:block;font-size:24px;color:#202124;line-height:1}
+.messages-summary-bar span{display:block;margin-top:4px;font-size:12px;color:#6d7278}
+.messages-page {
     grid-template-columns: 380px minmax(0, 1fr);
 
     max-width: 1700px;
@@ -344,3 +456,4 @@
   }
 
 }
+@media (max-width: 900px){.messages-summary-bar{grid-template-columns:1fr}}

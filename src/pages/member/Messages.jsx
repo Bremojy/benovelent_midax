@@ -165,8 +165,14 @@ function Messages() {
   return (
     <DashboardLayout>
       <div className={`messages-page ${mobileChatOpen ? "mobile-chat-open" : ""}`}>
+        <div className="messages-summary-bar">
+          <div><strong>{sidebarMembers.length}</strong><span>Members available</span></div>
+          <div><strong>{sidebarConversations.length}</strong><span>Conversations live</span></div>
+        </div>
         <div className="messages-sidebar-container">
           <ChatSidebar
+            title="Member Messages"
+            searchPlaceholder="Search members or conversations..."
             members={sidebarMembers}
             conversations={sidebarConversations}
             selectedConversationId={selectedConversation?._id}
@@ -175,6 +181,8 @@ function Messages() {
             search={search}
             setSearch={setSearch}
             loading={loadingSidebar}
+            emptyMembersLabel="No members found"
+            emptyConversationsLabel="No conversations yet"
           />
         </div>
 

@@ -356,6 +356,23 @@ export default function Profile() {
 
           </div>
 
+{profileCompletion?.checklist?.length > 0 && (
+  <section className="profile-checklist-panel">
+    <h2>What you still need to make it 100%</h2>
+    <div className="profile-checklist-grid">
+      {profileCompletion.checklist.map((item) => (
+        <div key={item.key} className={item.completed ? "profile-checklist-item complete" : "profile-checklist-item"}>
+          <strong>{item.label}</strong>
+          <span>{item.completed ? "Completed" : "Missing"}</span>
+        </div>
+      ))}
+    </div>
+    {profileCompletion.missingFields?.length > 0 && (
+      <p className="profile-checklist-note">Missing: {profileCompletion.missingFields.join(", ")}</p>
+    )}
+  </section>
+)}
+
         </section>
 
         {/* =================================

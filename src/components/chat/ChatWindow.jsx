@@ -3,9 +3,8 @@ import ChatHeader from "./ChatHeader";
 import MessageBubble from "./MessageBubble";
 import MessageInput from "./MessageInput";
 import TypingIndicator from "./TypingIndicator";
+import API from "../../services/api";
 import "./ChatWindow.css";
-
-const API = import.meta.env.VITE_API_URL || "https://benovelent-midax.onrender.com";
 
 function ChatWindow({
   conversation,
@@ -81,62 +80,45 @@ function ChatWindow({
     };
   }, [socket, conversation?._id, currentUser?._id, typingUserId]);
 
+
   async function loadMessages(conversationId) {
-    try {
-      setLoadingMessages(true);
-      const token = localStorage.getItem("memberToken");
-      const response = await fetch(`${API}/api/messages/conversation/${conversationId}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      const data = await response.json();
-      const items = Array.isArray(data) ? data : data.messages || [];
-      setMessages(items.map(normalizeMessage));
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setLoadingMessages(false);
-    }
+  try {
+    setLoadingMessages(true);
+    const { data } = await API.get(`/messages/conversation/${conversationId}`);
+    const items = Array.isArray(data) ? data : data.messages || [];
+    setMessages(items.map(normalizeMessage));
+  } catch (error) {
+    console.error(error);
+  } finally {
+    setLoadingMessages(false);
   }
+}
 
-  async function sendMessage(text, attachment, messageType = "text") {
-    if (!conversation?._id) return;
-    if (!String(text || "").trim() && !attachment) return;
 
-    try {
-      const token = localStorage.getItem("memberToken");
-      const response = await fetch(`${API}/api/messages`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          conversationId: conversation._id,
-          message: text,
-          attachment,
-          messageType,
-        }),
-      });
+async function sendMessage(text, attachment, messageType = "text") {
+  if (!conversation?._id) return;
+  if (!String(text || "").trim() && !attachment) return;
 
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data?.message || "Unable to send message.");
+  try {
+    const { data } = await API.post("/messages", {
+      conversationId: conversation._id,
+      message: text,
+      attachment,
+      messageType,
+    });
+
+    const created = normalizeMessage(data.message || data);
+    setMessages((previous) => {
+      if (previous.some((item) => String(item._id) === String(created._id))) {
+        return previous;
       }
-
-      const created = normalizeMessage(data.message || data);
-      setMessages((previous) => {
-        if (previous.some((item) => String(item._id) === String(created._id))) {
-          return previous;
-        }
-        return [...previous, created];
-      });
-    } catch (error) {
-      console.error(error);
-      throw error;
-    }
+      return [...previous, created];
+    });
+  } catch (error) {
+    console.error(error);
+    throw error;
   }
+}
 
   function scrollToBottom() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });

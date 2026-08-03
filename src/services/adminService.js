@@ -557,3 +557,13 @@ export default {
   getAdminSettings,
   updateAdminSettings,
 };
+
+
+// ========================================
+// ADMIN DIRECTORY
+// ========================================
+
+export const getAdminColleagues = async () => {
+  const { data } = await API.get("/admin/colleagues");
+  return data;
+};

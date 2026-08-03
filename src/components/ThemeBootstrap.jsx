@@ -11,6 +11,8 @@ function applyTheme(color) {
 
 export default function ThemeBootstrap() {
   useEffect(() => {
+    const appearance = localStorage.getItem("benevolentMidaxAppearance") || "light";
+    document.documentElement.setAttribute("data-appearance", appearance);
     let active = true;
 
     const loadTheme = async () => {

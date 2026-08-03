@@ -390,3 +390,34 @@
   }
 
 }
+
+.contribution-community-card{
+  background:#fff;
+  border:1px solid rgba(0,0,0,.06);
+  border-radius:24px;
+  padding:24px;
+  box-shadow:0 14px 35px rgba(15,23,42,.06);
+  margin-bottom:20px;
+}
+.community-metrics-grid{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:16px;
+  margin-top:18px;
+}
+.community-metrics-grid div{
+  border:1px solid rgba(255,122,0,.18);
+  border-radius:18px;
+  padding:16px;
+  background:linear-gradient(180deg,rgba(255,122,0,.04),rgba(255,255,255,.9));
+}
+.community-metrics-grid span{display:block;font-size:.78rem;text-transform:uppercase;letter-spacing:.08em;color:#6b7280;margin-bottom:8px}
+.community-metrics-grid strong{font-size:1.15rem;color:#111827}
+html[data-appearance="dark"] .contribution-community-card,
+html[data-appearance="dark"] .community-metrics-grid div{
+  background:#12161b;
+  border-color:rgba(255,255,255,.08);
+  box-shadow:none;
+}
+html[data-appearance="dark"] .community-metrics-grid strong{color:#fff}
+@media (max-width:900px){.community-metrics-grid{grid-template-columns:1fr}}

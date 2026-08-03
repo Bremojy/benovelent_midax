@@ -1,3 +1,4 @@
+import { useState } from "react";
 import "./Gallery.css";
 
 const galleryVideoSources = [
@@ -6,6 +7,7 @@ const galleryVideoSources = [
 ].filter(Boolean);
 
 function Gallery() {
+  const [videoFailed, setVideoFailed] = useState(false);
   const images = [
     "/uploads/gallery/1.jpg",
     "/uploads/gallery/2.jpg",
@@ -17,7 +19,7 @@ function Gallery() {
 
   return (
     <main className="gallery-page">
-      <section className="gallery-hero gallery-video-hero">
+      <section className={`gallery-hero gallery-video-hero ${videoFailed ? "video-failed" : ""}`}>
         <video
           className="gallery-background-video"
           autoPlay
@@ -26,6 +28,7 @@ function Gallery() {
           playsInline
           preload="auto"
           poster="/hero.jpg"
+          onError={() => setVideoFailed(true)}
           aria-hidden="true"
         >
           {galleryVideoSources.map((src) => (

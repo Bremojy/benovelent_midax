@@ -9,6 +9,7 @@ import DashboardLayout
 import {
   getMemberContributions,
   getMemberFinance,
+  getMemberDashboard,
 } from "../../services/memberService";
 
 import "./Contributions.css";
@@ -30,9 +31,10 @@ export default function Contributions() {
         setLoading(true);
         setError("");
 
-        const [response, financeResponse] = await Promise.all([
+        const [response, financeResponse, dashboardResponse] = await Promise.all([
           getMemberContributions(),
           getMemberFinance(),
+          getMemberDashboard(),
         ]);
 
         if (
@@ -44,7 +46,10 @@ export default function Contributions() {
           );
         }
 
-        setData(response);
+        setData({
+          ...response,
+          community: dashboardResponse?.dashboard || {},
+        });
         setFinance(Array.isArray(financeResponse?.transactions) ? financeResponse.transactions : []);
 
       } catch (err) {
@@ -137,6 +142,43 @@ export default function Contributions() {
               View your contribution history
               and payment records.
             </p>
+          </div>
+
+        </section>
+
+
+        {/* COMMUNITY TOTALS */}
+
+        <section className="contribution-community-card">
+
+          <div className="member-section-heading">
+
+            <div>
+              <span>COMMUNITY FINANCE</span>
+
+              <h2>All members combined</h2>
+
+            </div>
+
+            <strong>
+              {formatCurrency(data?.community?.statistics?.totalContributions || data?.community?.summary?.totalContributions || 0)}
+            </strong>
+
+          </div>
+
+          <div className="community-metrics-grid">
+            <div>
+              <span>Total contributions</span>
+              <strong>{formatCurrency(data?.community?.statistics?.totalContributions || data?.community?.summary?.totalContributions || 0)}</strong>
+            </div>
+            <div>
+              <span>Monthly contribution</span>
+              <strong>{formatCurrency(data?.community?.statistics?.monthlyContribution || data?.community?.summary?.contribution || 0)}</strong>
+            </div>
+            <div>
+              <span>Members active</span>
+              <strong>{data?.community?.statistics?.online || data?.community?.onlineMembers || 0}</strong>
+            </div>
           </div>
 
         </section>

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import "./Constitution.css";
 import { Link } from "react-router-dom";
 import {
@@ -13,9 +14,10 @@ const constitutionVideoSources = [
 ].filter(Boolean);
 
 function Constitution() {
+  const [videoFailed, setVideoFailed] = useState(false);
   return (
     <main className="constitution-page">
-      <section className="constitution-hero constitution-video-hero">
+      <section className={`constitution-hero constitution-video-hero ${videoFailed ? "video-failed" : ""}`}>
         <video
           className="constitution-background-video"
           autoPlay
@@ -24,6 +26,7 @@ function Constitution() {
           playsInline
           preload="auto"
           poster="/hero.jpg"
+          onError={() => setVideoFailed(true)}
           aria-hidden="true"
         >
           {constitutionVideoSources.map((src) => (

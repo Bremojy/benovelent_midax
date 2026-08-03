@@ -20,6 +20,7 @@ import {
   updateSuperAdminProfile,
   updateSuperAdminSettings,
 } from "../services/superAdminService";
+import { resolveApiUrl } from "../services/api";
 import "./PortalSettings.css";
 
 const THEMES = [
@@ -43,6 +44,7 @@ export default function PortalSettings() {
     bio: user?.bio || "",
   });
   const [themeColor, setThemeColor] = useState(user?.themeColor || "#ff7a00");
+  const [appearance, setAppearance] = useState(() => localStorage.getItem("benevolentMidaxAppearance") || "light");
   const [photo, setPhoto] = useState(null);
   const [photoPreview, setPhotoPreview] = useState(user?.profileImage || "");
   const [passwords, setPasswords] = useState({
@@ -218,6 +220,24 @@ export default function PortalSettings() {
     }
   };
 
+
+const saveAppearance = async (value) => {
+  setAppearance(value);
+  try {
+    document.documentElement.setAttribute("data-appearance", value);
+    localStorage.setItem("benevolentMidaxAppearance", value);
+    const response = isMember
+      ? await updateMemberSettings({ appearance: value })
+      : isAdmin
+        ? await updateAdminSettings({ appearance: value })
+        : await updateSuperAdminSettings({ appearance: value });
+    setMessage(response?.message || "Appearance saved.");
+    await refreshUser();
+  } catch (err) {
+    setError(err.response?.data?.message || err.message || "Unable to save appearance.");
+  }
+};
+
   const imageSrc = photoPreview
     ? resolveApiUrl(photoPreview)
     : "";
@@ -361,6 +381,15 @@ export default function PortalSettings() {
                   {themeColor === theme.value && <Check size={17} />}
                 </button>
               ))}
+            </div>
+
+            <div className="appearance-options">
+              <strong>Background mode</strong>
+              <div className="appearance-row">
+                <button type="button" className={appearance === "light" ? "appearance-chip selected" : "appearance-chip"} onClick={() => saveAppearance("light")}>White</button>
+                <button type="button" className={appearance === "dark" ? "appearance-chip selected" : "appearance-chip"} onClick={() => saveAppearance("dark")}>Black</button>
+                <button type="button" className={appearance === "system" ? "appearance-chip selected" : "appearance-chip"} onClick={() => saveAppearance("system")}>System</button>
+              </div>
             </div>
 
             {loading && <small>Loading saved preferences...</small>}

@@ -97,3 +97,45 @@ padding:16px;
   outline:3px solid var(--portal-accent-soft,#ff7a0018);
   outline-offset:2px;
 }
+
+html[data-appearance="dark"] .dashboard-container{
+  background:
+    radial-gradient(circle at 12% 8%, rgba(255,122,0,.10), transparent 28%),
+    radial-gradient(circle at 92% 86%, rgba(120,130,140,.10), transparent 30%),
+    #111318;
+}
+html[data-appearance="dark"] .dashboard-content,
+html[data-appearance="dark"] .dashboard-main{
+  color:#eef0f3;
+}
+html[data-appearance="dark"] .portal-panel,
+html[data-appearance="dark"] .portal-module-header h1,
+html[data-appearance="dark"] .portal-stat,
+html[data-appearance="dark"] .settings-panel,
+html[data-appearance="dark"] .portal-settings-header{
+  color:#eef0f3;
+  background:#191c21;
+  border-color:#2a2f37;
+}
+html[data-appearance="dark"] .portal-table th,
+html[data-appearance="dark"] .portal-table td,
+html[data-appearance="dark"] .portal-module-header p,
+html[data-appearance="dark"] .portal-stat span{
+  color:#b8c0cc;
+}
+html[data-appearance="dark"] .portal-empty{
+  color:#b8c0cc;
+}
+html[data-appearance="dark"] .portal-table th,
+html[data-appearance="dark"] .portal-table td{
+  border-bottom-color:#2b313a;
+}
+html[data-appearance="dark"] .portal-field input,
+html[data-appearance="dark"] .portal-field select,
+html[data-appearance="dark"] .portal-field textarea,
+html[data-appearance="dark"] .settings-field input,
+html[data-appearance="dark"] .settings-field textarea{
+  background:#11151a;
+  border-color:#2c323b;
+  color:#eef0f3;
+}

@@ -3,6 +3,8 @@ import { Search, MessageCircle, Users, Circle } from "lucide-react";
 import "./ChatSidebar.css";
 
 function ChatSidebar({
+  title = "Messages",
+  searchPlaceholder = "Search people...",
   members = [],
   conversations = [],
   selectedConversationId,
@@ -11,6 +13,10 @@ function ChatSidebar({
   search,
   setSearch,
   loading,
+  emptyConversationsLabel = "No conversations yet",
+  emptyMembersLabel = "No people found",
+  memberSectionLabel = "All people",
+  conversationSectionLabel = "Recent chats",
 }) {
   const filteredMembers = useMemo(() => {
     const keyword = String(search || "").trim().toLowerCase();
@@ -39,13 +45,13 @@ function ChatSidebar({
   return (
     <div className="chat-sidebar">
       <div className="chat-sidebar-top">
-        <h2>Messages</h2>
+        <h2>{title}</h2>
 
         <div className="chat-search">
           <Search size={18} />
           <input
             type="text"
-            placeholder="Search members..."
+            placeholder={searchPlaceholder}
             value={search}
             onChange={(e) => setSearch?.(e.target.value)}
           />
@@ -54,7 +60,7 @@ function ChatSidebar({
 
       <div className="chat-section-label">
         <MessageCircle size={16} />
-        <span>Recent chats</span>
+        <span>{conversationSectionLabel}</span>
       </div>
 
       <div className="conversation-list">
@@ -63,7 +69,7 @@ function ChatSidebar({
         )}
 
         {!loading && filteredConversations.length === 0 && (
-          <div className="chat-empty">No conversations yet</div>
+          <div className="chat-empty">{emptyConversationsLabel}</div>
         )}
 
         {filteredConversations.map((conversation) => {
@@ -99,12 +105,12 @@ function ChatSidebar({
 
       <div className="chat-section-label">
         <Users size={16} />
-        <span>All members</span>
+        <span>{memberSectionLabel}</span>
       </div>
 
       <div className="member-directory">
         {filteredMembers.length === 0 && (
-          <div className="chat-empty">No members found</div>
+          <div className="chat-empty">{emptyMembersLabel}</div>
         )}
 
         {filteredMembers.map((member) => (

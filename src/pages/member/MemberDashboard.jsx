@@ -112,6 +112,14 @@ function MemberDashboard() {
     member?.profileCompletion ??
     0;
 
+  const checklist =
+    profileCompletion?.checklist ||
+    [];
+
+  const missingFields =
+    profileCompletion?.missingFields ||
+    [];
+
   return (
     <DashboardLayout>
 
@@ -171,51 +179,79 @@ function MemberDashboard() {
             PROFILE COMPLETION
         ================================= */}
 
-        {completion < 100 && (
-          <section className="profile-completion-card">
+        
+{completion < 100 && (
+  <section className="profile-completion-card">
+    <div className="completion-icon">✓</div>
 
-            <div className="completion-icon">
-              ✓
+    <div className="completion-content">
+      <div className="completion-heading">
+        <div>
+          <h3>Complete your profile</h3>
+          <p>
+            Finish the items below to unlock 100% profile completion and full portal access.
+          </p>
+        </div>
+
+        <strong>{completion}%</strong>
+      </div>
+
+      <div className="completion-track">
+        <div
+          className="completion-progress"
+          style={{ width: `${completion}%` }}
+        />
+      </div>
+
+      <div className="completion-checklist">
+        {checklist.map((item) => (
+          <div
+            key={item.key}
+            className={item.completed ? "checklist-item complete" : "checklist-item"}
+          >
+            <span>{item.completed ? "✓" : "○"}</span>
+            <div>
+              <strong>{item.label}</strong>
+              <p>{item.completed ? "Completed" : "Still needed"}</p>
             </div>
+          </div>
+        ))}
+      </div>
 
-            <div className="completion-content">
+      {missingFields.length > 0 && (
+        <div className="completion-missing">
+          <strong>To reach 100%, complete:</strong>
+          <p>{missingFields.join(", ")}</p>
+        </div>
+      )}
+    </div>
+  </section>
+)}
 
-              <div className="completion-heading">
-
-                <div>
-                  <h3>
-                    Complete your profile
-                  </h3>
-
-                  <p>
-                    Complete your membership
-                    information to unlock all
-                    available benefits.
-                  </p>
-                </div>
-
-                <strong>
-                  {completion}%
-                </strong>
-
-              </div>
-
-              <div className="completion-track">
-
-                <div
-                  className="completion-progress"
-                  style={{
-                    width: `${completion}%`,
-                  }}
-                />
-
-              </div>
-
-            </div>
-
-          </section>
-        )}
-
+<section className="trust-strip">
+  <div>
+    <span>LIVE TRUST SIGNALS</span>
+    <h2>What is happening in the constitution now</h2>
+  </div>
+  <div className="trust-strip-grid">
+    <div>
+      <strong>{statistics?.totalMembers ?? member?.communityMembers ?? 0}</strong>
+      <span>Members in the constitution</span>
+    </div>
+    <div>
+      <strong>{statistics?.onlineMembers ?? 0}</strong>
+      <span>Members currently online</span>
+    </div>
+    <div>
+      <strong>{recentContributions?.length ?? 0}</strong>
+      <span>Recent contributions visible</span>
+    </div>
+    <div>
+      <strong>{announcements?.length ?? 0}</strong>
+      <span>Active announcements</span>
+    </div>
+  </div>
+</section>
         {/* =================================
             PROFILE HEADER
         ================================= */}
