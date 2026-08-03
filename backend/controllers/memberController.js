@@ -16,6 +16,32 @@ require("../utils/calculateProfileCompletion");
 
 const createAuditLog =
 require("../utils/createAuditLog");
+
+
+function coerceProfileObject(value, fallback = {}) {
+    if (value == null || value === "") {
+        return fallback;
+    }
+
+    if (typeof value === "object" && !Array.isArray(value)) {
+        return value;
+    }
+
+    if (typeof value === "string") {
+        try {
+            const parsed = JSON.parse(value);
+
+            if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+                return parsed;
+            }
+        } catch (error) {
+            // Ignore malformed JSON and fall back below.
+        }
+    }
+
+    return fallback;
+}
+
 exports.getDashboard = async (req, res) => {
 
     try {
@@ -458,23 +484,35 @@ const allowedFields = [
     "acceptedDeclaration",
 ];
 
-allowedFields.forEach((field) => {
+        allowedFields.forEach((field) => {
+            if (req.body[field] !== undefined) {
+                let value = req.body[field];
 
-    if (req.body[field] !== undefined) {
-        let value = req.body[field];
+                if ((field === "nextOfKin" || field === "emergencyContact") && typeof value === "string") {
+                    try {
+                        const parsed = JSON.parse(value);
+                        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+                            value = parsed;
+                        }
+                    } catch {
+                        // Keep the raw value if it is not valid JSON.
+                    }
+                }
 
-        if ((field === "nextOfKin" || field === "emergencyContact") && typeof value === "string") {
-            try {
-                value = JSON.parse(value);
-            } catch {
-                // Keep the raw value if it is not valid JSON.
+                member[field] = value;
             }
-        }
+        });
 
-        member[field] = value;
-    }
+        member.nextOfKin = coerceProfileObject(
+            member.nextOfKin,
+            member.nextOfKin && typeof member.nextOfKin === "object" ? member.nextOfKin : {}
+        );
 
-});
+        member.emergencyContact = coerceProfileObject(
+            member.emergencyContact,
+            member.emergencyContact && typeof member.emergencyContact === "object" ? member.emergencyContact : {}
+        );
+
 
         // ------------------------------------------
         // PROFILE PHOTO / DOCUMENT UPLOADS

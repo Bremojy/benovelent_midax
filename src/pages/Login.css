@@ -13,10 +13,14 @@
 .login-video {
   position: absolute;
   inset: 0;
-  z-index: 0; pointer-events: none;
+  z-index: 0;
+  pointer-events: none;
   width: 100%;
   height: 100%;
   object-fit: cover;
+  display: block;
+  filter: saturate(1.08) brightness(.92);
+  transform: scale(1.01);
 }
 
 .login-video-overlay {
@@ -24,8 +28,8 @@
   inset: 0;
   z-index: 1;
   background:
-    linear-gradient(90deg, rgba(8, 10, 12, .68), rgba(8, 10, 12, .34)),
-    linear-gradient(180deg, rgba(255, 122, 0, .06), rgba(0, 0, 0, .48));
+    linear-gradient(90deg, rgba(8, 10, 12, .58), rgba(8, 10, 12, .26)),
+    linear-gradient(180deg, rgba(255, 122, 0, .05), rgba(0, 0, 0, .40));
 }
 
 .login-glow {

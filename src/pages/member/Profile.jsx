@@ -720,6 +720,20 @@ export default function Profile() {
 
             </div>
 
+            <div className="profile-upload-actions">
+              <p>
+                After choosing your files, click upload to save them immediately.
+              </p>
+
+              <button
+                type="submit"
+                className="profile-upload-button"
+                disabled={saving}
+              >
+                {saving ? "Uploading..." : "Upload Selected Files"}
+              </button>
+            </div>
+
           </ProfileSection>
 
           {/* ================================
