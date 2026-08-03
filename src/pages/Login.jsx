@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import "./Login.css";
 
+
 function getPortalPath(role) {
   switch ((role || "").toLowerCase()) {
     case "superadmin":
@@ -17,7 +18,7 @@ function getPortalPath(role) {
   }
 }
 
-const loginVideoSources = ["/videos/benevolent-community-loop.mp4"];
+const loginVideoSources = ["/videos/benevolent-login-loop.mp4"];
 
 export default function Login() {
   const navigate = useNavigate();
