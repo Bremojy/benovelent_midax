@@ -518,35 +518,38 @@ const allowedFields = [
         // PROFILE PHOTO / DOCUMENT UPLOADS
         // Files are stored locally in backend/uploads.
         // ------------------------------------------
-        if (req.files?.profileImage?.[0]) {
-            const file = req.files.profileImage[0];
-            member.profileImage = `/uploads/${req.uploadType || "profiles"}/${file.filename}`;
+        const uploadedFiles = req.files || {};
+        const fileBase = `/uploads/${req.uploadType || "profiles"}`;
+
+        if (uploadedFiles.profileImage?.[0]) {
+            const file = uploadedFiles.profileImage[0];
+            member.profileImage = `${fileBase}/${file.filename}`;
         }
 
-        if (req.files?.passportPhoto?.[0]) {
-            const file = req.files.passportPhoto[0];
-            const filePath = `/uploads/${req.uploadType || "profiles"}/${file.filename}`;
+        if (uploadedFiles.passportPhoto?.[0]) {
+            const file = uploadedFiles.passportPhoto[0];
+            const filePath = `${fileBase}/${file.filename}`;
             member.passportPhoto = filePath;
             member.documents = member.documents || {};
             member.documents.passportPhoto = filePath;
         }
 
-        if (req.files?.nationalIdFront?.[0]) {
-            const file = req.files.nationalIdFront[0];
+        if (uploadedFiles.nationalIdFront?.[0]) {
+            const file = uploadedFiles.nationalIdFront[0];
             member.documents = member.documents || {};
-            member.documents.nationalIdFront = `/uploads/${req.uploadType || "profiles"}/${file.filename}`;
+            member.documents.nationalIdFront = `${fileBase}/${file.filename}`;
         }
 
-        if (req.files?.nationalIdBack?.[0]) {
-            const file = req.files.nationalIdBack[0];
+        if (uploadedFiles.nationalIdBack?.[0]) {
+            const file = uploadedFiles.nationalIdBack[0];
             member.documents = member.documents || {};
-            member.documents.nationalIdBack = `/uploads/${req.uploadType || "profiles"}/${file.filename}`;
+            member.documents.nationalIdBack = `${fileBase}/${file.filename}`;
         }
 
-        if (req.files?.signature?.[0]) {
-            const file = req.files.signature[0];
+        if (uploadedFiles.signature?.[0]) {
+            const file = uploadedFiles.signature[0];
             member.documents = member.documents || {};
-            member.documents.signature = `/uploads/${req.uploadType || "profiles"}/${file.filename}`;
+            member.documents.signature = `${fileBase}/${file.filename}`;
         }
 
         member.lastSeen = new Date();

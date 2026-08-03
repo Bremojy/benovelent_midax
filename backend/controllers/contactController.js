@@ -65,7 +65,11 @@ exports.createContactMessage = async (req, res) => {
 exports.getContactMessages = async (req, res) => {
   try {
     const messages = await ContactMessage.find().sort({ createdAt: -1 }).lean();
-    return res.json({ success: true, count: messages.length, messages });
+    const normalized = messages.map((item) => ({
+      ...item,
+      phoneFirstLine: [item.phone, item.email, item.fullName].filter(Boolean).join(" • "),
+    }));
+    return res.json({ success: true, count: normalized.length, messages: normalized });
   } catch (error) {
     console.error("Get contact messages error:", error);
     return res.status(500).json({ success: false, message: "Unable to load contact messages." });

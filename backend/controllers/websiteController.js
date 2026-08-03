@@ -2,7 +2,7 @@ const fs = require("fs");
 const path = require("path");
 const WebsiteContent = require("../models/WebsiteContent");
 
-const DEFAULT_SECTIONS = ["home", "about", "services", "contact", "footer", "settings", "gallery", "privacy-policy", "terms-conditions", "disclaimer"];
+const DEFAULT_SECTIONS = ["home", "about", "services", "contact", "footer", "settings", "gallery", "constitution", "privacy-policy", "terms-conditions", "disclaimer"];
 
 const SECTION_DEFAULTS = {
     "privacy-policy": {
@@ -172,7 +172,7 @@ exports.uploadConstitutionFile = async (req, res) => {
             images: [],
         });
 
-        const fileUrl = `/uploads/${req.uploadType || "documents"}/${req.file.filename}`;
+        const fileUrl = `/documents/${req.file.filename}`;
 
         section.content = {
             ...(typeof section.content === "object" && section.content ? section.content : {}),

@@ -32,6 +32,7 @@ function MessageCenterPage({
   const [mobileChatOpen, setMobileChatOpen] = useState(false);
   const actorId = String(currentUser?.chatId || currentUser?._id || "");
   const loadContactsRef = useRef(loadContacts);
+  const lastManualRefreshRef = useRef(0);
 
   useEffect(() => {
     loadContactsRef.current = loadContacts;
@@ -110,8 +111,34 @@ function MessageCenterPage({
 
     load();
 
+    const handleFocus = () => {
+      if (document.visibilityState === "visible") {
+        load();
+      }
+    };
+
+    const handlePageClick = () => {
+      if (document.visibilityState === "visible") {
+        autoRefreshNow();
+      }
+    };
+
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleFocus);
+    document.addEventListener("click", handlePageClick, true);
+
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === "visible") {
+        load();
+      }
+    }, 15000);
+
     return () => {
       active = false;
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleFocus);
+      document.removeEventListener("click", handlePageClick, true);
+      window.clearInterval(interval);
     };
   }, [currentUser?._id]);
 
@@ -189,6 +216,13 @@ function MessageCenterPage({
       console.error("Refresh chat error:", error);
       setBanner(error?.message || "Unable to refresh conversations.");
     }
+  };
+
+  const autoRefreshNow = () => {
+    const now = Date.now();
+    if (now - lastManualRefreshRef.current < 2500) return;
+    lastManualRefreshRef.current = now;
+    refreshChat();
   };
 
   const handleAudioCall = () => {

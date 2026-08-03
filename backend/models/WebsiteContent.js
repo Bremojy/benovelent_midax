@@ -14,6 +14,7 @@ const websiteContentSchema = new mongoose.Schema(
         "footer",
         "settings",
         "gallery",
+        "constitution",
         "privacy-policy",
         "terms-conditions",
         "disclaimer"

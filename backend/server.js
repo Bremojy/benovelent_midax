@@ -90,6 +90,16 @@ app.use(
     express.static(path.join(__dirname, "uploads"))
 );
 
+app.use(
+    "/documents",
+    express.static(path.join(__dirname, "..", "public", "documents"))
+);
+
+app.use(
+    "/documents",
+    express.static(path.join(__dirname, "uploads", "documents"))
+);
+
 // ===============================================
 // ROOT ROUTE
 // ===============================================

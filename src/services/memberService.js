@@ -46,33 +46,21 @@ export const updateMemberProfileWithPhoto = async (profile, files = {}) => {
     }
   });
 
-  const appendFile = (fieldName, file) => {
-    if (file) {
-      formData.append(fieldName, file);
-    }
+  const appendIfFile = (fieldName, candidate) => {
+    const file = Array.isArray(candidate) ? candidate[0] : candidate?.[0] || candidate;
+    const looksLikeFile = file && typeof file === "object" && typeof file.name === "string";
+    if (!looksLikeFile) return;
+    formData.append(fieldName, file);
   };
 
-  const isFileLike =
-    typeof File !== "undefined" && files instanceof File;
-
-  if (files && typeof files === "object" && !isFileLike) {
-    appendFile("profileImage", files.profileImage);
-    appendFile("passportPhoto", files.passportPhoto);
-    appendFile("nationalIdFront", files.nationalIdFront);
-    appendFile("nationalIdBack", files.nationalIdBack);
-    appendFile("signature", files.signature);
-
-    if (
-      !files.profileImage &&
-      !files.passportPhoto &&
-      !files.nationalIdFront &&
-      !files.nationalIdBack &&
-      !files.signature
-    ) {
-      appendFile("profileImage", files.file || files.image || files.photo);
-    }
-  } else {
-    appendFile("profileImage", files);
+  if (files && typeof files === "object" && typeof files.name === "string") {
+    appendIfFile("profileImage", files);
+  } else if (files && typeof files === "object") {
+    appendIfFile("profileImage", files.profileImage || files.file || files.image || files.photo);
+    appendIfFile("passportPhoto", files.passportPhoto);
+    appendIfFile("nationalIdFront", files.nationalIdFront);
+    appendIfFile("nationalIdBack", files.nationalIdBack);
+    appendIfFile("signature", files.signature);
   }
 
   const { data } = await API.put("/member/profile", formData, {

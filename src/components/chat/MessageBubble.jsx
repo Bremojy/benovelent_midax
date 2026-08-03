@@ -22,8 +22,12 @@ function MessageBubble({
   const isImage = message?.messageType === "image" || /\.(png|jpe?g|webp|gif|bmp|svg)(\?|$)/i.test(attachment);
 
   return (
-    <div className={own ? "message own" : "message"}>
+    <div className={own ? "message own" : "message other"}>
       <div className="message-content">
+        {!own && message?.sender?.fullName && (
+          <div className="message-sender">{message.sender.fullName}</div>
+        )}
+
         {attachment && isImage && (
           <img
             src={attachment}

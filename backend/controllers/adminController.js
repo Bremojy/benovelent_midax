@@ -1,5 +1,6 @@
 const bcrypt = require("bcryptjs");
 const Member = require("../models/Member");
+const { sendEmail, sendSmsNotification } = require("../services/memberBroadcastService");
 
 /* =====================================================
    ADMIN DASHBOARD
@@ -360,6 +361,44 @@ exports.createMember = async (req, res) => {
       await Member.create(
         memberData
       );
+
+    // ==========================================
+    // SEND INVITE CREDENTIALS
+    // ==========================================
+
+    const inviteSubject = "Your Benevolent Midax member login credentials";
+    const inviteMessage = [
+      `Hello ${member.fullName},`,
+      "",
+      "Your Benevolent Midax member account has been created.",
+      `Member Number: ${member.memberNumber}`,
+      `Username: ${member.username || member.email || member.phone}`,
+      `Temporary Password: ${temporaryPassword}`,
+      "",
+      "Please sign in and change your password immediately.",
+    ].join("\n");
+
+    const inviteHtml = `
+      <div style="font-family:Arial,sans-serif;line-height:1.6">
+        <h2>Your Benevolent Midax member login credentials</h2>
+        <p>Hello ${member.fullName},</p>
+        <p>Your Benevolent Midax member account has been created.</p>
+        <ul>
+          <li><strong>Member Number:</strong> ${member.memberNumber}</li>
+          <li><strong>Username:</strong> ${member.username || member.email || member.phone}</li>
+          <li><strong>Temporary Password:</strong> ${temporaryPassword}</li>
+        </ul>
+        <p>Please sign in and change your password immediately.</p>
+      </div>`;
+
+    await Promise.allSettled([
+      member.email
+        ? sendEmail({ to: member.email, subject: inviteSubject, text: inviteMessage, html: inviteHtml })
+        : Promise.resolve(),
+      member.phone
+        ? sendSmsNotification({ to: member.phone, message: `MIDAX login: ${member.username || member.email || member.phone}. Temp password: ${temporaryPassword}` })
+        : Promise.resolve(),
+    ]);
 
     // ==========================================
     // REMOVE PASSWORD FROM RESPONSE
