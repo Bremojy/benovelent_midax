@@ -49,6 +49,8 @@ const verifyToken = async (req, res, next) => {
       process.env.JWT_SECRET
     );
 
+    req.auth = decoded;
+
     if (!decoded.id) {
       return res.status(401).json({
         success: false,

@@ -5,6 +5,8 @@ const {
   getWebsiteContent,
   getWebsiteSettings,
   getGallery,
+  getConstitution,
+  uploadConstitutionFile,
   getSection,
   createSection,
   updateSection,
@@ -23,8 +25,10 @@ const { uploadSingle, setUploadType } = require("../middleware/upload");
 router.get("/", getWebsiteContent);
 router.get("/settings", getWebsiteSettings);
 router.get("/gallery", getGallery);
+router.get("/constitution", getConstitution);
 
 router.post("/gallery/upload", protect, isSuperAdmin, setUploadType("gallery"), uploadSingle("image"), uploadGalleryImage);
+router.post("/constitution/upload", protect, isSuperAdmin, setUploadType("documents"), uploadSingle("file"), uploadConstitutionFile);
 
 // Get one section
 router.get("/:section", getSection);

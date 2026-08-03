@@ -44,7 +44,7 @@ function Gallery() {
           muted
           loop
           playsInline
-          preload="metadata"
+          preload="auto"
           poster="/hero.jpg"
           onError={() => setVideoFailed(true)}
           aria-hidden="true"

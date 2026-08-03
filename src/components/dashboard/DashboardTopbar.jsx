@@ -81,13 +81,14 @@ function DashboardTopbar({
 
   const goToMessages = () => {
     if (normalizedRole === "member") navigate("/member/messages");
-    else if (normalizedRole === "admin") navigate("/admin/members");
-    else navigate("/superadmin/admins");
+    else if (normalizedRole === "admin") navigate("/admin/messages");
+    else navigate("/superadmin/messages");
   };
 
   const goToNotifications = () => {
     if (normalizedRole === "member") navigate("/member/notifications");
-    else navigate(basePath);
+    else if (normalizedRole === "admin") navigate("/admin/notifications");
+    else navigate("/superadmin/notifications");
   };
 
   const goToSettings = () => {

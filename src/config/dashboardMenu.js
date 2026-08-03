@@ -36,6 +36,7 @@ export const dashboardMenus = {
     { title: "Claims", icon: HandHeart, path: "/admin/claims" },
     { title: "Support", icon: Headphones, path: "/admin/support" },
     { title: "Message Center", icon: Mail, path: "/admin/messages" },
+    { title: "Notifications", icon: Bell, path: "/admin/notifications" },
     { title: "Polls", icon: Vote, path: "/admin/polls" },
     { title: "Settings", icon: Settings, path: "/admin/settings" },
   ],
@@ -48,6 +49,9 @@ export const dashboardMenus = {
     { title: "Audit", icon: ClipboardList, path: "/superadmin/audit" },
     { title: "Settings", icon: Settings, path: "/superadmin/settings" },
     { title: "System", icon: ShieldCheck, path: "/superadmin/system" },
+    { title: "Constitution", icon: ClipboardList, path: "/superadmin/constitution" },
+    { title: "Messages", icon: Mail, path: "/superadmin/messages" },
+    { title: "Notifications", icon: Bell, path: "/superadmin/notifications" },
     { title: "Polls", icon: Vote, path: "/superadmin/polls" },
   ],
 };

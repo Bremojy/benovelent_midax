@@ -1,17 +1,38 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import "./Constitution.css";
-import { Link } from "react-router-dom";
+import API, { resolveApiUrl } from "../services/api";
 import {
   ShieldCheck,
   Scale,
   BookOpen,
   Users,
+  Eye,
+  Printer,
+  Download,
 } from "lucide-react";
 
+const constitutionFile = "/documents/benevolent-midax-constitution.pdf";
 const constitutionVideoSources = ["/videos/benevolent-community-loop.mp4"];
 
 function Constitution() {
   const [videoFailed, setVideoFailed] = useState(false);
+  const [fileUrl, setFileUrl] = useState(constitutionFile);
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const { data } = await API.get("/website/constitution");
+        if (!active) return;
+        const content = data?.section?.content || data?.file || {};
+        setFileUrl(resolveApiUrl(content.fileUrl || constitutionFile));
+      } catch {
+        if (active) setFileUrl(resolveApiUrl(constitutionFile));
+      }
+    })();
+    return () => { active = false; };
+  }, []);
+
   return (
     <main className="constitution-page">
       <section className={`constitution-hero constitution-video-hero ${videoFailed ? "video-failed" : ""}`}>
@@ -21,7 +42,7 @@ function Constitution() {
           muted
           loop
           playsInline
-          preload="metadata"
+          preload="auto"
           poster="/hero.jpg"
           onError={() => setVideoFailed(true)}
           aria-hidden="true"
@@ -74,10 +95,18 @@ function Constitution() {
       <section className="constitution-download">
         <div className="section-container">
           <h2>Read Our Constitution</h2>
-          <p>Download and understand the complete Benevolent Midax Constitution.</p>
-          <Link className="primary-button" to="/contact">
-            Request Constitution
-          </Link>
+          <p>View, download or print the official Benevolent Midax Constitution.</p>
+          <div className="constitution-actions">
+            <a className="primary-button" href={fileUrl} target="_blank" rel="noreferrer">
+              <Eye size={18} /> View file
+            </a>
+            <a className="primary-button secondary" href={fileUrl} download>
+              <Download size={18} /> Download PDF
+            </a>
+            <button className="primary-button tertiary" type="button" onClick={() => window.open(fileUrl, "_blank", "noopener,noreferrer")?.focus?.()}>
+              <Printer size={18} /> Print
+            </button>
+          </div>
         </div>
       </section>
     </main>

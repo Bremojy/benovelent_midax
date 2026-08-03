@@ -1258,29 +1258,46 @@ exports.getClaims = async (req, res) => {
 
 exports.getChatMembers = async (req, res) => {
     try {
-        const currentUserId = req.user._id;
+        const currentUserId = String(req.auth?.chatId || req.user?._id || "");
+        const keyword = String(req.query.search || "").trim().toLowerCase();
 
-        const members = await Member.find({
-            _id: { $ne: currentUserId },
+        const filter = {
             isDeleted: { $ne: true },
-        })
-            .select("fullName username profileImage online lastSeen status memberNumber department position phone email")
-            .sort({ fullName: 1 })
-            .lean();
+            _id: { $ne: currentUserId },
+        };
 
-        const conversations = await Conversation.find({
-            participants: currentUserId,
-            deletedFor: { $ne: currentUserId },
-        })
-            .select("participants _id")
-            .lean();
+        if (keyword) {
+            filter.$or = [
+                { fullName: { $regex: keyword, $options: "i" } },
+                { username: { $regex: keyword, $options: "i" } },
+                { email: { $regex: keyword, $options: "i" } },
+                { memberNumber: { $regex: keyword, $options: "i" } },
+                { department: { $regex: keyword, $options: "i" } },
+                { position: { $regex: keyword, $options: "i" } },
+            ];
+        }
+
+        const [members, conversations] = await Promise.all([
+            Member.find(filter)
+                .select("fullName username profileImage online lastSeen status memberNumber department position phone email role")
+                .sort({ role: 1, fullName: 1 })
+                .limit(Number(req.query.limit || 500))
+                .lean(),
+            Conversation.find({
+                participants: currentUserId,
+                deletedFor: { $ne: currentUserId },
+            })
+                .select("participants _id lastMessageText lastMessageTime unreadCounts")
+                .sort({ lastMessageTime: -1 })
+                .lean(),
+        ]);
 
         const conversationMap = new Map();
 
         conversations.forEach((conversation) => {
             const partnerId = (conversation.participants || [])
                 .map((id) => id?.toString?.() || String(id))
-                .find((id) => id !== currentUserId.toString());
+                .find((id) => id !== currentUserId);
 
             if (partnerId) {
                 conversationMap.set(partnerId, conversation._id.toString());
@@ -1289,6 +1306,7 @@ exports.getChatMembers = async (req, res) => {
 
         const contacts = members.map((member) => ({
             ...member,
+            roleLabel: member.role === "admin" ? "Leader" : member.role === "superadmin" ? "Super Admin" : "Member",
             conversationId: conversationMap.get(member._id.toString()) || null,
         }));
 

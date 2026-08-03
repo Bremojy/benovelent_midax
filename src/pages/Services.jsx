@@ -282,7 +282,7 @@ the Benevolent Midax Constitution.
     <ul>
 
       <li>
-        ✓ Maximum KES 20,000
+        ✓ Available subject to constitutional approval
       </li>
 
       <li>

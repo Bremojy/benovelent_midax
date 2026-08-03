@@ -1,4 +1,5 @@
 const { getIO } = require("../sockets/socket");
+const { getChatActorId } = require("../utils/chatProfile");
 const Message = require("../models/Message");
 const Conversation = require("../models/Conversation");
 const Notification = require("../models/Notification");
@@ -9,6 +10,7 @@ SEND MESSAGE
 
 exports.sendMessage = async (req, res) => {
     try {
+        const actorId = getChatActorId(req);
         const {
             conversationId,
             message,
@@ -58,7 +60,7 @@ exports.sendMessage = async (req, res) => {
 
         const newMessage = await Message.create({
             conversation: conversationId,
-            sender: req.user._id,
+            sender: actorId,
             message: bodyText,
             messageType: inferredType,
             attachment: bodyAttachment,
@@ -70,7 +72,7 @@ exports.sendMessage = async (req, res) => {
 
         conversation.lastMessage = newMessage._id;
         conversation.lastMessageText = bodyText || bodyAttachment || "New message";
-        conversation.lastMessageSender = req.user._id;
+        conversation.lastMessageSender = actorId;
         conversation.lastMessageTime = new Date();
 
         await conversation.save();
@@ -78,7 +80,7 @@ exports.sendMessage = async (req, res) => {
         const io = getIO();
         const recipients = (conversation.participants || [])
             .map((participant) => participant?.toString?.() || String(participant))
-            .filter((participantId) => participantId && participantId !== req.user._id.toString());
+            .filter((participantId) => participantId && participantId !== String(actorId));
 
         if (io) {
             io.to(conversationId).emit("new-message", newMessage);
@@ -94,7 +96,7 @@ exports.sendMessage = async (req, res) => {
                 recipients.map((recipient) => ({
                     recipient,
                     recipientModel: "Member",
-                    sender: req.user._id,
+                    sender: actorId,
                     senderModel,
                     title,
                     message: notificationMessage,
@@ -131,13 +133,15 @@ exports.getConversationMessages = async (req, res) => {
 
 try{
 
+const actorId = getChatActorId(req);
+
 const messages=
 await Message.find({
 
 conversation:req.params.conversationId,
 
 deletedFor:{
-$ne:req.user._id
+$ne:actorId
 },
 
 deletedForEveryone:false
@@ -199,6 +203,8 @@ exports.editMessage=async(req,res)=>{
 
 try{
 
+const actorId = getChatActorId(req);
+
 const msg=
 await Message.findById(req.params.id);
 
@@ -214,7 +220,7 @@ message:"Message not found."
 
 }
 
-if(msg.sender.toString()!=req.user._id.toString()){
+if(msg.sender.toString()!=String(actorId)){
 
 return res.status(403).json({
 
@@ -267,6 +273,8 @@ exports.deleteMessage = async (req, res) => {
 
 try{
 
+const actorId = getChatActorId(req);
+
 const msg=
 await Message.findById(req.params.id);
 
@@ -282,9 +290,9 @@ message:"Message not found."
 
 }
 
-if(!msg.deletedFor.includes(req.user._id)){
+if(!msg.deletedFor.includes(actorId)){
 
-msg.deletedFor.push(req.user._id);
+msg.deletedFor.push(actorId);
 
 }
 
@@ -323,6 +331,8 @@ exports.deleteForEveryone=async(req,res)=>{
 
 try{
 
+const actorId = getChatActorId(req);
+
 const msg=
 await Message.findById(req.params.id);
 
@@ -338,7 +348,7 @@ message:"Message not found."
 
 }
 
-if(msg.sender.toString()!=req.user._id.toString()){
+if(msg.sender.toString()!=String(actorId)){
 
 return res.status(403).json({
 
@@ -386,6 +396,8 @@ exports.markAsRead = async (req, res) => {
 
 try{
 
+const actorId = getChatActorId(req);
+
 const msg=
 await Message.findById(req.params.id);
 
@@ -401,9 +413,9 @@ message:"Message not found."
 
 }
 
-if(!msg.seenBy.includes(req.user._id)){
+if(!msg.seenBy.includes(actorId)){
 
-msg.seenBy.push(req.user._id);
+msg.seenBy.push(actorId);
 
 msg.seenAt=new Date();
 
@@ -442,6 +454,8 @@ exports.reactToMessage = async (req, res) => {
 
 try{
 
+const actorId = getChatActorId(req);
+
 const {
 
 emoji
@@ -465,7 +479,7 @@ message:"Message not found."
 
 msg.reactions.push({
 
-member:req.user._id,
+member:actorId,
 
 emoji
 

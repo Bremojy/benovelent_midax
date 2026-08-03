@@ -134,6 +134,69 @@ exports.getGallery = async (req, res) => {
 };
 
 /* =====================================================
+   GET CONSTITUTION
+===================================================== */
+
+exports.getConstitution = async (req, res) => {
+    try {
+        const section = await findOrCreateSection("constitution", {
+            title: "Constitution",
+            subtitle: "Official governance document",
+            description: "The latest Benevolent Midax Constitution file.",
+            content: { fileUrl: "/documents/benevolent-midax-constitution.pdf", fileName: "Benevolent Midax Constitution.pdf" },
+            images: [],
+        });
+
+        res.json({ success: true, section, file: section.content || {} });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+/* =====================================================
+   UPLOAD CONSTITUTION FILE
+===================================================== */
+
+exports.uploadConstitutionFile = async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ success: false, message: "Please choose a PDF file to upload." });
+        }
+
+        const section = await findOrCreateSection("constitution", {
+            title: "Constitution",
+            subtitle: "Official governance document",
+            description: "The latest Benevolent Midax Constitution file.",
+            content: { fileUrl: "/documents/benevolent-midax-constitution.pdf", fileName: "Benevolent Midax Constitution.pdf" },
+            images: [],
+        });
+
+        const fileUrl = `/uploads/${req.uploadType || "documents"}/${req.file.filename}`;
+
+        section.content = {
+            ...(typeof section.content === "object" && section.content ? section.content : {}),
+            fileUrl,
+            fileName: req.file.originalname || "Benevolent Midax Constitution.pdf",
+            updatedAt: new Date().toISOString(),
+        };
+        section.updatedBy = req.user?._id;
+        section.published = true;
+        await section.save();
+
+        res.status(201).json({
+            success: true,
+            message: "Constitution file uploaded successfully.",
+            section,
+            fileUrl,
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+/* =====================================================
    UPLOAD GALLERY IMAGE
 ===================================================== */
 

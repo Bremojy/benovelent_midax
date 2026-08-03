@@ -15,6 +15,7 @@ import API from "../../services/api";
 const QUICK_EMOJIS = ["😊", "😂", "❤️", "🙏", "👍", "🎉", "😎", "😢", "🔥", "🥰", "🤝", "✨", "💬", "📎", "📷"];
 
 function getCurrentUserId(currentUser) {
+  if (currentUser?.chatId) return currentUser.chatId;
   if (currentUser?._id) return currentUser._id;
   try {
     return JSON.parse(localStorage.getItem("user") || "null")?._id || "";

@@ -22,7 +22,7 @@ function ChatWindow({
   const partner = useMemo(() => {
     if (!conversation) return null;
     const participants = conversation.participants || [];
-    const currentId = currentUser?._id?.toString?.() || String(currentUser?._id || "");
+    const currentId = currentUser?.chatId?.toString?.() || currentUser?._id?.toString?.() || String(currentUser?._id || "");
     return conversation.partner || participants.find((member) => String(member?._id || member) !== currentId) || null;
   }, [conversation, currentUser]);
 
@@ -58,7 +58,8 @@ function ChatWindow({
     };
 
     const handleTyping = (senderId) => {
-      if (String(senderId) !== String(currentUser?._id)) {
+      const actorId = String(currentUser?.chatId || currentUser?._id || "");
+      if (String(senderId) !== actorId) {
         setTypingUserId(String(senderId || ""));
       }
     };
@@ -150,13 +151,13 @@ async function sendMessage(text, attachment, messageType = "text") {
             <MessageBubble
               key={message._id}
               message={message}
-              own={String(message.sender?._id || message.sender) === String(currentUser?._id)}
+              own={String(message.sender?._id || message.sender) === String(currentUser?.chatId || currentUser?._id)}
             />
           ))
         )}
 
         <TypingIndicator
-          visible={Boolean(typingUserId) && String(typingUserId) !== String(currentUser?._id)}
+          visible={Boolean(typingUserId) && String(typingUserId) !== String(currentUser?.chatId || currentUser?._id || "")}
           user={partner}
         />
         <div ref={messagesEndRef} />

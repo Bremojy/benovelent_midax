@@ -9,6 +9,7 @@ const Admin = require("../models/Admin");
 const SuperAdmin = require("../models/SuperAdmin");
 
 const generateToken = require("../utils/generateToken");
+const { ensureChatProfile } = require("../utils/chatProfile");
 
 const {
     LOGIN_ALLOWED,
@@ -162,10 +163,25 @@ exports.login = async (req, res) => {
     await user.save();
 
     // --------------------------------------
+    // CHAT PROFILE (ADMIN / SUPERADMIN)
+    // --------------------------------------
+
+    let chatProfile = user;
+    if (user.role === "admin" || user.role === "superadmin") {
+      try {
+        chatProfile = await ensureChatProfile(user);
+      } catch (chatError) {
+        console.error("Chat profile sync error:", chatError);
+      }
+    }
+
+    // --------------------------------------
     // GENERATE TOKEN
     // --------------------------------------
 
-    const token = generateToken(user);
+    const token = generateToken(user, {
+      chatId: chatProfile?._id?.toString?.() || user._id.toString(),
+    });
 
     // --------------------------------------
     // NORMALIZED NAME
@@ -175,6 +191,8 @@ exports.login = async (req, res) => {
       user.fullName ||
       user.name ||
       "";
+
+    const chatId = chatProfile?._id?.toString?.() || user._id.toString();
 
     // --------------------------------------
     // RESPONSE
@@ -189,6 +207,7 @@ exports.login = async (req, res) => {
 
       user: {
         id: user._id,
+        chatId,
         fullName,
         email: user.email,
         role: user.role,
@@ -261,6 +280,9 @@ exports.getMe = async (req, res) => {
 
       user: {
         id: user._id,
+
+        chatId:
+          req.auth?.chatId || user._id.toString(),
 
         fullName:
           user.fullName ||

@@ -52,12 +52,25 @@ export const updateMemberProfileWithPhoto = async (profile, files = {}) => {
     }
   };
 
-  if (files && typeof files === "object") {
+  const isFileLike =
+    typeof File !== "undefined" && files instanceof File;
+
+  if (files && typeof files === "object" && !isFileLike) {
     appendFile("profileImage", files.profileImage);
     appendFile("passportPhoto", files.passportPhoto);
     appendFile("nationalIdFront", files.nationalIdFront);
     appendFile("nationalIdBack", files.nationalIdBack);
     appendFile("signature", files.signature);
+
+    if (
+      !files.profileImage &&
+      !files.passportPhoto &&
+      !files.nationalIdFront &&
+      !files.nationalIdBack &&
+      !files.signature
+    ) {
+      appendFile("profileImage", files.file || files.image || files.photo);
+    }
   } else {
     appendFile("profileImage", files);
   }

@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Search, MessageCircle, Users, Circle } from "lucide-react";
+import { Search, MessageCircle, Users, Crown, Circle, BadgeCheck } from "lucide-react";
 import "./ChatSidebar.css";
 
 function ChatSidebar({
@@ -20,13 +20,20 @@ function ChatSidebar({
 }) {
   const filteredMembers = useMemo(() => {
     const keyword = String(search || "").trim().toLowerCase();
-    if (!keyword) return members;
+    const sorted = [...members].sort((a, b) => {
+      const roleRank = rankRole(a.role) - rankRole(b.role);
+      if (roleRank !== 0) return roleRank;
+      return String(a.fullName || "").localeCompare(String(b.fullName || ""));
+    });
 
-    return members.filter((member) => {
-      const name = String(member.fullName || "").toLowerCase();
-      const username = String(member.username || "").toLowerCase();
-      const department = String(member.department || "").toLowerCase();
-      return name.includes(keyword) || username.includes(keyword) || department.includes(keyword);
+    if (!keyword) return sorted;
+
+    return sorted.filter((member) => {
+      const haystack = [member.fullName, member.username, member.department, member.position, member.email, member.roleLabel]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(keyword);
     });
   }, [members, search]);
 
@@ -36,16 +43,24 @@ function ChatSidebar({
 
     return conversations.filter((conversation) => {
       const partner = conversation.partner || {};
-      const name = String(partner.fullName || "").toLowerCase();
-      const lastMessage = String(conversation.lastMessageText || "").toLowerCase();
-      return name.includes(keyword) || lastMessage.includes(keyword);
+      const haystack = [partner.fullName, partner.username, conversation.lastMessageText]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(keyword);
     });
   }, [conversations, search]);
 
+  const leaders = filteredMembers.filter((member) => isLeader(member.role));
+  const regularMembers = filteredMembers.filter((member) => !isLeader(member.role));
+
   return (
-    <div className="chat-sidebar">
+    <div className="chat-sidebar modern-chat-sidebar">
       <div className="chat-sidebar-top">
-        <h2>{title}</h2>
+        <div>
+          <span className="chat-sidebar-eyebrow">Private portal</span>
+          <h2>{title}</h2>
+        </div>
 
         <div className="chat-search">
           <Search size={18} />
@@ -58,93 +73,121 @@ function ChatSidebar({
         </div>
       </div>
 
-      <div className="chat-section-label">
-        <MessageCircle size={16} />
-        <span>{conversationSectionLabel}</span>
+      <div className="chat-directory-summary">
+        <div><strong>{leaders.length}</strong><span>Leaders</span></div>
+        <div><strong>{regularMembers.length}</strong><span>Members</span></div>
+        <div><strong>{filteredConversations.length}</strong><span>Chats</span></div>
       </div>
 
-      <div className="conversation-list">
-        {loading && (
-          <div className="chat-loading">Loading conversations...</div>
-        )}
-
-        {!loading && filteredConversations.length === 0 && (
-          <div className="chat-empty">{emptyConversationsLabel}</div>
-        )}
-
+      <Section icon={<MessageCircle size={16} />} label={conversationSectionLabel}>
+        {loading && <div className="chat-loading">Loading conversations...</div>}
+        {!loading && filteredConversations.length === 0 && <div className="chat-empty">{emptyConversationsLabel}</div>}
         {filteredConversations.map((conversation) => {
           const partner = conversation.partner || {};
           const isActive = selectedConversationId === conversation._id;
-
           return (
-            <div
+            <button
               key={conversation._id}
+              type="button"
               className={isActive ? "conversation active" : "conversation"}
               onClick={() => onSelectConversation?.(conversation)}
             >
-              <div className="avatar">
-                <img
-                  src={partner.profileImage || "/default-avatar.svg"}
-                  alt={partner.fullName || "Member"}
-                />
-                {partner.online && <span className="online-dot" />}
-              </div>
-
+              <Avatar user={partner} isOnline={partner.online} />
               <div className="conversation-info">
-                <h4>{partner.fullName || "Member"}</h4>
-                <p>{conversation.lastMessageText || "No messages yet"}</p>
+                <h4>
+                  {partner.fullName || "Member"}
+                  {partner.roleLabel ? <span className="role-chip small">{partner.roleLabel}</span> : null}
+                </h4>
+                <p>{conversation.lastMessageText || "Tap to continue the conversation"}</p>
               </div>
-
-              {conversation.unreadCount > 0 && (
-                <span className="badge">{conversation.unreadCount}</span>
-              )}
-            </div>
+              {conversation.unreadCount > 0 && <span className="badge">{conversation.unreadCount}</span>}
+            </button>
           );
         })}
-      </div>
+      </Section>
 
-      <div className="chat-section-label">
-        <Users size={16} />
-        <span>{memberSectionLabel}</span>
-      </div>
-
-      <div className="member-directory">
-        {filteredMembers.length === 0 && (
-          <div className="chat-empty">{emptyMembersLabel}</div>
-        )}
-
-        {filteredMembers.map((member) => (
-          <button
-            type="button"
+      <Section icon={<Crown size={16} />} label="Leaders">
+        {leaders.length === 0 && <div className="chat-empty">{emptyMembersLabel}</div>}
+        {leaders.map((member) => (
+          <ContactRow
             key={member._id}
-            className="member-row"
+            member={member}
             onClick={() => onStartConversation?.(member)}
-          >
-            <div className="avatar">
-              <img
-                src={member.profileImage || "/default-avatar.svg"}
-                alt={member.fullName || "Member"}
-              />
-              <span className={member.online ? "online-dot" : "offline-dot"} />
-            </div>
-
-            <div className="conversation-info">
-              <h4>{member.fullName || "Member"}</h4>
-              <p>
-                {member.online ? "Online now" : member.lastSeen ? `Last seen ${new Date(member.lastSeen).toLocaleDateString()}` : "Offline"}
-              </p>
-            </div>
-
-            {member.conversationId ? (
-              <span className="member-chat-tag">Chat</span>
-            ) : (
-              <span className="member-chat-tag muted">New</span>
-            )}
-          </button>
+          />
         ))}
-      </div>
+      </Section>
+
+      <Section icon={<Users size={16} />} label={memberSectionLabel}>
+        {regularMembers.length === 0 && <div className="chat-empty">{emptyMembersLabel}</div>}
+        {regularMembers.map((member) => (
+          <ContactRow
+            key={member._id}
+            member={member}
+            onClick={() => onStartConversation?.(member)}
+          />
+        ))}
+      </Section>
     </div>
   );
+}
+
+function Section({ icon, label, children }) {
+  return (
+    <section className="chat-section-block">
+      <div className="chat-section-label">
+        {icon}
+        <span>{label}</span>
+      </div>
+      <div className="member-directory">{children}</div>
+    </section>
+  );
+}
+
+function ContactRow({ member, onClick }) {
+  return (
+    <button type="button" className="member-row" onClick={onClick}>
+      <Avatar user={member} isOnline={member.online} />
+      <div className="conversation-info">
+        <h4>
+          {member.fullName || "Member"}
+          {member.verified ? <BadgeCheck size={14} className="verified-dot" /> : null}
+        </h4>
+        <p>
+          {member.roleLabel || roleLabel(member.role)} · {member.online ? "Online now" : member.lastSeen ? `Last seen ${new Date(member.lastSeen).toLocaleDateString()}` : "Offline"}
+        </p>
+      </div>
+      <span className={`member-chat-tag ${member.conversationId ? "" : "muted"}`}>
+        {member.conversationId ? "Chat" : "New"}
+      </span>
+    </button>
+  );
+}
+
+function Avatar({ user, isOnline }) {
+  return (
+    <div className="avatar">
+      <img src={user.profileImage || "/default-avatar.svg"} alt={user.fullName || "Member"} loading="lazy" decoding="async" />
+      <span className={isOnline ? "online-dot" : "offline-dot"} />
+    </div>
+  );
+}
+
+function isLeader(role) {
+  return ["admin", "superadmin"].includes(String(role || "").toLowerCase());
+}
+
+function roleLabel(role) {
+  const value = String(role || "member").toLowerCase();
+  if (value === "superadmin") return "Super Admin";
+  if (value === "admin") return "Leader";
+  return "Member";
+}
+
+function rankRole(role) {
+  const value = String(role || "member").toLowerCase();
+  if (value === "superadmin") return 0;
+  if (value === "admin") return 1;
+  return 2;
 }
 
 export default ChatSidebar;

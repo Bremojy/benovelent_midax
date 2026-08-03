@@ -28,7 +28,7 @@ export default function About() {
             muted
             loop
             playsInline
-            preload="metadata"
+            preload="auto"
             poster="/hero.jpg"
             onError={() => setVideoError(true)}
             aria-hidden="true"

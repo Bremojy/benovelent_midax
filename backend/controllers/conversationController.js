@@ -11,7 +11,7 @@ try{
 
 const {participantId}=req.body;
 
-const me=req.user._id;
+const me = req.auth?.chatId || req.user._id;
 
 if(me.toString()===participantId){
 
@@ -97,9 +97,9 @@ try{
 
 const conversations=await Conversation.find({
 
-participants:req.user._id,
+participants: req.auth?.chatId || req.user._id,
 
-deletedFor:{$ne:req.user._id}
+deletedFor: {$ne: req.auth?.chatId || req.user._id}
 
 })
 

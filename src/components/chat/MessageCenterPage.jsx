@@ -30,6 +30,7 @@ function MessageCenterPage({
   const [loadingSidebar, setLoadingSidebar] = useState(true);
   const [banner, setBanner] = useState("");
   const [mobileChatOpen, setMobileChatOpen] = useState(false);
+  const actorId = String(currentUser?.chatId || currentUser?._id || "");
   const loadContactsRef = useRef(loadContacts);
 
   useEffect(() => {
@@ -56,7 +57,7 @@ function MessageCenterPage({
   }, [authUser]);
 
   useEffect(() => {
-    if (!currentUser?._id) return;
+    if (!actorId) return;
 
     const token = getToken(currentUser?.role);
     const newSocket = io(import.meta.env.VITE_API_URL || "https://benovelent-midax.onrender.com", {
@@ -66,7 +67,7 @@ function MessageCenterPage({
     });
 
     newSocket.on("connect", () => {
-      newSocket.emit("user-online", currentUser._id);
+      newSocket.emit("user-online", actorId);
     });
 
     newSocket.on("connect_error", (error) => {
@@ -79,10 +80,10 @@ function MessageCenterPage({
       newSocket.disconnect();
       setSocket(null);
     };
-  }, [currentUser?._id, currentUser?.role]);
+  }, [actorId, currentUser?.role]);
 
   useEffect(() => {
-    if (!currentUser?._id) return;
+    if (!actorId) return;
 
     let active = true;
 
@@ -115,8 +116,8 @@ function MessageCenterPage({
   }, [currentUser?._id]);
 
   const normalizedConversations = useMemo(
-    () => normalizeConversations(conversations, currentUser?._id),
-    [conversations, currentUser?._id]
+    () => normalizeConversations(conversations, actorId),
+    [conversations, actorId]
   );
 
   const normalizedPeople = useMemo(
@@ -156,7 +157,7 @@ function MessageCenterPage({
 
       if (person.conversationId) {
         const response = await API.get(`/conversations/${person.conversationId}`);
-        const conversation = normalizeConversation(response.data?.conversation || response.data, currentUser?._id);
+        const conversation = normalizeConversation(response.data?.conversation || response.data, actorId);
         if (conversation) {
           setConversations((previous) => [conversation, ...previous.filter((item) => String(item._id) !== String(conversation._id))]);
           selectConversation(conversation);
@@ -165,7 +166,7 @@ function MessageCenterPage({
       }
 
       const response = await API.post("/conversations", { participantId: person._id });
-      const conversation = normalizeConversation(response.data?.conversation || response.data, currentUser?._id);
+      const conversation = normalizeConversation(response.data?.conversation || response.data, actorId);
 
       if (conversation) {
         setConversations((previous) => [conversation, ...previous.filter((item) => String(item._id) !== String(conversation._id))]);

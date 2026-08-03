@@ -1,13 +1,13 @@
-.chat-header{
+.modern-chat-header{
   height:auto;
-  min-height:86px;
-  background: rgba(255,255,255,.94);
-  backdrop-filter: blur(18px);
-  border-bottom:1px solid rgba(0,0,0,.06);
+  min-height:88px;
+  background:rgba(255,255,255,.96);
+  backdrop-filter:blur(18px);
+  border-bottom:1px solid rgba(15,23,42,.06);
   display:flex;
   justify-content:space-between;
   align-items:center;
-  padding:16px 22px;
+  padding:16px 20px;
   gap:16px;
 }
 
@@ -24,59 +24,77 @@
 }
 
 .chat-avatar img{
-  width:54px;
-  height:54px;
-  border-radius:50%;
+  width:56px;
+  height:56px;
+  border-radius:20px;
   object-fit:cover;
-  border: 2px solid rgba(255,255,255,.96);
-  box-shadow: 0 8px 20px rgba(20,20,20,.08);
+  border:1px solid rgba(15,23,42,.08);
+  box-shadow:0 10px 24px rgba(15,23,42,.07);
 }
 
 .online-indicator{
   position:absolute;
-  bottom:2px;
-  right:2px;
+  right:3px;
+  bottom:3px;
+  width:12px;
+  height:12px;
+  border-radius:999px;
+  background:#22c55e;
+  border:2px solid #fff;
+}
+
+.chat-user-info{
+  min-width:0;
+}
+
+.chat-name-row{
+  display:flex;
+  align-items:center;
+  flex-wrap:wrap;
+  gap:8px;
 }
 
 .chat-user-info h3{
-  color:#16181c;
-  margin-bottom:4px;
-  font-size:17px;
-  font-weight:800;
+  color:#0f172a;
+  font-size:18px;
+  line-height:1.2;
+  font-weight:900;
 }
 
 .chat-user-info p{
-  color:#7b8188;
-  font-size:14px;
+  color:#64748b;
+  font-size:13px;
+  margin-top:4px;
 }
 
 .typing-status{
   color:#0d8f63 !important;
-  font-weight:700;
+  font-weight:800;
   animation:typingPulse 1s infinite;
 }
 
 .chat-actions{
   display:flex;
   gap:10px;
+  flex-shrink:0;
 }
 
 .chat-actions button{
-  width:42px;
-  height:42px;
+  width:44px;
+  height:44px;
   border:none;
-  border-radius:50%;
+  border-radius:14px;
   background:#f3f5f7;
   cursor:pointer;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  transition:.22s ease;
+  display:grid;
+  place-items:center;
+  transition:.2s ease;
 }
 
 .chat-actions button:hover{
-  background:#0d8f63;
-  color:white;
+  background:#ff7a00;
+  color:#fff;
+  transform:translateY(-1px);
 }
 
 .empty{
@@ -86,13 +104,18 @@
 
 @keyframes typingPulse{
   0%{opacity:1;}
-  50%{opacity:.45;}
+  50%{opacity:.42;}
   100%{opacity:1;}
 }
 
 @media(max-width:768px){
-  .chat-header{
+  .modern-chat-header{
     padding:14px 14px;
+    align-items:flex-start;
+  }
+
+  .chat-user-info h3{
+    font-size:15px;
   }
 
   .chat-actions{
@@ -100,11 +123,8 @@
   }
 
   .chat-actions button{
-    width:38px;
-    height:38px;
-  }
-
-  .chat-user-info h3{
-    font-size:15px;
+    width:40px;
+    height:40px;
+    border-radius:12px;
   }
 }

@@ -5,16 +5,16 @@ export default function Messages() {
   return (
     <MessageCenterPage
       eyebrow="MEMBER MESSAGE CENTRE"
-      title="Connect with other members"
-      description="Start private conversations, follow up on support matters and keep your communication inside the portal."
-      searchPlaceholder="Search members or conversations..."
-      memberSectionLabel="All members"
-      emptyMembersLabel="No other members are available right now."
-      emptyConversationsLabel="No conversations yet — choose a member to start."
+      title="Chat with members and leaders"
+      description="Start private conversations with fellow members and the leadership team inside one fast, secure inbox."
+      searchPlaceholder="Search members or leaders..."
+      memberSectionLabel="Members"
+      emptyMembersLabel="No members or leaders found right now."
+      emptyConversationsLabel="No conversations yet - choose a contact to start."
       onRefreshHint="Member conversations refreshed."
       loadContacts={async () => {
         const [membersResponse, conversationsResponse] = await Promise.allSettled([
-          API.get("/member/chat-members"),
+          API.get("/member/chat-members", { params: { limit: 400 } }),
           API.get("/conversations"),
         ]);
 
