@@ -1,129 +1,57 @@
 .typing-indicator{
-
-    display:flex;
-
-    align-items:flex-end;
-
-    gap:12px;
-
-    margin:15px;
-
-    animation:fadeIn .3s ease;
-
+  display:flex;
+  align-items:flex-end;
+  gap:12px;
+  margin:8px 0 0;
+  animation:fadeIn .24s ease;
 }
 
 .typing-avatar img{
-
-    width:38px;
-
-    height:38px;
-
-    border-radius:50%;
-
-    object-fit:cover;
-
+  width:38px;
+  height:38px;
+  border-radius:50%;
+  object-fit:cover;
+  box-shadow:0 8px 20px rgba(20,20,20,.08);
 }
 
 .typing-bubble{
-
-    display:flex;
-
-    align-items:center;
-
-    gap:6px;
-
-    background:#f3f4f6;
-
-    padding:14px 18px;
-
-    border-radius:20px;
-
+  display:flex;
+  align-items:center;
+  gap:6px;
+  background:#eef2f6;
+  padding:14px 18px;
+  border-radius:20px;
 }
 
 .typing-bubble span{
-
-    width:8px;
-
-    height:8px;
-
-    border-radius:50%;
-
-    background:#777;
-
-    animation:typingBounce 1.2s infinite;
-
+  width:8px;
+  height:8px;
+  border-radius:50%;
+  background:#7a8188;
+  animation:typingBounce 1.2s infinite;
 }
 
-.typing-bubble span:nth-child(2){
-
-    animation-delay:.2s;
-
-}
-
-.typing-bubble span:nth-child(3){
-
-    animation-delay:.4s;
-
-}
+.typing-bubble span:nth-child(2){ animation-delay:.2s; }
+.typing-bubble span:nth-child(3){ animation-delay:.4s; }
 
 @keyframes typingBounce{
-
-    0%{
-
-        transform:translateY(0);
-
-        opacity:.4;
-
-    }
-
-    50%{
-
-        transform:translateY(-6px);
-
-        opacity:1;
-
-    }
-
-    100%{
-
-        transform:translateY(0);
-
-        opacity:.4;
-
-    }
-
+  0%{ transform:translateY(0); opacity:.4; }
+  50%{ transform:translateY(-6px); opacity:1; }
+  100%{ transform:translateY(0); opacity:.4; }
 }
 
 @keyframes fadeIn{
-
-    from{
-
-        opacity:0;
-
-    }
-
-    to{
-
-        opacity:1;
-
-    }
-
+  from{ opacity:0; }
+  to{ opacity:1; }
 }
 
 @media(max-width:768px){
+  .typing-indicator{
+    margin:6px 0 0;
+  }
 
-.typing-indicator{
-
-    margin:10px;
-
-}
-
-.typing-avatar img{
-
+  .typing-avatar img{
     width:34px;
-
     height:34px;
-
-}
-
+  }
 }

@@ -1,480 +1,249 @@
-/* =========================================================
-   MESSAGES PAGE
-   Benevolent Midax
-========================================================= */
-
-.messages-summary-bar{
-  grid-column:1/-1;
-  display:grid;
-  grid-template-columns:repeat(2,minmax(0,1fr));
-  gap:12px;
-  margin-bottom:16px;
-}
-.messages-summary-bar div{
-  background:#fff;
-  border:1px solid #ececec;
-  border-radius:16px;
-  padding:14px 16px;
-  box-shadow:0 8px 20px rgba(0,0,0,.04);
-}
-.messages-summary-bar strong{display:block;font-size:24px;color:#202124;line-height:1}
-.messages-summary-bar span{display:block;margin-top:4px;font-size:12px;color:#6d7278}
-.messages-page {
-  width: 100%;
-  height: calc(100vh - 120px);
-  min-height: 560px;
-
-  display: grid;
-  grid-template-columns: 340px minmax(0, 1fr);
-
-  background: #ffffff;
-
-  border: 1px solid #eeeeee;
-  border-radius: 22px;
-
-  overflow: hidden;
-
-  box-shadow:
-    0 10px 35px rgba(0, 0, 0, 0.06);
-
-  position: relative;
+.message-center {
+  width: min(1440px, calc(100% - 28px));
+  margin: 0 auto;
+  padding: 20px 0 42px;
 }
 
-
-/* =========================================================
-   SIDEBAR CONTAINER
-========================================================= */
-
-.messages-sidebar-container {
-  min-width: 0;
-  width: 100%;
-  height: 100%;
-
-  border-right: 1px solid #eeeeee;
-
-  overflow: hidden;
-
-  background: #ffffff;
-}
-
-
-/* =========================================================
-   CHAT CONTAINER
-========================================================= */
-
-.messages-chat-container {
-  min-width: 0;
-  width: 100%;
-  height: 100%;
-
-  overflow: hidden;
-
-  background: #f8f9fa;
-}
-
-
-/* =========================================================
-   CHAT WINDOW
-========================================================= */
-
-.messages-chat-container .chat-window {
-  width: 100%;
-  height: 100%;
-}
-
-
-/* =========================================================
-   GENERAL SCROLLBAR
-========================================================= */
-
-.messages-page * {
-  scrollbar-width: thin;
-  scrollbar-color: #d8d8d8 transparent;
-}
-
-.messages-page *::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-
-.messages-page *::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.messages-page *::-webkit-scrollbar-thumb {
-  background: #d8d8d8;
-  border-radius: 20px;
-}
-
-.messages-page *::-webkit-scrollbar-thumb:hover {
-  background: #bdbdbd;
-}
-
-
-/* =========================================================
-   EMPTY CHAT
-========================================================= */
-
-.messages-page .chat-window-empty {
-  width: 100%;
-  height: 100%;
-
-  display: flex;
-  flex-direction: column;
-
-  align-items: center;
-  justify-content: center;
-
-  padding: 30px;
-
-  text-align: center;
-
-  color: #777777;
-
-  background:
-    radial-gradient(
-      circle at center,
-      rgba(255, 122, 0, 0.04),
-      transparent 55%
-    );
-}
-
-.messages-page .chat-window-empty::before {
-  content: "💬";
-
-  display: flex;
-
-  align-items: center;
-  justify-content: center;
-
-  width: 70px;
-  height: 70px;
-
+.message-center-hero {
+  display:flex;
+  justify-content:space-between;
+  gap: 20px;
+  align-items: stretch;
   margin-bottom: 18px;
-
-  border-radius: 50%;
-
-  background: #fff3e8;
-
-  font-size: 30px;
+  padding: 28px;
+  border-radius: 28px;
+  background:
+    radial-gradient(circle at top right, rgba(255,122,0,.11), transparent 28%),
+    linear-gradient(135deg, rgba(255,255,255,.96), rgba(248,249,251,.95));
+  border: 1px solid rgba(0,0,0,.06);
+  box-shadow: 0 18px 55px rgba(20,20,20,.06);
+  backdrop-filter: blur(18px);
 }
 
-
-/* =========================================================
-   FOCUS / ACCESSIBILITY
-========================================================= */
-
-.messages-page button,
-.messages-page input,
-.messages-page textarea {
-  font-family: inherit;
+.message-center-hero-copy {
+  max-width: 760px;
 }
 
-.messages-page button:focus-visible,
-.messages-page input:focus-visible,
-.messages-page textarea:focus-visible {
-  outline: 3px solid rgba(255, 122, 0, 0.2);
-  outline-offset: 2px;
+.message-center-kicker {
+  display:inline-flex;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: rgba(255,122,0,.12);
+  color: #cf5f00;
+  letter-spacing: .08em;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
 }
 
+.message-center-hero h1 {
+  margin: 14px 0 10px;
+  font-size: clamp(32px, 4vw, 52px);
+  line-height: 1.06;
+  color: #16181c;
+}
 
-/* =========================================================
-   TABLET
-========================================================= */
+.message-center-hero p {
+  color: #5f6670;
+  font-size: 16px;
+  line-height: 1.8;
+}
 
-@media (max-width: 1100px) {
+.message-center-hero-actions {
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  gap: 10px;
+}
 
-  .messages-summary-bar{
-  grid-column:1/-1;
+.portal-chip-action {
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap: 8px;
+  padding: 12px 16px;
+  border: 0;
+  border-radius: 16px;
+  font-weight: 800;
+  cursor:pointer;
+  background: linear-gradient(135deg, #ff7a00, #ff9c3a);
+  color:#fff;
+  box-shadow: 0 12px 30px rgba(255,122,0,.24);
+}
+
+.portal-chip-action.ghost {
+  background: rgba(17,24,39,.05);
+  color: #1f2937;
+  box-shadow: none;
+}
+
+.message-center-metrics {
   display:grid;
-  grid-template-columns:repeat(2,minmax(0,1fr));
-  gap:12px;
-  margin-bottom:16px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 16px;
 }
-.messages-summary-bar div{
+
+.message-center-metric {
+  display:flex;
+  align-items:center;
+  gap: 14px;
+  padding: 16px 18px;
+  border-radius: 20px;
+  background: rgba(255,255,255,.88);
+  border: 1px solid rgba(0,0,0,.06);
+  box-shadow: 0 10px 28px rgba(20,20,20,.04);
+  backdrop-filter: blur(12px);
+}
+
+.message-center-metric-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 16px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  color: #ff7a00;
+  background: rgba(255,122,0,.10);
+}
+
+.message-center-metric span {
+  display:block;
+  color:#70757c;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
+
+.message-center-metric strong {
+  display:block;
+  margin-top: 6px;
+  color:#17191d;
+  font-size: 22px;
+  line-height: 1;
+}
+
+.message-center-shell {
+  width: 100%;
+  height: calc(100vh - 320px);
+  min-height: 640px;
+}
+
+.messages-call-banner {
+  margin-bottom: 14px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, rgba(14,165,233,.12), rgba(255,122,0,.12));
+  color: #203040;
+  border: 1px solid rgba(0,0,0,.05);
+  font-weight: 700;
+}
+
+.messages-top-mobile-actions {
+  display:none;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.messages-top-mobile-actions button {
+  flex:1;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 0;
   background:#fff;
-  border:1px solid #ececec;
-  border-radius:16px;
-  padding:14px 16px;
-  box-shadow:0 8px 20px rgba(0,0,0,.04);
+  color:#1e2329;
+  font-weight: 700;
+  box-shadow: 0 8px 20px rgba(20,20,20,.05);
 }
-.messages-summary-bar strong{display:block;font-size:24px;color:#202124;line-height:1}
-.messages-summary-bar span{display:block;margin-top:4px;font-size:12px;color:#6d7278}
-.messages-page {
-    grid-template-columns: 300px minmax(0, 1fr);
 
-    height: calc(100vh - 105px);
+.messages-top-mobile-actions button:disabled {
+  opacity: .5;
+}
 
-    border-radius: 18px;
+.messages-sidebar-container,
+.messages-chat-container {
+  height: 100%;
+}
+
+@media (max-width: 1024px) {
+  .message-center-shell {
+    height: auto;
+    min-height: 0;
+    display: grid;
   }
 
+  .messages-sidebar-container {
+    height: auto;
+  }
+
+  .messages-chat-container {
+    height: min(78vh, 720px);
+  }
 }
-
-
-/* =========================================================
-   SMALL TABLETS
-========================================================= */
 
 @media (max-width: 900px) {
-
-  .messages-summary-bar{
-  grid-column:1/-1;
-  display:grid;
-  grid-template-columns:repeat(2,minmax(0,1fr));
-  gap:12px;
-  margin-bottom:16px;
-}
-.messages-summary-bar div{
-  background:#fff;
-  border:1px solid #ececec;
-  border-radius:16px;
-  padding:14px 16px;
-  box-shadow:0 8px 20px rgba(0,0,0,.04);
-}
-.messages-summary-bar strong{display:block;font-size:24px;color:#202124;line-height:1}
-.messages-summary-bar span{display:block;margin-top:4px;font-size:12px;color:#6d7278}
-.messages-page {
-    height: calc(100vh - 90px);
-    min-height: 500px;
-
+  .message-center-hero,
+  .message-center-metrics {
     grid-template-columns: 1fr;
-
-    border-radius: 16px;
   }
 
+  .message-center-hero {
+    flex-direction: column;
+  }
 
-  /* -----------------------------------------------
-     DEFAULT MOBILE STATE
-  ------------------------------------------------ */
+  .message-center-hero-actions {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .message-center-shell {
+    grid-template-columns: 1fr;
+  }
 
   .messages-sidebar-container {
-    display: block;
-
-    width: 100%;
-    height: 100%;
-
-    border-right: none;
+    border-right: 0;
+    border-bottom: 1px solid rgba(0,0,0,.06);
   }
 
   .messages-chat-container {
+    height: 68vh;
+    min-height: 560px;
+  }
+
+  .message-center-shell.mobile-chat-open .messages-sidebar-container {
     display: none;
   }
 
-
-  /* -----------------------------------------------
-     WHEN CHAT IS OPEN
-  ------------------------------------------------ */
-
-  .messages-page.mobile-chat-open
-  .messages-sidebar-container {
-    display: none;
+  .message-center-shell.mobile-chat-open .messages-chat-container {
+    height: min(82vh, 760px);
+    border-radius: 24px;
   }
 
-  .messages-page.mobile-chat-open
-  .messages-chat-container {
-    display: block;
-
-    width: 100%;
-    height: 100%;
+  .messages-top-mobile-actions {
+    display: flex;
   }
-
 }
 
-
-/* =========================================================
-   PHONES
-========================================================= */
-
-@media (max-width: 600px) {
-
-  .messages-summary-bar{
-  grid-column:1/-1;
-  display:grid;
-  grid-template-columns:repeat(2,minmax(0,1fr));
-  gap:12px;
-  margin-bottom:16px;
-}
-.messages-summary-bar div{
-  background:#fff;
-  border:1px solid #ececec;
-  border-radius:16px;
-  padding:14px 16px;
-  box-shadow:0 8px 20px rgba(0,0,0,.04);
-}
-.messages-summary-bar strong{display:block;font-size:24px;color:#202124;line-height:1}
-.messages-summary-bar span{display:block;margin-top:4px;font-size:12px;color:#6d7278}
-.messages-page {
-    width: 100%;
-
-    height: calc(100dvh - 75px);
-
-    min-height: 0;
-
-    margin: 0;
-
-    border-radius: 0;
-
-    border-left: none;
-    border-right: none;
-
-    box-shadow: none;
+@media (max-width: 640px) {
+  .message-center {
+    width: min(1440px, calc(100% - 16px));
   }
 
-
-  .messages-sidebar-container,
-  .messages-chat-container {
-    height: 100%;
-  }
-
-
-  .messages-page .chat-window-empty {
+  .message-center-hero {
     padding: 20px;
-
-    font-size: 15px;
+    border-radius: 22px;
   }
 
-
-  .messages-page .chat-window-empty::before {
-    width: 60px;
-    height: 60px;
-
-    font-size: 26px;
+  .message-center-hero h1 {
+    font-size: 30px;
   }
 
-}
-
-
-/* =========================================================
-   VERY SMALL PHONES
-   iPhone SE / small Android devices
-========================================================= */
-
-@media (max-width: 380px) {
-
-  .messages-summary-bar{
-  grid-column:1/-1;
-  display:grid;
-  grid-template-columns:repeat(2,minmax(0,1fr));
-  gap:12px;
-  margin-bottom:16px;
-}
-.messages-summary-bar div{
-  background:#fff;
-  border:1px solid #ececec;
-  border-radius:16px;
-  padding:14px 16px;
-  box-shadow:0 8px 20px rgba(0,0,0,.04);
-}
-.messages-summary-bar strong{display:block;font-size:24px;color:#202124;line-height:1}
-.messages-summary-bar span{display:block;margin-top:4px;font-size:12px;color:#6d7278}
-.messages-page {
-    height: calc(100dvh - 68px);
+  .message-center-metric strong {
+    font-size: 20px;
   }
-
-}
-
-
-/* =========================================================
-   LANDSCAPE PHONES
-========================================================= */
-
-@media (
-  max-width: 900px
-) and (
-  orientation: landscape
-) {
-
-  .messages-summary-bar{
-  grid-column:1/-1;
-  display:grid;
-  grid-template-columns:repeat(2,minmax(0,1fr));
-  gap:12px;
-  margin-bottom:16px;
-}
-.messages-summary-bar div{
-  background:#fff;
-  border:1px solid #ececec;
-  border-radius:16px;
-  padding:14px 16px;
-  box-shadow:0 8px 20px rgba(0,0,0,.04);
-}
-.messages-summary-bar strong{display:block;font-size:24px;color:#202124;line-height:1}
-.messages-summary-bar span{display:block;margin-top:4px;font-size:12px;color:#6d7278}
-.messages-page {
-    height: calc(100dvh - 60px);
-  }
-
-}
-
-
-/* =========================================================
-   LARGE DESKTOP
-========================================================= */
-
-@media (min-width: 1600px) {
-
-  .messages-summary-bar{
-  grid-column:1/-1;
-  display:grid;
-  grid-template-columns:repeat(2,minmax(0,1fr));
-  gap:12px;
-  margin-bottom:16px;
-}
-.messages-summary-bar div{
-  background:#fff;
-  border:1px solid #ececec;
-  border-radius:16px;
-  padding:14px 16px;
-  box-shadow:0 8px 20px rgba(0,0,0,.04);
-}
-.messages-summary-bar strong{display:block;font-size:24px;color:#202124;line-height:1}
-.messages-summary-bar span{display:block;margin-top:4px;font-size:12px;color:#6d7278}
-.messages-page {
-    grid-template-columns: 380px minmax(0, 1fr);
-
-    max-width: 1700px;
-
-    margin-left: auto;
-    margin-right: auto;
-  }
-
-}
-
-
-/* =========================================================
-   REDUCED MOTION
-========================================================= */
-
-@media (prefers-reduced-motion: reduce) {
-
-  .messages-page *,
-  .messages-page *::before,
-  .messages-page *::after {
-    scroll-behavior: auto !important;
-    transition: none !important;
-    animation: none !important;
-  }
-
-}
-@media (max-width: 900px){.messages-summary-bar{grid-template-columns:1fr}}
-
-
-.messages-page {
-  background: linear-gradient(180deg, #fff, #fbfbfc);
-}
-
-.messages-summary-bar div {
-  border-radius: 18px;
-}
-
-.messages-sidebar-container {
-  background: linear-gradient(180deg, #fff, #fafafa);
-}
-
-.messages-chat-container {
-  background: linear-gradient(180deg, #fefefe, #f7f7f8);
-}
-
-.messages-page .chat-window-empty {
-  background: radial-gradient(circle at top, rgba(255, 122, 0, 0.06), transparent 55%), #fafafa;
 }

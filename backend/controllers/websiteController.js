@@ -2,21 +2,64 @@ const fs = require("fs");
 const path = require("path");
 const WebsiteContent = require("../models/WebsiteContent");
 
-const DEFAULT_SECTIONS = ["home", "about", "services", "contact", "footer", "settings", "gallery"];
+const DEFAULT_SECTIONS = ["home", "about", "services", "contact", "footer", "settings", "gallery", "privacy-policy", "terms-conditions", "disclaimer"];
+
+const SECTION_DEFAULTS = {
+    "privacy-policy": {
+        title: "Privacy Policy",
+        subtitle: "How we protect member data",
+        description: "A clear privacy statement for the Benevolent Midax public website and portals.",
+        content: {
+            overview: "We protect member information and only use data to run the scheme, support communication and manage the portals.",
+            confidentiality: "Member records, support requests and portal activity are treated as confidential and limited to authorized users.",
+            updates: "The superadmin can update this page whenever policy language changes.",
+        },
+    },
+    "terms-conditions": {
+        title: "Terms & Conditions",
+        subtitle: "The rules for using the portal",
+        description: "Guidelines for members, administrators and visitors using the Benevolent Midax website.",
+        content: {
+            overview: "Use the website and portals responsibly, keep login details private and follow the constitution and scheme rules.",
+            access: "Unauthorized access, misuse of portal features and abuse of member information are prohibited.",
+            updates: "Content can be reviewed and edited by the superadmin from Website Settings.",
+        },
+    },
+    "disclaimer": {
+        title: "Disclaimer",
+        subtitle: "Important limitations and notices",
+        description: "A transparent notice explaining how public content and support decisions should be interpreted.",
+        content: {
+            overview: "Information on this website is provided for community support and administrative reference.",
+            advice: "Portal content does not replace official committee decisions, receipts or legal advice.",
+            updates: "This page can be updated by the superadmin when notices change.",
+        },
+    },
+};
 
 async function findOrCreateSection(section, defaults = {}) {
+    const preset = SECTION_DEFAULTS[section] || {};
+    const nextDefaults = {
+        ...preset,
+        ...defaults,
+        content: {
+            ...(typeof preset.content === "object" && preset.content ? preset.content : {}),
+            ...(typeof defaults.content === "object" && defaults.content ? defaults.content : {}),
+        },
+    };
+
     let record = await WebsiteContent.findOne({ section });
 
     if (!record) {
         record = await WebsiteContent.create({
             section,
-            title: defaults.title || "",
-            subtitle: defaults.subtitle || "",
-            description: defaults.description || "",
-            content: defaults.content || {},
-            images: defaults.images || [],
-            published: defaults.published !== false,
-            updatedBy: defaults.updatedBy,
+            title: nextDefaults.title || "",
+            subtitle: nextDefaults.subtitle || "",
+            description: nextDefaults.description || "",
+            content: nextDefaults.content || {},
+            images: nextDefaults.images || [],
+            published: nextDefaults.published !== false,
+            updatedBy: nextDefaults.updatedBy,
         });
     }
 
@@ -29,6 +72,12 @@ async function findOrCreateSection(section, defaults = {}) {
 
 exports.getWebsiteContent = async (req, res) => {
     try {
+        await Promise.all(
+            DEFAULT_SECTIONS.map((section) =>
+                findOrCreateSection(section)
+            )
+        );
+
         const content = await WebsiteContent.find().sort({ section: 1 }).lean();
 
         res.json({ success: true, count: content.length, content });
@@ -137,12 +186,7 @@ exports.uploadGalleryImage = async (req, res) => {
 
 exports.getSection = async (req, res) => {
     try {
-        const section = await WebsiteContent.findOne({ section: req.params.section }).lean();
-
-        if (!section) {
-            return res.status(404).json({ success: false, message: "Section not found." });
-        }
-
+        const section = await findOrCreateSection(req.params.section);
         res.json({ success: true, section });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });

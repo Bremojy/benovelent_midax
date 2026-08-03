@@ -13,7 +13,10 @@ const websiteContentSchema = new mongoose.Schema(
         "contact",
         "footer",
         "settings",
-        "gallery"
+        "gallery",
+        "privacy-policy",
+        "terms-conditions",
+        "disclaimer"
       ]
     },
 

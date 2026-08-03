@@ -99,17 +99,17 @@ Gallery
 
           <h3>Legal</h3>
 
-          <a href="#">
+          <Link to="/privacy-policy">
             Privacy Policy
-          </a>
+          </Link>
 
-          <a href="#">
+          <Link to="/terms-conditions">
             Terms & Conditions
-          </a>
+          </Link>
 
-          <a href="#">
+          <Link to="/disclaimer">
             Disclaimer
-          </a>
+          </Link>
 
         </div>
 

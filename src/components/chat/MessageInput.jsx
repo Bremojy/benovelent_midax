@@ -14,10 +14,20 @@ import API from "../../services/api";
 
 const QUICK_EMOJIS = ["😊", "😂", "❤️", "🙏", "👍", "🎉", "😎", "😢", "🔥", "🥰", "🤝", "✨"];
 
+function getCurrentUserId(currentUser) {
+  if (currentUser?._id) return currentUser._id;
+  try {
+    return JSON.parse(localStorage.getItem("user") || "null")?._id || "";
+  } catch {
+    return "";
+  }
+}
+
 function MessageInput({
   onSend,
   socket,
   conversation,
+  currentUser,
 }) {
   const [message, setMessage] = useState("");
   const [image, setImage] = useState("");
@@ -57,7 +67,7 @@ setImage(data.imageUrl || data.fileUrl || "");
       await onSend(message, image, image ? "image" : "text");
       socket?.emit("stop-typing", {
         conversationId: conversation._id,
-        sender: JSON.parse(localStorage.getItem("user") || "null")?._id,
+        sender: getCurrentUserId(currentUser),
       });
       setMessage("");
       setImage("");
@@ -70,7 +80,7 @@ setImage(data.imageUrl || data.fileUrl || "");
   function typing() {
     socket?.emit("typing", {
       conversationId: conversation._id,
-      sender: localStorage.getItem("user") ? JSON.parse(localStorage.getItem("user"))._id : undefined,
+      sender: getCurrentUserId(currentUser),
     });
   }
 
@@ -154,7 +164,7 @@ setImage(data.imageUrl || data.fileUrl || "");
           onBlur={() => {
             socket?.emit("stop-typing", {
               conversationId: conversation._id,
-              sender: JSON.parse(localStorage.getItem("user") || "null")?._id,
+              sender: getCurrentUserId(currentUser),
             });
           }}
         />

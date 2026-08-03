@@ -1,179 +1,177 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { ArrowRight, Eye, HeartHandshake, ShieldCheck, Sparkles, Target, LockKeyhole } from "lucide-react";
 import { Link } from "react-router-dom";
-import {
-  Target,
-  Eye,
-  HeartHandshake,
-  Users,
-  ShieldCheck,
-  Award,
-  ArrowRight,
-} from "lucide-react";
+import "../styles/public-modern.css";
 
-const aboutVideoSources = [
-  import.meta.env.VITE_ABOUT_VIDEO_URL,
+const aboutVideos = [
+  "/videos/benevolent-news-loop.mp4",
   "/videos/benevolent-community-loop.mp4",
-].filter(Boolean);
+];
 
-function About() {
-  const [videoFailed, setVideoFailed] = useState(false);
+export default function About() {
+  const [videoError, setVideoError] = useState(false);
+  const [videoIndex, setVideoIndex] = useState(0);
+
+  useEffect(() => {
+    if (videoError || aboutVideos.length < 2) return;
+
+    const timer = window.setInterval(() => {
+      setVideoIndex((current) => (current + 1) % aboutVideos.length);
+    }, 12000);
+
+    return () => window.clearInterval(timer);
+  }, [videoError]);
+
   return (
-    <main className="about-page">
-      <section className={`about-hero about-video-hero ${videoFailed ? "video-failed" : ""}`}>
-        <video
-          className="about-background-video"
-          autoPlay
-          muted
-          loop
-          playsInline
-          preload="auto"
-          poster="/hero.jpg"
-          onError={() => setVideoFailed(true)}
-          aria-hidden="true"
-        >
-          {aboutVideoSources.map((src) => (
-            <source key={src} src={src} type="video/mp4" />
-          ))}
-        </video>
-        <div className="about-video-overlay" />
+    <main className="public-modern-page">
+      <section className="modern-hero">
+        {!videoError && (
+          <video
+            className="modern-hero-video"
+            autoPlay
+            muted
+            loop
+            playsInline
+            preload="auto"
+            poster="/hero.jpg"
+            onError={() => setVideoError(true)}
+            aria-hidden="true"
+          >
+            <source key={aboutVideos[videoIndex]} src={aboutVideos[videoIndex]} type="video/mp4" />
+          </video>
+        )}
+        <div className="modern-hero-overlay" />
 
-        <div className="about-hero-content">
-          <p className="about-label">ABOUT BENEVOLENT MIDAX</p>
+        <div className="modern-hero-content">
+          <div>
+            <span className="modern-kicker">
+              <Sparkles size={14} /> About Benevolent Midax
+            </span>
 
-          <h1>
-            Together We Protect.
-            <br />
-            Together We Thrive.
-          </h1>
+            <h1>A trusted community built for care and confidentiality.</h1>
 
-          <p className="about-hero-text">
-            Building a dependable community where members stand together during life's most important moments.
+            <p>
+              Benevolent Midax is designed to protect the dignity of every member by combining support, communication and a modern digital experience that works beautifully on every device.
+            </p>
+
+            <div className="modern-hero-actions">
+              <Link to="/contact" className="modern-btn">
+                Join the community <ArrowRight size={18} />
+              </Link>
+              <Link to="/services" className="modern-btn-secondary">
+                View services
+              </Link>
+            </div>
+          </div>
+
+          <div className="modern-hero-panel">
+            <div className="modern-panel-grid">
+              <div className="modern-metric">
+                <strong>Trust</strong>
+                <span>Open and accountable</span>
+              </div>
+              <div className="modern-metric">
+                <strong>Privacy</strong>
+                <span>Confidential communication</span>
+              </div>
+              <div className="modern-metric">
+                <strong>Support</strong>
+                <span>For the whole community</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="modern-section">
+        <div className="modern-section-head">
+          <span className="eyebrow">Who we are</span>
+          <h2>We help members stand together with confidence.</h2>
+          <p>
+            The organization combines a benevolent constitution, transparent support services and a secure portal that encourages positive communication.
           </p>
-
-          <Link to="/contact" className="about-primary-btn">
-            Join the Community
-            <ArrowRight size={18} />
-          </Link>
         </div>
-      </section>
 
-      <section className="about-stats">
-        <div className="about-container">
-          <div className="about-stats-grid">
-            <div className="about-stat">
-              <h2>500+</h2>
-              <p>Active Members</p>
-            </div>
-            <div className="about-stat">
-              <h2>100%</h2>
-              <p>Transparency</p>
-            </div>
-            <div className="about-stat">
-              <h2>24/7</h2>
-              <p>Community Support</p>
-            </div>
-            <div className="about-stat">
-              <h2>10+</h2>
-              <p>Years of Unity</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="about-section">
-        <div className="about-container">
-          <div className="about-grid">
-            <div className="about-image">
-              <img
-                src="/about-welcome.svg"
-                alt="Benevolent Midax community welcome"
-                onError={(e) => { e.currentTarget.src = "/hero.jpg"; }}
-              />
-            </div>
-
-            <div>
-              <p className="about-label">WHO WE ARE</p>
-              <h2>A Strong Community Built on Care</h2>
-              <p className="about-large-text">
-                Benevolent Midax is a member-driven support scheme committed to ensuring that no family faces difficult moments alone.
-              </p>
-              <p>
-                Through collective responsibility, compassion and accountability, members contribute towards building a reliable support system that creates confidence, unity and lasting impact.
+        <div className="modern-split">
+          <div className="modern-image-card">
+            <img
+              src="/about-welcome.svg"
+              alt="Benevolent Midax community welcome"
+              onError={(e) => {
+                e.currentTarget.src = "/hero.jpg";
+              }}
+            />
+            <div className="modern-glass">
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                <LockKeyhole size={18} />
+                <strong>Confidential by design</strong>
+              </div>
+              <p style={{ margin: 0, color: "rgba(255,255,255,.84)" }}>
+                Sensitive member information stays inside the secure portals.
               </p>
             </div>
           </div>
-        </div>
-      </section>
 
-      <section className="about-values">
-        <div className="about-container">
-          <div className="about-title">
-            <p className="about-label">OUR FOUNDATION</p>
-            <h2>Guided by Purpose</h2>
-          </div>
+          <div>
+            <h2 style={{ marginTop: 0 }}>A modern support scheme with human values.</h2>
+            <p style={{ marginTop: 14, color: "#5f6670", lineHeight: 1.85 }}>
+              The public website, member dashboard and admin tools now share a cleaner visual identity to increase trust and make the experience feel professional on all screen sizes.
+            </p>
 
-          <div className="about-cards">
-            <div className="about-card">
-              <div className="about-icon"><Target size={34} /></div>
-              <h3>Mission</h3>
-              <p>Supporting members and their families through compassionate, reliable and timely assistance.</p>
-            </div>
+            <div className="modern-card-grid" style={{ marginTop: 22, gridTemplateColumns: "repeat(2, minmax(0, 1fr))" }}>
+              <div className="modern-card">
+                <div className="icon"><Target size={24} /></div>
+                <h3>Mission</h3>
+                <p>Deliver dependable support when members face emergencies, loss or educational needs.</p>
+              </div>
 
-            <div className="about-card">
-              <div className="about-icon"><Eye size={34} /></div>
-              <h3>Vision</h3>
-              <p>Creating a trusted community where everyone feels secure, valued and supported.</p>
-            </div>
+              <div className="modern-card">
+                <div className="icon"><Eye size={24} /></div>
+                <h3>Vision</h3>
+                <p>Create a resilient and trustworthy community that protects every member’s dignity.</p>
+              </div>
 
-            <div className="about-card">
-              <div className="about-icon"><HeartHandshake size={34} /></div>
-              <h3>Values</h3>
-              <p>Compassion, integrity, accountability and unity define everything we do.</p>
-            </div>
-          </div>
-        </div>
-      </section>
+              <div className="modern-card">
+                <div className="icon"><HeartHandshake size={24} /></div>
+                <h3>Values</h3>
+                <p>Compassion, integrity and accountability guide every decision in the scheme.</p>
+              </div>
 
-      <section className="about-features">
-        <div className="about-container">
-          <div className="about-title">
-            <p className="about-label">WHY MIDAX</p>
-            <h2>More Than a Benevolent Scheme</h2>
-          </div>
-
-          <div className="about-feature-grid">
-            <div className="feature-box">
-              <Users size={38} />
-              <h3>Community First</h3>
-              <p>Every member belongs to a caring family that stands together.</p>
-            </div>
-
-            <div className="feature-box">
-              <ShieldCheck size={38} />
-              <h3>Transparency</h3>
-              <p>Every contribution is managed with accountability and trust.</p>
-            </div>
-
-            <div className="feature-box">
-              <Award size={38} />
-              <h3>Reliable Support</h3>
-              <p>Assistance when it matters most, giving members peace of mind.</p>
+              <div className="modern-card">
+                <div className="icon"><ShieldCheck size={24} /></div>
+                <h3>Trust</h3>
+                <p>Privacy, clear messaging and strong administration keep the portal dependable.</p>
+              </div>
             </div>
           </div>
         </div>
       </section>
 
-      <section className="about-cta">
-        <div className="about-container">
-          <h2>Join a Community That Cares</h2>
-          <p>Become part of a dependable family built on compassion, unity and support.</p>
-          <Link to="/contact" className="about-primary-btn">
-            Contact Us
-          </Link>
+      <section className="modern-section">
+        <div className="modern-section-head">
+          <span className="eyebrow">Why it works</span>
+          <h2>Everything is focused on communication and confidence.</h2>
+        </div>
+
+        <div className="modern-trust-band">
+          <div className="trust-chip">
+            <strong>Members</strong>
+            <span>Private conversations and support access</span>
+          </div>
+          <div className="trust-chip">
+            <strong>Admins</strong>
+            <span>Fast responses and member coordination</span>
+          </div>
+          <div className="trust-chip">
+            <strong>Superadmin</strong>
+            <span>Edit content and manage the website</span>
+          </div>
+          <div className="trust-chip">
+            <strong>Modern UI</strong>
+            <span>Responsive, clean and easy to use</span>
+          </div>
         </div>
       </section>
     </main>
   );
 }
-
-export default About;
