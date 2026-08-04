@@ -230,12 +230,8 @@ export default function Polls({ mode = "member" }) {
                       <p>{poll.description || "No description provided."}</p>
                     </div>
                     <div className="poll-card-actions">
-                      {isAdmin && (
-                        <>
-                          <button type="button" className="poll-mini-btn danger" onClick={() => deletePoll(poll._id)}><Trash2 size={15} /> Delete</button>
-                          <button type="button" className="poll-mini-btn" onClick={() => printResults(poll)}><FileDown size={15} /> Print results</button>
-                        </>
-                      )}
+                      {isAdmin && <button type="button" className="poll-mini-btn danger" onClick={() => deletePoll(poll._id)}><Trash2 size={15} /> Delete</button>}
+                      {(closed || isAdmin) && <button type="button" className="poll-mini-btn" onClick={() => printResults(poll)}><FileDown size={15} /> Print results</button>}
                     </div>
                   </div>
 

@@ -139,7 +139,7 @@ export default function AdminFinance() {
           <h2>{editing ? "Edit Transaction" : "Add Transaction"}</h2>
           <form onSubmit={saveTransaction} className="portal-form-grid">
             <label className="portal-field"><span>Member ID</span><input value={form.member} onChange={(e) => setForm({ ...form, member: e.target.value })} placeholder="Member ObjectId" required /></label>
-            <label className="portal-field"><span>Type</span><select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}><option value="contribution">Contribution</option><option value="support">Support</option><option value="expense">Expense</option><option value="income">Income</option></select></label>
+            <label className="portal-field"><span>Type</span><select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}><option value="contribution">Contribution</option><option value="claim">Support / Claim</option><option value="expense">Expense</option><option value="income">Income</option></select></label>
             <label className="portal-field"><span>Category</span><input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} placeholder="Salary, funeral support, etc." /></label>
             <label className="portal-field"><span>Amount</span><input type="number" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} required /></label>
             <label className="portal-field"><span>Payment Method</span><input value={form.paymentMethod} onChange={(e) => setForm({ ...form, paymentMethod: e.target.value })} /></label>

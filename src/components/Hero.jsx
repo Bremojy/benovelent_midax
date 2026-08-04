@@ -115,12 +115,8 @@ function Hero() {
     : `${UPLOAD_URL}${imageUrl}`;
 
   return (
-    <section
-      className="hero"
-      style={{
-        backgroundImage: `url(${backgroundImage})`,
-      }}
-    >
+    <section className="hero">
+      <img className="hero-image" src={backgroundImage} alt={current.title || "Benevolent Midax"} />
       <div className="hero-overlay"></div>
 
       <div className="hero-content">

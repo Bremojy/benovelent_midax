@@ -148,7 +148,7 @@ exports.createMedicalApplication = async (req, res) => {
 
         const uploadedDocuments = (req.files || []).map(file => ({
             fileName: file.originalname,
-            fileUrl: `/uploads/${req.uploadType || "support"}/${file.filename}`,
+            fileUrl: `/${req.uploadType === "documents" ? "documents" : "uploads/" + (req.uploadType || "support")}/${file.filename}`,
             uploadedAt: new Date(),
         }));
 

@@ -109,6 +109,7 @@ async function sendMessage(text, attachment, messageType = "text") {
     });
 
     const created = normalizeMessage(data.message || data);
+    socket?.emit("send-message", { conversationId: conversation._id, sender: currentUser?.chatId || currentUser?._id, text, file: attachment, messageType, messageId: created._id });
     setMessages((previous) => {
       if (previous.some((item) => String(item._id) === String(created._id))) {
         return previous;

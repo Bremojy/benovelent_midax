@@ -1,6 +1,8 @@
 const bcrypt = require("bcryptjs");
 const Member = require("../models/Member");
 const { sendEmail, sendSmsNotification } = require("../services/memberBroadcastService");
+const calculateProfileCompletion = require("../utils/calculateProfileCompletion");
+const Finance = require("../models/Finance");
 
 /* =====================================================
    ADMIN DASHBOARD
@@ -15,6 +17,11 @@ exports.getDashboard = async (req, res) => {
       suspendedMembers,
       onlineMembers,
       verifiedMembers,
+      completedProfiles,
+      incompleteProfiles,
+      totalLeaders,
+      bookBalance,
+      approvedClaims,
     ] = await Promise.all([
       Member.countDocuments({ isDeleted: false }),
       Member.countDocuments({ status: "active", isDeleted: false }),
@@ -22,7 +29,14 @@ exports.getDashboard = async (req, res) => {
       Member.countDocuments({ status: "suspended", isDeleted: false }),
       Member.countDocuments({ online: true, isDeleted: false }),
       Member.countDocuments({ verified: true, isDeleted: false }),
+      Member.countDocuments({ profileCompleted: true, isDeleted: false }),
+      Member.countDocuments({ profileCompleted: { $ne: true }, isDeleted: false }),
+      require("../models/Admin").countDocuments({ status: { $ne: "deleted" } }),
+      Finance.aggregate([{ $match: { status: { $in: ["approved", "completed"] } } }, { $group: { _id: null, total: { $sum: { $cond: [{ $in: ["$type", ["contribution", "income"]] }, "$amount", { $multiply: ["$amount", -1] }] } } } }]),
+      Finance.countDocuments({ type: "claim", status: { $in: ["approved", "completed"] } }),
     ]);
+
+    const incompleteMembers = (await Member.find({ isDeleted: false, profileCompleted: { $ne: true } }).select("fullName memberNumber profileCompletion").sort({ profileCompletion: 1, createdAt: -1 }).limit(20).lean()).map((m) => ({ ...m, missingFields: calculateProfileCompletion(m).missingFields }));
 
     res.json({
       success: true,
@@ -33,6 +47,12 @@ exports.getDashboard = async (req, res) => {
         suspendedMembers,
         onlineMembers,
         verifiedMembers,
+        completedProfiles,
+        incompleteProfiles,
+        totalLeaders,
+        bookBalance: Number(bookBalance?.[0]?.total || 0),
+        approvedClaims,
+        incompleteMembers,
       },
     });
   } catch (error) {
@@ -572,6 +592,17 @@ exports.updateMember = async (req, res) => {
 
     member.notes =
       req.body.notes ?? member.notes;
+    member.nationalId = req.body.nationalId ?? member.nationalId;
+    member.gender = req.body.gender ?? member.gender;
+    member.maritalStatus = req.body.maritalStatus ?? member.maritalStatus;
+    member.dateOfBirth = req.body.dateOfBirth ?? member.dateOfBirth;
+    member.physicalAddress = req.body.physicalAddress ?? member.physicalAddress;
+    member.siteStation = req.body.siteStation ?? member.siteStation;
+    member.customSiteStation = req.body.customSiteStation ?? member.customSiteStation;
+    if (req.body.nextOfKin && typeof req.body.nextOfKin === "object") member.nextOfKin = { ...(member.nextOfKin?.toObject?.() || member.nextOfKin || {}), ...req.body.nextOfKin };
+    const completion = calculateProfileCompletion(member);
+    member.profileCompletion = completion.percentage;
+    member.profileCompleted = completion.percentage === 100;
 
     await member.save();
 
@@ -1333,3 +1364,6 @@ exports.updateSettings = async (req, res) => {
     return res.status(500).json({ success: false, message: error.message });
   }
 };
+
+
+exports.openClaimDocument = async (req,res)=>{try{const map={medical:"MedicalSupport",funeral:"FuneralSupport",education:"EducationSupport"};const modelName=map[String(req.params.type).toLowerCase()];if(!modelName)return res.status(400).json({success:false,message:"Invalid claim type."});const Model=require(`../models/${modelName}`);const claim=await Model.findById(req.params.id);if(!claim)return res.status(404).json({success:false,message:"Claim not found."});claim.processedBy=req.user._id;if(Array.isArray(claim.timeline))claim.timeline.push({status:claim.status,remarks:`Document opened by administrator ${req.user.fullName||req.user.email||req.user._id}`,updatedBy:req.user._id,date:new Date()});claim.updatedBy=req.user._id;await claim.save();res.json({success:true,message:"Document access recorded."})}catch(e){res.status(500).json({success:false,message:e.message})}};

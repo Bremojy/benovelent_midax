@@ -21,7 +21,7 @@ const { uploadSingle, setUploadType } = require("../middleware/upload");
 
 
 // Upload a chat asset
-router.post("/upload", protect, setUploadType("messages"), uploadSingle("image"), uploadMessageAsset);
+router.post("/upload", protect, setUploadType("messages"), uploadSingle("file"), uploadMessageAsset);
 
 // Send a message
 router.post("/", protect, sendMessage);

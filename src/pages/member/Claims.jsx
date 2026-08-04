@@ -50,6 +50,9 @@ export default function Claims() {
                     <strong>{String(claim.supportType || "support").toUpperCase()} SUPPORT</strong>
                     <span>{formatDate(claim.createdAt || claim.applicationDate)}</span>
                     {claim.remarks && <small>{claim.remarks}</small>}
+                    {Array.isArray(claim.timeline) && claim.timeline.length > 0 && <div className="claim-timeline-mini">{claim.timeline.slice(-6).map((event,index)=><div key={index}><strong>{event.status}</strong><span>{event.remarks || "Status updated"}</span><small>{event.date ? new Date(event.date).toLocaleString("en-KE") : ""}</small></div>)}</div>}
+                    {claim.rejectionReason && <small>Rejection reason: {claim.rejectionReason}</small>}
+                    {claim.approvedAmount > 0 && <small>Approved amount: {money(claim.approvedAmount)}</small>}
                     {Array.isArray(claim.documents) && claim.documents.length > 0 && (
                       <div className="claim-documents">
                         <strong>Documents:</strong>

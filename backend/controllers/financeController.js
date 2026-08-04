@@ -1,6 +1,7 @@
 const Finance = require("../models/Finance");
 const Member = require("../models/Member");
 const Notification = require("../models/Notification");
+const Contribution = require("../models/Contribution");
 
 /* =====================================================
    GENERATE TRANSACTION NUMBER
@@ -724,3 +725,31 @@ exports.getFinanceSummary = async (req, res) => {
 
 };
 
+
+
+exports.getMemberAccounts = async (req, res) => {
+  try {
+    const memberId = req.user._id;
+    const year = Number(req.query.year) || new Date().getFullYear();
+    const [transactions, contributions, yearContributions, member, medical, funeral, education, allMedical, allFuneral, allEducation] = await Promise.all([
+      Finance.find({ member: memberId }).sort({ transactionDate: -1 }).lean(),
+      Contribution.find({ member: memberId, year }).sort({ month: 1 }).lean(),
+      Contribution.find({ year }).lean(),
+      Member.findById(memberId).select("fullName memberNumber").lean(),
+      require("../models/MedicalSupport").find({ member: memberId }).select("status approvedAmount requestedAmount").lean(),
+      require("../models/FuneralSupport").find({ member: memberId }).select("status approvedAmount requestedAmount").lean(),
+      require("../models/EducationSupport").find({ member: memberId }).select("status approvedAmount requestedAmount").lean(),
+      require("../models/MedicalSupport").find({}).select("status").lean(),
+      require("../models/FuneralSupport").find({}).select("status").lean(),
+      require("../models/EducationSupport").find({}).select("status").lean(),
+    ]);
+    const monthly = Array.from({length:12}, (_,i) => {
+      const month=i+1; const rows=yearContributions.filter(c=>Number(c.month)===month && Number(c.paidAmount||0)>0);
+      return {month, contributed:rows.reduce((a,c)=>a+Number(c.paidAmount||0),0), contributingMembers:new Set(rows.map(c=>String(c.member))).size};
+    });
+    const claims=[...medical,...funeral,...education];
+    const allCases=[...allMedical,...allFuneral,...allEducation];
+    const ledgerBalance=transactions.reduce((sum,t)=>sum + ((t.type==="contribution"||t.type==="income")?Number(t.amount||0):-Number(t.amount||0)),0);
+    res.json({success:true,member,year,transactions,monthly,totals:{contributedThisYear:contributions.reduce((a,c)=>a+Number(c.paidAmount||0),0),ledgerBalance,totalCasesHelped:allCases.filter(c=>["Approved","Paid","Disbursed","Completed","Closed"].includes(c.status)).length,pendingClaims:claims.filter(c=>["Pending","Under Review"].includes(c.status)).length}});
+  } catch(error){res.status(500).json({success:false,message:error.message});}
+};

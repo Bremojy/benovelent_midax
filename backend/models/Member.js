@@ -208,6 +208,18 @@ physicalAddress: {
   trim: true,
 },
 
+siteStation: {
+  type: String,
+  enum: ["Chokaa", "Saika", "Ruaraka", "Garden City", "Garden Estate", "Jacaranda", "Depot", "None of above"],
+  default: "",
+},
+
+customSiteStation: {
+  type: String,
+  trim: true,
+  default: "",
+},
+
 // =====================================
 // EMPLOYMENT
 // =====================================

@@ -1,6 +1,8 @@
 const bcrypt = require("bcryptjs");
 
 const Member = require("../models/Member");
+const Admin = require("../models/Admin");
+const SuperAdmin = require("../models/SuperAdmin");
 const Contribution = require("../models/Contribution");
 const News = require("../models/News");
 const Message = require("../models/Message");
@@ -460,28 +462,9 @@ const allowedFields = [
     "village",
     "postalAddress",
     "physicalAddress",
-
-    // Employment
-    "occupation",
-    "employer",
-    "monthlyIncome",
-
-    // Next of kin
+    "siteStation",
+    "customSiteStation",
     "nextOfKin",
-
-    // Payment
-    "mpesaNumber",
-    "bankName",
-    "bankBranch",
-    "accountNumber",
-
-    // Emergency
-    "emergencyContact",
-
-    // Acceptances
-    "acceptedConstitution",
-    "acceptedPrivacyPolicy",
-    "acceptedDeclaration",
 ];
 
         allowedFields.forEach((field) => {
@@ -513,6 +496,9 @@ const allowedFields = [
             member.emergencyContact && typeof member.emergencyContact === "object" ? member.emergencyContact : {}
         );
 
+        if (member.siteStation !== "None of above") {
+            member.customSiteStation = "";
+        }
 
         // ------------------------------------------
         // PROFILE PHOTO / DOCUMENT UPLOADS
@@ -1206,7 +1192,9 @@ exports.getClaims = async (req, res) => {
                 .lean(),
         ]);
 
-        const claims = [
+        const generic = await require("../models/SupportRequest").find({ member: req.user._id }).lean();
+
+const claims = [
             ...medical.map(item => ({
                 ...item,
                 supportType: "medical",
@@ -1263,14 +1251,15 @@ exports.getChatMembers = async (req, res) => {
     try {
         const currentUserId = String(req.auth?.chatId || req.user?._id || "");
         const keyword = String(req.query.search || "").trim().toLowerCase();
+        const limit = Number(req.query.limit || 500);
 
-        const filter = {
+        const baseFilter = {
             isDeleted: { $ne: true },
             _id: { $ne: currentUserId },
         };
 
         if (keyword) {
-            filter.$or = [
+            baseFilter.$or = [
                 { fullName: { $regex: keyword, $options: "i" } },
                 { username: { $regex: keyword, $options: "i" } },
                 { email: { $regex: keyword, $options: "i" } },
@@ -1280,11 +1269,23 @@ exports.getChatMembers = async (req, res) => {
             ];
         }
 
-        const [members, conversations] = await Promise.all([
-            Member.find(filter)
+        const [members, admins, superAdmins, conversations] = await Promise.all([
+            Member.find(baseFilter)
                 .select("fullName username profileImage online lastSeen status memberNumber department position phone email role")
                 .sort({ role: 1, fullName: 1 })
-                .limit(Number(req.query.limit || 500))
+                .limit(limit)
+                .lean(),
+            Admin.find({
+                status: { $ne: "deleted" },
+            })
+                .select("fullName name email phone profileImage online lastSeen status role")
+                .limit(limit)
+                .lean(),
+            SuperAdmin.find({
+                status: { $ne: "deleted" },
+            })
+                .select("fullName name email phone profileImage online lastSeen status role")
+                .limit(limit)
                 .lean(),
             Conversation.find({
                 participants: currentUserId,
@@ -1307,16 +1308,43 @@ exports.getChatMembers = async (req, res) => {
             }
         });
 
-        const contacts = members.map((member) => ({
-            ...member,
-            roleLabel: member.role === "admin" ? "Leader" : member.role === "superadmin" ? "Super Admin" : "Member",
-            conversationId: conversationMap.get(member._id.toString()) || null,
-        }));
+        const normalizeContact = (user, defaultRole) => {
+            const role = String(user.role || defaultRole || "member").toLowerCase();
+            const fullName = user.fullName || user.name || "User";
+            const contactId = String(user._id);
+            return {
+                ...user,
+                _id: contactId,
+                fullName,
+                role,
+                roleLabel: role === "superadmin" ? "Super Admin" : role === "admin" ? "Leader" : "Member",
+                online: Boolean(user.online),
+                conversationId: conversationMap.get(contactId) || null,
+            };
+        };
+
+        const contacts = [
+            ...members.map((member) => normalizeContact(member, "member")),
+            ...admins.map((admin) => normalizeContact(admin, "admin")),
+            ...superAdmins.map((superAdmin) => normalizeContact(superAdmin, "superadmin")),
+        ].filter((item) => String(item._id) !== currentUserId);
+
+        // Deduplicate by id and role
+        const unique = new Map();
+        contacts.forEach((contact) => {
+            unique.set(String(contact._id), contact);
+        });
 
         return res.json({
             success: true,
-            count: contacts.length,
-            members: contacts,
+            count: unique.size,
+            members: Array.from(unique.values()).sort((a, b) => {
+                const order = { superadmin: 0, admin: 1, member: 2 };
+                const aRank = order[String(a.role || "member").toLowerCase()] ?? 3;
+                const bRank = order[String(b.role || "member").toLowerCase()] ?? 3;
+                if (aRank !== bRank) return aRank - bRank;
+                return String(a.fullName || "").localeCompare(String(b.fullName || ""));
+            }),
         });
     } catch (error) {
         console.error("Get Chat Members Error:", error);
@@ -1326,3 +1354,6 @@ exports.getChatMembers = async (req, res) => {
         });
     }
 };
+
+
+exports.getCommunityStats = async (req,res)=>{try{const MemberModel=require("../models/Member");const Admin=require("../models/Admin");const Finance=require("../models/Finance");const [totalMembers,activeMembers,suspendedMembers,totalLeaders,book,medicalClaims,funeralClaims,educationClaims]=await Promise.all([MemberModel.countDocuments({isDeleted:false}),MemberModel.countDocuments({status:"active",isDeleted:false}),MemberModel.countDocuments({status:"suspended",isDeleted:false}),Admin.countDocuments({status:{$ne:"deleted"}}),Finance.aggregate([{ $match:{status:{$in:["approved","completed"]}}},{ $group:{_id:null,total:{$sum:{$cond:[{$in:["$type",["contribution","income"]]},"$amount",{$multiply:["$amount",-1]}]}}}}]),require("../models/MedicalSupport").countDocuments({status:{$in:["Approved","Paid","Completed","Closed"]}}),require("../models/FuneralSupport").countDocuments({status:{$in:["Approved","Paid","Completed","Closed"]}}),require("../models/EducationSupport").countDocuments({status:{$in:["Approved","Paid","Completed","Closed"]}})]);res.json({success:true,stats:{totalMembers,activeMembers,suspendedMembers,totalLeaders,bookBalance:Number(book?.[0]?.total||0),approvedClaims:medicalClaims+funeralClaims+educationClaims}})}catch(e){res.status(500).json({success:false,message:e.message})}};

@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, MessageCircleMore, RefreshCw, ShieldCheck, UserRound, Users, Video, Phone } from "lucide-react";
+import { ArrowLeft, RefreshCw, ShieldCheck } from "lucide-react";
 import { io } from "socket.io-client";
 import DashboardLayout from "../../layouts/DashboardLayout";
-import ChatSidebar from "./ChatSidebar";
 import ChatWindow from "./ChatWindow";
+import CallOverlay from "./CallOverlay";
 import API from "../../services/api";
 import { useAuth } from "../../context/AuthContext";
 import "../../pages/member/messages.css";
@@ -26,13 +26,12 @@ function MessageCenterPage({
   const [selectedConversation, setSelectedConversation] = useState(null);
   const [people, setPeople] = useState([]);
   const [conversations, setConversations] = useState([]);
-  const [search, setSearch] = useState("");
   const [loadingSidebar, setLoadingSidebar] = useState(true);
   const [banner, setBanner] = useState("");
   const [mobileChatOpen, setMobileChatOpen] = useState(false);
+  const [call, setCall] = useState(null);
   const actorId = String(currentUser?.chatId || currentUser?._id || "");
   const loadContactsRef = useRef(loadContacts);
-  const lastManualRefreshRef = useRef(0);
 
   useEffect(() => {
     loadContactsRef.current = loadContacts;
@@ -40,7 +39,6 @@ function MessageCenterPage({
 
   useEffect(() => {
     let active = true;
-
     (async () => {
       try {
         const response = await API.get("/auth/me");
@@ -51,7 +49,6 @@ function MessageCenterPage({
         setCurrentUser(authUser || null);
       }
     })();
-
     return () => {
       active = false;
     };
@@ -73,74 +70,54 @@ function MessageCenterPage({
 
     newSocket.on("connect_error", (error) => {
       console.error("Chat socket connection error:", error);
+      setBanner("Chat connection failed. Calls require the live Socket.IO server to be reachable.");
     });
 
+    const handleIncomingCall = (payload) => {
+      if (!payload?.offer || !payload?.from) return;
+      if (call) return;
+      setCall({
+        direction: "incoming",
+        incomingCall: payload,
+        callType: payload.callType === "video" ? "video" : "audio",
+        partner: normalizedPeople.find((person) => String(person._id) === String(payload.callerUserId)) || selectedConversation?.partner || {
+          _id: payload.callerUserId,
+          fullName: payload.callerName || "Member",
+        },
+      });
+    };
+
+    newSocket.on("incoming-call", handleIncomingCall);
     setSocket(newSocket);
 
     return () => {
+      newSocket.off("incoming-call", handleIncomingCall);
       newSocket.disconnect();
       setSocket(null);
     };
   }, [actorId, currentUser?.role]);
 
+  const loadChatData = async () => {
+    try {
+      setLoadingSidebar(true);
+      const result = await loadContactsRef.current({ currentUser });
+      const peopleList = Array.isArray(result?.members) ? result.members : Array.isArray(result?.data?.members) ? result.data.members : [];
+      const conversationList = Array.isArray(result?.conversations) ? result.conversations : Array.isArray(result?.data?.conversations) ? result.data.conversations : [];
+      setPeople(peopleList);
+      setConversations(conversationList);
+    } catch (error) {
+      console.error("Load chat data error:", error);
+      setPeople([]);
+      setConversations([]);
+    } finally {
+      setLoadingSidebar(false);
+    }
+  };
+
   useEffect(() => {
     if (!actorId) return;
-
-    let active = true;
-
-    const load = async () => {
-      try {
-        setLoadingSidebar(true);
-        const result = await loadContactsRef.current({ currentUser });
-        if (!active) return;
-
-        const peopleList = Array.isArray(result?.members) ? result.members : Array.isArray(result?.data?.members) ? result.data.members : [];
-        const conversationList = Array.isArray(result?.conversations) ? result.conversations : Array.isArray(result?.data?.conversations) ? result.data.conversations : [];
-        setPeople(peopleList);
-        setConversations(conversationList);
-      } catch (error) {
-        console.error("Load chat data error:", error);
-        if (active) {
-          setPeople([]);
-          setConversations([]);
-        }
-      } finally {
-        if (active) setLoadingSidebar(false);
-      }
-    };
-
-    load();
-
-    const handleFocus = () => {
-      if (document.visibilityState === "visible") {
-        load();
-      }
-    };
-
-    const handlePageClick = () => {
-      if (document.visibilityState === "visible") {
-        autoRefreshNow();
-      }
-    };
-
-    window.addEventListener("focus", handleFocus);
-    document.addEventListener("visibilitychange", handleFocus);
-    document.addEventListener("click", handlePageClick, true);
-
-    const interval = window.setInterval(() => {
-      if (document.visibilityState === "visible") {
-        load();
-      }
-    }, 15000);
-
-    return () => {
-      active = false;
-      window.removeEventListener("focus", handleFocus);
-      document.removeEventListener("visibilitychange", handleFocus);
-      document.removeEventListener("click", handlePageClick, true);
-      window.clearInterval(interval);
-    };
-  }, [currentUser?._id]);
+    loadChatData();
+  }, [actorId, currentUser?._id]);
 
   const normalizedConversations = useMemo(
     () => normalizeConversations(conversations, actorId),
@@ -159,12 +136,6 @@ function MessageCenterPage({
     }
   }, [normalizedConversations, selectedConversation]);
 
-  const selectConversation = (conversation) => {
-    if (!conversation) return;
-    setSelectedConversation(conversation);
-    setMobileChatOpen(true);
-  };
-
   const startConversation = async (person) => {
     try {
       if (!person?._id) return;
@@ -178,7 +149,8 @@ function MessageCenterPage({
         );
 
       if (existingConversation) {
-        selectConversation(existingConversation);
+        setSelectedConversation(existingConversation);
+        setMobileChatOpen(true);
         return;
       }
 
@@ -187,7 +159,8 @@ function MessageCenterPage({
         const conversation = normalizeConversation(response.data?.conversation || response.data, actorId);
         if (conversation) {
           setConversations((previous) => [conversation, ...previous.filter((item) => String(item._id) !== String(conversation._id))]);
-          selectConversation(conversation);
+          setSelectedConversation(conversation);
+          setMobileChatOpen(true);
           return;
         }
       }
@@ -197,7 +170,8 @@ function MessageCenterPage({
 
       if (conversation) {
         setConversations((previous) => [conversation, ...previous.filter((item) => String(item._id) !== String(conversation._id))]);
-        selectConversation(conversation);
+        setSelectedConversation(conversation);
+        setMobileChatOpen(true);
       }
     } catch (error) {
       setBanner(error.response?.data?.message || error.message || "Unable to start conversation.");
@@ -207,111 +181,77 @@ function MessageCenterPage({
   const refreshChat = async () => {
     try {
       setBanner(onRefreshHint || "Messages refreshed.");
-      const result = await loadContactsRef.current({ currentUser });
-      const peopleList = Array.isArray(result?.members) ? result.members : Array.isArray(result?.data?.members) ? result.data.members : [];
-      const conversationList = Array.isArray(result?.conversations) ? result.conversations : Array.isArray(result?.data?.conversations) ? result.data.conversations : [];
-      setPeople(peopleList);
-      setConversations(conversationList);
+      await loadChatData();
     } catch (error) {
       console.error("Refresh chat error:", error);
       setBanner(error?.message || "Unable to refresh conversations.");
     }
   };
 
-  const autoRefreshNow = () => {
-    const now = Date.now();
-    if (now - lastManualRefreshRef.current < 2500) return;
-    lastManualRefreshRef.current = now;
-    refreshChat();
-  };
-
-  const handleAudioCall = () => {
-    if (!selectedConversation?.partner) return;
-    setBanner(`Audio call started with ${selectedConversation.partner.fullName}.`);
-  };
-
-  const handleVideoCall = () => {
-    if (!selectedConversation?.partner) return;
-    setBanner(`Video call started with ${selectedConversation.partner.fullName}.`);
-  };
-
   const mobileBack = () => setMobileChatOpen(false);
 
-  const summary = useMemo(() => {
-    return {
-      people: normalizedPeople.length,
-      conversations: normalizedConversations.length,
-      online: normalizedPeople.filter((person) => person.online).length,
-    };
-  }, [normalizedPeople, normalizedConversations]);
+  const startCall = (type) => {
+    if (!socket?.connected) {
+      setBanner("Call cannot start because the chat server is offline.");
+      return;
+    }
+    if (!selectedConversation?.partner?._id) {
+      setBanner("Select a member before starting a call.");
+      return;
+    }
+    setCall({
+      direction: "outgoing",
+      callType: type,
+      partner: selectedConversation.partner,
+      incomingCall: null,
+    });
+  };
 
   return (
     <DashboardLayout>
-      <div className="message-center">
-        <section className="message-center-hero">
+      <div className="message-center compact-message-center">
+        <section className="message-center-hero compact-message-center-hero">
           <div className="message-center-hero-copy">
             <span className="message-center-kicker">{eyebrow}</span>
             <h1>{title}</h1>
             <p>{description}</p>
           </div>
 
-          <div className="message-center-hero-actions">
-            <button type="button" className="portal-chip-action" onClick={refreshChat}>
-              <RefreshCw size={16} />
-              Refresh
-            </button>
-            <button type="button" className="portal-chip-action ghost" onClick={() => setBanner("Communication remains private and encrypted inside the portal.")}>
-              <ShieldCheck size={16} />
-              Privacy
-            </button>
-          </div>
-        </section>
+          <div className="message-center-chat-picker compact-picker">
+            <label htmlFor="chat-person-picker">Choose a person to chat with</label>
+            <div className="message-center-chat-picker-row">
+              <select
+                id="chat-person-picker"
+                value={selectedConversation?.partner?._id || ""}
+                onChange={(e) => {
+                  const person = normalizedPeople.find((x) => String(x._id) === String(e.target.value));
+                  if (person) startConversation(person);
+                }}
+              >
+                <option value="">{searchPlaceholder || "Select from dropdown"}</option>
+                {normalizedPeople.map((person) => (
+                  <option key={person._id} value={person._id}>
+                    {person.fullName}{person.roleLabel ? ` • ${person.roleLabel}` : ""}{person.online ? " • Online" : ""}
+                  </option>
+                ))}
+              </select>
 
-        <section className="message-center-metrics">
-          <Metric icon={<Users size={20} />} label="People available" value={summary.people} />
-          <Metric icon={<MessageCircleMore size={20} />} label="Active chats" value={summary.conversations} />
-          <Metric icon={<UserRound size={20} />} label="Online now" value={summary.online} />
+              <button type="button" className="portal-chip-action" onClick={refreshChat}>
+                <RefreshCw size={16} />
+                Refresh
+              </button>
+            </div>
+          </div>
         </section>
 
         {banner && <div className="messages-call-banner">{banner}</div>}
 
         <div className={`messages-page message-center-shell ${mobileChatOpen ? "mobile-chat-open" : ""}`}>
-          <div className="messages-sidebar-container">
-            <ChatSidebar
-              title={title}
-              searchPlaceholder={searchPlaceholder}
-              memberSectionLabel={memberSectionLabel}
-              conversationSectionLabel="Recent conversations"
-              members={normalizedPeople}
-              conversations={normalizedConversations}
-              selectedConversationId={selectedConversation?._id}
-              onSelectConversation={selectConversation}
-              onStartConversation={startConversation}
-              search={search}
-              setSearch={setSearch}
-              loading={loadingSidebar}
-              emptyMembersLabel={emptyMembersLabel}
-              emptyConversationsLabel={emptyConversationsLabel}
-            />
-          </div>
-
-          <div className="messages-chat-container">
-            <div className="messages-top-mobile-actions">
+          <div className="messages-chat-container full-width-chat">
+            <div className="messages-top-mobile-actions compact-top-actions">
               <button type="button" onClick={mobileBack}>
                 <ArrowLeft size={18} />
                 Back
-              </button>
-              <button type="button" onClick={handleAudioCall} disabled={!selectedConversation}>
-                <Phone size={18} />
-                Audio
-              </button>
-              <button type="button" onClick={handleVideoCall} disabled={!selectedConversation}>
-                <Video size={18} />
-                Video
-              </button>
-              <button type="button" onClick={refreshChat}>
-                <RefreshCw size={18} />
-                Refresh
               </button>
             </div>
 
@@ -320,25 +260,24 @@ function MessageCenterPage({
               socket={socket}
               currentUser={currentUser}
               onBack={mobileBack}
-              onAudioCall={handleAudioCall}
-              onVideoCall={handleVideoCall}
+              onAudioCall={() => startCall("audio")}
+              onVideoCall={() => startCall("video")}
             />
           </div>
         </div>
       </div>
-    </DashboardLayout>
-  );
-}
 
-function Metric({ icon, label, value }) {
-  return (
-    <div className="message-center-metric">
-      <div className="message-center-metric-icon">{icon}</div>
-      <div>
-        <span>{label}</span>
-        <strong>{value}</strong>
-      </div>
-    </div>
+      {call && (
+        <CallOverlay
+          socket={socket}
+          currentUser={currentUser}
+          partner={call.partner}
+          callType={call.callType}
+          incomingCall={call.incomingCall}
+          onClose={() => setCall(null)}
+        />
+      )}
+    </DashboardLayout>
   );
 }
 

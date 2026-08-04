@@ -51,6 +51,7 @@ export default function AdminClaims() {
     finally{setBusy("");}
   };
 
+  const openDocument = async (type,id,url) => { try { await API.post(`/admin/claims/${String(type).toLowerCase()}/${id}/open`); } catch {} window.open(url,"_blank","noopener,noreferrer"); };
   return <DashboardLayout><div className="portal-module">
     <header className="portal-module-header"><div><span>ASSISTANCE PROCESSING</span><h1>Claims</h1><p>Review and process medical, funeral and education assistance applications.</p></div><button className="portal-btn" onClick={load}>Refresh</button></header>
     {error&&<div className="portal-alert">{error}</div>}
@@ -70,7 +71,7 @@ export default function AdminClaims() {
   const url = typeof doc === "string" ? doc : doc?.fileUrl;
   if (!url) return null;
   const full = url.startsWith("http") ? url : resolveApiUrl(url);
-  return <a key={`${url}-${index}`} href={full} target="_blank" rel="noreferrer">Doc {index + 1}</a>;
+  return <button key={`${url}-${index}`} className="portal-btn secondary" type="button" onClick={()=>openDocument(x.supportType,x._id,full)}>Open Doc {index + 1}</button>;
 }) : "—"}</td><td><div className="portal-actions">{!["Approved","Paid","Closed","Disbursed","Completed"].includes(x.status)&&<><button className="portal-btn" disabled={busy===`approve-${x._id}`} onClick={()=>action(x,"approve")}>Approve</button><button className="portal-btn danger" disabled={busy===`reject-${x._id}`} onClick={()=>action(x,"reject")}>Reject</button></>}</div></td></tr>)}
       </tbody></table></div>}
     </section>

@@ -148,7 +148,7 @@ exports.applyEducationSupport = async (req, res) => {
     // =====================================
 
     const fileUrl = (file) =>
-      file ? `/uploads/${req.uploadType || "support"}/${file.filename}` : "";
+      file ? `/${req.uploadType === "documents" ? "documents" : "uploads/" + (req.uploadType || "support")}/${file.filename}` : "";
 
     const feeStructureFile = req.files?.feeStructure?.[0];
     const admissionLetterFile = req.files?.admissionLetter?.[0];

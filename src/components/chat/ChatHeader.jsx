@@ -28,17 +28,23 @@ function ChatHeader({ conversation, partner, typingUser, onAudioCall, onVideoCal
         </div>
       </div>
 
-      <div className="chat-actions">
-        <button type="button" title="Audio call" aria-label="Audio call" onClick={onAudioCall}>
-          <Phone size={20} />
-        </button>
-        <button type="button" title="Video call" aria-label="Video call" onClick={onVideoCall}>
-          <Video size={20} />
-        </button>
-        <button type="button" title="Profile" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}>
-          <Info size={20} />
-        </button>
-      </div>
+      {(onAudioCall || onVideoCall) && (
+        <div className="chat-actions">
+          {onAudioCall && (
+            <button type="button" title="Audio call" aria-label="Audio call" onClick={onAudioCall}>
+              <Phone size={20} />
+            </button>
+          )}
+          {onVideoCall && (
+            <button type="button" title="Video call" aria-label="Video call" onClick={onVideoCall}>
+              <Video size={20} />
+            </button>
+          )}
+          <button type="button" title="Profile" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}>
+            <Info size={20} />
+          </button>
+        </div>
+      )}
     </div>
   );
 }

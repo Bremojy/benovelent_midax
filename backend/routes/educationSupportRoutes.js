@@ -45,7 +45,7 @@ router.post(
     requireVerifiedMember,
     profileCompleted,
     requireActiveMember,
-    setUploadType("support"),
+    setUploadType("documents"),
     uploadFields([
         { name: "feeStructure", maxCount: 1 },
         { name: "admissionLetter", maxCount: 1 },

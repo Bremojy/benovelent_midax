@@ -44,7 +44,7 @@ router.post(
     "/apply",
     verifyToken,
     isMember,
-    setUploadType("support"),
+    setUploadType("documents"),
     uploadArray("documents", 10),
     medicalController.createMedicalApplication
 );

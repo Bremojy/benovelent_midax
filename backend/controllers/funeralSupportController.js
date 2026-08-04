@@ -75,7 +75,7 @@ exports.applyFuneralSupport = async (req, res) => {
         eligibility.member;
 
         const fileUrl = (file) =>
-            file ? `/uploads/${req.uploadType || "support"}/${file.filename}` : "";
+            file ? `/${req.uploadType === "documents" ? "documents" : "uploads/" + (req.uploadType || "support")}/${file.filename}` : "";
 
         const deathCertificateFile = req.files?.deathCertificate?.[0];
         const burialPermitFile = req.files?.burialPermit?.[0];

@@ -20,6 +20,8 @@ function MessageBubble({
   const body = message?.message || message?.text || "";
   const attachment = message?.attachment || message?.image || "";
   const isImage = message?.messageType === "image" || /\.(png|jpe?g|webp|gif|bmp|svg)(\?|$)/i.test(attachment);
+  const isAudio = message?.messageType === "audio";
+  const isVideo = message?.messageType === "video";
 
   return (
     <div className={own ? "message own" : "message other"}>
@@ -36,6 +38,8 @@ function MessageBubble({
           />
         )}
 
+        {isAudio && attachment && <audio controls src={attachment} style={{maxWidth:"100%"}} />}
+        {isVideo && attachment && <video controls src={attachment} style={{maxWidth:"100%",borderRadius:12}} />}
         {body && <p>{body}</p>}
 
         {attachment && !isImage && (

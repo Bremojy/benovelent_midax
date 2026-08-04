@@ -5,7 +5,9 @@ import {
 } from "react";
 
 import DashboardLayout from "../../layouts/DashboardLayout";
+import { useAuth } from "../../context/AuthContext";
 import { resolveApiUrl } from "../../services/api";
+import API from "../../services/api";
 
 import {
   getAdminMembers,
@@ -19,7 +21,7 @@ import {
 
 import "./AdminMembers.css";
 
-function AdminMembers() {
+function AdminMembers() { const { role }=useAuth(); const isSuperAdmin=role==="superadmin";
   // ========================================
   // DATA
   // ========================================
@@ -855,39 +857,43 @@ function AdminMembers() {
                                   : "Suspend"}
                               </button>
 
-                              <button
-                                type="button"
-                                className="reset-member-button"
-                                disabled={
-                                  resetting
-                                }
-                                onClick={() =>
-                                  handleResetPassword(
-                                    member
-                                  )
-                                }
-                              >
-                                {resetting
-                                  ? "..."
-                                  : "Reset"}
-                              </button>
+{isSuperAdmin && (
+                              <>
+                                <button
+                                  type="button"
+                                  className="reset-member-button"
+                                  disabled={
+                                    resetting
+                                  }
+                                  onClick={() =>
+                                    handleResetPassword(
+                                      member
+                                    )
+                                  }
+                                >
+                                  {resetting
+                                    ? "..."
+                                    : "Reset"}
+                                </button>
 
-                              <button
-                                type="button"
-                                className="delete-member-button"
-                                disabled={
-                                  deleting
-                                }
-                                onClick={() =>
-                                  handleDelete(
-                                    member
-                                  )
-                                }
-                              >
-                                {deleting
-                                  ? "..."
-                                  : "Remove"}
-                              </button>
+                                <button
+                                  type="button"
+                                  className="delete-member-button"
+                                  disabled={
+                                    deleting
+                                  }
+                                  onClick={() =>
+                                    handleDelete(
+                                      member
+                                    )
+                                  }
+                                >
+                                  {deleting
+                                    ? "..."
+                                    : "Remove"}
+                                </button>
+                              </>
+                              )}
 
                             </div>
 
@@ -1138,6 +1144,14 @@ function MemberFormModal({
     monthlyContribution:
       member?.monthlyContribution ??
       "",
+    nationalId: member?.nationalId || "",
+    gender: member?.gender || "",
+    maritalStatus: member?.maritalStatus || "",
+    dateOfBirth: member?.dateOfBirth ? String(member.dateOfBirth).slice(0,10) : "",
+    physicalAddress: member?.physicalAddress || "",
+    siteStation: member?.siteStation || "",
+    customSiteStation: member?.customSiteStation || "",
+    nextOfKin: member?.nextOfKin || { fullName: "", relationship: "", phone: "" },
   });
 
   const [saving, setSaving] =
@@ -1366,6 +1380,8 @@ function MemberFormModal({
 
           </div>
 
+          {editing && <div className="admin-form-grid"><FormField label="National ID" name="nationalId" value={form.nationalId} onChange={handleChange}/><FormField label="Date of Birth" name="dateOfBirth" type="date" value={form.dateOfBirth} onChange={handleChange}/><FormField label="Physical Address" name="physicalAddress" value={form.physicalAddress} onChange={handleChange}/><label className="admin-form-field"><span>Gender</span><select name="gender" value={form.gender} onChange={handleChange}><option value="">Select</option><option>Male</option><option>Female</option><option>Other</option></select></label><label className="admin-form-field"><span>Marital status</span><select name="maritalStatus" value={form.maritalStatus} onChange={handleChange}><option value="">Select</option><option>Single</option><option>Married</option><option>Divorced</option><option>Widowed</option></select></label><label className="admin-form-field"><span>Site station</span><select name="siteStation" value={form.siteStation} onChange={handleChange}><option value="">Select</option>{["Chokaa","Saika","Ruaraka","Garden City","Garden Estate","Jacaranda","Depot","None of above"].map(x=><option key={x}>{x}</option>)}</select></label>{form.siteStation==="None of above"&&<FormField label="Your site station" name="customSiteStation" value={form.customSiteStation} onChange={handleChange}/>}<FormField label="Next of kin name" name="nextOfKin.fullName" value={form.nextOfKin?.fullName||""} onChange={e=>setForm(x=>({...x,nextOfKin:{...x.nextOfKin,fullName:e.target.value}}))}/><FormField label="Next of kin relationship" name="nextOfKin.relationship" value={form.nextOfKin?.relationship||""} onChange={e=>setForm(x=>({...x,nextOfKin:{...x.nextOfKin,relationship:e.target.value}}))}/><FormField label="Next of kin phone" name="nextOfKin.phone" value={form.nextOfKin?.phone||""} onChange={e=>setForm(x=>({...x,nextOfKin:{...x.nextOfKin,phone:e.target.value}}))}/></div>}
+
           <div className="admin-member-form-actions">
 
             <button
@@ -1450,6 +1466,8 @@ function MemberDetailsModal({
   const nationalFront = resolveUploadUrl(safeDocs?.nationalIdFront || "");
   const nationalBack = resolveUploadUrl(safeDocs?.nationalIdBack || "");
   const signature = resolveUploadUrl(safeDocs?.signature || "");
+  const [dependents, setDependents] = useState([]);
+  useEffect(() => { if (!member?._id) return; API.get(`/dependents/admin/member/${member._id}`).then(({data}) => setDependents(data?.dependents || [])).catch(() => setDependents([])); }, [member?._id]);
 
   const documentLinks = [
     { label: "Profile Photo", src: member?.profileImage || safeDocs?.profilePhoto },
@@ -1548,6 +1566,7 @@ function MemberDetailsModal({
           <MemberDetail label="Village" value={member.village} />
           <MemberDetail label="Postal Address" value={member.postalAddress} />
           <MemberDetail label="Physical Address" value={member.physicalAddress} />
+          <MemberDetail label="Site Station" value={member.siteStation === "None of above" ? member.customSiteStation : member.siteStation} />
           <MemberDetail label="Occupation" value={member.occupation} />
           <MemberDetail label="Employer" value={member.employer} />
           <MemberDetail label="Monthly Income" value={member.monthlyIncome !== undefined ? `KES ${Number(member.monthlyIncome || 0).toLocaleString()}` : "—"} />

@@ -1,12 +1,1 @@
-import LegalSectionPage from "../components/LegalSectionPage";
-
-export default function TermsConditions() {
-  return (
-    <LegalSectionPage
-      section="terms-conditions"
-      title="Terms & Conditions"
-      subtitle="The rules for using the portal"
-      intro="These terms explain how the website, portals and support services should be used by members, administrators and super administrators."
-    />
-  );
-}
+import LegalSectionPage from "../components/LegalSectionPage";export default function TermsConditions(){return <LegalSectionPage section="terms-conditions" title="Terms & Conditions" subtitle="Using the Benevolent Midax website and portal" intro="Use the website and portal responsibly, respect other members, keep account credentials private and understand that support is processed according to the Benevolent Fund Scheme constitution and approved procedures."/>}

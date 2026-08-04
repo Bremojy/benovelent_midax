@@ -2,7 +2,7 @@ const fs = require("fs");
 const path = require("path");
 const WebsiteContent = require("../models/WebsiteContent");
 
-const DEFAULT_SECTIONS = ["home", "about", "services", "contact", "footer", "settings", "gallery", "constitution", "privacy-policy", "terms-conditions", "disclaimer"];
+const DEFAULT_SECTIONS = ["home", "about", "services", "contact", "footer", "settings", "gallery", "constitution", "privacy-policy", "terms-conditions"];
 
 const SECTION_DEFAULTS = {
     "privacy-policy": {
@@ -10,9 +10,10 @@ const SECTION_DEFAULTS = {
         subtitle: "How we protect member data",
         description: "A clear privacy statement for the Benevolent Midax public website and portals.",
         content: {
-            overview: "We protect member information and only use data to run the scheme, support communication and manage the portals.",
-            confidentiality: "Member records, support requests and portal activity are treated as confidential and limited to authorized users.",
-            updates: "The superadmin can update this page whenever policy language changes.",
+            overview: "This website supports members, enhances communication and protects privacy in line with the Benevolent Fund Scheme's purpose and governance.",
+            confidentiality: "Member information, support requests, dependants and portal activity are protected and should only be accessed by authorised administrators and the member concerned.",
+            access: "The superAdmin controls administrative access and can review or edit member records where authorised by the portal role.",
+            updates: "The superadmin can update this page when policy language changes, while scheme decisions remain governed by the constitution and committee processes.",
         },
     },
     "terms-conditions": {
@@ -20,21 +21,13 @@ const SECTION_DEFAULTS = {
         subtitle: "The rules for using the portal",
         description: "Guidelines for members, administrators and visitors using the Benevolent Midax website.",
         content: {
-            overview: "Use the website and portals responsibly, keep login details private and follow the constitution and scheme rules.",
-            access: "Unauthorized access, misuse of portal features and abuse of member information are prohibited.",
+            overview: "Use the website and portals responsibly, keep login details private and follow the Benevolent Fund Scheme constitution and approved procedures.",
+            support: "Funeral and medical support is subject to the constitutional eligibility, claim limits, documentation and approval process.",
+            communication: "Use portal chat, polls and support tools respectfully. Do not misuse another member's information or account.",
             updates: "Content can be reviewed and edited by the superadmin from Website Settings.",
         },
     },
-    "disclaimer": {
-        title: "Disclaimer",
-        subtitle: "Important limitations and notices",
-        description: "A transparent notice explaining how public content and support decisions should be interpreted.",
-        content: {
-            overview: "Information on this website is provided for community support and administrative reference.",
-            advice: "Portal content does not replace official committee decisions, receipts or legal advice.",
-            updates: "This page can be updated by the superadmin when notices change.",
-        },
-    },
+
 };
 
 async function findOrCreateSection(section, defaults = {}) {

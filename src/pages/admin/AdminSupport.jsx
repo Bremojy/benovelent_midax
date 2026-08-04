@@ -9,6 +9,7 @@ import "../../styles/portalModule.css";
 export default function AdminSupport() {
   const [members, setMembers] = useState([]);
   const [contactMessages, setContactMessages] = useState([]);
+  const [supportRequests, setSupportRequests] = useState([]);
   const [form, setForm] = useState({ recipient: "", title: "", message: "" });
   const [invite, setInvite] = useState({ memberNumber: "", fullName: "", username: "", phone: "", email: "", department: "", position: "", monthlyContribution: "" });
   const [loading, setLoading] = useState(true);
@@ -21,9 +22,10 @@ export default function AdminSupport() {
   const load = async () => {
     try {
       setLoading(true);
-      const [membersRes, contactsRes] = await Promise.allSettled([
+      const [membersRes, contactsRes, supportRes] = await Promise.allSettled([
         getAdminMembers({ page: 1, limit: 100 }),
         API.get("/contact"),
+        API.get("/member/support-requests"),
       ]);
 
       setMembers(
@@ -35,6 +37,11 @@ export default function AdminSupport() {
       setContactMessages(
         contactsRes.status === "fulfilled"
           ? (contactsRes.value?.data?.messages || [])
+          : []
+      );
+      setSupportRequests(
+        supportRes.status === "fulfilled"
+          ? (supportRes.value?.data?.requests || [])
           : []
       );
     } catch (e) {
@@ -196,6 +203,8 @@ export default function AdminSupport() {
           </form>
         </section>
 
+        <section className="portal-panel" style={{ marginTop: 18 }}><div className="portal-panel-header"><h2>Other support requests</h2></div>{supportRequests.length===0?<div className="portal-empty">No custom support requests.</div>:<div className="portal-table-wrap"><table className="portal-table"><thead><tr><th>Member</th><th>Type</th><th>Description</th><th>Amount</th><th>Status</th><th>Documents</th></tr></thead><tbody>{supportRequests.map(x=><tr key={x._id}><td>{x.member?.fullName||"Member"}</td><td>{x.supportType}</td><td>{x.description}</td><td>{money(x.requestedAmount)}</td><td><span className="portal-badge">{x.status}</span></td><td>{(x.documents||[]).map((d,i)=><a key={d} href={d.startsWith("http")?d:`${API.defaults.baseURL.replace(/\/api$/,'')}${d}`} target="_blank" rel="noreferrer">Doc {i+1}</a>)}</td></tr>)}</tbody></table></div>}</section>
+
         <section className="portal-panel" style={{ marginTop: 18 }}>
           <div className="portal-panel-header" style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
             <Phone size={18} />
@@ -221,3 +230,5 @@ export default function AdminSupport() {
     </DashboardLayout>
   );
 }
+
+const money=v=>new Intl.NumberFormat("en-KE",{style:"currency",currency:"KES",maximumFractionDigits:0}).format(Number(v||0));

@@ -27,7 +27,6 @@ const SECTION_FIELDS = [
   { key: "gallery", label: "Gallery" },
   { key: "privacy-policy", label: "Privacy Policy" },
   { key: "terms-conditions", label: "Terms & Conditions" },
-  { key: "disclaimer", label: "Disclaimer" },
   { key: "settings", label: "Website Settings" },
 ];
 

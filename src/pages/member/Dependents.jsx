@@ -31,7 +31,7 @@ export default function Dependents() {
   const submit = async (e) => {
     e.preventDefault();
     setError(""); setSuccess("");
-    if (!form.fullName || !form.relationship || !form.dateOfBirth) {
+    if (!form.fullName || !form.relationship || !form.gender || !form.dateOfBirth) {
       setError("Full name, relationship and date of birth are required.");
       return;
     }
@@ -81,8 +81,8 @@ export default function Dependents() {
             <form onSubmit={submit}>
               <Field label="Full Name"><input value={form.fullName} onChange={(e)=>set("fullName",e.target.value)} required /></Field>
               <div className="support-two-col">
-                <Field label="Relationship"><input value={form.relationship} onChange={(e)=>set("relationship",e.target.value)} required /></Field>
-                <Field label="Gender"><select value={form.gender} onChange={(e)=>set("gender",e.target.value)}><option value="">Select</option><option>Male</option><option>Female</option><option>Other</option></select></Field>
+                <Field label="Relationship"><select value={form.relationship} onChange={(e)=>set("relationship",e.target.value)} required><option value="">Select</option>{["Spouse","Son","Daughter","Father","Mother","Brother","Sister","Guardian","Other"].map(x=><option key={x}>{x}</option>)}</select></Field>
+                <Field label="Gender"><select value={form.gender} onChange={(e)=>set("gender",e.target.value)} required><option value="">Select</option><option>Male</option><option>Female</option><option>Other</option></select></Field>
               </div>
               <div className="support-two-col">
                 <Field label="Date of Birth"><input type="date" value={form.dateOfBirth} onChange={(e)=>set("dateOfBirth",e.target.value)} required /></Field>
@@ -95,7 +95,7 @@ export default function Dependents() {
               <Field label="School / Institution"><input value={form.school} onChange={(e)=>set("school",e.target.value)} /></Field>
               <div className="support-two-col">
                 <Field label="Admission Number"><input value={form.admissionNumber} onChange={(e)=>set("admissionNumber",e.target.value)} /></Field>
-                <Field label="Education Level"><input value={form.educationLevel} onChange={(e)=>set("educationLevel",e.target.value)} /></Field>
+                <Field label="Education Level"><select value={form.educationLevel} onChange={(e)=>set("educationLevel",e.target.value)}><option value="">Select</option>{["Primary","Junior Secondary","Secondary","College","University","TVET","Other"].map(x=><option key={x}>{x}</option>)}</select></Field>
               </div>
               <Field label="Address"><input value={form.address} onChange={(e)=>set("address",e.target.value)} /></Field>
               <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>

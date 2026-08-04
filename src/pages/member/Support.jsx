@@ -5,7 +5,7 @@ import { getMemberClaims } from "../../services/memberService";
 import "./Support.css";
 
 const initialForm = {
-  type: "medical",
+  type: "medical", customType: "", caseDescription: "",
   dependentId: "",
   hospitalName: "",
   hospitalLocation: "",
@@ -117,6 +117,8 @@ export default function Support() {
         documents.slice(2).forEach((file) => formData.append("supportingDocuments", file));
       }
 
+      if (form.type === "other") { if (!form.customType?.trim() || !form.caseDescription?.trim() || Number(form.requestedAmount)<=0) throw new Error("Please complete the support type, description and amount."); endpoint="/member/support-requests"; formData.append("supportType",form.customType.trim()); formData.append("description",form.caseDescription.trim()); formData.append("requestedAmount",String(Number(form.requestedAmount))); documents.forEach(file=>formData.append("documents",file)); }
+
       const { data } = await API.post(endpoint, formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
@@ -159,9 +161,11 @@ export default function Support() {
                 <select value={form.type} onChange={(e) => set("type", e.target.value)}>
                   <option value="medical">Medical Support</option>
                   <option value="funeral">Funeral Support</option>
-                  <option value="education">Education Support</option>
+                  <option value="education">Education Support</option><option value="other">None of above</option>
                 </select>
               </div>
+
+              {form.type === "other" && (<><Field label="Your support type"><input value={form.customType||""} onChange={e=>set("customType",e.target.value)} required /></Field><Field label="Brief description"><textarea rows="4" value={form.caseDescription||""} onChange={e=>set("caseDescription",e.target.value)} required /></Field></>)}
 
               {form.type === "medical" && (
                 <>

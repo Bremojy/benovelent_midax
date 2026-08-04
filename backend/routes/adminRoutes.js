@@ -20,6 +20,7 @@ const {
 const {
   isAdmin,
   isAdminOrSuperAdmin,
+  isSuperAdmin,
 } = require("../middleware/roleMiddleware");
 
 // =======================================
@@ -48,6 +49,7 @@ const {
   getSettings,
   updateSettings,
   getColleagues,
+  openClaimDocument,
 } = require("../controllers/adminController");
 
 // =======================================
@@ -81,6 +83,7 @@ router.put("/change-password", protect, isAdmin, changePassword);
 router.get("/settings", protect, isAdmin, getSettings);
 router.put("/settings", protect, isAdmin, updateSettings);
 router.get("/colleagues", protect, isAdminOrSuperAdmin, getColleagues);
+router.post("/claims/:type/:id/open", protect, isAdmin, openClaimDocument);
 
 router.post(
   "/members",
@@ -224,7 +227,7 @@ router.patch(
 router.delete(
   "/members/:id",
   protect,
-  isAdminOrSuperAdmin,
+  isSuperAdmin,
   deleteMember
 );
 
@@ -235,7 +238,7 @@ router.delete(
 router.patch(
   "/members/:id/restore",
   protect,
-  isAdminOrSuperAdmin,
+  isSuperAdmin,
   restoreMember
 );
 
@@ -246,7 +249,7 @@ router.patch(
 router.patch(
   "/members/:id/reset-password",
   protect,
-  isAdminOrSuperAdmin,
+  isSuperAdmin,
   resetPassword
 );
 

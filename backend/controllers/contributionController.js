@@ -273,7 +273,10 @@ exports.getContributions = async (req,res)=>{
             .filter(item => Number(item.year) === currentYear)
             .reduce((sum, item) => sum + Number(item.paidAmount || item.amount || 0), 0);
 
-        const member = await Member.findById(requestedMemberId).select("monthlyContribution").lean();
+        const requestedMemberId = req.params.memberId || req.user?._id || null;
+        const member = requestedMemberId
+            ? await Member.findById(requestedMemberId).select("monthlyContribution").lean()
+            : null;
 
         res.json({
             success:true,

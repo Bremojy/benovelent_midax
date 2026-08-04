@@ -82,7 +82,7 @@ function DashboardTopbar({
   const goToMessages = () => {
     if (normalizedRole === "member") navigate("/member/messages");
     else if (normalizedRole === "admin") navigate("/admin/messages");
-    else navigate("/superadmin/messages");
+
   };
 
   const goToNotifications = () => {
@@ -94,7 +94,7 @@ function DashboardTopbar({
   const goToSettings = () => {
     if (normalizedRole === "member") navigate("/member/settings");
     else if (normalizedRole === "admin") navigate("/admin/settings");
-    else navigate("/superadmin/settings");
+    else navigate("/superadmin/password");
   };
 
   const handleLogout = async () => {
@@ -146,7 +146,7 @@ function DashboardTopbar({
 
         {/* MESSAGES */}
 
-        <button
+        {normalizedRole !== "superadmin" && <button
           type="button"
           className="icon-btn"
           onClick={goToMessages}
@@ -162,7 +162,7 @@ function DashboardTopbar({
                 : unreadMessages}
             </span>
           )}
-        </button>
+        </button>}
 
         {/* NOTIFICATIONS */}
 
@@ -250,7 +250,7 @@ function DashboardTopbar({
             <div className="profile-dropdown" role="menu">
               <button type="button" onClick={goToSettings} role="menuitem">
                 <Settings size={17} />
-                Account settings
+                Change password & settings
               </button>
               <button type="button" className="profile-logout" onClick={handleLogout} role="menuitem">
                 <LogOut size={17} />

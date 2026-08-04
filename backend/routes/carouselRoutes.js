@@ -1,5 +1,4 @@
 const express = require("express");
-const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
 
@@ -9,37 +8,7 @@ const { isSuperAdmin } = require("../middleware/roleMiddleware");
 
 const router = express.Router();
 
-// ========================================
-// CREATE UPLOAD FOLDER IF IT DOESN'T EXIST
-// ========================================
-
-const uploadPath = path.join(__dirname, "../uploads/carousel");
-
-if (!fs.existsSync(uploadPath)) {
-    fs.mkdirSync(uploadPath, { recursive: true });
-}
-
-// ========================================
-// MULTER CONFIGURATION
-// ========================================
-
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        cb(null, uploadPath);
-    },
-
-    filename: (req, file, cb) => {
-        cb(
-            null,
-            Date.now() +
-                "-" +
-                Math.round(Math.random() * 1000000) +
-                path.extname(file.originalname)
-        );
-    },
-});
-
-const upload = multer({ storage });
+const { uploadSingle, setUploadType } = require("../middleware/upload");
 
 // ========================================
 // GET ALL CAROUSEL SLIDES
@@ -91,7 +60,7 @@ router.get("/active", async (req, res) => {
 // UPLOAD CAROUSEL IMAGE
 // ========================================
 
-router.post("/upload", protect, isSuperAdmin, upload.single("image"), async (req, res) => {
+router.post("/upload", protect, isSuperAdmin, setUploadType("carousel"), uploadSingle("image"), async (req, res) => {
     try {
         if (!req.file) {
             return res.status(400).json({
@@ -182,7 +151,7 @@ router.post("/", protect, isSuperAdmin, async (req, res) => {
 // UPDATE CAROUSEL
 // ========================================
 
-router.put("/:id", protect, isSuperAdmin, upload.single("image"), async (req, res) => {
+router.put("/:id", protect, isSuperAdmin, setUploadType("carousel"), uploadSingle("image"), async (req, res) => {
     try {
         const updateData = {
             ...req.body,
@@ -241,11 +210,8 @@ router.delete("/:id", protect, isSuperAdmin, async (req, res) => {
         }
 
         if (slide.imageUrl) {
-            const imagePath = path.join(
-                __dirname,
-                "..",
-                slide.imageUrl.replace(/^\/+/, "")
-            );
+            const { uploadRoot } = require("../config/uploadConfig");
+            const imagePath = path.join(uploadRoot, slide.imageUrl.replace(/^\/+/, ""));
 
             if (fs.existsSync(imagePath)) {
                 fs.unlinkSync(imagePath);

@@ -17,10 +17,11 @@ const {
   updateSettings,
   getClaims,
   getChatMembers,
+  getCommunityStats,
 } = require("../controllers/memberController");
 
 const { getMemberContributions } = require("../controllers/contributionController");
-const { getMemberTransactions } = require("../controllers/financeController");
+const { getMemberTransactions, getMemberAccounts } = require("../controllers/financeController");
 
 
 const { verifyToken: protect } = require("../middleware/authMiddleware");
@@ -30,6 +31,7 @@ const { verifyToken: protect } = require("../middleware/authMiddleware");
 // ===============================
 
 router.get("/dashboard", protect, getDashboard);
+router.get("/community-stats", protect, getCommunityStats);
 
 // ===============================
 // PROFILE
@@ -67,11 +69,8 @@ router.get(
   getMemberContributions
 );
 
-router.get(
-  "/finance",
-  protect,
-  getMemberTransactions
-);
+router.get("/finance", protect, getMemberTransactions);
+router.get("/accounts", protect, getMemberAccounts);
 
 // ===============================
 // MEMBER CLAIMS / SUPPORT HISTORY

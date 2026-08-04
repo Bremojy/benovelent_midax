@@ -16,7 +16,9 @@ const {
 
     verifyDependent,
 
-    getAllDependents
+    getAllDependents,
+
+    getDependentsForMember
 
 } = require("../controllers/dependentController");
 
@@ -89,12 +91,8 @@ router.delete(
 
 // View all dependents
 
-router.get(
-    "/",
-    protect,
-    admin,
-    getAllDependents
-);
+router.get("/admin/member/:memberId", protect, admin, getDependentsForMember);
+router.get("/", protect, admin, getAllDependents);
 
 // Verify dependent
 

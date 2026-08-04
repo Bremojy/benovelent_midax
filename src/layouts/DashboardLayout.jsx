@@ -19,9 +19,7 @@ function DashboardLayout({
   children,
 }) {
   const [sidebarOpen, setSidebarOpen] =
-    useState(
-      window.innerWidth >= 992
-    );
+    useState(false);
 
   const {
     user,

@@ -418,3 +418,11 @@ exports.getAllDependents = async (req, res) => {
     }
 
 };
+exports.getDependentsForMember = async (req,res)=>{
+ try{
+  const member=await Member.findById(req.params.memberId).select("_id").lean();
+  if(!member)return res.status(404).json({success:false,message:"Member not found."});
+  const dependents=await Dependent.find({member:member._id}).sort({createdAt:-1}).lean();
+  res.json({success:true,count:dependents.length,dependents});
+ }catch(error){res.status(500).json({success:false,message:error.message});}
+};

@@ -61,7 +61,7 @@ router.post(
     memberStatus,
 
     profileCompleted,
-    setUploadType("support"),
+    setUploadType("documents"),
     uploadFields([
         { name: "deathCertificate", maxCount: 1 },
         { name: "burialPermit", maxCount: 1 },

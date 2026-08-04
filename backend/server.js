@@ -59,6 +59,7 @@ const conversationRoutes = require("./routes/conversationRoutes");
 const messageRoutes = require("./routes/messageRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
 const contactRoutes = require("./routes/contactRoutes");
+const supportRequestRoutes = require("./routes/supportRequestRoutes");
 
 const auditLogRoutes = require("./routes/auditLogRoutes");
 
@@ -85,20 +86,11 @@ app.use(express.urlencoded({
 // STATIC FILES
 // ===============================================
 
-app.use(
-    "/uploads",
-    express.static(path.join(__dirname, "uploads"))
-);
+const { uploadRoot, documentRoot } = require("./config/uploadConfig");
 
-app.use(
-    "/documents",
-    express.static(path.join(__dirname, "..", "public", "documents"))
-);
-
-app.use(
-    "/documents",
-    express.static(path.join(__dirname, "uploads", "documents"))
-);
+app.use("/uploads", express.static(uploadRoot));
+app.use("/documents", express.static(documentRoot));
+app.use("/documents", express.static(path.join(__dirname, "..", "public", "documents")));
 
 // ===============================================
 // ROOT ROUTE
@@ -165,6 +157,7 @@ app.use("/api/conversations", conversationRoutes);
 app.use("/api/messages", messageRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/contact", contactRoutes);
+app.use("/api/member/support-requests", supportRequestRoutes);
 
 // News & Website
 
