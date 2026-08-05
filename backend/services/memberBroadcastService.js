@@ -1,5 +1,6 @@
 const axios = require("axios");
 const nodemailer = require("nodemailer");
+const { Resend } = require("resend");
 const Member = require("../models/Member");
 
 function getSmtpConfig() {
@@ -20,12 +21,33 @@ function getSmtpConfig() {
   };
 }
 
-function escapeHtml(value) {
-  return String(value || "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+function getResendConfig() {
+  const apiKey = process.env.RESEND_API_KEY;
+  const from = process.env.RESEND_FROM_EMAIL || process.env.SMTP_FROM || process.env.EMAIL_FROM;
+
+  if (!apiKey || !from) return null;
+
+  return {
+    apiKey,
+    from,
+  };
+}
+
+function getEmailProvider() {
+  const provider = String(process.env.EMAIL_PROVIDER || "").toLowerCase();
+  if (provider === "resend" || process.env.RESEND_API_KEY) {
+    return "resend";
+  }
+  if (provider === "smtp" || process.env.SMTP_HOST) {
+    return "smtp";
+  }
+  return null;
+}
+
+function getResendClient() {
+  const config = getResendConfig();
+  if (!config) return null;
+  return new Resend(config.apiKey);
 }
 
 async function getTransport() {
@@ -37,6 +59,14 @@ async function getTransport() {
     secure: config.secure,
     auth: config.auth,
   });
+}
+
+function escapeHtml(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
 async function getActiveMembers({ includeEmails = true } = {}) {
@@ -54,21 +84,43 @@ async function getActiveMembers({ includeEmails = true } = {}) {
 }
 
 async function sendEmail({ to, subject, text, html }) {
-  const config = getSmtpConfig();
-  if (!config || !to) return { sent: false, reason: "smtp-not-configured" };
+  if (!to) return { sent: false, reason: "no-recipient" };
 
-  const transport = await getTransport();
-  if (!transport) return { sent: false, reason: "smtp-not-configured" };
+  const provider = getEmailProvider();
 
-  await transport.sendMail({
-    from: config.from,
-    to,
-    subject,
-    text,
-    html,
-  });
+  if (provider === "resend") {
+    const config = getResendConfig();
+    const client = getResendClient();
+    if (!config || !client) return { sent: false, reason: "resend-not-configured" };
 
-  return { sent: true };
+    await client.emails.send({
+      from: config.from,
+      to,
+      subject,
+      text,
+      html,
+    });
+
+    return { sent: true, provider: "resend" };
+  }
+
+  if (provider === "smtp") {
+    const config = getSmtpConfig();
+    const transport = await getTransport();
+    if (!config || !transport) return { sent: false, reason: "smtp-not-configured" };
+
+    await transport.sendMail({
+      from: config.from,
+      to,
+      subject,
+      text,
+      html,
+    });
+
+    return { sent: true, provider: "smtp" };
+  }
+
+  return { sent: false, reason: "email-not-configured" };
 }
 
 async function sendBulkEmailToMembers({ subject, text, html, members }) {
@@ -81,20 +133,47 @@ async function sendBulkEmailToMembers({ subject, text, html, members }) {
     return { sent: 0, skipped: "no-email-recipients" };
   }
 
-  const transport = await getTransport();
-  if (!transport) return { sent: 0, skipped: "smtp-not-configured" };
+  const provider = getEmailProvider();
 
-  for (const recipient of recipients) {
-    await transport.sendMail({
-      from: getSmtpConfig().from,
-      to: recipient,
-      subject,
-      text,
-      html,
-    });
+  if (provider === "resend") {
+    const config = getResendConfig();
+    const client = getResendClient();
+    if (!config || !client) return { sent: 0, skipped: "resend-not-configured" };
+
+    let sent = 0;
+    for (const recipient of recipients) {
+      await client.emails.send({
+        from: config.from,
+        to: recipient,
+        subject,
+        text,
+        html,
+      });
+      sent += 1;
+    }
+
+    return { sent, provider: "resend" };
   }
 
-  return { sent: recipients.length };
+  if (provider === "smtp") {
+    const config = getSmtpConfig();
+    const transport = await getTransport();
+    if (!config || !transport) return { sent: 0, skipped: "smtp-not-configured" };
+
+    for (const recipient of recipients) {
+      await transport.sendMail({
+        from: config.from,
+        to: recipient,
+        subject,
+        text,
+        html,
+      });
+    }
+
+    return { sent: recipients.length, provider: "smtp" };
+  }
+
+  return { sent: 0, skipped: "email-not-configured" };
 }
 
 async function sendSmsNotification({ to, message }) {

@@ -9,7 +9,8 @@ const { verifyToken } = require("../middleware/authMiddleware");
 const {
     isMember,
     isAdmin,
-    isSuperAdmin
+    isSuperAdmin,
+    isAdminOrSuperAdmin
 } = require("../middleware/roleMiddleware");
 
 const { uploadArray, setUploadType } = require("../middleware/upload");
@@ -59,7 +60,7 @@ router.put(
 router.get(
     "/admin/summary",
     verifyToken,
-    isAdmin,
+    isAdminOrSuperAdmin,
     medicalController.getMedicalSummary
 );
 
@@ -67,7 +68,7 @@ router.get(
 router.get(
     "/admin/applications",
     verifyToken,
-    isAdmin,
+    isAdminOrSuperAdmin,
     medicalController.getAllApplications
 );
 
@@ -75,7 +76,7 @@ router.get(
 router.put(
     "/admin/review/:id",
     verifyToken,
-    isAdmin,
+    isAdminOrSuperAdmin,
     medicalController.markUnderReview
 );
 
@@ -83,7 +84,7 @@ router.put(
 router.put(
     "/admin/approve/:id",
     verifyToken,
-    isAdmin,
+    isAdminOrSuperAdmin,
     medicalController.approveApplication
 );
 
@@ -91,7 +92,7 @@ router.put(
 router.put(
     "/admin/reject/:id",
     verifyToken,
-    isAdmin,
+    isAdminOrSuperAdmin,
     medicalController.rejectApplication
 );
 
@@ -99,7 +100,7 @@ router.put(
 router.put(
     "/admin/pay/:id",
     verifyToken,
-    isAdmin,
+    isAdminOrSuperAdmin,
     medicalController.markAsPaid
 );
 

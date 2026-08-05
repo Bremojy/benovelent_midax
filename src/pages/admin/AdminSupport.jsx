@@ -21,7 +21,7 @@ export default function AdminSupport() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [broadcast, setBroadcast] = useState(true);
-  const [smsEnabled, setSmsEnabled] = useState(true);
+  const [smsEnabled, setSmsEnabled] = useState(false);
 
   const load = async () => {
     try {
@@ -217,7 +217,7 @@ export default function AdminSupport() {
             <button className="portal-btn" disabled={sending}>{sending ? "Sending..." : broadcast ? "Send Broadcast" : "Send Support Message"}</button>
           </form>
           <p style={{ marginTop: 12, color: "#64748b" }}>
-            Broadcasts can create in-app notifications and send email/SMS when SMTP and SMS settings are configured.
+            Broadcasts can create in-app notifications and send email notifications. SMS is optional and stays off until you enable it.
           </p>
         </section>
 

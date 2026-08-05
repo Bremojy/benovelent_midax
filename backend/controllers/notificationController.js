@@ -227,7 +227,7 @@ exports.broadcastToMembers = async (req, res) => {
       message,
       smsText,
       emailHtml,
-      broadcastSms = true,
+      broadcastSms = false,
       inApp = true,
     } = req.body || {};
 
