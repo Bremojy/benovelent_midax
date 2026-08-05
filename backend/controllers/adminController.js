@@ -3,6 +3,7 @@ const Member = require("../models/Member");
 const { sendEmail, sendSmsNotification } = require("../services/memberBroadcastService");
 const calculateProfileCompletion = require("../utils/calculateProfileCompletion");
 const Finance = require("../models/Finance");
+const { resolveStoredFileUrl } = require("../utils/uploadUrl");
 
 /* =====================================================
    ADMIN DASHBOARD
@@ -355,22 +356,22 @@ exports.createMember = async (req, res) => {
     }
 
     if (req.files?.profileImage?.[0]) {
-      memberData.profileImage = `/uploads/${req.uploadType || "member-documents"}/${req.files.profileImage[0].filename}`;
+      memberData.profileImage = resolveStoredFileUrl(req.files.profileImage[0], `/uploads/${req.uploadType || "member-documents"}`);
     }
     if (req.files?.passportPhoto?.[0]) {
-      memberData.passportPhoto = `/uploads/${req.uploadType || "member-documents"}/${req.files.passportPhoto[0].filename}`;
+      memberData.passportPhoto = resolveStoredFileUrl(req.files.passportPhoto[0], `/uploads/${req.uploadType || "member-documents"}`);
     }
     if (req.files?.nationalIdFront?.[0]) {
       memberData.documents = memberData.documents || {};
-      memberData.documents.nationalIdFront = `/uploads/${req.uploadType || "member-documents"}/${req.files.nationalIdFront[0].filename}`;
+      memberData.documents.nationalIdFront = resolveStoredFileUrl(req.files.nationalIdFront[0], `/uploads/${req.uploadType || "member-documents"}`);
     }
     if (req.files?.nationalIdBack?.[0]) {
       memberData.documents = memberData.documents || {};
-      memberData.documents.nationalIdBack = `/uploads/${req.uploadType || "member-documents"}/${req.files.nationalIdBack[0].filename}`;
+      memberData.documents.nationalIdBack = resolveStoredFileUrl(req.files.nationalIdBack[0], `/uploads/${req.uploadType || "member-documents"}`);
     }
     if (req.files?.signature?.[0]) {
       memberData.documents = memberData.documents || {};
-      memberData.documents.signature = `/uploads/${req.uploadType || "member-documents"}/${req.files.signature[0].filename}`;
+      memberData.documents.signature = resolveStoredFileUrl(req.files.signature[0], `/uploads/${req.uploadType || "member-documents"}`);
     }
 
     // ==========================================
@@ -1276,11 +1277,11 @@ exports.updateProfile = async (req, res) => {
     }
 
     if (req.file) {
-      admin.profileImage = `/uploads/${req.uploadType || "profiles"}/${req.file.filename}`;
+      admin.profileImage = resolveStoredFileUrl(req.file, `/uploads/${req.uploadType || "profiles"}`);
     }
 
     if (req.files?.profileImage?.[0]) {
-      admin.profileImage = `/uploads/${req.uploadType || "profiles"}/${req.files.profileImage[0].filename}`;
+      admin.profileImage = resolveStoredFileUrl(req.files.profileImage[0], `/uploads/${req.uploadType || "profiles"}`);
     }
 
     await admin.save();

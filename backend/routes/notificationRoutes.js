@@ -39,9 +39,11 @@ router.put("/:id/read", protect, markAsRead);
 router.put("/read-all", protect, markAllAsRead);
 
 // Delete one notification
+router.delete("/clear", protect, clearNotifications);
+
+// Delete one notification
 router.delete("/:id", protect, deleteNotification);
 
-// Clear all notifications
 router.delete("/", protect, clearNotifications);
 
 module.exports = router;

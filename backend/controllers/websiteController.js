@@ -1,6 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const WebsiteContent = require("../models/WebsiteContent");
+const { resolveStoredFileUrl } = require("../utils/uploadUrl");
 
 const DEFAULT_SECTIONS = ["home", "about", "services", "contact", "footer", "settings", "gallery", "constitution", "privacy-policy", "terms-conditions"];
 
@@ -165,7 +166,7 @@ exports.uploadConstitutionFile = async (req, res) => {
             images: [],
         });
 
-        const fileUrl = `/documents/${req.file.filename}`;
+        const fileUrl = resolveStoredFileUrl(req.file, "/documents");
 
         section.content = {
             ...(typeof section.content === "object" && section.content ? section.content : {}),
@@ -207,7 +208,7 @@ exports.uploadGalleryImage = async (req, res) => {
             images: [],
         });
 
-        const imageUrl = `/uploads/${req.uploadType || "gallery"}/${req.file.filename}`;
+        const imageUrl = resolveStoredFileUrl(req.file, `/uploads/${req.uploadType || "gallery"}`);
 
         section.images = Array.from(new Set([...(section.images || []), imageUrl]));
 

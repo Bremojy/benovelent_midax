@@ -1,9 +1,59 @@
-const { upload } = require("../config/uploadConfig");
+const { upload, useCloudinary, uploadBufferToCloudinary } = require("../config/uploadConfig");
 
-// ======================================================
-// SET UPLOAD TYPE
-// This middleware tells Multer which folder to use.
-// ======================================================
+const decorateCloudinaryFile = (cloudResult, uploadType, sourceFile = {}) => {
+  if (!cloudResult) return sourceFile;
+
+  if (!useCloudinary) return sourceFile;
+
+  return {
+    ...sourceFile,
+    ...cloudResult,
+    path: cloudResult.secure_url || cloudResult.url || sourceFile.path,
+    url: cloudResult.secure_url || cloudResult.url || sourceFile.url || sourceFile.path,
+    secure_url: cloudResult.secure_url || cloudResult.url || sourceFile.path,
+    filename: cloudResult.public_id || sourceFile.filename || cloudResult.asset_id,
+    originalname: sourceFile.originalname || cloudResult.original_filename || sourceFile.name,
+    mimetype: sourceFile.mimetype || cloudResult.mimetype || sourceFile.mimetype,
+    size: cloudResult.bytes || sourceFile.size,
+    cloudinary: {
+      public_id: cloudResult.public_id,
+      resource_type: cloudResult.resource_type,
+      format: cloudResult.format,
+      folder: uploadType,
+    },
+  };
+};
+
+const uploadFilesToCloudinary = async (req) => {
+  if (!useCloudinary) return;
+
+  const uploadType = req.uploadType || "general";
+
+  if (req.file) {
+    const sourceFile = req.file;
+    const result = await uploadBufferToCloudinary(sourceFile, uploadType);
+    req.file = decorateCloudinaryFile(result, uploadType, sourceFile);
+  }
+
+  if (Array.isArray(req.files)) {
+    const uploaded = [];
+    for (const file of req.files) {
+      const result = await uploadBufferToCloudinary(file, uploadType);
+      uploaded.push(decorateCloudinaryFile(result, uploadType, file));
+    }
+    req.files = uploaded;
+  } else if (req.files && typeof req.files === "object") {
+    const nextFiles = {};
+    for (const [fieldName, files] of Object.entries(req.files)) {
+      nextFiles[fieldName] = [];
+      for (const file of files || []) {
+        const result = await uploadBufferToCloudinary(file, uploadType);
+        nextFiles[fieldName].push(decorateCloudinaryFile(result, uploadType, file));
+      }
+    }
+    req.files = nextFiles;
+  }
+};
 
 const setUploadType = (type) => {
   return (req, res, next) => {
@@ -12,66 +62,26 @@ const setUploadType = (type) => {
   };
 };
 
-// ======================================================
-// SINGLE FILE UPLOAD
-// ======================================================
-
-const uploadSingle = (fieldName = "file") => {
+const wrapUpload = (parser) => {
   return (req, res, next) => {
-    upload.single(fieldName)(req, res, (err) => {
+    parser(req, res, async (err) => {
       if (err) {
-        return res.status(400).json({
-          success: false,
-          message: err.message,
-        });
+        return res.status(400).json({ success: false, message: err.message });
       }
 
-      next();
+      try {
+        await uploadFilesToCloudinary(req);
+        next();
+      } catch (uploadError) {
+        next(uploadError);
+      }
     });
   };
 };
 
-// ======================================================
-// MULTIPLE FILES
-// ======================================================
-
-const uploadArray = (fieldName = "files", maxCount = 10) => {
-  return (req, res, next) => {
-    upload.array(fieldName, maxCount)(req, res, (err) => {
-      if (err) {
-        return res.status(400).json({
-          success: false,
-          message: err.message,
-        });
-      }
-
-      next();
-    });
-  };
-};
-
-// ======================================================
-// MULTIPLE NAMED FIELDS
-// ======================================================
-
-const uploadFields = (fields = []) => {
-  return (req, res, next) => {
-    upload.fields(fields)(req, res, (err) => {
-      if (err) {
-        return res.status(400).json({
-          success: false,
-          message: err.message,
-        });
-      }
-
-      next();
-    });
-  };
-};
-
-// ======================================================
-// EXPORTS
-// ======================================================
+const uploadSingle = (fieldName = "file") => wrapUpload(upload.single(fieldName));
+const uploadArray = (fieldName = "files", maxCount = 10) => wrapUpload(upload.array(fieldName, maxCount));
+const uploadFields = (fields = []) => wrapUpload(upload.fields(fields));
 
 module.exports = {
   setUploadType,

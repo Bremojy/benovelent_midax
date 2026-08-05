@@ -12,6 +12,7 @@ const Dependent = require("../models/Dependent");
 const MedicalSupport = require("../models/MedicalSupport");
 const FuneralSupport = require("../models/FuneralSupport");
 const EducationSupport = require("../models/EducationSupport");
+const { resolveStoredFileUrl } = require("../utils/uploadUrl");
 
 const calculateProfileCompletion =
 require("../utils/calculateProfileCompletion");
@@ -512,12 +513,12 @@ const allowedFields = [
 
         if (uploadedFiles.profileImage?.[0]) {
             const file = uploadedFiles.profileImage[0];
-            member.profileImage = `${fileBase}/${file.filename}`;
+            member.profileImage = resolveStoredFileUrl(file, fileBase);
         }
 
         if (uploadedFiles.passportPhoto?.[0]) {
             const file = uploadedFiles.passportPhoto[0];
-            const filePath = `${fileBase}/${file.filename}`;
+            const filePath = resolveStoredFileUrl(file, fileBase);
             member.passportPhoto = filePath;
             member.documents = member.documents || {};
             member.documents.passportPhoto = filePath;
@@ -526,19 +527,19 @@ const allowedFields = [
         if (uploadedFiles.nationalIdFront?.[0]) {
             const file = uploadedFiles.nationalIdFront[0];
             member.documents = member.documents || {};
-            member.documents.nationalIdFront = `${fileBase}/${file.filename}`;
+            member.documents.nationalIdFront = resolveStoredFileUrl(file, fileBase);
         }
 
         if (uploadedFiles.nationalIdBack?.[0]) {
             const file = uploadedFiles.nationalIdBack[0];
             member.documents = member.documents || {};
-            member.documents.nationalIdBack = `${fileBase}/${file.filename}`;
+            member.documents.nationalIdBack = resolveStoredFileUrl(file, fileBase);
         }
 
         if (uploadedFiles.signature?.[0]) {
             const file = uploadedFiles.signature[0];
             member.documents = member.documents || {};
-            member.documents.signature = `${fileBase}/${file.filename}`;
+            member.documents.signature = resolveStoredFileUrl(file, fileBase);
         }
 
         member.lastSeen = new Date();

@@ -1,4 +1,5 @@
 const bcrypt = require("bcryptjs");
+const { resolveStoredFileUrl } = require("../utils/uploadUrl");
 
 const Admin = require("../models/Admin");
 
@@ -742,7 +743,7 @@ exports.updateProfile = async (req, res) => {
     }
 
     if (req.files?.profileImage?.[0]) {
-      profile.profileImage = `/uploads/${req.uploadType || "profiles"}/${req.files.profileImage[0].filename}`;
+      profile.profileImage = resolveStoredFileUrl(req.files.profileImage[0], `/uploads/${req.uploadType || "profiles"}`);
     }
 
     await profile.save();

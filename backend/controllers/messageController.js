@@ -3,6 +3,7 @@ const { getChatActorId } = require("../utils/chatProfile");
 const Message = require("../models/Message");
 const Conversation = require("../models/Conversation");
 const Notification = require("../models/Notification");
+const { resolveStoredFileUrl } = require("../utils/uploadUrl");
 
 /* =====================================================
 SEND MESSAGE
@@ -573,7 +574,7 @@ exports.uploadMessageAsset = async (req, res) => {
             });
         }
 
-        const assetUrl = `/uploads/${req.uploadType || "messages"}/${req.file.filename}`;
+        const assetUrl = resolveStoredFileUrl(req.file, `/uploads/${req.uploadType || "messages"}`);
 
         return res.status(201).json({
             success: true,

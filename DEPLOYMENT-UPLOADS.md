@@ -1,20 +1,24 @@
 # Benevolent Midax deployment notes
 
-## Render persistent uploads
+## Upload storage on Render
 
-The application keeps uploads on the backend filesystem as requested. For Render, the filesystem is not durable across restarts unless a persistent disk is mounted.
-
-Mount a Render persistent disk at:
-
-`/var/data`
+The backend now supports Cloudinary uploads, which is the recommended option for Render because uploaded files receive permanent public URLs instead of being stored on temporary disk.
 
 Set these backend environment variables:
 
-`UPLOAD_ROOT=/var/data/uploads`
+`CLOUDINARY_CLOUD_NAME=...`
 
-`DOCUMENT_ROOT=/var/data/documents`
+`CLOUDINARY_API_KEY=...`
 
-The backend automatically creates the folders when an upload arrives.
+`CLOUDINARY_API_SECRET=...`
+
+If you still want local filesystem storage in development, you can keep these optional fallback paths:
+
+`UPLOAD_ROOT=./backend/uploads`
+
+`DOCUMENT_ROOT=./backend/documents`
+
+For Render persistent disk storage, mount a disk at `/var/data` and point the fallback paths there.
 
 This covers:
 - carousel images
@@ -39,3 +43,7 @@ The current constitution supplied for this update is bundled in both:
 - `public/documents/benevolent-midax-constitution.pdf`
 
 The backend serves it through `/documents/benevolent-midax-constitution.pdf`.
+
+
+## Cloudinary
+Use either `CLOUDINARY_URL` or the separate `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, and `CLOUDINARY_API_SECRET` variables.
