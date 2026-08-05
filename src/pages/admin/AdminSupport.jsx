@@ -84,7 +84,17 @@ export default function AdminSupport() {
       const { data } = await API.post(url, payload);
       if (!data?.success) throw new Error(data?.message || "Unable to send support message.");
 
-      setSuccess(broadcast ? "Broadcast sent to members by email, SMS and in-app notification when configured." : "Message sent successfully.");
+      const emailSent = data?.result?.emailResult?.sent || 0;
+      const smsSent = data?.result?.smsResult?.sent || 0;
+      const inAppSent = data?.result?.inAppNotifications || data?.result?.membersCount || 0;
+      const emailSkipped = data?.result?.emailResult?.skipped;
+      const smsSkipped = data?.result?.smsResult?.skipped;
+
+      setSuccess(
+        broadcast
+          ? `Broadcast processed. In-app: ${inAppSent}. Email: ${emailSent}${emailSkipped ? ` (skipped: ${emailSkipped})` : ""}. SMS: ${smsSent}${smsSkipped ? ` (skipped: ${smsSkipped})` : ""}.`
+          : "Message sent successfully."
+      );
       setForm({ recipient: "", title: "", message: "" });
     } catch (e) {
       setError(e.response?.data?.message || e.message || "Unable to send message.");
@@ -142,8 +152,10 @@ export default function AdminSupport() {
 
       const { data } = await createAdminMember(payload);
       const tempPassword = data?.temporaryPassword || "Check the success response";
+      const emailStatus = data?.delivery?.email?.sent ? "email sent" : data?.delivery?.email?.reason ? `email skipped (${data.delivery.email.reason})` : "email status unknown";
+      const smsStatus = data?.delivery?.sms?.sent ? "sms sent" : data?.delivery?.sms?.reason ? `sms skipped (${data.delivery.sms.reason})` : "sms status unknown";
 
-      setSuccess(`Member invited successfully. Temporary password: ${tempPassword}`);
+      setSuccess(`Member invited successfully. Temporary password: ${tempPassword}. Delivery: ${emailStatus}, ${smsStatus}.`);
       setInvite({ memberNumber: "", fullName: "", username: "", phone: "", email: "", department: "", position: "", monthlyContribution: "" });
       await load();
     } catch (e) {
@@ -275,12 +287,20 @@ export default function AdminSupport() {
                       <div><strong>Passport</strong><div>{member.passportPhoto ? "Uploaded" : "Missing"}</div></div>
                       <div><strong>ID Front</strong><div>{member.documents?.nationalIdFront || member.nationalIdFront ? "Uploaded" : "Missing"}</div></div>
                       <div><strong>ID Back</strong><div>{member.documents?.nationalIdBack || member.nationalIdBack ? "Uploaded" : "Missing"}</div></div>
+                      <div><strong>Signature</strong><div>{member.documents?.signature || member.signature ? "Uploaded" : "Missing"}</div></div>
                       <div><strong>Constitution</strong><div>{member.acceptedConstitution ? "Accepted" : "Pending"}</div></div>
+                      <div><strong>Privacy Policy</strong><div>{member.acceptedPrivacyPolicy ? "Accepted" : "Pending"}</div></div>
+                      <div><strong>Declaration</strong><div>{member.acceptedDeclaration ? "Accepted" : "Pending"}</div></div>
+                      <div><strong>Profile completion</strong><div>{member.profileCompletion ?? member.profileCompletion === 0 ? `${member.profileCompletion}%` : "—"}</div></div>
                     </div>
 
                     <div style={{ marginTop: 10, display: "grid", gap: 8 }}>
+                      <div><strong>Phone:</strong> {member.phone || "—"} | <strong>Email:</strong> {member.email || "—"}</div>
+                      <div><strong>National ID:</strong> {member.nationalId || "—"} | <strong>Gender:</strong> {member.gender || "—"} | <strong>DOB:</strong> {member.dateOfBirth ? new Date(member.dateOfBirth).toLocaleDateString() : "—"}</div>
                       <div><strong>Address:</strong> {member.physicalAddress || "—"}</div>
                       <div><strong>Site station:</strong> {member.siteStation === "None of above" ? member.customSiteStation || "—" : member.siteStation || "—"}</div>
+                      <div><strong>Occupation:</strong> {member.occupation || "—"} | <strong>Employer:</strong> {member.employer || "—"} | <strong>Income:</strong> {member.monthlyIncome || "—"}</div>
+                      <div><strong>M-Pesa:</strong> {member.mpesaNumber || "—"} | <strong>Bank:</strong> {member.bankName || "—"} / {member.bankBranch || "—"} | <strong>Account:</strong> {member.accountNumber || "—"}</div>
                       <div><strong>Emergency contact:</strong> {member.emergencyContact?.fullName || "—"} {member.emergencyContact?.phone ? `(${member.emergencyContact.phone})` : ""}</div>
                       <div><strong>Next of kin:</strong> {member.nextOfKin?.fullName || "—"} {member.nextOfKin?.phone ? `(${member.nextOfKin.phone})` : ""}</div>
                     </div>

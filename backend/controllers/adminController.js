@@ -413,14 +413,19 @@ exports.createMember = async (req, res) => {
         <p>Please sign in and change your password immediately.</p>
       </div>`;
 
-    await Promise.allSettled([
+    const delivery = await Promise.allSettled([
       member.email
         ? sendEmail({ to: member.email, subject: inviteSubject, text: inviteMessage, html: inviteHtml })
-        : Promise.resolve(),
+        : Promise.resolve({ skipped: true, reason: "no-email" }),
       member.phone
         ? sendSmsNotification({ to: member.phone, message: `MIDAX login: ${member.username || member.email || member.phone}. Temp password: ${temporaryPassword}` })
-        : Promise.resolve(),
+        : Promise.resolve({ skipped: true, reason: "no-phone" }),
     ]);
+
+    const deliveryResult = {
+      email: delivery[0]?.status === "fulfilled" ? delivery[0].value : { sent: false, error: delivery[0]?.reason?.message || "email-failed" },
+      sms: delivery[1]?.status === "fulfilled" ? delivery[1].value : { sent: false, error: delivery[1]?.reason?.message || "sms-failed" },
+    };
 
     // ==========================================
     // REMOVE PASSWORD FROM RESPONSE
@@ -442,6 +447,8 @@ exports.createMember = async (req, res) => {
         "Member account created successfully.",
 
       temporaryPassword,
+
+      delivery: deliveryResult,
 
       member:
         memberResponse,

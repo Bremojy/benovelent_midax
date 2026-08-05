@@ -42,6 +42,7 @@ async function getTransport() {
 async function getActiveMembers({ includeEmails = true } = {}) {
   const projection = includeEmails ? "fullName email phone mpesaNumber status emailNotifications notifications" : "fullName status";
   return Member.find({
+    role: "member",
     status: "active",
     isDeleted: false,
     $or: [

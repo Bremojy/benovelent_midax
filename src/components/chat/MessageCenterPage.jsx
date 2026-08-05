@@ -295,7 +295,7 @@ function getToken(role) {
 function normalizeMembers(items, actorId) {
   const unique = new Map();
   (items || []).forEach((member) => {
-    const id = String(member?._id || "");
+    const id = String(member?._id || "").trim();
     if (!id || id === String(actorId)) return;
 
     const role = String(member?.role || "").toLowerCase();
@@ -304,7 +304,14 @@ function normalizeMembers(items, actorId) {
       role === "admin" ? "Leader" :
       "Member";
 
-    unique.set(id, {
+    const email = String(member?.email || "").trim().toLowerCase();
+    const phone = String(member?.phone || "").trim();
+    const memberNumber = String(member?.memberNumber || "").trim();
+    const dedupeKey = [role, email || phone || memberNumber || id].filter(Boolean).join("|");
+
+    if (unique.has(dedupeKey)) return;
+
+    unique.set(dedupeKey, {
       ...member,
       _id: id,
       role,

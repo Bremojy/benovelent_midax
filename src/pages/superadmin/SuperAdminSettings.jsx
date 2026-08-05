@@ -258,7 +258,7 @@ export default function SuperAdminSettings() {
       });
 
       setSlides((prev) => [data.slide, ...prev]);
-      setMessage("Carousel slide uploaded and saved locally under /uploads/carousel.");
+      setMessage("Carousel slide uploaded to Cloudinary and published to the public carousel.");
       setUploadFile(null);
       setCarouselForm({
         title: "",
@@ -328,7 +328,7 @@ export default function SuperAdminSettings() {
       const images = data?.section?.images || [];
       setGallery(Array.isArray(images) ? images : gallery);
       setGalleryFile(null);
-      setMessage("Gallery image saved locally and published to the public gallery.");
+      setMessage("Gallery image uploaded to Cloudinary and published to the public gallery.");
     } catch (err) {
       setError(err.response?.data?.message || err.message || "Unable to upload gallery image.");
     } finally {
@@ -448,7 +448,7 @@ export default function SuperAdminSettings() {
           <div className="portal-form-grid">
             <div className="portal-field" style={{ gridColumn: "1 / -1" }}>
               <p style={{ margin: 0, color: "#666", lineHeight: 1.6 }}>
-                The public site can be edited through the Website content tab. Carousel slides are what show on the home hero. Leaders are shown on the public leadership page. Gallery images are saved locally on the backend and reflected on the public gallery page.
+                The public site can be edited through the Website content tab. Carousel slides are what show on the home hero. Leaders are shown on the public leadership page. Gallery images are uploaded to Cloudinary and reflected on the public gallery page.
               </p>
             </div>
           </div>
@@ -734,7 +734,7 @@ export default function SuperAdminSettings() {
                     <Check size={20} />
                     <div>
                       <span>PUBLIC GALLERY</span>
-                      <h2>Images saved locally</h2>
+                      <h2>Images uploaded to Cloudinary</h2>
                     </div>
                   </div>
 
@@ -757,7 +757,7 @@ export default function SuperAdminSettings() {
 
         <section className="portal-panel">
           <p style={{ color: "#666" }}>
-            Signed in as <strong>{user?.fullName || user?.name || "Super Administrator"}</strong> ({roleLabel}). Carousel, leader and gallery uploads are stored locally on the backend and served statically by the server.
+            Signed in as <strong>{user?.fullName || user?.name || "Super Administrator"}</strong> ({roleLabel}). Carousel, leader and gallery uploads are stored in Cloudinary and served through permanent URLs.
           </p>
         </section>
       </div>

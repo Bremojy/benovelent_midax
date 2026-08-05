@@ -83,7 +83,7 @@ router.put("/change-password", protect, isAdmin, changePassword);
 router.get("/settings", protect, isAdmin, getSettings);
 router.put("/settings", protect, isAdmin, updateSettings);
 router.get("/colleagues", protect, isAdminOrSuperAdmin, getColleagues);
-router.post("/claims/:type/:id/open", protect, isAdmin, openClaimDocument);
+router.post("/claims/:type/:id/open", protect, isAdminOrSuperAdmin, openClaimDocument);
 
 router.post(
   "/members",

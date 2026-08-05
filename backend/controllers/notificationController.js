@@ -240,7 +240,7 @@ exports.broadcastToMembers = async (req, res) => {
 
     const contactableMembers = await getActiveMembers({ includeEmails: true });
     const inAppMembers = inApp
-      ? await Member.find({ status: "active", isDeleted: false }).select("_id").lean()
+      ? await Member.find({ role: "member", status: "active", isDeleted: false }).select("_id").lean()
       : [];
     const senderModel = senderModelFromUser(req.user);
 
@@ -266,13 +266,14 @@ exports.broadcastToMembers = async (req, res) => {
       html: emailHtml || `<h2>${title.trim()}</h2><p>${message.trim().replace(/\n/g, "<br>")}</p>`,
       smsText: smsText || message.trim(),
       broadcastSms: Boolean(broadcastSms),
+      members: contactableMembers,
     });
 
     return res.status(201).json({
       success: true,
       message: "Broadcast sent successfully.",
       result,
-      inAppNotifications: inApp ? members.length : 0,
+      inAppNotifications: inApp ? inAppMembers.length : 0,
     });
   } catch (error) {
     console.error("Broadcast notification error:", error);

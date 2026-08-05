@@ -1327,7 +1327,7 @@ exports.getChatMembers = async (req, res) => {
         }
 
         const [members, admins, superAdmins, conversations] = await Promise.all([
-            Member.find(memberFilter)
+            Member.find({ ...memberFilter, role: "member" })
                 .select("fullName username profileImage online lastSeen status memberNumber department position phone email role")
                 .sort({ role: 1, fullName: 1 })
                 .limit(limit)

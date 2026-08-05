@@ -435,8 +435,8 @@ function SuperAdminDashboard() {
                 icon={
                   <ShieldCheck size={21} />
                 }
-                title="System Security"
-                description="Review system access"
+                title="Website Settings"
+                description="Edit content, leaders, gallery and uploads"
                 href="/superadmin/settings"
               />
 

@@ -197,6 +197,7 @@ const SuperAdminSettings = lazy(() => import("./pages/superadmin/SuperAdminSetti
 const SuperAdminSystem = lazy(() => import("./pages/superadmin/SuperAdminSystem"));
 const SuperAdminConstitution = lazy(() => import("./pages/superadmin/SuperAdminConstitution"));
 const SuperAdminNotifications = lazy(() => import("./pages/superadmin/SuperAdminNotifications"));
+const SuperAdminMessages = lazy(() => import("./pages/superadmin/SuperAdminMessages"));
 
 
 // =====================================================
@@ -385,8 +386,8 @@ function AppContent() {
 
           <Route path="/admin/accounts" element={<ProtectedRoute allowedRoles={["admin"]}><AdminFinance /></ProtectedRoute>} />
           <Route path="/admin/finance" element={<Navigate to="/admin/accounts" replace />} />
-          <Route path="/admin/claims" element={<ProtectedRoute allowedRoles={["admin"]}><AdminClaims /></ProtectedRoute>} />
-          <Route path="/admin/support" element={<ProtectedRoute allowedRoles={["admin"]}><AdminSupport /></ProtectedRoute>} />
+          <Route path="/admin/claims" element={<ProtectedRoute allowedRoles={["admin", "superadmin"]}><AdminClaims /></ProtectedRoute>} />
+          <Route path="/admin/support" element={<ProtectedRoute allowedRoles={["admin", "superadmin"]}><AdminSupport /></ProtectedRoute>} />
           <Route path="/admin/messages" element={<ProtectedRoute allowedRoles={["admin"]}><AdminMessages /></ProtectedRoute>} />
           <Route path="/admin/notifications" element={<ProtectedRoute allowedRoles={["admin"]}><AdminNotifications /></ProtectedRoute>} />
           <Route path="/admin/settings" element={<ProtectedRoute allowedRoles={["admin"]}><PortalSettings /></ProtectedRoute>} />
@@ -573,6 +574,9 @@ function AppContent() {
           <Route path="/superadmin/finance" element={<Navigate to="/superadmin/accounts" replace />} />
           <Route path="/superadmin/audit" element={<ProtectedRoute allowedRoles={["superadmin"]}><SuperAdminAudit /></ProtectedRoute>} />
           <Route path="/superadmin/notifications" element={<ProtectedRoute allowedRoles={["superadmin"]}><SuperAdminNotifications /></ProtectedRoute>} />
+          <Route path="/superadmin/messages" element={<ProtectedRoute allowedRoles={["superadmin"]}><SuperAdminMessages /></ProtectedRoute>} />
+          <Route path="/superadmin/claims" element={<ProtectedRoute allowedRoles={["superadmin"]}><AdminClaims /></ProtectedRoute>} />
+          <Route path="/superadmin/support" element={<ProtectedRoute allowedRoles={["superadmin"]}><AdminSupport /></ProtectedRoute>} />
           <Route path="/superadmin/settings" element={<ProtectedRoute allowedRoles={["superadmin"]}><SuperAdminSettings /></ProtectedRoute>} />
           <Route path="/superadmin/password" element={<ProtectedRoute allowedRoles={["superadmin"]}><PortalSettings /></ProtectedRoute>} />
           <Route path="/superadmin/system" element={<ProtectedRoute allowedRoles={["superadmin"]}><SuperAdminSystem /></ProtectedRoute>} />
