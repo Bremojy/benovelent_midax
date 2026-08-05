@@ -97,7 +97,7 @@ const contributionSchema = new mongoose.Schema({
     timestamps:true
 });
 
-contributionSchema.pre("save",function(next){
+contributionSchema.pre("save",async function(){
 
     this.balance=this.expectedAmount-this.paidAmount;
 
@@ -113,7 +113,6 @@ contributionSchema.pre("save",function(next){
 
     }
 
-    next();
 
 });
 

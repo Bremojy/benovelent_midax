@@ -1,4 +1,4 @@
-const { upload, useCloudinary, isProduction, uploadBufferToCloudinary } = require("../config/uploadConfig");
+const { upload, useCloudinary, uploadBufferToCloudinary } = require("../config/uploadConfig");
 
 const decorateCloudinaryFile = (cloudResult, uploadType, sourceFile = {}) => {
   if (!cloudResult) return sourceFile;
@@ -70,13 +70,6 @@ const wrapUpload = (parser) => {
       }
 
       try {
-        if (isProduction && !useCloudinary) {
-          return res.status(500).json({
-            success: false,
-            message: "Cloudinary is not configured on the backend. Add CLOUDINARY_URL or CLOUDINARY_* environment variables on Render.",
-          });
-        }
-
         await uploadFilesToCloudinary(req);
         next();
       } catch (uploadError) {

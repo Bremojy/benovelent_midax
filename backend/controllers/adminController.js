@@ -24,20 +24,20 @@ exports.getDashboard = async (req, res) => {
       bookBalance,
       approvedClaims,
     ] = await Promise.all([
-      Member.countDocuments({ isDeleted: false }),
-      Member.countDocuments({ status: "active", isDeleted: false }),
-      Member.countDocuments({ status: "inactive", isDeleted: false }),
-      Member.countDocuments({ status: "suspended", isDeleted: false }),
-      Member.countDocuments({ online: true, isDeleted: false }),
-      Member.countDocuments({ verified: true, isDeleted: false }),
-      Member.countDocuments({ profileCompleted: true, isDeleted: false }),
-      Member.countDocuments({ profileCompleted: { $ne: true }, isDeleted: false }),
+      Member.countDocuments({ role: "member", isDeleted: false }),
+      Member.countDocuments({ role: "member", status: "active", isDeleted: false }),
+      Member.countDocuments({ role: "member", status: "inactive", isDeleted: false }),
+      Member.countDocuments({ role: "member", status: "suspended", isDeleted: false }),
+      Member.countDocuments({ role: "member", online: true, isDeleted: false }),
+      Member.countDocuments({ role: "member", verified: true, isDeleted: false }),
+      Member.countDocuments({ role: "member", profileCompleted: true, isDeleted: false }),
+      Member.countDocuments({ role: "member", profileCompleted: { $ne: true }, isDeleted: false }),
       require("../models/Admin").countDocuments({ status: { $ne: "deleted" } }),
       Finance.aggregate([{ $match: { status: { $in: ["approved", "completed"] } } }, { $group: { _id: null, total: { $sum: { $cond: [{ $in: ["$type", ["contribution", "income"]] }, "$amount", { $multiply: ["$amount", -1] }] } } } }]),
       Finance.countDocuments({ type: "claim", status: { $in: ["approved", "completed"] } }),
     ]);
 
-    const incompleteMembers = (await Member.find({ isDeleted: false, profileCompleted: { $ne: true } }).select("fullName memberNumber profileCompletion").sort({ profileCompletion: 1, createdAt: -1 }).limit(20).lean()).map((m) => ({ ...m, missingFields: calculateProfileCompletion(m).missingFields }));
+    const incompleteMembers = (await Member.find({ role: "member", isDeleted: false, profileCompleted: { $ne: true } }).select("fullName memberNumber profileCompletion").sort({ profileCompletion: 1, createdAt: -1 }).limit(20).lean()).map((m) => ({ ...m, missingFields: calculateProfileCompletion(m).missingFields }));
 
     res.json({
       success: true,
@@ -101,6 +101,7 @@ exports.getMembers = async (req, res) => {
     const search = req.query.search || "";
 
     const query = {
+      role: "member",
       isDeleted: false,
       $or: [
         { fullName: { $regex: search, $options: "i" } },
@@ -374,9 +375,6 @@ exports.createMember = async (req, res) => {
       memberData.documents.signature = resolveStoredFileUrl(req.files.signature[0], `/uploads/${req.uploadType || "member-documents"}`);
     }
 
-    memberData.nextOfKin = normalizeProfileObject(req.body.nextOfKin);
-    memberData.emergencyContact = normalizeProfileObject(req.body.emergencyContact);
-
     // ==========================================
     // CREATE MEMBER
     // ==========================================
@@ -611,23 +609,7 @@ exports.updateMember = async (req, res) => {
       member.customSiteStation = String(req.body.customSiteStation ?? member.customSiteStation ?? "").trim();
     }
 
-    const incomingNextOfKin = normalizeProfileObject(req.body.nextOfKin);
-    const incomingEmergencyContact = normalizeProfileObject(req.body.emergencyContact);
-
-    if (Object.keys(incomingNextOfKin).length) {
-      member.nextOfKin = {
-        ...(member.nextOfKin?.toObject?.() || member.nextOfKin || {}),
-        ...incomingNextOfKin,
-      };
-    }
-
-    if (Object.keys(incomingEmergencyContact).length) {
-      member.emergencyContact = {
-        ...(member.emergencyContact?.toObject?.() || member.emergencyContact || {}),
-        ...incomingEmergencyContact,
-      };
-    }
-
+    if (req.body.nextOfKin && typeof req.body.nextOfKin === "object") member.nextOfKin = { ...(member.nextOfKin?.toObject?.() || member.nextOfKin || {}), ...req.body.nextOfKin };
     const completion = calculateProfileCompletion(member);
     member.profileCompletion = completion.percentage;
     member.profileCompleted = completion.percentage === 100;
@@ -866,47 +848,58 @@ exports.restoreMember = async (req,res)=>{
    RESET MEMBER PASSWORD
 ===================================================== */
 
-exports.resetPassword = async (req, res) => {
-  try {
-    const member = await Member.findById(req.params.id);
+exports.resetPassword = async (req,res)=>{
 
-    if (!member) {
+  try{
+
+    const member =
+      await Member.findById(req.params.id);
+
+    if(!member){
+
       return res.status(404).json({
-        success: false,
-        message: "Member not found.",
+
+        success:false,
+
+        message:"Member not found."
+
       });
+
     }
 
     const temporaryPassword = `MIDAX@${Math.floor(100000 + Math.random() * 900000)}`;
-    const hashedPassword = await bcrypt.hash(temporaryPassword, 10);
 
-    await Member.findByIdAndUpdate(
-      req.params.id,
-      {
-        $set: {
-          password: hashedPassword,
-          mustChangePassword: true,
-          passwordChangedAt: new Date(),
-        },
-        $unset: {
-          resetPasswordToken: 1,
-          resetPasswordExpires: 1,
-        },
-      },
-      { runValidators: false }
-    );
+    // Member schema hashes the plaintext password on save.
+    member.password = temporaryPassword;
+
+    member.mustChangePassword = true;
+
+    await member.save();
 
     res.json({
-      success: true,
-      message: "Password reset successfully.",
-      temporaryPassword,
+
+      success:true,
+
+      message:"Password reset successfully.",
+
+      temporaryPassword
+
     });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
+
   }
+
+  catch(error){
+
+    res.status(500).json({
+
+      success:false,
+
+      message:error.message
+
+    });
+
+  }
+
 };
 
 /* =====================================================
@@ -917,6 +910,7 @@ exports.getRecentMembers = async (req, res) => {
   try {
 
     const members = await Member.find({
+      role: "member",
       isDeleted: false
     })
       .select("-password")
@@ -960,7 +954,7 @@ exports.getStatistics = async (req, res) => {
       deletedMembers,
     ] = await Promise.all([
 
-      Member.countDocuments({ isDeleted: false }),
+      Member.countDocuments({ role: "member", isDeleted: false }),
 
       Member.countDocuments({
         status: "active",
@@ -1054,6 +1048,7 @@ exports.filterMembers = async (req, res) => {
     } = req.query;
 
     const query = {
+      role: "member",
       isDeleted: false,
     };
 

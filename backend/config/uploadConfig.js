@@ -12,9 +12,10 @@ const useCloudinary = Boolean(
   cloudinaryUrl || (cloudName && apiKey && apiSecret)
 );
 
-const isProduction =
-  process.env.RENDER === "true" ||
-  process.env.NODE_ENV === "production";
+
+if (process.env.NODE_ENV === "production" && !useCloudinary) {
+  console.warn("Cloudinary environment variables are missing. Production uploads will fail until CLOUDINARY_URL or CLOUDINARY_CLOUD_NAME/API_KEY/API_SECRET are configured.");
+}
 
 if (useCloudinary) {
   if (cloudinaryUrl) {
@@ -31,13 +32,13 @@ if (useCloudinary) {
 
 const uploadRoot = process.env.UPLOAD_ROOT
   ? path.resolve(process.env.UPLOAD_ROOT)
-  : (isProduction
+  : (process.env.RENDER === "true" || process.env.NODE_ENV === "production"
       ? path.join("/var", "data", "uploads")
       : path.join(__dirname, "..", "uploads"));
 
 const documentRoot = process.env.DOCUMENT_ROOT
   ? path.resolve(process.env.DOCUMENT_ROOT)
-  : (isProduction
+  : (process.env.RENDER === "true" || process.env.NODE_ENV === "production"
       ? path.join("/var", "data", "documents")
       : path.join(__dirname, "..", "documents"));
 
@@ -57,7 +58,7 @@ const localStorage = multer.diskStorage({
   },
 });
 
-const storage = useCloudinary ? multer.memoryStorage() : (isProduction ? multer.memoryStorage() : localStorage);
+const storage = useCloudinary ? multer.memoryStorage() : localStorage;
 
 const allowedMimeTypes = new Set([
   "image/jpeg", "image/png", "image/webp", "image/gif", "image/svg+xml",
@@ -109,7 +110,6 @@ module.exports = {
   uploadRoot,
   documentRoot,
   useCloudinary,
-  isProduction,
   cloudinary,
   getCloudinaryFolder,
   uploadBufferToCloudinary,

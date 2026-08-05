@@ -497,7 +497,7 @@ memberSchema.methods.matchPassword = async function (enteredPassword) {
 // HASH PASSWORD
 // =====================================
 
-memberSchema.pre("validate", function () {
+memberSchema.pre("validate", async function () {
   const currentStation = String(this.siteStation || "").trim();
   if (!currentStation || !SITE_STATIONS.includes(currentStation)) {
     this.siteStation = currentStation === "None of above" ? currentStation : "";
@@ -507,29 +507,14 @@ memberSchema.pre("validate", function () {
     this.customSiteStation = this.customSiteStation ? String(this.customSiteStation).trim() : "";
   }
 
-  const normalizeContact = (value) => {
-    if (!value) return {};
-    if (typeof value === "string") {
-      try {
-        const parsed = JSON.parse(value);
-        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-          value = parsed;
-        }
-      } catch (error) {
-        return {};
-      }
-    }
-    if (typeof value !== "object" || Array.isArray(value)) return {};
-    return {
-      fullName: String(value.fullName || "").trim(),
-      relationship: String(value.relationship || "").trim(),
-      phone: String(value.phone || "").trim(),
-      nationalId: String(value.nationalId || "").trim(),
+  if (this.nextOfKin && typeof this.nextOfKin === "object") {
+    this.nextOfKin = {
+      fullName: String(this.nextOfKin.fullName || "").trim(),
+      relationship: String(this.nextOfKin.relationship || "").trim(),
+      phone: String(this.nextOfKin.phone || "").trim(),
+      nationalId: String(this.nextOfKin.nationalId || "").trim(),
     };
-  };
-
-  this.nextOfKin = normalizeContact(this.nextOfKin);
-  this.emergencyContact = normalizeContact(this.emergencyContact);
+  }
 });
 
 memberSchema.pre("save", async function () {

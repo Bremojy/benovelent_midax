@@ -185,7 +185,7 @@ const educationSupportSchema = new mongoose.Schema(
 // AUTO CALCULATE LOAN
 // =====================================
 
-educationSupportSchema.pre("save", function (next) {
+educationSupportSchema.pre("save", async function () {
   this.interestAmount =
     (this.requestedAmount * this.interestRate) / 100;
 
@@ -199,8 +199,6 @@ educationSupportSchema.pre("save", function (next) {
       this.totalRepayment /
         this.repaymentPeriodMonths
     );
-
-  next();
 });
 
 // =====================================

@@ -137,7 +137,7 @@ exports.getConstitution = async (req, res) => {
             title: "Constitution",
             subtitle: "Official governance document",
             description: "The latest Benevolent Midax Constitution file.",
-            content: { fileUrl: "", fileName: "Benevolent Midax Constitution.pdf" },
+            content: { fileUrl: "/documents/benevolent-midax-constitution.pdf", fileName: "Benevolent Midax Constitution.pdf" },
             images: [],
         });
 
@@ -162,7 +162,7 @@ exports.uploadConstitutionFile = async (req, res) => {
             title: "Constitution",
             subtitle: "Official governance document",
             description: "The latest Benevolent Midax Constitution file.",
-            content: { fileUrl: "", fileName: "Benevolent Midax Constitution.pdf" },
+            content: { fileUrl: "/documents/benevolent-midax-constitution.pdf", fileName: "Benevolent Midax Constitution.pdf" },
             images: [],
         });
 

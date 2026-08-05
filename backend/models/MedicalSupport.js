@@ -218,13 +218,12 @@ const medicalSupportSchema = new mongoose.Schema(
 // =====================================
 // Calculate Outstanding Balance
 // =====================================
-medicalSupportSchema.pre("save",function(next){
+medicalSupportSchema.pre("save",async function(){
 
     this.balance =
     (this.approvedAmount || 0) -
     (this.paidAmount || 0);
 
-    next();
 
 });
 
