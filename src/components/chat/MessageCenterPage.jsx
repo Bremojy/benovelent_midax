@@ -143,6 +143,10 @@ function MessageCenterPage({
         setBanner("You cannot chat with yourself.");
         return;
       }
+      if (String(person.role || "").toLowerCase() === "superadmin") {
+        setBanner("SuperAdmin conversations are disabled.");
+        return;
+      }
       
       const existingConversation =
         normalizedConversations.find(
@@ -299,8 +303,9 @@ function normalizeMembers(items, actorId) {
     if (!id || id === String(actorId)) return;
 
     const role = String(member?.role || "").toLowerCase();
+    if (role === "superadmin") return;
+
     const roleLabel =
-      role === "superadmin" ? "SuperAdmin" :
       role === "admin" ? "Leader" :
       "Member";
 
@@ -338,6 +343,10 @@ function normalizeConversation(conversation, currentUserId) {
     conversation.partner ||
     participants.find((member) => String(member?._id || member) !== String(currentUserId)) ||
     null;
+
+  if (String(partner?.role || "").toLowerCase() === "superadmin") {
+    return null;
+  }
 
   return {
     ...conversation,

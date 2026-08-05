@@ -1326,7 +1326,7 @@ exports.getChatMembers = async (req, res) => {
             ];
         }
 
-        const [members, admins, superAdmins, conversations] = await Promise.all([
+        const [members, admins, conversations] = await Promise.all([
             Member.find({ ...memberFilter, role: "member" })
                 .select("fullName username profileImage online lastSeen status memberNumber department position phone email role")
                 .sort({ role: 1, fullName: 1 })
@@ -1334,13 +1334,6 @@ exports.getChatMembers = async (req, res) => {
                 .lean(),
             Admin.find(adminFilter)
                 .select("fullName name email phone profileImage online lastSeen status role position")
-                .limit(limit)
-                .lean(),
-            SuperAdmin.find({
-                status: { $ne: "deleted" },
-                _id: { $ne: currentUserId },
-            })
-                .select("name email phone profileImage online lastSeen status role")
                 .limit(limit)
                 .lean(),
             Conversation.find({
@@ -1364,6 +1357,9 @@ exports.getChatMembers = async (req, res) => {
 
         const normalizeContact = (user, defaultRole) => {
             const role = String(user.role || defaultRole || "member").toLowerCase();
+            if (role === "superadmin") {
+                return null;
+            }
             const fullName = user.fullName || user.name || "User";
             const contactId = String(user._id);
             return {
@@ -1371,7 +1367,7 @@ exports.getChatMembers = async (req, res) => {
                 _id: contactId,
                 fullName,
                 role,
-                roleLabel: role === "superadmin" ? "SuperAdmin" : role === "admin" ? "Leader" : "Member",
+                roleLabel: role === "admin" ? "Leader" : "Member",
                 online: Boolean(user.online),
                 conversationId: conversationMap.get(contactId) || null,
             };
@@ -1380,8 +1376,7 @@ exports.getChatMembers = async (req, res) => {
         const contacts = [
             ...members.map((member) => normalizeContact(member, "member")),
             ...admins.map((admin) => normalizeContact(admin, "admin")),
-            ...superAdmins.map((superAdmin) => normalizeContact(superAdmin, "superadmin")),
-        ].filter((item) => String(item._id) !== currentUserId);
+        ].filter((item) => item && String(item._id) !== currentUserId);
 
         const unique = new Map();
         contacts.forEach((contact) => {
