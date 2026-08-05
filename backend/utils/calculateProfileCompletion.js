@@ -1,6 +1,10 @@
 const PROFILE_FIELDS = [
   { key: "profileImage", label: "Profile photo" },
-  { key: "memberNumber", label: "Employee number" },
+  { key: "passportPhoto", label: "Passport photo" },
+  { key: "documents.nationalIdFront", label: "National ID front" },
+  { key: "documents.nationalIdBack", label: "National ID back" },
+  { key: "documents.signature", label: "Signature" },
+  { key: "memberNumber", label: "Member number" },
   { key: "phone", label: "Phone number" },
   { key: "nationalId", label: "National ID" },
   { key: "gender", label: "Gender" },
@@ -8,11 +12,18 @@ const PROFILE_FIELDS = [
   { key: "dateOfBirth", label: "Date of birth" },
   { key: "physicalAddress", label: "Physical address" },
   { key: "siteStation", label: "Site station" },
+  { key: "acceptedConstitution", label: "Constitution accepted" },
+  { key: "acceptedPrivacyPolicy", label: "Privacy policy accepted" },
+  { key: "acceptedDeclaration", label: "Declaration accepted" },
+  { key: "emergencyContact.fullName", label: "Emergency contact name" },
+  { key: "emergencyContact.relationship", label: "Emergency contact relationship" },
+  { key: "emergencyContact.phone", label: "Emergency contact phone" },
 ];
 
 const SITE_STATION_NONE = "None of above";
 
-const getValue = (source, path) => String(path).split(".").reduce((acc, key) => (acc == null ? acc : acc[key]), source);
+const getValue = (source, path) =>
+  String(path).split(".").reduce((acc, key) => (acc == null ? acc : acc[key]), source);
 
 const isFilled = (value) => {
   if (typeof value === "boolean") return value;

@@ -439,69 +439,109 @@ exports.updateProfile = async (req, res) => {
         }
 
         // Update only supplied fields
-        // ==========================================
-// ALLOWED MEMBER PROFILE FIELDS
-// ==========================================
+        const allowedFields = [
+            "phone",
+            "email",
+            "nationalId",
+            "gender",
+            "dateOfBirth",
+            "maritalStatus",
+            "physicalAddress",
+            "siteStation",
+            "customSiteStation",
+            "acceptedConstitution",
+            "acceptedPrivacyPolicy",
+            "acceptedDeclaration",
+            "emergencyContact",
+            "nextOfKin",
+            "mpesaNumber",
+            "bankName",
+            "bankBranch",
+            "accountNumber",
+            "occupation",
+            "employer",
+            "monthlyIncome",
+        ];
 
-const allowedFields = [
-    "phone",
-    "nationalId",
-    "gender",
-    "dateOfBirth",
-    "maritalStatus",
-    "physicalAddress",
-    "siteStation",
-    "customSiteStation",
-    "nextOfKin",
-];
+        const parseMaybeJson = (value) => {
+            if (typeof value !== "string") return value;
+            try {
+                const parsed = JSON.parse(value);
+                return parsed;
+            } catch {
+                return value;
+            }
+        };
+
+        const parseBoolean = (value) => {
+            if (typeof value === "boolean") return value;
+            if (typeof value === "number") return value === 1;
+            if (typeof value === "string") {
+                return ["true", "1", "yes", "on"].includes(value.trim().toLowerCase());
+            }
+            return Boolean(value);
+        };
 
         allowedFields.forEach((field) => {
-            if (req.body[field] !== undefined) {
-                let value = req.body[field];
+            if (req.body[field] === undefined) return;
 
-                if ((field === "nextOfKin" || field === "emergencyContact") && typeof value === "string") {
-                    try {
-                        const parsed = JSON.parse(value);
-                        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-                            value = parsed;
-                        }
-                    } catch {
-                        // Keep the raw value if it is not valid JSON.
-                    }
+            let value = req.body[field];
+
+            if (field === "nextOfKin" || field === "emergencyContact") {
+                value = parseMaybeJson(value);
+                if (!value || typeof value !== "object" || Array.isArray(value)) {
+                    value = {};
                 }
-
-                member[field] = value;
+            } else if (
+                field === "acceptedConstitution" ||
+                field === "acceptedPrivacyPolicy" ||
+                field === "acceptedDeclaration"
+            ) {
+                value = parseBoolean(value);
+            } else if (field === "monthlyIncome") {
+                value = value === "" ? 0 : Number(value) || 0;
+            } else {
+                value = typeof value === "string" ? value.trim() : value;
+                if (field === "email" && !String(value || "").trim()) {
+                    return;
+                }
             }
+
+            member[field] = value;
         });
 
         member.nextOfKin = coerceProfileObject(
             member.nextOfKin,
-            member.nextOfKin && typeof member.nextOfKin === "object" ? member.nextOfKin : {}
+            {}
         );
 
         member.emergencyContact = coerceProfileObject(
             member.emergencyContact,
-            member.emergencyContact && typeof member.emergencyContact === "object" ? member.emergencyContact : {}
+            {}
         );
 
-        member.siteStation = String(member.siteStation || "").trim();
-        if (!member.siteStation) {
-            member.siteStation = "";
-        }
+        member.nextOfKin = {
+            fullName: String(member.nextOfKin.fullName || "").trim(),
+            relationship: String(member.nextOfKin.relationship || "").trim(),
+            phone: String(member.nextOfKin.phone || "").trim(),
+            nationalId: String(member.nextOfKin.nationalId || "").trim(),
+        };
 
+        member.emergencyContact = {
+            fullName: String(member.emergencyContact.fullName || "").trim(),
+            relationship: String(member.emergencyContact.relationship || "").trim(),
+            phone: String(member.emergencyContact.phone || "").trim(),
+        };
+
+        member.siteStation = String(member.siteStation || "").trim();
         if (member.siteStation !== "None of above") {
             member.customSiteStation = "";
         } else {
             member.customSiteStation = String(member.customSiteStation || req.body.customSiteStation || "").trim();
         }
 
-        if (member.nextOfKin && typeof member.nextOfKin === "object") {
-            member.nextOfKin = {
-                fullName: String(member.nextOfKin.fullName || "").trim(),
-                relationship: String(member.nextOfKin.relationship || "").trim(),
-                phone: String(member.nextOfKin.phone || "").trim(),
-                nationalId: String(member.nextOfKin.nationalId || "").trim(),
-            };
+        if (!member.siteStation) {
+            member.customSiteStation = String(member.customSiteStation || "").trim();
         }
 
         // ------------------------------------------
@@ -1286,7 +1326,7 @@ exports.getChatMembers = async (req, res) => {
             ];
         }
 
-        const [members, admins, conversations] = await Promise.all([
+        const [members, admins, superAdmins, conversations] = await Promise.all([
             Member.find(memberFilter)
                 .select("fullName username profileImage online lastSeen status memberNumber department position phone email role")
                 .sort({ role: 1, fullName: 1 })
@@ -1294,6 +1334,13 @@ exports.getChatMembers = async (req, res) => {
                 .lean(),
             Admin.find(adminFilter)
                 .select("fullName name email phone profileImage online lastSeen status role position")
+                .limit(limit)
+                .lean(),
+            SuperAdmin.find({
+                status: { $ne: "deleted" },
+                _id: { $ne: currentUserId },
+            })
+                .select("name email phone profileImage online lastSeen status role")
                 .limit(limit)
                 .lean(),
             Conversation.find({
@@ -1324,7 +1371,7 @@ exports.getChatMembers = async (req, res) => {
                 _id: contactId,
                 fullName,
                 role,
-                roleLabel: role === "admin" ? "Leader" : "Member",
+                roleLabel: role === "superadmin" ? "SuperAdmin" : role === "admin" ? "Leader" : "Member",
                 online: Boolean(user.online),
                 conversationId: conversationMap.get(contactId) || null,
             };
@@ -1333,6 +1380,7 @@ exports.getChatMembers = async (req, res) => {
         const contacts = [
             ...members.map((member) => normalizeContact(member, "member")),
             ...admins.map((admin) => normalizeContact(admin, "admin")),
+            ...superAdmins.map((superAdmin) => normalizeContact(superAdmin, "superadmin")),
         ].filter((item) => String(item._id) !== currentUserId);
 
         const unique = new Map();
@@ -1344,7 +1392,7 @@ exports.getChatMembers = async (req, res) => {
             success: true,
             count: unique.size,
             members: Array.from(unique.values()).sort((a, b) => {
-                const order = { admin: 0, member: 1 };
+                const order = { superadmin: 0, admin: 1, member: 2 };
                 const aRank = order[String(a.role || "member").toLowerCase()] ?? 2;
                 const bRank = order[String(b.role || "member").toLowerCase()] ?? 2;
                 if (aRank !== bRank) return aRank - bRank;

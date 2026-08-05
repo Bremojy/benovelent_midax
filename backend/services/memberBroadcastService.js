@@ -117,17 +117,17 @@ async function sendSmsNotification({ to, message }) {
   return { sent: true };
 }
 
-async function notifyMembers({ subject, text, html, smsText, broadcastSms = false }) {
-  const members = await getActiveMembers({ includeEmails: true });
+async function notifyMembers({ subject, text, html, smsText, broadcastSms = false, members = null }) {
+  const recipients = Array.isArray(members) && members.length ? members : await getActiveMembers({ includeEmails: true });
 
   let emailResult = { sent: 0, skipped: "no-members" };
-  if (members.length) {
-    emailResult = await sendBulkEmailToMembers({ subject, text, html, members });
+  if (recipients.length) {
+    emailResult = await sendBulkEmailToMembers({ subject, text, html, members: recipients });
   }
 
   let smsResult = { sent: 0, skipped: "sms-not-configured" };
   if (broadcastSms) {
-    const smsTargets = members
+    const smsTargets = recipients
       .map((member) => member.phone || member.mpesaNumber)
       .filter(Boolean);
 
@@ -142,7 +142,7 @@ async function notifyMembers({ subject, text, html, smsText, broadcastSms = fals
     }
   }
 
-  return { membersCount: members.length, emailResult, smsResult };
+  return { membersCount: recipients.length, emailResult, smsResult };
 }
 
 module.exports = {

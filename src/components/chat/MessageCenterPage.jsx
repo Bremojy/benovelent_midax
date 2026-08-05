@@ -143,11 +143,7 @@ function MessageCenterPage({
         setBanner("You cannot chat with yourself.");
         return;
       }
-      if (String(person.role || "").toLowerCase() === "superadmin") {
-        setBanner("SuperAdmins are not available in the chat directory.");
-        return;
-      }
-
+      
       const existingConversation =
         normalizedConversations.find(
           (conversation) => String(conversation.partner?._id) === String(person._id)
@@ -297,14 +293,34 @@ function getToken(role) {
 }
 
 function normalizeMembers(items, actorId) {
-  return (items || [])
-    .filter((member) => String(member?._id || "") !== String(actorId))
-    .filter((member) => String(member?.role || "").toLowerCase() !== "superadmin")
-    .map((member) => ({
+  const unique = new Map();
+  (items || []).forEach((member) => {
+    const id = String(member?._id || "");
+    if (!id || id === String(actorId)) return;
+
+    const role = String(member?.role || "").toLowerCase();
+    const roleLabel =
+      role === "superadmin" ? "SuperAdmin" :
+      role === "admin" ? "Leader" :
+      "Member";
+
+    unique.set(id, {
       ...member,
+      _id: id,
+      role,
+      roleLabel,
       fullName: member.fullName || member.name || "User",
       online: Boolean(member.online),
-    }));
+    });
+  });
+
+  return Array.from(unique.values()).sort((a, b) => {
+    const order = { superadmin: 0, admin: 1, member: 2 };
+    const aRank = order[String(a.role || "member").toLowerCase()] ?? 3;
+    const bRank = order[String(b.role || "member").toLowerCase()] ?? 3;
+    if (aRank !== bRank) return aRank - bRank;
+    return String(a.fullName || "").localeCompare(String(b.fullName || ""));
+  });
 }
 
 function normalizeConversation(conversation, currentUserId) {

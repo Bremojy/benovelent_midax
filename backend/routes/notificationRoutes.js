@@ -14,6 +14,7 @@ const {
 } = require("../controllers/notificationController");
 
 const { verifyToken: protect } = require("../middleware/authMiddleware");
+const { isAdminOrSuperAdmin } = require("../middleware/roleMiddleware");
 
 // =======================================
 // NOTIFICATION ROUTES
@@ -30,7 +31,7 @@ router.get("/:id", protect, getNotification);
 
 // Create notification (Admin/Super Admin/System)
 router.post("/", protect, createNotification);
-router.post("/broadcast", protect, broadcastToMembers);
+router.post("/broadcast", protect, isAdminOrSuperAdmin, broadcastToMembers);
 
 // Mark one notification as read
 router.put("/:id/read", protect, markAsRead);

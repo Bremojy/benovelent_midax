@@ -1,377 +1,219 @@
-const { notifyMembers } = require("../services/memberBroadcastService");
-const Notification=require("../models/Notification");
+const Notification = require("../models/Notification");
+const Member = require("../models/Member");
+const { getActiveMembers, notifyMembers } = require("../services/memberBroadcastService");
+
+function senderModelFromUser(user = {}) {
+  const role = String(user.role || "").toLowerCase();
+  if (role === "superadmin") return "SuperAdmin";
+  if (role === "admin") return "Admin";
+  return "Member";
+}
 
 /* =====================================================
 GET MY NOTIFICATIONS
 ===================================================== */
 
-exports.getNotifications=async(req,res)=>{
+exports.getNotifications = async (req, res) => {
+  try {
+    const notifications = await Notification.find({
+      recipient: req.user._id,
+    })
+      .populate("sender", "fullName profileImage")
+      .sort({ createdAt: -1 });
 
-try{
-
-const notifications=
-await Notification.find({
-
-recipient:req.user._id
-
-})
-
-.populate(
-
-"sender",
-
-"fullName profileImage"
-
-)
-
-.sort({
-
-createdAt:-1
-
-});
-
-res.json({
-
-success:true,
-
-count:notifications.length,
-
-notifications
-
-});
-
-}
-
-catch(error){
-
-res.status(500).json({
-
-success:false,
-
-message:error.message
-
-});
-
-}
-
+    return res.json({
+      success: true,
+      count: notifications.length,
+      notifications,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
 };
-
-
 
 /* =====================================================
 UNREAD COUNT
 ===================================================== */
 
-exports.getUnreadCount=async(req,res)=>{
+exports.getUnreadCount = async (req, res) => {
+  try {
+    const unread = await Notification.countDocuments({
+      recipient: req.user._id,
+      read: false,
+    });
 
-try{
-
-const unread=
-await Notification.countDocuments({
-
-recipient:req.user._id,
-
-read:false
-
-});
-
-res.json({
-
-success:true,
-
-unread
-
-});
-
-}
-
-catch(error){
-
-res.status(500).json({
-
-success:false,
-
-message:error.message
-
-});
-
-}
-
+    return res.json({
+      success: true,
+      unread,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
 };
-
-
 
 /* =====================================================
 MARK AS READ
 ===================================================== */
 
-exports.markRead=async(req,res)=>{
+exports.markRead = async (req, res) => {
+  try {
+    const notification = await Notification.findById(req.params.id);
+    if (!notification) {
+      return res.status(404).json({
+        success: false,
+        message: "Notification not found.",
+      });
+    }
 
-try{
+    notification.read = true;
+    notification.readAt = new Date();
+    await notification.save();
 
-const notification=
-await Notification.findById(req.params.id);
-
-if(!notification){
-
-return res.status(404).json({
-
-success:false,
-
-message:"Notification not found."
-
-});
-
-}
-
-notification.read=true;
-
-notification.readAt=new Date();
-
-await notification.save();
-
-res.json({
-
-success:true,
-
-notification
-
-});
-
-}
-
-catch(error){
-
-res.status(500).json({
-
-success:false,
-
-message:error.message
-
-});
-
-}
-
+    return res.json({
+      success: true,
+      notification,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
 };
-
-
 
 /* =====================================================
 MARK ALL AS READ
 ===================================================== */
 
-exports.markAllRead=async(req,res)=>{
+exports.markAllRead = async (req, res) => {
+  try {
+    await Notification.updateMany(
+      {
+        recipient: req.user._id,
+        read: false,
+      },
+      {
+        $set: {
+          read: true,
+          readAt: new Date(),
+        },
+      }
+    );
 
-try{
-
-await Notification.updateMany(
-
-{
-
-recipient:req.user._id,
-
-read:false
-
-},
-
-{
-
-$set:{
-
-read:true,
-
-readAt:new Date()
-
-}
-
-}
-
-);
-
-res.json({
-
-success:true,
-
-message:"All notifications marked as read."
-
-});
-
-}
-
-catch(error){
-
-res.status(500).json({
-
-success:false,
-
-message:error.message
-
-});
-
-}
-
+    return res.json({
+      success: true,
+      message: "All notifications marked as read.",
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
 };
-
-
 
 /* =====================================================
 CREATE NOTIFICATION
 ===================================================== */
 
-exports.createNotification=async(req,res)=>{
+exports.createNotification = async (req, res) => {
+  try {
+    const notification = await Notification.create(req.body);
 
-try{
-
-const notification=
-await Notification.create(req.body);
-
-res.status(201).json({
-
-success:true,
-
-notification
-
-});
-
-}
-
-catch(error){
-
-res.status(500).json({
-
-success:false,
-
-message:error.message
-
-});
-
-}
-
+    return res.status(201).json({
+      success: true,
+      notification,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
 };
-
-
 
 /* =====================================================
 DELETE NOTIFICATION
 ===================================================== */
 
-exports.deleteNotification=async(req,res)=>{
+exports.deleteNotification = async (req, res) => {
+  try {
+    const notification = await Notification.findById(req.params.id);
+    if (!notification) {
+      return res.status(404).json({
+        success: false,
+        message: "Notification not found.",
+      });
+    }
 
-try{
+    await Notification.deleteOne({ _id: notification._id });
 
-const notification=
-await Notification.findById(req.params.id);
-
-if(!notification){
-
-return res.status(404).json({
-
-success:false,
-
-message:"Notification not found."
-
-});
-
-}
-
-await notification.deleteOne();
-
-res.json({
-
-success:true,
-
-message:"Notification deleted."
-
-});
-
-}
-
-catch(error){
-
-res.status(500).json({
-
-success:false,
-
-message:error.message
-
-});
-
-}
-
+    return res.json({
+      success: true,
+      message: "Notification deleted.",
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
 };
-
-
 
 /* =====================================================
 DELETE ALL MY NOTIFICATIONS
 ===================================================== */
 
-exports.clearNotifications=async(req,res)=>{
+exports.clearNotifications = async (req, res) => {
+  try {
+    await Notification.deleteMany({
+      recipient: req.user._id,
+    });
 
-try{
-
-await Notification.deleteMany({
-
-recipient:req.user._id
-
-});
-
-res.json({
-
-success:true,
-
-message:"Notifications cleared."
-
-});
-
-}
-
-catch(error){
-
-res.status(500).json({
-
-success:false,
-
-message:error.message
-
-});
-
-}
-
+    return res.json({
+      success: true,
+      message: "Notifications cleared.",
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
 };
 
 /* =====================================================
-   COMPATIBILITY EXPORTS
+GET SINGLE NOTIFICATION
 ===================================================== */
 
-// Route aliases
-exports.markAsRead = exports.markRead;
-exports.markAllAsRead = exports.markAllRead;
-
-// Get single notification
 exports.getNotification = async (req, res) => {
-    try {
-        const notification = await Notification.findById(req.params.id)
-            .populate("sender", "fullName profileImage");
+  try {
+    const notification = await Notification.findById(req.params.id)
+      .populate("sender", "fullName profileImage");
 
-        if (!notification) {
-            return res.status(404).json({
-                success: false,
-                message: "Notification not found."
-            });
-        }
-
-        res.json({
-            success: true,
-            notification
-        });
-
-    } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: error.message
-        });
+    if (!notification) {
+      return res.status(404).json({
+        success: false,
+        message: "Notification not found.",
+      });
     }
+
+    return res.json({
+      success: true,
+      notification,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
 };
 
 /* =====================================================
@@ -380,13 +222,42 @@ BROADCAST TO MEMBERS
 
 exports.broadcastToMembers = async (req, res) => {
   try {
-    const { title, message, smsText, emailHtml, broadcastSms = true } = req.body || {};
+    const {
+      title,
+      message,
+      smsText,
+      emailHtml,
+      broadcastSms = true,
+      inApp = true,
+    } = req.body || {};
 
     if (!title?.trim() || !message?.trim()) {
       return res.status(400).json({
         success: false,
         message: "Title and message are required.",
       });
+    }
+
+    const contactableMembers = await getActiveMembers({ includeEmails: true });
+    const inAppMembers = inApp
+      ? await Member.find({ status: "active", isDeleted: false }).select("_id").lean()
+      : [];
+    const senderModel = senderModelFromUser(req.user);
+
+    if (inApp && inAppMembers.length) {
+      await Notification.insertMany(
+        inAppMembers.map((member) => ({
+          recipient: member._id,
+          recipientModel: "Member",
+          sender: req.user._id,
+          senderModel,
+          title: title.trim(),
+          message: message.trim(),
+          type: "announcement",
+          icon: "campaign",
+          read: false,
+        }))
+      );
     }
 
     const result = await notifyMembers({
@@ -401,6 +272,7 @@ exports.broadcastToMembers = async (req, res) => {
       success: true,
       message: "Broadcast sent successfully.",
       result,
+      inAppNotifications: inApp ? members.length : 0,
     });
   } catch (error) {
     console.error("Broadcast notification error:", error);
@@ -410,3 +282,10 @@ exports.broadcastToMembers = async (req, res) => {
     });
   }
 };
+
+/* =====================================================
+COMPATIBILITY ALIASES
+===================================================== */
+
+exports.markAsRead = exports.markRead;
+exports.markAllAsRead = exports.markAllRead;
