@@ -530,73 +530,52 @@ exports.activateAdmin = async (
 // RESET ADMIN PASSWORD
 // ======================================================
 
-exports.resetAdminPassword =
-  async (req, res) => {
-    try {
-      const { id } =
-        req.params;
+exports.resetAdminPassword = async (req, res) => {
+  try {
+    const { id } = req.params;
 
-      const admin =
-        await Admin.findById(id);
+    const admin = await Admin.findById(id);
 
-      if (!admin) {
-        return res.status(404).json({
-          success: false,
-          message:
-            "Administrator not found.",
-        });
-      }
-
-      // ---------------------------------------------
-      // GENERATE TEMPORARY PASSWORD
-      // ---------------------------------------------
-
-      const temporaryPassword =
-        `MIDAX@${Math.floor(
-          100000 +
-            Math.random() *
-              900000
-        )}`;
-
-      admin.password =
-        temporaryPassword;
-
-      admin.mustChangePassword =
-        true;
-
-      admin.passwordChangedAt =
-        null;
-
-      admin.resetPasswordToken =
-        null;
-
-      admin.resetPasswordExpires =
-        null;
-
-      await admin.save();
-
-      return res.json({
-        success: true,
-
-        message:
-          "Administrator password reset successfully.",
-
-        temporaryPassword,
-      });
-
-    } catch (error) {
-      console.error(
-        "Reset Admin Password Error:",
-        error
-      );
-
-      return res.status(500).json({
+    if (!admin) {
+      return res.status(404).json({
         success: false,
-        message:
-          "Unable to reset administrator password.",
+        message: "Administrator not found.",
       });
     }
-  };
+
+    const temporaryPassword = `MIDAX@${Math.floor(100000 + Math.random() * 900000)}`;
+    const hashedPassword = await bcrypt.hash(temporaryPassword, 10);
+
+    await Admin.findByIdAndUpdate(
+      id,
+      {
+        $set: {
+          password: hashedPassword,
+          mustChangePassword: true,
+          passwordChangedAt: new Date(),
+        },
+        $unset: {
+          resetPasswordToken: 1,
+          resetPasswordExpires: 1,
+        },
+      },
+      { runValidators: false }
+    );
+
+    return res.json({
+      success: true,
+      message: "Administrator password reset successfully.",
+      temporaryPassword,
+    });
+  } catch (error) {
+    console.error("Reset Admin Password Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Unable to reset administrator password.",
+    });
+  }
+};
 
 
 // ======================================================

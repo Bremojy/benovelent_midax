@@ -453,6 +453,7 @@ const allowedFields = [
     "siteStation",
     "customSiteStation",
     "nextOfKin",
+    "emergencyContact",
 ];
 
         allowedFields.forEach((field) => {
