@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { BarChart3, CheckCircle2, FileDown, Plus, RefreshCw, Trash2, Vote } from "lucide-react";
 import DashboardLayout from "../layouts/DashboardLayout";
 import API from "../services/api";
+import { buildPrintHeadHtml, printHeadStyles } from "../utils/printHead";
 import "./Polls.css";
 
 export default function Polls({ mode = "member" }) {
@@ -115,20 +116,14 @@ export default function Polls({ mode = "member" }) {
       <html>
         <head>
           <title>${escapeHtml(poll.title || "Poll Results")}</title>
-          <style>
-            body{font-family:Arial,sans-serif;padding:24px;color:#1f2328}
-            h1{margin:0 0 8px}
-            .meta{color:#666;margin-bottom:18px}
-            table{width:100%;border-collapse:collapse}
-            th,td{padding:10px;border-bottom:1px solid #e7e7e7;text-align:left}
-            th{text-transform:uppercase;font-size:12px;letter-spacing:.06em;color:#666}
-            .bar{height:10px;border-radius:999px;background:#ff7a0018;overflow:hidden}
-            .bar > div{height:100%;background:#ff7a00}
-          </style>
+          ${printHeadStyles()}
         </head>
         <body>
-          <h1>${escapeHtml(poll.title || "Poll Results")}</h1>
-          <div class="meta">Total votes: ${Number(data?.totalVotes || poll.totalVotes || 0)}</div>
+          ${buildPrintHeadHtml({
+            title: `Poll Results — ${poll.title || "Community Vote"}`,
+            subtitle: "Official results generated from the Benevolent Midax polling module.",
+          })}
+          <p class="print-note">Total votes: ${Number(data?.totalVotes || poll.totalVotes || 0)}</p>
           <table>
             <thead><tr><th>Option</th><th>Votes</th><th>Percentage</th></tr></thead>
             <tbody>

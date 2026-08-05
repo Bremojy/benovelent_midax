@@ -1578,9 +1578,6 @@ function MemberDetailsModal({
           <MemberDetail label="Kin Relationship" value={member.nextOfKin?.relationship} />
           <MemberDetail label="Kin Phone" value={member.nextOfKin?.phone} />
           <MemberDetail label="Kin ID" value={member.nextOfKin?.nationalId} />
-          <MemberDetail label="Emergency Contact" value={member.emergencyContact?.fullName} />
-          <MemberDetail label="Emergency Relationship" value={member.emergencyContact?.relationship} />
-          <MemberDetail label="Emergency Phone" value={member.emergencyContact?.phone} />
           <MemberDetail label="Profile Completion" value={`${Number(member.profileCompletion || 0)}%`} />
           <MemberDetail label="Profile Completed" value={member.profileCompleted ? "Yes" : "No"} />
           <MemberDetail label="Profile Verified" value={member.profileVerified ? "Yes" : "No"} />

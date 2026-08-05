@@ -125,8 +125,8 @@ function MessageCenterPage({
   );
 
   const normalizedPeople = useMemo(
-    () => normalizeMembers(people),
-    [people]
+    () => normalizeMembers(people, actorId),
+    [people, actorId]
   );
 
   useEffect(() => {
@@ -139,6 +139,14 @@ function MessageCenterPage({
   const startConversation = async (person) => {
     try {
       if (!person?._id) return;
+      if (String(person._id) === String(actorId)) {
+        setBanner("You cannot chat with yourself.");
+        return;
+      }
+      if (String(person.role || "").toLowerCase() === "superadmin") {
+        setBanner("SuperAdmins are not available in the chat directory.");
+        return;
+      }
 
       const existingConversation =
         normalizedConversations.find(
@@ -288,12 +296,15 @@ function getToken(role) {
   return localStorage.getItem("memberToken");
 }
 
-function normalizeMembers(items) {
-  return (items || []).map((member) => ({
-    ...member,
-    fullName: member.fullName || member.name || "User",
-    online: Boolean(member.online),
-  }));
+function normalizeMembers(items, actorId) {
+  return (items || [])
+    .filter((member) => String(member?._id || "") !== String(actorId))
+    .filter((member) => String(member?.role || "").toLowerCase() !== "superadmin")
+    .map((member) => ({
+      ...member,
+      fullName: member.fullName || member.name || "User",
+      online: Boolean(member.online),
+    }));
 }
 
 function normalizeConversation(conversation, currentUserId) {
