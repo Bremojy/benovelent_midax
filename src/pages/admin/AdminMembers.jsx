@@ -1537,50 +1537,34 @@ function MemberDetailsModal({
           </div>
           <div className="admin-member-hero-copy">
             <strong>{member.memberNumber || "—"}</strong>
-            <span>{member.department || "No department"}</span>
-            <p>{member.bio || "No bio provided."}</p>
+            <span>{member.siteStation === "None of above" ? member.customSiteStation : member.siteStation || "No site station"}</span>
+            <p>{member.profileCompletion !== undefined ? `${Number(member.profileCompletion || 0)}% profile complete` : "Profile details synced from the member portal."}</p>
           </div>
         </div>
 
         <div className="admin-member-modal-body admin-member-modal-body-grid">
 
           <MemberDetail label="Full Name" value={member.fullName} />
+          <MemberDetail label="Member / Employee Number" value={member.memberNumber} />
           <MemberDetail label="Username" value={member.username} />
           <MemberDetail label="Email" value={member.email} />
           <MemberDetail label="Phone" value={member.phone} />
-          <MemberDetail label="Department" value={member.department} />
-          <MemberDetail label="Position" value={member.position} />
-          <MemberDetail label="Monthly Contribution" value={member.monthlyContribution !== undefined ? `KES ${Number(member.monthlyContribution).toLocaleString()}` : "—"} />
+          <MemberDetail label="National ID" value={member.nationalId} />
+          <MemberDetail label="Gender" value={member.gender} />
+          <MemberDetail label="Marital Status" value={member.maritalStatus} />
+          <MemberDetail label="Date of Birth" value={formatDate(member.dateOfBirth)} />
+          <MemberDetail label="Physical Address" value={member.physicalAddress} />
+          <MemberDetail label="Site Station" value={member.siteStation === "None of above" ? member.customSiteStation : member.siteStation} />
+          <MemberDetail label="Next of Kin" value={member.nextOfKin?.fullName} />
+          <MemberDetail label="Kin Relationship" value={member.nextOfKin?.relationship} />
+          <MemberDetail label="Kin Phone" value={member.nextOfKin?.phone} />
+          <MemberDetail label="Profile Completion" value={`${Number(member.profileCompletion || 0)}%`} />
+          <MemberDetail label="Profile Completed" value={member.profileCompleted ? "Yes" : "No"} />
           <MemberDetail label="Role" value={member.role} />
           <MemberDetail label="Status" value={capitalize(member.status || "active")} />
           <MemberDetail label="Verified" value={member.verified ? "Yes" : "No"} />
           <MemberDetail label="Online" value={member.online ? "Online" : "Offline"} />
           <MemberDetail label="Join Date" value={formatDate(member.joinDate)} />
-          <MemberDetail label="National ID" value={member.nationalId} />
-          <MemberDetail label="Gender" value={member.gender} />
-          <MemberDetail label="Date of Birth" value={formatDate(member.dateOfBirth)} />
-          <MemberDetail label="Marital Status" value={member.maritalStatus} />
-          <MemberDetail label="County" value={member.county} />
-          <MemberDetail label="Sub-County" value={member.subCounty} />
-          <MemberDetail label="Ward" value={member.ward} />
-          <MemberDetail label="Village" value={member.village} />
-          <MemberDetail label="Postal Address" value={member.postalAddress} />
-          <MemberDetail label="Physical Address" value={member.physicalAddress} />
-          <MemberDetail label="Site Station" value={member.siteStation === "None of above" ? member.customSiteStation : member.siteStation} />
-          <MemberDetail label="Occupation" value={member.occupation} />
-          <MemberDetail label="Employer" value={member.employer} />
-          <MemberDetail label="Monthly Income" value={member.monthlyIncome !== undefined ? `KES ${Number(member.monthlyIncome || 0).toLocaleString()}` : "—"} />
-          <MemberDetail label="M-Pesa Number" value={member.mpesaNumber} />
-          <MemberDetail label="Bank Name" value={member.bankName} />
-          <MemberDetail label="Bank Branch" value={member.bankBranch} />
-          <MemberDetail label="Account Number" value={member.accountNumber} />
-          <MemberDetail label="Next of Kin" value={member.nextOfKin?.fullName} />
-          <MemberDetail label="Kin Relationship" value={member.nextOfKin?.relationship} />
-          <MemberDetail label="Kin Phone" value={member.nextOfKin?.phone} />
-          <MemberDetail label="Kin ID" value={member.nextOfKin?.nationalId} />
-          <MemberDetail label="Profile Completion" value={`${Number(member.profileCompletion || 0)}%`} />
-          <MemberDetail label="Profile Completed" value={member.profileCompleted ? "Yes" : "No"} />
-          <MemberDetail label="Profile Verified" value={member.profileVerified ? "Yes" : "No"} />
           <MemberDetail label="Last Login" value={formatDate(member.lastLogin)} />
           <MemberDetail label="Last Seen" value={formatDate(member.lastSeen)} />
           <MemberDetail label="Constitution Accepted" value={member.acceptedConstitution ? "Yes" : "No"} />

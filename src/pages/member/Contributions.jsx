@@ -23,7 +23,7 @@ export default function Contributions() {
     if (!win) return;
     const totals = data?.totals || {};
     const monthly = data?.monthly || [];
-    const transactions = data?.transactions || [];
+    const transactions = [...(data?.transactions || [])].sort((a, b) => new Date(b.transactionDate || b.createdAt || 0) - new Date(a.transactionDate || a.createdAt || 0));
     win.document.write(`
       <html>
         <head>
@@ -128,7 +128,7 @@ export default function Contributions() {
                 <tr><th>Date</th><th>Type</th><th>Description</th><th>Amount</th><th>Status</th></tr>
               </thead>
               <tbody>
-                {(data?.transactions || []).map((x, i) => (
+                {([...((data?.transactions || []))].sort((a, b) => new Date(b.transactionDate || b.createdAt || 0) - new Date(a.transactionDate || a.createdAt || 0))).map((x, i) => (
                   <tr key={x._id || i}>
                     <td>{x.transactionDate ? new Date(x.transactionDate).toLocaleDateString("en-KE") : "—"}</td>
                     <td>{x.type}</td>

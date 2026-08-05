@@ -40,6 +40,8 @@ function DashboardLayout({
       }
     };
 
+    resize();
+
     window.addEventListener(
       "resize",
       resize

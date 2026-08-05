@@ -597,8 +597,16 @@ exports.updateMember = async (req, res) => {
     member.maritalStatus = req.body.maritalStatus ?? member.maritalStatus;
     member.dateOfBirth = req.body.dateOfBirth ?? member.dateOfBirth;
     member.physicalAddress = req.body.physicalAddress ?? member.physicalAddress;
-    member.siteStation = req.body.siteStation ?? member.siteStation;
-    member.customSiteStation = req.body.customSiteStation ?? member.customSiteStation;
+
+    const incomingSiteStation = String(req.body.siteStation ?? member.siteStation ?? "").trim();
+    member.siteStation = incomingSiteStation || "";
+
+    if (member.siteStation !== "None of above") {
+      member.customSiteStation = "";
+    } else {
+      member.customSiteStation = String(req.body.customSiteStation ?? member.customSiteStation ?? "").trim();
+    }
+
     if (req.body.nextOfKin && typeof req.body.nextOfKin === "object") member.nextOfKin = { ...(member.nextOfKin?.toObject?.() || member.nextOfKin || {}), ...req.body.nextOfKin };
     const completion = calculateProfileCompletion(member);
     member.profileCompletion = completion.percentage;

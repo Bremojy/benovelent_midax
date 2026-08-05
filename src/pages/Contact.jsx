@@ -1,10 +1,9 @@
-
 import { useState } from "react";
 import { Phone, Mail, MessageCircle, MapPin, Send, CheckCircle2, Loader2, ArrowRight } from "lucide-react";
 import API from "../services/api";
 import "../styles/public-modern.css";
 
-const heroVideo = "/videos/benevolent-login-loop.mp4";
+const heroVideo = "/videos/benevolent-contact-loop.mp4";
 
 export default function Contact() {
   const [form, setForm] = useState({ fullName: "", email: "", phone: "", subject: "", message: "" });

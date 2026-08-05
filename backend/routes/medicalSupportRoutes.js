@@ -14,27 +14,6 @@ const {
 
 const { uploadArray, setUploadType } = require("../middleware/upload");
 
-console.log("verifyToken:", typeof verifyToken);
-console.log("isMember:", typeof isMember);
-console.log("isAdmin:", typeof isAdmin);
-console.log("isSuperAdmin:", typeof isSuperAdmin);
-
-console.log(
-    "createMedicalApplication:",
-    typeof medicalController.createMedicalApplication
-);
-
-console.log(
-    "getMyApplications:",
-    typeof medicalController.getMyApplications
-);
-
-console.log(
-    "getMedicalSummary:",
-    typeof medicalController.getMedicalSummary
-);
-
-
 // ======================================================
 // MEMBER ROUTES
 // ======================================================
@@ -71,8 +50,6 @@ router.put(
     isMember,
     medicalController.cancelApplication
 );
-
-
 
 // ======================================================
 // ADMIN ROUTES
@@ -126,8 +103,6 @@ router.put(
     medicalController.markAsPaid
 );
 
-
-
 // ======================================================
 // SUPER ADMIN
 // ======================================================
@@ -139,7 +114,5 @@ router.delete(
     isSuperAdmin,
     medicalController.deleteApplication
 );
-
-
 
 module.exports = router;

@@ -3,6 +3,7 @@ const http = require("http");
 const cors = require("cors");
 const mongoose = require("mongoose");
 const path = require("path");
+const fs = require("fs");
 
 require("dotenv").config();
 
@@ -91,6 +92,34 @@ const { uploadRoot, documentRoot } = require("./config/uploadConfig");
 app.use("/uploads", express.static(uploadRoot));
 app.use("/documents", express.static(documentRoot));
 app.use("/documents", express.static(path.join(__dirname, "..", "public", "documents")));
+
+app.get("/documents/:filename", (req, res, next) => {
+    const filename = String(req.params.filename || "").trim();
+    if (!filename) {
+        return next();
+    }
+
+    const candidates = [
+        path.join(documentRoot, filename),
+        path.join(__dirname, "..", "documents", filename),
+        path.join(__dirname, "..", "public", "documents", filename),
+    ];
+
+    for (const candidate of candidates) {
+        if (fs.existsSync(candidate)) {
+            return res.sendFile(candidate);
+        }
+    }
+
+    if (/constitution/i.test(filename)) {
+        const fallback = path.join(__dirname, "..", "public", "documents", "benevolent-midax-constitution.pdf");
+        if (fs.existsSync(fallback)) {
+            return res.sendFile(fallback);
+        }
+    }
+
+    return next();
+});
 
 // ===============================================
 // ROOT ROUTE

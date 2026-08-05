@@ -483,10 +483,15 @@ const allowedFields = [
             member.emergencyContact && typeof member.emergencyContact === "object" ? member.emergencyContact : {}
         );
 
+        member.siteStation = String(member.siteStation || "").trim();
+        if (!member.siteStation) {
+            member.siteStation = "";
+        }
+
         if (member.siteStation !== "None of above") {
             member.customSiteStation = "";
-        } else if (!member.customSiteStation) {
-            member.customSiteStation = String(req.body.customSiteStation || "").trim();
+        } else {
+            member.customSiteStation = String(member.customSiteStation || req.body.customSiteStation || "").trim();
         }
 
         if (member.nextOfKin && typeof member.nextOfKin === "object") {

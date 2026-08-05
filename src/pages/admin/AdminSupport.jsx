@@ -89,6 +89,20 @@ export default function AdminSupport() {
     }
   };
 
+  const deleteContactMessage = async (id) => {
+    if (!id) return;
+    if (!window.confirm("Delete this contact submission?")) return;
+    try {
+      setError("");
+      setSuccess("");
+      await API.delete(`/contact/${id}`);
+      setSuccess("Contact submission deleted.");
+      await load();
+    } catch (e) {
+      setError(e.response?.data?.message || e.message || "Unable to delete contact submission.");
+    }
+  };
+
   const inviteMember = async (e) => {
     e.preventDefault();
     setError("");
@@ -216,9 +230,14 @@ export default function AdminSupport() {
             <div style={{ display: "grid", gap: 12 }}>
               {contactMessages.map((item) => (
                 <article key={item._id} className="portal-card" style={{ border: "1px solid rgba(15,23,42,.06)" }}>
-                  <strong>{item.phone || "No phone provided"}{item.email ? ` • ${item.email}` : ""}</strong>
-                  <div style={{ color: "#64748b", marginTop: 6 }}>{item.fullName}</div>
-                  <div style={{ fontWeight: 700, marginTop: 8 }}>{item.subject}</div>
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
+                    <div>
+                      <strong>{item.phone || "No phone provided"}{item.email ? ` • ${item.email}` : ""}</strong>
+                      <div style={{ color: "#64748b", marginTop: 6 }}>{item.fullName}</div>
+                      <div style={{ fontWeight: 700, marginTop: 8 }}>{item.subject}</div>
+                    </div>
+                    <button type="button" className="portal-btn danger" onClick={() => deleteContactMessage(item._id)}>Delete</button>
+                  </div>
                   <p style={{ marginTop: 8, lineHeight: 1.7 }}>{item.message}</p>
                   <small style={{ color: "#94a3b8" }}>{new Date(item.createdAt).toLocaleString()}</small>
                 </article>

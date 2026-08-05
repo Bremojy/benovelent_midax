@@ -95,3 +95,14 @@ exports.updateContactMessage = async (req, res) => {
     return res.status(500).json({ success: false, message: "Unable to update contact message." });
   }
 };
+
+exports.deleteContactMessage = async (req, res) => {
+  try {
+    const message = await ContactMessage.findByIdAndDelete(req.params.id);
+    if (!message) return res.status(404).json({ success: false, message: "Contact message not found." });
+    return res.json({ success: true, message: "Contact message deleted successfully." });
+  } catch (error) {
+    console.error("Delete contact message error:", error);
+    return res.status(500).json({ success: false, message: "Unable to delete contact message." });
+  }
+};

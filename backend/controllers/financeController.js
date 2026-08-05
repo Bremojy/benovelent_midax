@@ -44,7 +44,9 @@ exports.createTransaction = async (req, res) => {
 
             receiptNumber,
 
-            notes
+            notes,
+
+            transactionDate
 
         } = req.body;
 
@@ -96,6 +98,8 @@ exports.createTransaction = async (req, res) => {
             receiptNumber,
 
             notes,
+
+            transactionDate: transactionDate ? new Date(transactionDate) : new Date(),
 
             status: "pending"
 
@@ -196,7 +200,8 @@ exports.getTransactions = async (req, res) => {
 
             .sort({
 
-                transactionDate: -1
+                transactionDate: -1,
+                createdAt: -1
 
             })
 
@@ -332,6 +337,7 @@ exports.updateTransaction = async (req, res) => {
             "paymentMethod",
             "referenceNumber",
             "receiptNumber",
+            "transactionDate",
             "notes"
         ];
 
@@ -606,7 +612,8 @@ exports.getMemberTransactions = async (req, res) => {
 
         .sort({
 
-            transactionDate: -1
+            transactionDate: -1,
+            createdAt: -1
 
         })
 
@@ -732,9 +739,9 @@ exports.getMemberAccounts = async (req, res) => {
     const memberId = req.user._id;
     const year = Number(req.query.year) || new Date().getFullYear();
     const [transactions, contributions, yearContributions, member, medical, funeral, education, allMedical, allFuneral, allEducation] = await Promise.all([
-      Finance.find({ member: memberId }).sort({ transactionDate: -1 }).lean(),
-      Contribution.find({ member: memberId, year }).sort({ month: 1 }).lean(),
-      Contribution.find({ year }).lean(),
+      Finance.find({ member: memberId }).sort({ transactionDate: -1, createdAt: -1 }).lean(),
+      Contribution.find({ member: memberId, year }).sort({ paymentDate: -1, year: -1, month: -1, createdAt: -1 }).lean(),
+      Contribution.find({ year }).sort({ paymentDate: -1, year: -1, month: -1, createdAt: -1 }).lean(),
       Member.findById(memberId).select("fullName memberNumber").lean(),
       require("../models/MedicalSupport").find({ member: memberId }).select("status approvedAmount requestedAmount").lean(),
       require("../models/FuneralSupport").find({ member: memberId }).select("status approvedAmount requestedAmount").lean(),

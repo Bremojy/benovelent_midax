@@ -1,9 +1,10 @@
-
 import { useEffect, useMemo, useState } from "react";
-import { CheckCircle2, Edit3, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { Edit3, Plus, Trash2 } from "lucide-react";
 import DashboardLayout from "../../layouts/DashboardLayout";
 import API from "../../services/api";
 import "../../styles/portalModule.css";
+
+const today = new Date().toISOString().slice(0, 10);
 
 const EMPTY_FORM = {
   member: "",
@@ -14,6 +15,7 @@ const EMPTY_FORM = {
   paymentMethod: "",
   referenceNumber: "",
   receiptNumber: "",
+  transactionDate: today,
   notes: "",
 };
 
@@ -52,6 +54,14 @@ export default function AdminFinance() {
   const number = (value) => new Intl.NumberFormat("en-KE", { style: "currency", currency: "KES", maximumFractionDigits: 0 }).format(Number(value || 0));
   const first = (...keys) => { for (const key of keys) if (summary?.[key] !== undefined) return summary[key]; return 0; };
 
+  const sortedTransactions = useMemo(() => {
+    return [...transactions].sort((a, b) => new Date(b.transactionDate || b.createdAt || 0) - new Date(a.transactionDate || a.createdAt || 0));
+  }, [transactions]);
+
+  const sortedContributions = useMemo(() => {
+    return [...contributions].sort((a, b) => new Date(b.paymentDate || b.createdAt || 0) - new Date(a.paymentDate || a.createdAt || 0));
+  }, [contributions]);
+
   const startCreate = () => {
     setEditing(null);
     setForm(EMPTY_FORM);
@@ -68,6 +78,7 @@ export default function AdminFinance() {
       paymentMethod: transaction?.paymentMethod || "",
       referenceNumber: transaction?.referenceNumber || "",
       receiptNumber: transaction?.receiptNumber || "",
+      transactionDate: transaction?.transactionDate ? new Date(transaction.transactionDate).toISOString().slice(0, 10) : today,
       notes: transaction?.notes || "",
     });
   };
@@ -80,6 +91,7 @@ export default function AdminFinance() {
       const payload = {
         ...form,
         amount: Number(form.amount),
+        transactionDate: form.transactionDate || today,
       };
       const response = editing
         ? await API.put(`/finance/${editing._id}`, payload)
@@ -118,7 +130,7 @@ export default function AdminFinance() {
     <DashboardLayout>
       <div className="portal-module">
         <header className="portal-module-header">
-          <div><span>FINANCIAL CONTROL</span><h1>Finance</h1><p>Monitor contributions, transactions and the Benevolent Midax financial position.</p></div>
+          <div><span>FINANCIAL CONTROL</span><h1>Accounts</h1><p>Monitor contributions, transactions and the Benevolent Midax financial position.</p></div>
           <div className="portal-actions">
             <button className="portal-btn secondary" onClick={startCreate}><Plus size={16} /> New transaction</button>
             <button className="portal-btn" onClick={load} disabled={loading}>{loading ? "Refreshing..." : "Refresh"}</button>
@@ -139,6 +151,7 @@ export default function AdminFinance() {
           <h2>{editing ? "Edit Transaction" : "Add Transaction"}</h2>
           <form onSubmit={saveTransaction} className="portal-form-grid">
             <label className="portal-field"><span>Member ID</span><input value={form.member} onChange={(e) => setForm({ ...form, member: e.target.value })} placeholder="Member ObjectId" required /></label>
+            <label className="portal-field"><span>Date</span><input type="date" value={form.transactionDate} onChange={(e) => setForm({ ...form, transactionDate: e.target.value })} required /></label>
             <label className="portal-field"><span>Type</span><select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}><option value="contribution">Contribution</option><option value="claim">Support / Claim</option><option value="expense">Expense</option><option value="income">Income</option></select></label>
             <label className="portal-field"><span>Category</span><input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} placeholder="Salary, funeral support, etc." /></label>
             <label className="portal-field"><span>Amount</span><input type="number" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} required /></label>
@@ -156,22 +169,23 @@ export default function AdminFinance() {
 
         <section className="portal-panel">
           <h2>Recent Transactions</h2>
-          {transactions.length === 0 ? <div className="portal-empty">No finance transactions returned.</div> :
+          {sortedTransactions.length === 0 ? <div className="portal-empty">No finance transactions returned.</div> :
             <div className="portal-table-wrap"><table className="portal-table"><thead><tr><th>Date</th><th>Type</th><th>Description</th><th>Amount</th><th>Status</th><th>Actions</th></tr></thead><tbody>
-              {transactions.slice(0, 30).map((x, i) => <tr key={x._id || i}><td>{date(x.date || x.createdAt)}</td><td>{x.type || "—"}</td><td>{x.description || x.reference || "—"}</td><td>{number(x.amount)}</td><td><span className="portal-badge">{x.status || "Recorded"}</span></td><td><div className="portal-actions"><button className="portal-btn secondary" onClick={() => startEdit(x)}><Edit3 size={14} /> Edit</button><button className="portal-btn danger" onClick={() => removeTransaction(x)}><Trash2 size={14} /> Delete</button></div></td></tr>)}
+              {sortedTransactions.slice(0, 30).map((x, i) => <tr key={x._id || i}><td>{date(x.transactionDate || x.createdAt)}</td><td>{x.type || "—"}</td><td>{x.description || x.reference || "—"}</td><td>{number(x.amount)}</td><td><span className="portal-badge">{x.status || "Recorded"}</span></td><td><div className="portal-actions"><button className="portal-btn secondary" onClick={() => startEdit(x)}><Edit3 size={14} /> Edit</button><button className="portal-btn danger" onClick={() => removeTransaction(x)}><Trash2 size={14} /> Delete</button></div></td></tr>)}
             </tbody></table></div>}
         </section>
 
         <section className="portal-panel">
           <h2>Contributions</h2>
-          {contributions.length === 0 ? <div className="portal-empty">No contribution records returned.</div> :
-            <div className="portal-table-wrap"><table className="portal-table"><thead><tr><th>Member</th><th>Period</th><th>Expected</th><th>Paid</th><th>Status</th></tr></thead><tbody>
-              {contributions.slice(0, 30).map((x, i) => <tr key={x._id || i}><td>{x.member?.fullName || x.member?.memberNumber || "Member"}</td><td>{x.month || "—"} {x.year || ""}</td><td>{number(x.expectedAmount)}</td><td>{number(x.paidAmount)}</td><td><span className="portal-badge">{x.status || "Recorded"}</span></td></tr>)}
+          {sortedContributions.length === 0 ? <div className="portal-empty">No contribution records returned.</div> :
+            <div className="portal-table-wrap"><table className="portal-table"><thead><tr><th>Date</th><th>Member</th><th>Period</th><th>Expected</th><th>Paid</th><th>Status</th></tr></thead><tbody>
+              {sortedContributions.slice(0, 30).map((x, i) => <tr key={x._id || i}><td>{date(x.paymentDate || x.createdAt)}</td><td>{x.member?.fullName || x.member?.memberNumber || "Member"}</td><td>{x.month || "—"} {x.year || ""}</td><td>{number(x.expectedAmount)}</td><td>{number(x.paidAmount)}</td><td><span className="portal-badge">{x.status || "Recorded"}</span></td></tr>)}
             </tbody></table></div>}
         </section>
       </div>
     </DashboardLayout>
   );
 }
+
 function Stat({ label, value }) { return <div className="portal-stat"><span>{label}</span><strong>{value}</strong></div>; }
 function date(v) { const d = new Date(v); return Number.isNaN(d.getTime()) ? "—" : d.toLocaleDateString("en-GB"); }

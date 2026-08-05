@@ -249,11 +249,10 @@ exports.getContributions = async (req,res)=>{
 
         .sort({
 
-            year:-1,
-
-            month:-1,
-
-            createdAt:-1
+            paymentDate: -1,
+            year: -1,
+            month: -1,
+            createdAt: -1
 
         });
 
@@ -341,9 +340,10 @@ exports.getMemberContributions = async (req,res)=>{
 
         .sort({
 
-            year:-1,
-
-            month:-1
+            paymentDate: -1,
+            year: -1,
+            month: -1,
+            createdAt: -1
 
         });
 

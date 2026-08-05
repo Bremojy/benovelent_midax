@@ -2,6 +2,8 @@ const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
 const calculateProfileCompletion = require("../utils/calculateProfileCompletion");
 
+const SITE_STATIONS = ["Chokaa", "Saika", "Ruaraka", "Garden City", "Garden Estate", "Jacaranda", "Depot", "None of above"];
+
 const memberSchema = new mongoose.Schema(
   {
     memberNumber: {
@@ -210,8 +212,9 @@ physicalAddress: {
 
 siteStation: {
   type: String,
-  enum: ["Chokaa", "Saika", "Ruaraka", "Garden City", "Garden Estate", "Jacaranda", "Depot", "None of above"],
+  enum: ["", "Chokaa", "Saika", "Ruaraka", "Garden City", "Garden Estate", "Jacaranda", "Depot", "None of above"],
   default: "",
+  trim: true,
 },
 
 customSiteStation: {
@@ -493,6 +496,28 @@ memberSchema.methods.matchPassword = async function (enteredPassword) {
 // =====================================
 // HASH PASSWORD
 // =====================================
+
+memberSchema.pre("validate", function (next) {
+  const currentStation = String(this.siteStation || "").trim();
+  if (!currentStation || !SITE_STATIONS.includes(currentStation)) {
+    this.siteStation = currentStation === "None of above" ? currentStation : "";
+  }
+
+  if (this.siteStation !== "None of above") {
+    this.customSiteStation = this.customSiteStation ? String(this.customSiteStation).trim() : "";
+  }
+
+  if (this.nextOfKin && typeof this.nextOfKin === "object") {
+    this.nextOfKin = {
+      fullName: String(this.nextOfKin.fullName || "").trim(),
+      relationship: String(this.nextOfKin.relationship || "").trim(),
+      phone: String(this.nextOfKin.phone || "").trim(),
+      nationalId: String(this.nextOfKin.nationalId || "").trim(),
+    };
+  }
+
+  next();
+});
 
 memberSchema.pre("save", async function () {
 
