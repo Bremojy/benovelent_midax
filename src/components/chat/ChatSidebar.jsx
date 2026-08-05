@@ -20,11 +20,13 @@ function ChatSidebar({
 }) {
   const filteredMembers = useMemo(() => {
     const keyword = String(search || "").trim().toLowerCase();
-    const sorted = [...members].sort((a, b) => {
-      const roleRank = rankRole(a.role) - rankRole(b.role);
-      if (roleRank !== 0) return roleRank;
-      return String(a.fullName || "").localeCompare(String(b.fullName || ""));
-    });
+    const sorted = [...members]
+      .filter((member) => String(member?.role || "").toLowerCase() !== "superadmin")
+      .sort((a, b) => {
+        const roleRank = rankRole(a.role) - rankRole(b.role);
+        if (roleRank !== 0) return roleRank;
+        return String(a.fullName || "").localeCompare(String(b.fullName || ""));
+      });
 
     if (!keyword) return sorted;
 
@@ -173,20 +175,18 @@ function Avatar({ user, isOnline }) {
 }
 
 function isLeader(role) {
-  return ["admin", "superadmin"].includes(String(role || "").toLowerCase());
+  return ["admin"].includes(String(role || "").toLowerCase());
 }
 
 function roleLabel(role) {
   const value = String(role || "member").toLowerCase();
-  if (value === "superadmin") return "Super Admin";
   if (value === "admin") return "Leader";
   return "Member";
 }
 
 function rankRole(role) {
   const value = String(role || "member").toLowerCase();
-  if (value === "superadmin") return 0;
-  if (value === "admin") return 1;
+  if (value === "admin") return 0;
   return 2;
 }
 

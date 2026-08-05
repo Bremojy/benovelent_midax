@@ -187,7 +187,6 @@ adminSchema.methods.matchPassword =
   };
 
 
-adminSchema.index({ email: 1 });
 adminSchema.index({ status: 1 });
 adminSchema.index({ lastLogin: -1 });
 adminSchema.set("toJSON", {

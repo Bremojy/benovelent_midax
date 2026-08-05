@@ -81,12 +81,8 @@ export default function Profile() {
   }, [completion]);
 
   const set = (key, value) => setMember((current) => ({ ...current, [key]: value }));
-  const digitsOnly = (value) => String(value ?? "").replace(/\D+/g, "");
-  const setNumeric = (key, value) => set(key, digitsOnly(value));
   const setKin = (key, value) => setMember((current) => ({ ...current, nextOfKin: { ...(current?.nextOfKin || {}), [key]: value } }));
-  const setKinNumeric = (key, value) => setKin(key, digitsOnly(value));
   const setEmergency = (key, value) => setMember((current) => ({ ...current, emergencyContact: { ...(current?.emergencyContact || {}), [key]: value } }));
-  const setEmergencyNumeric = (key, value) => setEmergency(key, digitsOnly(value));
 
   const save = async (event) => {
     event.preventDefault();
@@ -166,9 +162,6 @@ export default function Profile() {
             <div>
               <strong>Profile completion</strong>
               <div>{missing.length ? `${missing.length} item(s) still required` : "All core details captured"}</div>
-              <div className="profile-progress-track" aria-hidden="true">
-                <span className="profile-progress-fill" style={{ width: `${pct}%` }} />
-              </div>
             </div>
           </div>
         </header>
@@ -184,9 +177,9 @@ export default function Profile() {
             </div>
             <div className="profile-card-grid">
               <Field label="Full name" value={member.fullName} onChange={(v) => set("fullName", v)} required />
-              <Field label="Phone" type="tel" numericOnly value={member.phone} onChange={(v) => setNumeric("phone", v)} required />
+              <Field label="Phone" type="tel" value={member.phone} onChange={(v) => set("phone", v)} required />
               <Field label="Email" type="email" value={member.email} onChange={(v) => set("email", v)} />
-              <Field label="National ID" numericOnly value={member.nationalId} onChange={(v) => setNumeric("nationalId", v)} required />
+              <Field label="National ID" value={member.nationalId} onChange={(v) => set("nationalId", v)} required />
               <Select label="Gender" value={member.gender} onChange={(v) => set("gender", v)} options={["Male", "Female", "Other"]} />
               <Select label="Marital status" value={member.maritalStatus} onChange={(v) => set("maritalStatus", v)} options={["Single", "Married", "Divorced", "Widowed"]} />
               <Field label="Date of birth" type="date" value={member.dateOfBirth ? String(member.dateOfBirth).slice(0, 10) : ""} onChange={(v) => set("dateOfBirth", v)} />
@@ -227,11 +220,11 @@ export default function Profile() {
               )}
               <Field label="Occupation" value={member.occupation} onChange={(v) => set("occupation", v)} />
               <Field label="Employer" value={member.employer} onChange={(v) => set("employer", v)} />
-              <Field label="Monthly income" type="number" numericOnly value={member.monthlyIncome} onChange={(v) => setNumeric("monthlyIncome", v)} />
-              <Field label="M-Pesa number" numericOnly value={member.mpesaNumber} onChange={(v) => setNumeric("mpesaNumber", v)} />
+              <Field label="Monthly income" type="number" value={member.monthlyIncome} onChange={(v) => set("monthlyIncome", v)} />
+              <Field label="M-Pesa number" value={member.mpesaNumber} onChange={(v) => set("mpesaNumber", v)} />
               <Field label="Bank name" value={member.bankName} onChange={(v) => set("bankName", v)} />
               <Field label="Bank branch" value={member.bankBranch} onChange={(v) => set("bankBranch", v)} />
-              <Field label="Account number" numericOnly value={member.accountNumber} onChange={(v) => setNumeric("accountNumber", v)} />
+              <Field label="Account number" value={member.accountNumber} onChange={(v) => set("accountNumber", v)} />
             </div>
           </section>
 
@@ -244,11 +237,11 @@ export default function Profile() {
             <div className="profile-card-grid">
               <Field label="Emergency contact name" value={member.emergencyContact?.fullName || ""} onChange={(v) => setEmergency("fullName", v)} required />
               <Field label="Emergency contact relationship" value={member.emergencyContact?.relationship || ""} onChange={(v) => setEmergency("relationship", v)} required />
-              <Field label="Emergency contact phone" type="tel" numericOnly value={member.emergencyContact?.phone || ""} onChange={(v) => setEmergencyNumeric("phone", v)} required />
+              <Field label="Emergency contact phone" type="tel" value={member.emergencyContact?.phone || ""} onChange={(v) => setEmergency("phone", v)} required />
               <Field label="Next of kin name" value={member.nextOfKin?.fullName || ""} onChange={(v) => setKin("fullName", v)} required />
               <Field label="Next of kin relationship" value={member.nextOfKin?.relationship || ""} onChange={(v) => setKin("relationship", v)} required />
-              <Field label="Next of kin phone" type="tel" numericOnly value={member.nextOfKin?.phone || ""} onChange={(v) => setKinNumeric("phone", v)} required />
-              <Field label="Next of kin national ID" numericOnly value={member.nextOfKin?.nationalId || ""} onChange={(v) => setKinNumeric("nationalId", v)} />
+              <Field label="Next of kin phone" type="tel" value={member.nextOfKin?.phone || ""} onChange={(v) => setKin("phone", v)} required />
+              <Field label="Next of kin national ID" value={member.nextOfKin?.nationalId || ""} onChange={(v) => setKin("nationalId", v)} />
             </div>
           </section>
 
@@ -277,23 +270,11 @@ export default function Profile() {
   );
 }
 
-function Field({ label, value, onChange, type = "text", disabled = false, required = false, numericOnly = false }) {
-  const inputType = numericOnly ? "text" : type;
+function Field({ label, value, onChange, type = "text", disabled = false, required = false }) {
   return (
     <label className="portal-field">
       <span>{label}</span>
-      <input
-        type={inputType}
-        value={value}
-        disabled={disabled}
-        required={required}
-        inputMode={numericOnly ? "numeric" : undefined}
-        pattern={numericOnly ? "[0-9]*" : undefined}
-        onChange={(e) => {
-          const nextValue = numericOnly ? String(e.target.value || "").replace(/\D+/g, "") : e.target.value;
-          onChange?.(nextValue);
-        }}
-      />
+      <input type={type} value={value} disabled={disabled} required={required} onChange={(e) => onChange?.(e.target.value)} />
     </label>
   );
 }

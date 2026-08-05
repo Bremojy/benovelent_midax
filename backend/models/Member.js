@@ -546,9 +546,6 @@ memberSchema.pre("save", async function () {
 // INDEXES
 // =====================================
 
-memberSchema.index({ email: 1 });
-memberSchema.index({ username: 1 });
-memberSchema.index({ memberNumber: 1 });
 memberSchema.index({ status: 1 });
 memberSchema.index({ online: 1 });
 

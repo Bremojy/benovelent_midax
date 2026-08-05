@@ -61,7 +61,6 @@ const websiteContentSchema = new mongoose.Schema(
   }
 );
 
-websiteContentSchema.index({ section: 1 });
 
 module.exports =
   mongoose.models.WebsiteContent ||

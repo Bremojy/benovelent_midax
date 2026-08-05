@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, Wallet, HandHeart, MessageCircle, UserRound, UserPlus, ShieldCheck, ClipboardList, Headphones, Vote, Settings2 } from "lucide-react";
+import { LayoutDashboard, Users, Wallet, HandHeart, MessageCircle, UserRound, UserPlus, ShieldCheck, ClipboardList, Headphones, Vote } from "lucide-react";
 
 export const dashboardMenus = {
   member: [
@@ -25,11 +25,11 @@ export const dashboardMenus = {
     { title: "Administrators", icon: UserPlus, path: "/superadmin/admins" },
     { title: "Members", icon: Users, path: "/superadmin/members" },
     { title: "Accounts", icon: Wallet, path: "/superadmin/accounts" },
-    { title: "Claims", icon: HandHeart, path: "/superadmin/claims" },
     { title: "Audit", icon: ClipboardList, path: "/superadmin/audit" },
-    { title: "Settings", icon: Settings2, path: "/superadmin/settings" },
     { title: "System", icon: ShieldCheck, path: "/superadmin/system" },
     { title: "Constitution", icon: ClipboardList, path: "/superadmin/constitution" },
+    { title: "Claims", icon: HandHeart, path: "/superadmin/claims" },
+    { title: "Settings", icon: ShieldCheck, path: "/superadmin/settings" },
     { title: "Polls", icon: Vote, path: "/superadmin/polls" },
   ],
 };

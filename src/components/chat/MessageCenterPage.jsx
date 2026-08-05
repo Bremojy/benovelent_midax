@@ -103,7 +103,7 @@ function MessageCenterPage({
       const result = await loadContactsRef.current({ currentUser });
       const peopleList = Array.isArray(result?.members) ? result.members : Array.isArray(result?.data?.members) ? result.data.members : [];
       const conversationList = Array.isArray(result?.conversations) ? result.conversations : Array.isArray(result?.data?.conversations) ? result.data.conversations : [];
-      setPeople(peopleList);
+      setPeople(peopleList.filter((person) => String(person?.role || "").toLowerCase() !== "superadmin"));
       setConversations(conversationList);
     } catch (error) {
       console.error("Load chat data error:", error);
@@ -143,8 +143,8 @@ function MessageCenterPage({
         setBanner("You cannot chat with yourself.");
         return;
       }
-      if (String(person.role || "").toLowerCase() === "superadmin") {
-        setBanner("SuperAdmin conversations are disabled.");
+      if (String(person?.role || "").toLowerCase() === "superadmin") {
+        setBanner("No one can communicate with SuperAdmin.");
         return;
       }
       
@@ -344,10 +344,6 @@ function normalizeConversation(conversation, currentUserId) {
     participants.find((member) => String(member?._id || member) !== String(currentUserId)) ||
     null;
 
-  if (String(partner?.role || "").toLowerCase() === "superadmin") {
-    return null;
-  }
-
   return {
     ...conversation,
     partner,
@@ -362,7 +358,11 @@ function normalizeConversation(conversation, currentUserId) {
 function normalizeConversations(items, currentUserId) {
   return (items || [])
     .map((conversation) => normalizeConversation(conversation, currentUserId))
-    .filter(Boolean)
+    .filter((conversation) => {
+      if (!conversation) return false;
+      const partnerRole = String(conversation.partner?.role || "").toLowerCase();
+      return partnerRole !== "superadmin";
+    })
     .sort((a, b) => new Date(b.lastMessageTime || b.updatedAt || b.createdAt) - new Date(a.lastMessageTime || a.updatedAt || a.createdAt));
 }
 

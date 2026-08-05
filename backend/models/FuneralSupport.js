@@ -9,8 +9,7 @@ const funeralSupportSchema = new mongoose.Schema(
     member:{
         type:mongoose.Schema.Types.ObjectId,
         ref:"Member",
-        required:true,
-        index:true
+        required:true
     },
 
     memberNumber:{
@@ -224,10 +223,6 @@ const funeralSupportSchema = new mongoose.Schema(
 // =====================================
 // INDEXES
 // =====================================
-
-funeralSupportSchema.index({
-    member:1
-});
 
 funeralSupportSchema.index({
     status:1

@@ -21,7 +21,7 @@ export default function AdminSupport() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [broadcast, setBroadcast] = useState(true);
-  const [smsEnabled, setSmsEnabled] = useState(false);
+  const [smsEnabled, setSmsEnabled] = useState(true);
 
   const load = async () => {
     try {
@@ -92,7 +92,7 @@ export default function AdminSupport() {
 
       setSuccess(
         broadcast
-          ? `Broadcast processed. In-app: ${inAppSent}. Email: ${emailSent}${emailSkipped ? ` (skipped: ${emailSkipped})` : ""}. SMS: ${smsSent}${smsSkipped && smsEnabled ? ` (skipped: ${smsSkipped})` : ""}.`
+          ? `Broadcast processed. In-app: ${inAppSent}. Email: ${emailSent}${emailSkipped ? ` (skipped: ${emailSkipped})` : ""}. SMS: ${smsSent}${smsSkipped ? ` (skipped: ${smsSkipped})` : ""}.`
           : "Message sent successfully."
       );
       setForm({ recipient: "", title: "", message: "" });
@@ -153,7 +153,7 @@ export default function AdminSupport() {
       const { data } = await createAdminMember(payload);
       const tempPassword = data?.temporaryPassword || "Check the success response";
       const emailStatus = data?.delivery?.email?.sent ? "email sent" : data?.delivery?.email?.reason ? `email skipped (${data.delivery.email.reason})` : "email status unknown";
-      const smsStatus = data?.delivery?.sms?.sent ? "sms sent" : data?.delivery?.sms?.reason ? `sms skipped (${data.delivery.sms.reason})` : "sms disabled";
+      const smsStatus = data?.delivery?.sms?.sent ? "sms sent" : data?.delivery?.sms?.reason ? `sms skipped (${data.delivery.sms.reason})` : "sms status unknown";
 
       setSuccess(`Member invited successfully. Temporary password: ${tempPassword}. Delivery: ${emailStatus}, ${smsStatus}.`);
       setInvite({ memberNumber: "", fullName: "", username: "", phone: "", email: "", department: "", position: "", monthlyContribution: "" });
@@ -206,7 +206,7 @@ export default function AdminSupport() {
               <div className="portal-field">
                 <label>
                   <input type="checkbox" checked={smsEnabled} onChange={e => setSmsEnabled(e.target.checked)} style={{ marginRight: 8 }} />
-                  Enable SMS fallback later
+                  Send SMS when recipients have phone numbers
                 </label>
               </div>
             </div>
