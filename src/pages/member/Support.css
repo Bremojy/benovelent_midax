@@ -344,3 +344,87 @@
 .support-file-hint{display:block;margin-top:7px;color:#74777d;font-size:11px;line-height:1.5}
 
 .claim-documents{display:flex;gap:8px;flex-wrap:wrap;margin-top:9px}.claim-documents a{font-size:11px;color:#c65f00;background:#fff3e7;padding:5px 8px;border-radius:8px;text-decoration:none;font-weight:700}
+
+
+.support-form { display: grid; gap: 14px; }
+.support-documents-panel {
+  padding: 16px;
+  border: 1px solid #ececec;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #fff, #fbfbfb);
+}
+.support-documents-panel-header {
+  display:flex; justify-content:space-between; gap:12px; align-items:flex-start; margin-bottom:12px; flex-wrap:wrap;
+}
+.support-documents-panel-header span {
+  display:block; color:#ff7a00; font-size:11px; font-weight:800; letter-spacing:1.4px;
+}
+.support-documents-panel-header h3 { margin:6px 0 0; font-size:16px; color:#222; }
+.support-attachment-list { display:grid; gap:10px; }
+.support-attachment-row {
+  display:grid;
+  grid-template-columns: 40px 1fr auto;
+  gap:10px;
+  align-items:start;
+  padding:12px;
+  border:1px solid #eee;
+  border-radius:14px;
+  background:#fff;
+}
+.support-attachment-index {
+  width:40px;
+  height:40px;
+  border-radius:12px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:#fff3e7;
+  color:#c85d00;
+  font-weight:800;
+}
+.support-attachment-fields {
+  display:grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap:10px;
+}
+.support-attachment-fields label span {
+  display:block;
+  margin-bottom:6px;
+  color:#666;
+  font-size:11px;
+  font-weight:700;
+  text-transform:uppercase;
+  letter-spacing:.08em;
+}
+.support-attachment-fields input,
+.support-attachment-fields select {
+  width:100%;
+  box-sizing:border-box;
+  border:1px solid #ddd;
+  border-radius:10px;
+  background:#fff;
+  padding:10px 11px;
+  font:inherit;
+}
+.support-item-main { min-width: 0; }
+.support-item-main p { margin: 7px 0 0; color:#4d5259; font-size:13px; line-height:1.6; }
+.claim-documents { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+.claim-documents a {
+  display:inline-flex;
+  flex-direction:column;
+  gap:2px;
+  min-width: 120px;
+  padding:8px 10px;
+  border-radius:10px;
+  text-decoration:none;
+  background:#fff3e7;
+  color:#9c5100;
+  font-weight:700;
+  border:1px solid rgba(255,122,0,.15);
+}
+.claim-documents a strong { font-size:11px; text-transform:uppercase; letter-spacing:.06em; }
+.claim-documents a span { font-size:12px; color:#503319; }
+@media (max-width: 800px) {
+  .support-attachment-row { grid-template-columns: 1fr; }
+  .support-attachment-fields { grid-template-columns: 1fr; }
+}

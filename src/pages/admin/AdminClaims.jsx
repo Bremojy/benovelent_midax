@@ -1,61 +1,80 @@
 import { useEffect, useState } from "react";
 import DashboardLayout from "../../layouts/DashboardLayout";
-import { useAuth } from "../../context/AuthContext";
 import API, { resolveApiUrl } from "../../services/api";
 import "../../styles/portalModule.css";
 
-const sources = [
-  { type:"Medical", get:"/medical/admin/applications", approve:"/medical/admin/approve/", reject:"/medical/admin/reject/" },
-  { type:"Funeral", get:"/funeral/", approve:"/funeral/", reject:"/funeral/" },
-  { type:"Education", get:"/education/", approve:"/education/", reject:"/education/" },
+const SOURCES = [
+  { type: "Medical", get: "/medical/admin/applications", approve: "/medical/admin/approve/", reject: "/medical/admin/reject/", remove: "/medical/admin/delete/", actionable: true },
+  { type: "Funeral", get: "/funeral/", approve: "/funeral/approve/", reject: "/funeral/reject/", remove: "/funeral/", actionable: true },
+  { type: "Education", get: "/education/", approve: "/education/", reject: "/education/", remove: "/education/", actionable: true },
+  { type: "Support Request", get: "/member/support-requests", actionable: false },
 ];
 
 export default function AdminClaims() {
-  const { role } = useAuth();
-  const isSuperAdmin = String(role || "").toLowerCase() === "superadmin";
-  const [items,setItems]=useState([]);
-  const [loading,setLoading]=useState(true);
-  const [error,setError]=useState("");
-  const [busy,setBusy]=useState("");
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState("");
 
-  const load=async()=>{
-    try{
-      setLoading(true);setError("");
-      const results=await Promise.allSettled(sources.map(s=>API.get(s.get)));
-      const merged=[];
-      results.forEach((r,i)=>{
-        if(r.status==="fulfilled"){
-          const data=r.value.data;
-          const arr=data?.applications||data?.claims||data?.records||[];
-          if(Array.isArray(arr)) arr.forEach(x=>merged.push({...x,supportType:sources[i].type,source:sources[i]}));
+  const load = async () => {
+    try {
+      setLoading(true);
+      setError("");
+      const results = await Promise.allSettled(SOURCES.map((source) => API.get(source.get)));
+      const merged = [];
+
+      results.forEach((result, index) => {
+        if (result.status !== "fulfilled") return;
+        const source = SOURCES[index];
+        const data = result.value.data;
+        const arr = data?.applications || data?.claims || data?.requests || data?.records || [];
+        if (Array.isArray(arr)) {
+          arr.forEach((item) => merged.push({ ...item, supportType: source.type, source }));
         }
       });
-      merged.sort((a,b)=>new Date(b.createdAt||b.applicationDate)-new Date(a.createdAt||a.applicationDate));
-      setItems(merged);
-      if(!merged.length && results.every(r=>r.status==="rejected")) throw results[0].reason;
-    }catch(err){setError(err.response?.data?.message||err.message||"Unable to load claims.");}
-    finally{setLoading(false);}
-  };
-  useEffect(()=>{load()},[]);
 
-  const action=async(item,kind)=>{
-    if(!item._id)return;
-    const key=`${kind}-${item._id}`;
-    try{
+      merged.sort((a, b) => new Date(b.createdAt || b.applicationDate) - new Date(a.createdAt || a.applicationDate));
+      setItems(merged);
+
+      if (!merged.length && results.every((result) => result.status === "rejected")) {
+        throw results[0].reason;
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || "Unable to load claims.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  const action = async (item, kind) => {
+    if (!item?._id || !item.source?.actionable) return;
+    const key = `${kind}-${item._id}`;
+    try {
       setBusy(key);
-      const endpoint=kind==="approve"?item.source.approve:item.source.reject;
-      const path = item.supportType === "Medical"
-        ? `${endpoint}${item._id}`
-        : `${endpoint}${item._id}/${kind}`;
-      const {data}=await API.put(path, kind==="reject"?{rejectionReason:"Reviewed and rejected by administrator."}:{});
-      if(!data?.success && data?.message===undefined) throw new Error("Action failed.");
+      const endpoint = kind === "approve" ? item.source.approve : item.source.reject;
+      const path =
+        item.supportType === "Medical"
+          ? `${endpoint}${item._id}`
+          : item.supportType === "Funeral"
+            ? `${endpoint}${item._id}`
+            : `${endpoint}${item._id}`;
+      const payload = kind === "reject" ? { rejectionReason: "Reviewed and rejected by administrator." } : {};
+      const { data } = await API.put(path, payload);
+      if (!data?.success) throw new Error(data?.message || "Action failed.");
       await load();
-    }catch(err){setError(err.response?.data?.message||err.message||"Unable to update claim.");}
-    finally{setBusy("");}
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || "Unable to update claim.");
+    } finally {
+      setBusy("");
+    }
   };
 
   const deleteClaim = async (item) => {
-    if (!item?._id) return;
+    if (!item?._id || !item.source?.actionable) return;
     if (!window.confirm("Delete this claim permanently?")) return;
     try {
       setBusy(`delete-${item._id}`);
@@ -74,31 +93,110 @@ export default function AdminClaims() {
     }
   };
 
-  const openDocument = async (type,id,url) => { try { await API.post(`/admin/claims/${String(type).toLowerCase()}/${id}/open`); } catch {} window.open(url,"_blank","noopener,noreferrer"); };
-  return <DashboardLayout><div className="portal-module">
-    <header className="portal-module-header"><div><span>ASSISTANCE PROCESSING</span><h1>Claims</h1><p>Review and process medical, funeral and education assistance applications. Superadmins can also delete approved, rejected or completed claims at any time.</p></div><button className="portal-btn" onClick={load}>Refresh</button></header>
-    {error&&<div className="portal-alert">{error}</div>}
-    <section className="portal-panel claim-guide">
-      <h2>Administrator processing guide</h2>
-      <div className="claim-guide-grid">
-        <div><b>1. Review</b><span>Open the application and verify the member details and supporting documents.</span></div>
-        <div><b>2. Decide</b><span>Move the application through review, approval or rejection using the controls below.</span></div>
-        <div><b>3. Disburse</b><span>After approval, record payment/disbursement so the member portal reflects the live status.</span></div>
-        <div><b>4. Communicate</b><span>Member notifications are generated from the backend workflow.</span></div>
+  const openDocument = async (type, id, url) => {
+    try {
+      if (type !== "Support Request" && type !== "General") {
+        await API.post(`/admin/claims/${String(type).toLowerCase()}/${id}/open`);
+      }
+    } catch {}
+    window.open(url, "_blank", "noopener,noreferrer");
+  };
+
+  return (
+    <DashboardLayout>
+      <div className="portal-module">
+        <header className="portal-module-header">
+          <div>
+            <span>ASSISTANCE PROCESSING</span>
+            <h1>Claims</h1>
+            <p>Review and process medical, funeral, education and support-request uploads.</p>
+          </div>
+          <button className="portal-btn" onClick={load}>Refresh</button>
+        </header>
+
+        {error && <div className="portal-alert">{error}</div>}
+
+        <section className="portal-panel">
+          {loading ? (
+            <div className="portal-empty">Loading claims...</div>
+          ) : items.length === 0 ? (
+            <div className="portal-empty">
+              <h3>No claims available</h3>
+              <p>Applications submitted by members will show up here.</p>
+            </div>
+          ) : (
+            <div className="claim-feed">
+              {items.map((item) => (
+                <article className="claim-feed-card" key={`${item.supportType}-${item._id}`}>
+                  <div className="claim-feed-main">
+                    <div className="claim-feed-top">
+                      <div>
+                        <span className="portal-badge">{item.supportType}</span>
+                        <h2>{item.description || item.purpose || item.caseDescription || "Support application"}</h2>
+                        <p>{item.member?.fullName || item.member?.memberNumber || "Member"}</p>
+                      </div>
+                      <div className={`portal-badge ${String(item.status || "pending").toLowerCase().replace(/\s+/g, "-")}`}>
+                        {item.status || "Pending"}
+                      </div>
+                    </div>
+
+                    <p className="claim-feed-description">
+                      {item.remarks || item.rejectionReason || "No remarks yet."}
+                    </p>
+
+                    {Array.isArray(item.documents) && item.documents.length > 0 && (
+                      <div className="claim-feed-documents">
+                        {item.documents.map((doc, index) => {
+                          const url = typeof doc === "string" ? doc : doc?.fileUrl || doc?.url;
+                          if (!url) return null;
+                          const fullUrl = url.startsWith("http") ? url : resolveApiUrl(url);
+                          const category = typeof doc === "string" ? "General" : doc?.category || "General";
+                          const label = typeof doc === "string" ? `Document ${index + 1}` : doc?.label || doc?.fileName || `Document ${index + 1}`;
+                          return (
+                            <button
+                              type="button"
+                              className="claim-doc-chip"
+                              key={`${url}-${index}`}
+                              onClick={() => openDocument(item.supportType, item._id, fullUrl)}
+                            >
+                              <strong>{category}</strong>
+                              <span>{label}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="claim-feed-side">
+                    <strong>{money(item.amount || item.requestedAmount || 0)}</strong>
+                    <small>{formatDate(item.createdAt || item.applicationDate)}</small>
+
+                    {item.source?.actionable && (
+                      <div className="portal-actions">
+                        <button className="portal-btn" disabled={busy === `approve-${item._id}`} onClick={() => action(item, "approve")}>
+                          Approve
+                        </button>
+                        <button className="portal-btn secondary" disabled={busy === `reject-${item._id}`} onClick={() => action(item, "reject")}>
+                          Reject
+                        </button>
+                        <button className="portal-btn danger" disabled={busy === `delete-${item._id}`} onClick={() => deleteClaim(item)}>
+                          Delete
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
       </div>
-    </section>
-    <section className="portal-panel">
-      {loading?<div className="portal-empty">Loading applications...</div>:items.length===0?<div className="portal-empty">No assistance applications found.</div>:
-      <div className="portal-table-wrap"><table className="portal-table"><thead><tr><th>Type</th><th>Applicant</th><th>Amount</th><th>Date</th><th>Status</th><th>Documents</th><th>Actions</th></tr></thead><tbody>
-      {items.map((x,i)=><tr key={`${x.supportType}-${x._id||i}`}><td>{x.supportType}</td><td>{x.member?.fullName||x.contributorName||x.memberNumber||"Member"}</td><td>{money(x.requestedAmount||x.amount)}</td><td>{date(x.createdAt||x.applicationDate)}</td><td><span className="portal-badge">{x.status||"Pending"}</span></td><td>{Array.isArray(x.documents) && x.documents.length ? x.documents.map((doc, index) => {
-  const url = typeof doc === "string" ? doc : doc?.fileUrl;
-  if (!url) return null;
-  const full = url.startsWith("http") ? url : resolveApiUrl(url);
-  return <button key={`${url}-${index}`} className="portal-btn secondary" type="button" onClick={()=>openDocument(x.supportType,x._id,full)}>Open Doc {index + 1}</button>;
-}) : "—"}</td><td><div className="portal-actions">{!["Approved","Paid","Closed","Disbursed","Completed"].includes(x.status)&&<><button className="portal-btn" disabled={busy===`approve-${x._id}`} onClick={()=>action(x,"approve")}>Approve</button><button className="portal-btn danger" disabled={busy===`reject-${x._id}`} onClick={()=>action(x,"reject")}>Reject</button></>}{isSuperAdmin&&<button className="portal-btn danger" disabled={busy===`delete-${x._id}`} onClick={()=>deleteClaim(x)}>Delete</button>}</div></td></tr>)}
-      </tbody></table></div>}
-    </section>
-  </div></DashboardLayout>
+    </DashboardLayout>
+  );
 }
-const money=v=>new Intl.NumberFormat("en-KE",{style:"currency",currency:"KES",maximumFractionDigits:0}).format(Number(v||0));
-const date=v=>v?new Date(v).toLocaleDateString("en-KE",{day:"2-digit",month:"short",year:"numeric"}):"—";
+
+const money = (v) =>
+  new Intl.NumberFormat("en-KE", { style: "currency", currency: "KES", maximumFractionDigits: 0 }).format(Number(v || 0));
+const formatDate = (v) =>
+  v ? new Date(v).toLocaleDateString("en-KE", { day: "2-digit", month: "short", year: "numeric" }) : "—";

@@ -1219,7 +1219,7 @@ exports.getClaims = async (req, res) => {
     try {
         const memberId = req.user._id;
 
-        const [medical, funeral, education] = await Promise.all([
+        const [medical, funeral, education, supportRequests] = await Promise.all([
             MedicalSupport.find({ member: memberId, isDeleted: { $ne: true } })
                 .populate("dependent", "fullName relationship")
                 .sort({ createdAt: -1 })
@@ -1234,11 +1234,39 @@ exports.getClaims = async (req, res) => {
                 .populate("dependent", "fullName relationship")
                 .sort({ createdAt: -1 })
                 .lean(),
+
+            require("../models/SupportRequest")
+                .find({ member: memberId })
+                .sort({ createdAt: -1 })
+                .lean(),
         ]);
 
-        const generic = await require("../models/SupportRequest").find({ member: req.user._id }).lean();
+        const normalizeDocuments = (documents = []) =>
+            (Array.isArray(documents) ? documents : [])
+                .map((document) => {
+                    if (!document) return null;
+                    if (typeof document === "string") {
+                        return {
+                            category: "General",
+                            label: "",
+                            fileName: "",
+                            fileUrl: document,
+                            uploadedAt: new Date(),
+                        };
+                    }
+                    const fileUrl = document.fileUrl || document.url || document.path || "";
+                    if (!fileUrl) return null;
+                    return {
+                        category: String(document.category || "General").trim() || "General",
+                        label: String(document.label || "").trim(),
+                        fileName: String(document.fileName || document.label || "").trim(),
+                        fileUrl,
+                        uploadedAt: document.uploadedAt || document.createdAt || new Date(),
+                    };
+                })
+                .filter(Boolean);
 
-const claims = [
+        const claims = [
             ...medical.map(item => ({
                 ...item,
                 supportType: "medical",
@@ -1266,6 +1294,12 @@ const claims = [
                     ...(item.supportingDocuments || []),
                 ].filter(Boolean),
             })),
+            ...supportRequests.map(item => ({
+                ...item,
+                supportType: String(item.supportType || "other").toLowerCase(),
+                amount: item.requestedAmount || 0,
+                documents: normalizeDocuments(item.documents),
+            })),
         ].sort(
             (a, b) =>
                 new Date(b.createdAt || b.applicationDate) -
@@ -1287,6 +1321,9 @@ const claims = [
 };
 
 
+// ==========================================
+// CHAT MEMBERS
+// ==========================================
 // ==========================================
 // CHAT MEMBERS
 // ==========================================

@@ -1,24 +1,92 @@
 const SupportRequest = require("../models/SupportRequest");
-const { resolveStoredFiles } = require("../utils/uploadUrl");
+const { resolveStoredFileUrl } = require("../utils/uploadUrl");
+
+const safeParse = (value, fallback) => {
+  if (value === undefined || value === null || value === "") return fallback;
+  if (Array.isArray(value)) return value;
+  if (typeof value !== "string") return value;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return fallback;
+  }
+};
+
+const asText = (value, fallback = "") => {
+  if (value === undefined || value === null) return fallback;
+  return String(value).trim();
+};
+
+const buildAttachmentList = (req) => {
+  const files = Array.isArray(req.files) ? req.files : [];
+  const categories = safeParse(req.body.documentCategories, []);
+  const labels = safeParse(req.body.documentLabels, []);
+
+  return files
+    .map((file, index) => {
+      const fileUrl = resolveStoredFileUrl(file, "/documents");
+      if (!fileUrl) return null;
+
+      const category = asText(categories[index], "General") || "General";
+      const label = asText(labels[index], file.originalname || `Document ${index + 1}`);
+      const fileName = asText(file.originalname || file.filename || label, label);
+
+      return {
+        category,
+        label,
+        fileName,
+        fileUrl,
+        uploadedAt: new Date(),
+      };
+    })
+    .filter(Boolean);
+};
+
+const normalizeDocuments = (documents = []) =>
+  (Array.isArray(documents) ? documents : [])
+    .map((document) => {
+      if (!document) return null;
+      if (typeof document === "string") {
+        return {
+          category: "General",
+          label: "",
+          fileName: "",
+          fileUrl: document,
+          uploadedAt: new Date(),
+        };
+      }
+      const fileUrl = document.fileUrl || document.url || document.path || "";
+      if (!fileUrl) return null;
+      return {
+        category: asText(document.category, "General") || "General",
+        label: asText(document.label, ""),
+        fileName: asText(document.fileName, document.label || ""),
+        fileUrl,
+        uploadedAt: document.uploadedAt ? new Date(document.uploadedAt) : new Date(),
+      };
+    })
+    .filter(Boolean);
 
 exports.create = async (req, res) => {
   try {
-    const files = resolveStoredFiles(req.files || [], "/documents");
     const { supportType, description, requestedAmount } = req.body;
+    const amount = Number(requestedAmount);
 
-    if (!supportType || !description || Number(requestedAmount) <= 0) {
+    if (!supportType || !description || !Number.isFinite(amount) || amount <= 0) {
       return res.status(400).json({
         success: false,
         message: "Support type, description and a positive amount are required.",
       });
     }
 
+    const attachments = buildAttachmentList(req);
+
     const item = await SupportRequest.create({
       member: req.user._id,
-      supportType,
-      description,
-      requestedAmount: Number(requestedAmount),
-      documents: files,
+      supportType: asText(supportType),
+      description: asText(description),
+      requestedAmount: amount,
+      documents: attachments,
       timeline: [
         {
           status: "Pending",
@@ -40,7 +108,13 @@ exports.mine = async (req, res) => {
       .sort({ createdAt: -1 })
       .lean();
 
-    return res.json({ success: true, requests });
+    return res.json({
+      success: true,
+      requests: requests.map((request) => ({
+        ...request,
+        documents: normalizeDocuments(request.documents),
+      })),
+    });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
   }
@@ -56,7 +130,13 @@ exports.all = async (req, res) => {
       .sort({ createdAt: -1 })
       .lean();
 
-    return res.json({ success: true, requests });
+    return res.json({
+      success: true,
+      requests: requests.map((request) => ({
+        ...request,
+        documents: normalizeDocuments(request.documents),
+      })),
+    });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
   }
@@ -78,7 +158,13 @@ exports.getOne = async (req, res) => {
       });
     }
 
-    return res.json({ success: true, request });
+    return res.json({
+      success: true,
+      request: {
+        ...request,
+        documents: normalizeDocuments(request.documents),
+      },
+    });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
   }
@@ -106,7 +192,13 @@ exports.update = async (req, res) => {
     });
 
     await item.save();
-    return res.json({ success: true, request: item });
+    return res.json({
+      success: true,
+      request: {
+        ...item.toObject(),
+        documents: normalizeDocuments(item.documents),
+      },
+    });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
   }

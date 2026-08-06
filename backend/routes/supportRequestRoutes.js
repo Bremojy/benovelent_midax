@@ -11,7 +11,7 @@ router.post(
   verifyToken,
   isMember,
   setUploadType("documents"),
-  uploadArray("documents", 10),
+  uploadArray("documents", 30),
   controller.create
 );
 
