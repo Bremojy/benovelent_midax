@@ -40,6 +40,9 @@ function MessageCenterPage({
 
   const actor = useMemo(() => buildActorProfile(currentUser || authUser), [currentUser, authUser]);
   const actorId = actor.id;
+  const showChooserOnMobile = isMobile && !mobileChatOpen;
+  const hidePageIntroOnMobile = isMobile && mobileChatOpen;
+  const isFullscreenChat = isMobile && mobileChatOpen && Boolean(selectedConversation);
 
   useEffect(() => {
     loadContactsRef.current = loadContacts;
@@ -262,9 +265,33 @@ function MessageCenterPage({
     });
   };
 
-  const showChooserOnMobile = isMobile && !mobileChatOpen;
-  const hidePageIntroOnMobile = isMobile && mobileChatOpen;
-  const isFullscreenChat = isMobile && mobileChatOpen && Boolean(selectedConversation);
+  if (isFullscreenChat) {
+    return (
+      <div className="message-center compact-message-center chat-focus-mode mobile-chat-page">
+        {banner && <div className="messages-call-banner mobile-chat-banner">{banner}</div>}
+        <div className="mobile-chat-overlay" role="dialog" aria-modal="true" aria-label="Chat conversation">
+          <ChatWindow
+            conversation={selectedConversation}
+            socket={socket}
+            currentUser={currentUser || authUser}
+            onBack={mobileBack}
+            onAudioCall={() => startCall("audio")}
+            onVideoCall={() => startCall("video")}
+          />
+        </div>
+        {call && (
+          <CallOverlay
+            socket={socket}
+            currentUser={currentUser || authUser}
+            partner={call.partner}
+            callType={call.callType}
+            incomingCall={call.incomingCall}
+            onClose={() => setCall(null)}
+          />
+        )}
+      </div>
+    );
+  }
 
   return (
     <DashboardLayout>
@@ -394,18 +421,6 @@ function MessageCenterPage({
           </div>
         )}
 
-        {isFullscreenChat && (
-          <div className="mobile-chat-overlay" role="dialog" aria-modal="true" aria-label="Chat conversation">
-            <ChatWindow
-              conversation={selectedConversation}
-              socket={socket}
-              currentUser={currentUser || authUser}
-              onBack={mobileBack}
-              onAudioCall={() => startCall("audio")}
-              onVideoCall={() => startCall("video")}
-            />
-          </div>
-        )}
       </div>
 
       {call && (
