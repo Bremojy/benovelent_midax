@@ -1,3 +1,4 @@
+
 .modern-chat-header{
   height:auto;
   min-height:88px;
@@ -131,7 +132,7 @@
 
 @media (max-width: 900px){
   .modern-chat-header{
-    background:#12121a;
+    background:#050507;
     border-bottom:1px solid rgba(255,255,255,.06);
   }
 
@@ -144,7 +145,7 @@
   }
 
   .chat-actions button{
-    background:#23232b;
+    background:#19191f;
     color:#f8fafc;
   }
 

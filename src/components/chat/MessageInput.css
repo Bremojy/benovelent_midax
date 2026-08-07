@@ -1,3 +1,4 @@
+
 .message-input-container{
   position:sticky;
   bottom:0;
@@ -20,13 +21,17 @@
   border-radius:16px;
   overflow:hidden;
   box-shadow:0 10px 24px rgba(15,23,42,.12);
+  max-width:min(100%, 340px);
 }
 
-.preview-image img{
-  width:120px;
-  height:120px;
-  object-fit:cover;
+.preview-image a{
   display:block;
+  padding:10px 14px;
+  background:#0f172a;
+  color:#fff;
+  text-decoration:none;
+  font-weight:700;
+  word-break:break-word;
 }
 
 .preview-image button{
@@ -187,5 +192,87 @@
     width:40px;
     height:40px;
     border-radius:13px;
+  }
+}
+
+@media (max-width: 900px){
+  .message-input-container{
+    background:rgba(6,6,8,.96);
+    border-top:1px solid rgba(255,255,255,.06);
+    box-shadow:0 -18px 36px rgba(0,0,0,.35);
+  }
+
+  .message-toolbar-actions button{
+    background:#1f1f24;
+    color:#f8fafc;
+    box-shadow:none;
+  }
+
+  .message-toolbar-actions button:hover{
+    background:#2b2b34;
+    color:#fff;
+  }
+
+  .message-toolbar textarea{
+    background:#141418;
+    color:#f8fafc;
+    border-color:rgba(255,255,255,.08);
+    border-radius:999px;
+    padding:14px 16px;
+    min-height:50px;
+  }
+
+  .message-toolbar textarea::placeholder{
+    color:#9ca3af;
+  }
+
+  .emoji-popover{
+    background:#17171d;
+    border-color:rgba(255,255,255,.08);
+    box-shadow:0 20px 44px rgba(0,0,0,.35);
+  }
+
+  .emoji-chip{
+    background:#23232b;
+    color:#fff;
+  }
+
+  .preview-image a{
+    background:#17171d;
+    color:#f8fafc;
+  }
+}
+
+@media (max-width: 640px){
+  .message-toolbar{
+    grid-template-columns:auto minmax(0,1fr) auto;
+    gap:8px;
+  }
+
+  .message-toolbar-actions{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    overflow-x:auto;
+    padding-bottom:2px;
+  }
+
+  .message-toolbar-actions button{
+    width:36px;
+    height:36px;
+    border-radius:999px;
+    flex-shrink:0;
+  }
+
+  .message-toolbar textarea{
+    min-height:48px;
+    max-height:120px;
+    font-size:14px;
+  }
+
+  .send-button{
+    width:46px !important;
+    height:46px !important;
+    border-radius:999px !important;
   }
 }

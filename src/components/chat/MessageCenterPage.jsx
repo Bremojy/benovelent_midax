@@ -25,7 +25,7 @@ function MessageCenterPage({ title, eyebrow, description, searchPlaceholder, mem
   const loadContactsRef = useRef(loadContacts);
   const peopleRef = useRef([]);
   const selectedConversationRef = useRef(null);
-  const actorId = String(currentUser?.chatId || currentUser?._id || "");
+  const actorId = String(currentUser?.chatId || currentUser?._id || currentUser?.id || currentUser?.memberId || "");
 
   useEffect(() => { loadContactsRef.current = loadContacts; }, [loadContacts]);
   useEffect(() => { const onResize = () => setIsMobile(window.innerWidth < 900); onResize(); window.addEventListener("resize", onResize); return () => window.removeEventListener("resize", onResize); }, []);
@@ -222,9 +222,9 @@ function safeDisplayName(value, fallbackSource = {}) {
   const raw = String(value || "").trim();
   const fallback = String(fallbackSource?.username || fallbackSource?.email || fallbackSource?.memberNumber || fallbackSource?.roleLabel || "Member").trim();
   if (!raw) return fallback || "Member";
-  const looksLikeUrl = /^https?:\/\//i.test(raw) || raw.includes("cloudinary.com") || raw.includes("/");
+  const looksLikeUrl = /^(https?:\/\/|www\.)/i.test(raw) || raw.includes("cloudinary.com") || raw.includes("res.cloudinary") || /\b(upload|image|avatar|photo)\b/i.test(raw) && raw.includes("/");
   if (looksLikeUrl) return fallback || "Member";
-  if (raw.length > 34 && /https?:|www\.|cloudinary|\/{1,}/i.test(raw)) return fallback || "Member";
+  if (raw.length > 34 && /https?:|www\.|cloudinary|\/{2,}/i.test(raw)) return fallback || "Member";
   return raw;
 }
 

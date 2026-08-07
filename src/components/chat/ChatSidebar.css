@@ -1,3 +1,4 @@
+
 .modern-chat-sidebar{
   height:100%;
   display:flex;
@@ -242,7 +243,7 @@
 @media (max-width: 900px){
   .modern-chat-sidebar{
     padding:14px;
-    background:#0b0b0f;
+    background:#050507;
     border-right:none;
     gap:12px;
   }
@@ -258,7 +259,7 @@
   .chat-directory-summary > div,
   .conversation,
   .member-row{
-    background:#17171d;
+    background:#141418;
     border-color:rgba(255,255,255,.08);
     box-shadow:none;
   }
@@ -277,7 +278,7 @@
 
   .chat-empty,
   .chat-loading{
-    background:#17171d;
+    background:#141418;
     color:#cbd5e1;
     border-color:rgba(255,255,255,.08);
   }

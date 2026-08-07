@@ -1392,14 +1392,23 @@ exports.getChatMembers = async (req, res) => {
             }
         });
 
+        const looksLikeUrl = (value) => /^(https?:\/\/|www\.)/i.test(String(value || "").trim()) || String(value || "").includes("cloudinary.com");
+
+        const normalizeDisplayName = (user, fallback = "User") => {
+            const raw = String(user?.fullName || user?.name || fallback || "User").trim();
+            if (!raw || looksLikeUrl(raw)) {
+                return String(user?.username || user?.email || user?.memberNumber || fallback || "User").trim() || "User";
+            }
+            return raw;
+        };
+
         const normalizeContact = (user, defaultRole) => {
             const role = String(user.role || defaultRole || "member").toLowerCase();
-            const fullName = user.fullName || user.name || "User";
             const contactId = String(user._id);
             return {
                 ...user,
                 _id: contactId,
-                fullName,
+                fullName: normalizeDisplayName(user, role === "admin" ? "Leader" : "Member"),
                 role,
                 roleLabel: role === "superadmin" ? "SuperAdmin" : role === "admin" ? "Leader" : "Member",
                 online: Boolean(user.online),

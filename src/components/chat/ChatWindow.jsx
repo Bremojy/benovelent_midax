@@ -12,7 +12,8 @@ function ChatWindow({ conversation, socket, currentUser, onBack, onAudioCall, on
   const [loadingMessages, setLoadingMessages] = useState(false);
   const messagesEndRef = useRef(null);
   const sendLockRef = useRef(false);
-  const currentId = String(currentUser?.chatId || currentUser?._id || "");
+  const ownIds = useMemo(() => new Set([currentUser?.chatId, currentUser?._id, currentUser?.id, currentUser?.memberId].filter(Boolean).map((value) => String(value))), [currentUser]);
+  const currentId = String(currentUser?.chatId || currentUser?._id || currentUser?.id || currentUser?.memberId || "");
 
   const partner = useMemo(() => {
     if (!conversation) return null;
@@ -57,7 +58,7 @@ function ChatWindow({ conversation, socket, currentUser, onBack, onAudioCall, on
       if (String(incomingConversationId) !== String(conversation._id)) return;
 
       const senderId = String(incoming?.sender?._id || incoming?.sender || incoming?.senderId || "");
-      if (senderId && senderId === currentId) {
+      if (senderId && ownIds.has(senderId)) {
         return;
       }
 
@@ -89,7 +90,7 @@ function ChatWindow({ conversation, socket, currentUser, onBack, onAudioCall, on
       socket.off("typing", handleTyping);
       socket.off("stop-typing", handleStopTyping);
     };
-  }, [socket, conversation?._id, currentId, typingUserId]);
+  }, [socket, conversation?._id, currentId, typingUserId, ownIds]);
 
   async function sendMessage(text, attachment, messageType = "text") {
     if (!conversation?._id) return;

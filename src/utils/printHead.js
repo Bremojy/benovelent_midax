@@ -1,3 +1,4 @@
+
 function escapeHtml(input) {
   return String(input || "").replace(/[&<>"']/g, (character) => ({
     "&": "&amp;",
@@ -8,7 +9,6 @@ function escapeHtml(input) {
   }[character]));
 }
 
-
 export function buildPrintHeadHtml({
   title = "Benevolent Midax Report",
   subtitle = "",
@@ -18,8 +18,8 @@ export function buildPrintHeadHtml({
     <div class="print-shell ${bodyClass}">
       <header class="print-header">
         <div class="print-header-left">
-          <div class="print-logo">BM</div>
-          <div>
+          <img class="print-letterhead-logo" src="/print-letterhead.png" alt="Midax letterhead" />
+          <div class="print-header-copy">
             <p class="print-eyebrow">Benevolent Fund Scheme</p>
             <h1>Benevolent Midax</h1>
             <p class="print-subtitle">${escapeHtml(subtitle || "Standing together in trust, accountability and support.")}</p>
@@ -44,23 +44,91 @@ export function printHeadStyles() {
   return `
     <style>
       @page { size: A4; margin: 16mm; }
-      body { font-family: Arial, sans-serif; color: #1f2328; }
+      body {
+        font-family: Arial, sans-serif;
+        color: #1f2328;
+        background: #ffffff;
+      }
       .print-shell { width: 100%; }
-      .print-header { display: flex; justify-content: space-between; gap: 24px; align-items: flex-start; border-bottom: 3px solid #ff7a00; padding-bottom: 18px; margin-bottom: 18px; }
-      .print-header-left { display: flex; gap: 14px; align-items: flex-start; }
-      .print-logo { width: 56px; height: 56px; border-radius: 16px; background: linear-gradient(135deg, #ff7a00, #ffb45c); color: white; display: grid; place-items: center; font-weight: 800; font-size: 1.1rem; flex: none; }
-      .print-eyebrow { margin: 0 0 4px; font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: #7a5a2f; }
-      .print-header h1 { margin: 0; font-size: 24px; }
-      .print-subtitle { margin: 6px 0 0; max-width: 420px; color: #555; line-height: 1.5; }
-      .print-header-right { text-align: right; font-size: 12px; line-height: 1.5; color: #444; }
+      .print-header {
+        display: flex;
+        justify-content: space-between;
+        gap: 24px;
+        align-items: flex-start;
+        border-bottom: 3px solid #d61f26;
+        padding-bottom: 16px;
+        margin-bottom: 18px;
+      }
+      .print-header-left {
+        display: flex;
+        gap: 16px;
+        align-items: center;
+        min-width: 0;
+      }
+      .print-letterhead-logo {
+        width: 220px;
+        max-width: 40vw;
+        height: auto;
+        object-fit: contain;
+        flex: none;
+      }
+      .print-header-copy {
+        min-width: 0;
+      }
+      .print-eyebrow {
+        margin: 0 0 4px;
+        font-size: 12px;
+        letter-spacing: .12em;
+        text-transform: uppercase;
+        color: #8a1d1d;
+        font-weight: 800;
+      }
+      .print-header h1 {
+        margin: 0;
+        font-size: 24px;
+      }
+      .print-subtitle {
+        margin: 6px 0 0;
+        max-width: 420px;
+        color: #555;
+        line-height: 1.5;
+      }
+      .print-header-right {
+        text-align: right;
+        font-size: 12px;
+        line-height: 1.5;
+        color: #444;
+      }
       .print-header-right p { margin: 0; }
-      .print-title-block h2 { margin: 0 0 12px; font-size: 20px; }
+      .print-title-block h2 {
+        margin: 0 0 12px;
+        font-size: 20px;
+      }
       table { width: 100%; border-collapse: collapse; }
-      th, td { padding: 10px; border-bottom: 1px solid #e4e7eb; text-align: left; vertical-align: top; }
-      th { text-transform: uppercase; font-size: 11px; letter-spacing: .06em; color: #667085; }
+      th, td {
+        padding: 10px;
+        border-bottom: 1px solid #e4e7eb;
+        text-align: left;
+        vertical-align: top;
+      }
+      th {
+        text-transform: uppercase;
+        font-size: 11px;
+        letter-spacing: .06em;
+        color: #667085;
+      }
       .print-note { margin: 0 0 14px; color: #5b6572; }
-      .bar { height: 10px; border-radius: 999px; background: #ff7a0018; overflow: hidden; }
-      .bar > div { height: 100%; background: #ff7a00; }
+      .bar {
+        height: 10px;
+        border-radius: 999px;
+        background: #ffd8d9;
+        overflow: hidden;
+      }
+      .bar > div { height: 100%; background: #d61f26; }
+      @media print {
+        .print-header-right { font-size: 11px; }
+        .print-letterhead-logo { width: 210px; }
+      }
     </style>
   `;
 }

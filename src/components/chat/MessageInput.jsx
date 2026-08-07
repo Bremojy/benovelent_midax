@@ -1,3 +1,4 @@
+
 import { useMemo, useRef, useState } from "react";
 import { Camera, Image, Mic, Paperclip, Send, Smile, Square, X } from "lucide-react";
 import API from "../../services/api";
@@ -22,26 +23,35 @@ export default function MessageInput({ onSend, socket, conversation, currentUser
   const [busy, setBusy] = useState(false);
 
   const fileInputRef = useRef(null);
-  const sendingRef = useRef(false);
   const imageInputRef = useRef(null);
   const cameraInputRef = useRef(null);
   const recorderRef = useRef(null);
   const streamRef = useRef(null);
   const chunksRef = useRef([]);
-  const currentId = String(currentUser?.chatId || currentUser?._id || "");
+  const sendingRef = useRef(false);
+  const textareaRef = useRef(null);
 
+  const currentId = String(currentUser?.chatId || currentUser?._id || currentUser?.id || currentUser?.memberId || "");
   const canSend = useMemo(() => Boolean(String(message).trim()) || Boolean(attachment), [message, attachment]);
 
   const uploadFile = async (file, autoSend = false) => {
     if (!file) return;
+    if (busy || sendingRef.current) return;
+
     setBusy(true);
     sendingRef.current = true;
+
     try {
       const formData = new FormData();
       formData.append("file", file);
-      const { data } = await API.post("/messages/upload", formData, { headers: { "Content-Type": "multipart/form-data" } });
+
+      const { data } = await API.post("/messages/upload", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+
       const url = data.fileUrl || data.imageUrl || data.assetUrl || "";
       const type = getMessageType(file);
+
       if (autoSend) {
         await onSend("", url, type);
       } else {
@@ -51,15 +61,19 @@ export default function MessageInput({ onSend, socket, conversation, currentUser
     } finally {
       sendingRef.current = false;
       setBusy(false);
+      textareaRef.current?.focus?.();
     }
   };
 
-  const send = async () => {
-    if (!canSend || busy || sendingRef.current) return;
+  const handleSend = async () => {
+    const cleanMessage = String(message || "").trim();
+    if ((!cleanMessage && !attachment) || busy || sendingRef.current || recording) return;
+
     sendingRef.current = true;
     setBusy(true);
+
     try {
-      await onSend(message, attachment, messageType);
+      await onSend(cleanMessage, attachment, messageType);
       setMessage("");
       setAttachment("");
       setMessageType("text");
@@ -68,6 +82,7 @@ export default function MessageInput({ onSend, socket, conversation, currentUser
     } finally {
       sendingRef.current = false;
       setBusy(false);
+      textareaRef.current?.focus?.();
     }
   };
 
@@ -79,7 +94,10 @@ export default function MessageInput({ onSend, socket, conversation, currentUser
       streamRef.current = stream;
       chunksRef.current = [];
 
-      recorder.ondataavailable = (event) => { if (event.data?.size) chunksRef.current.push(event.data); };
+      recorder.ondataavailable = (event) => {
+        if (event.data?.size) chunksRef.current.push(event.data);
+      };
+
       recorder.onstop = async () => {
         try {
           const tracks = streamRef.current?.getTracks() || [];
@@ -104,7 +122,11 @@ export default function MessageInput({ onSend, socket, conversation, currentUser
   };
 
   const stopRecord = () => {
-    try { recorderRef.current?.stop(); } catch { setRecording(false); }
+    try {
+      recorderRef.current?.stop();
+    } catch {
+      setRecording(false);
+    }
   };
 
   return (
@@ -112,34 +134,72 @@ export default function MessageInput({ onSend, socket, conversation, currentUser
       className="message-input-container instagram-composer"
       onSubmit={(event) => {
         event.preventDefault();
-        send();
+        handleSend();
       }}
     >
       {attachment && (
         <div className="preview-image attachment-preview">
-          <a href={attachment} target="_blank" rel="noreferrer">Attachment ready ({messageType})</a>
-          <button type="button" onClick={() => { setAttachment(""); setMessageType("text"); }} aria-label="Remove attachment"><X size={14} /></button>
+          <a href={attachment} target="_blank" rel="noreferrer">
+            Attachment ready ({messageType})
+          </a>
+          <button
+            type="button"
+            onClick={() => {
+              setAttachment("");
+              setMessageType("text");
+            }}
+            aria-label="Remove attachment"
+          >
+            <X size={14} />
+          </button>
         </div>
       )}
 
       {showEmoji && (
         <div className="emoji-popover">
           {EMOJIS.map((emoji) => (
-            <button key={emoji} type="button" className="emoji-chip" onClick={() => { setMessage((value) => value + emoji); setShowEmoji(false); }}>{emoji}</button>
+            <button
+              key={emoji}
+              type="button"
+              className="emoji-chip"
+              onClick={() => {
+                setMessage((value) => `${value}${emoji}`);
+                setShowEmoji(false);
+                textareaRef.current?.focus?.();
+              }}
+            >
+              {emoji}
+            </button>
           ))}
         </div>
       )}
 
       <div className="message-toolbar">
         <div className="message-toolbar-actions">
-          <button type="button" onClick={() => setShowEmoji((value) => !value)} title="Emoji" aria-label="Emoji picker"><Smile size={21} /></button>
-          <button type="button" onClick={() => imageInputRef.current?.click()} title="Image" aria-label="Attach image"><Image size={21} /></button>
-          <button type="button" onClick={() => fileInputRef.current?.click()} title="Attachment" aria-label="Attach file"><Paperclip size={21} /></button>
-          <button type="button" onClick={() => cameraInputRef.current?.click()} title="Camera" aria-label="Open camera"><Camera size={21} /></button>
-          <button type="button" onClick={recording ? stopRecord : startRecord} title={recording ? "Stop recording" : "Record voice note"} aria-label={recording ? "Stop recording voice note" : "Record voice note"}>{recording ? <Square size={19} /> : <Mic size={21} />}</button>
+          <button type="button" onClick={() => setShowEmoji((value) => !value)} title="Emoji" aria-label="Emoji picker">
+            <Smile size={21} />
+          </button>
+          <button type="button" onClick={() => imageInputRef.current?.click()} title="Image" aria-label="Attach image">
+            <Image size={21} />
+          </button>
+          <button type="button" onClick={() => fileInputRef.current?.click()} title="Attachment" aria-label="Attach file">
+            <Paperclip size={21} />
+          </button>
+          <button type="button" onClick={() => cameraInputRef.current?.click()} title="Camera" aria-label="Open camera">
+            <Camera size={21} />
+          </button>
+          <button
+            type="button"
+            onClick={recording ? stopRecord : startRecord}
+            title={recording ? "Stop recording" : "Record voice note"}
+            aria-label={recording ? "Stop recording voice note" : "Record voice note"}
+          >
+            {recording ? <Square size={19} /> : <Mic size={21} />}
+          </button>
         </div>
 
         <textarea
+          ref={textareaRef}
           placeholder={recording ? "Recording voice note..." : "Message..."}
           value={message}
           onChange={(event) => {
@@ -149,7 +209,8 @@ export default function MessageInput({ onSend, socket, conversation, currentUser
           onKeyDown={(event) => {
             if (event.key === "Enter" && !event.shiftKey) {
               event.preventDefault();
-              send();
+              event.stopPropagation();
+              handleSend();
             }
           }}
           disabled={recording}
@@ -161,9 +222,40 @@ export default function MessageInput({ onSend, socket, conversation, currentUser
         </button>
       </div>
 
-      <input ref={imageInputRef} hidden type="file" accept="image/*" onChange={async (event) => { const file = event.target.files?.[0]; event.target.value = ""; if (file) await uploadFile(file, false); }} />
-      <input ref={cameraInputRef} hidden type="file" accept="image/*" capture="environment" onChange={async (event) => { const file = event.target.files?.[0]; event.target.value = ""; if (file) await uploadFile(file, false); }} />
-      <input ref={fileInputRef} hidden type="file" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt" onChange={async (event) => { const file = event.target.files?.[0]; event.target.value = ""; if (file) await uploadFile(file, false); }} />
+      <input
+        ref={imageInputRef}
+        hidden
+        type="file"
+        accept="image/*"
+        onChange={async (event) => {
+          const file = event.target.files?.[0];
+          event.target.value = "";
+          if (file) await uploadFile(file, false);
+        }}
+      />
+      <input
+        ref={cameraInputRef}
+        hidden
+        type="file"
+        accept="image/*"
+        capture="environment"
+        onChange={async (event) => {
+          const file = event.target.files?.[0];
+          event.target.value = "";
+          if (file) await uploadFile(file, false);
+        }}
+      />
+      <input
+        ref={fileInputRef}
+        hidden
+        type="file"
+        accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt"
+        onChange={async (event) => {
+          const file = event.target.files?.[0];
+          event.target.value = "";
+          if (file) await uploadFile(file, false);
+        }}
+      />
     </form>
   );
 }

@@ -262,7 +262,7 @@ export default function Profile() {
           <section className="profile-unlocked-panel">
             <span className="profile-unlocked-kicker">PROFILE COMPLETE</span>
             <h2>Congratulations — your profile is 100% complete.</h2>
-            <p>Your data is now live for admins and superadmins, and your documents are safely stored in Cloudinary.</p>
+            <p>Your data is now live for admins and superadmins, and your documents are safely stored.</p>
           </section>
         )}
       </div>

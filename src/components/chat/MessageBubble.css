@@ -1,3 +1,4 @@
+
 .message{
   display:flex;
   justify-content:flex-start;
@@ -108,7 +109,7 @@
   }
 
   .message.other .message-content{
-    background:#2a2a31;
+    background:#1f1f24;
     color:#f8fafc;
     border-color:rgba(255,255,255,.06);
   }
@@ -128,5 +129,17 @@
 
   .message-file-link{
     text-decoration:underline;
+  }
+}
+
+@media (max-width: 640px){
+  .message-content{
+    max-width:88%;
+    padding:12px 14px;
+  }
+
+  .message-content p{
+    line-height:1.55;
+    font-size:14px;
   }
 }
