@@ -6,25 +6,18 @@ import TypingIndicator from "./TypingIndicator";
 import API from "../../services/api";
 import "./ChatWindow.css";
 
-function ChatWindow({
-  conversation,
-  socket,
-  currentUser,
-  onBack,
-  onAudioCall,
-  onVideoCall,
-}) {
+function ChatWindow({ conversation, socket, currentUser, onBack, onAudioCall, onVideoCall }) {
   const [messages, setMessages] = useState([]);
   const [typingUserId, setTypingUserId] = useState("");
   const [loadingMessages, setLoadingMessages] = useState(false);
   const messagesEndRef = useRef(null);
+  const currentId = String(currentUser?.chatId || currentUser?._id || "");
 
   const partner = useMemo(() => {
     if (!conversation) return null;
     const participants = conversation.participants || [];
-    const currentId = currentUser?.chatId?.toString?.() || currentUser?._id?.toString?.() || String(currentUser?._id || "");
     return conversation.partner || participants.find((member) => String(member?._id || member) !== currentId) || null;
-  }, [conversation, currentUser]);
+  }, [conversation, currentId]);
 
   useEffect(() => {
     if (!conversation?._id) {
@@ -32,42 +25,45 @@ function ChatWindow({
       return;
     }
 
-    loadMessages(conversation._id);
+    let cancelled = false;
+    (async () => {
+      try {
+        setLoadingMessages(true);
+        const { data } = await API.get(`/messages/conversation/${conversation._id}`);
+        if (cancelled) return;
+        const items = Array.isArray(data) ? data : data.messages || [];
+        setMessages(items.map(normalizeMessage));
+      } catch (error) {
+        console.error(error);
+      } finally {
+        if (!cancelled) setLoadingMessages(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [conversation?._id]);
 
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages, typingUserId]);
+  useEffect(() => { scrollToBottom(); }, [messages, typingUserId]);
 
   useEffect(() => {
     if (!socket || !conversation?._id) return;
-
     socket.emit("join-conversation", conversation._id);
 
     const handleNewMessage = (incoming) => {
       const incomingConversationId = incoming?.conversation?._id || incoming?.conversation || incoming?.conversationId;
       if (String(incomingConversationId) !== String(conversation._id)) return;
-
       const normalized = normalizeMessage(incoming);
-      setMessages((previous) => {
-        if (previous.some((item) => String(item._id) === String(normalized._id))) {
-          return previous;
-        }
-        return [...previous, normalized];
-      });
+      setMessages((previous) => previous.some((item) => String(item._id) === String(normalized._id)) ? previous : [...previous, normalized]);
     };
 
     const handleTyping = (senderId) => {
-      const actorId = String(currentUser?.chatId || currentUser?._id || "");
-      if (String(senderId) !== actorId) {
-        setTypingUserId(String(senderId || ""));
-      }
+      if (String(senderId) !== currentId) setTypingUserId(String(senderId || ""));
     };
 
     const handleStopTyping = (senderId) => {
-      if (!senderId || String(senderId) === String(typingUserId)) {
-        setTypingUserId("");
-      }
+      if (!senderId || String(senderId) === String(typingUserId)) setTypingUserId("");
     };
 
     socket.on("new-message", handleNewMessage);
@@ -79,110 +75,64 @@ function ChatWindow({
       socket.off("typing", handleTyping);
       socket.off("stop-typing", handleStopTyping);
     };
-  }, [socket, conversation?._id, currentUser?._id, typingUserId]);
+  }, [socket, conversation?._id, currentId, typingUserId]);
 
+  async function sendMessage(text, attachment, messageType = "text") {
+    if (!conversation?._id) return;
+    if (!String(text || "").trim() && !attachment) return;
 
-  async function loadMessages(conversationId) {
-  try {
-    setLoadingMessages(true);
-    const { data } = await API.get(`/messages/conversation/${conversationId}`);
-    const items = Array.isArray(data) ? data : data.messages || [];
-    setMessages(items.map(normalizeMessage));
-  } catch (error) {
-    console.error(error);
-  } finally {
-    setLoadingMessages(false);
-  }
-}
-
-
-async function sendMessage(text, attachment, messageType = "text") {
-  if (!conversation?._id) return;
-  if (!String(text || "").trim() && !attachment) return;
-
-  try {
-    const { data } = await API.post("/messages", {
-      conversationId: conversation._id,
+    const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const optimisticMessage = normalizeMessage({
+      _id: tempId,
+      conversation: conversation._id,
+      sender: { _id: currentId, fullName: currentUser?.fullName || currentUser?.name || "You" },
       message: text,
       attachment,
       messageType,
+      createdAt: new Date().toISOString(),
+      status: "sending",
+      __optimistic: true,
     });
 
-    const created = normalizeMessage(data.message || data);
-    socket?.emit("send-message", { conversationId: conversation._id, sender: currentUser?.chatId || currentUser?._id, text, file: attachment, messageType, messageId: created._id });
-    setMessages((previous) => {
-      if (previous.some((item) => String(item._id) === String(created._id))) {
-        return previous;
-      }
-      return [...previous, created];
-    });
-  } catch (error) {
-    console.error(error);
-    throw error;
-  }
-}
+    setMessages((previous) => [...previous, optimisticMessage]);
+    scrollToBottom();
 
-  function scrollToBottom() {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    try {
+      const { data } = await API.post("/messages", { conversationId: conversation._id, message: text, attachment, messageType });
+      const created = normalizeMessage(data.message || data);
+      setMessages((previous) => previous.map((item) => (String(item._id) === tempId ? created : item)));
+      // The REST API already persists and broadcasts the message on the server.
+    } catch (error) {
+      console.error(error);
+      setMessages((previous) => previous.filter((item) => String(item._id) !== tempId));
+      throw error;
+    }
   }
+
+  function scrollToBottom() { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }
 
   if (!conversation) {
-    return (
-      <div className="chat-window-empty">
-        Select a member to begin chatting.
-      </div>
-    );
+    return <div className="chat-window-empty">Select a conversation to begin chatting.</div>;
   }
 
   return (
     <div className="chat-window">
-      <ChatHeader
-        conversation={conversation}
-        partner={partner}
-        typingUser={typingUserId}
-        onAudioCall={onAudioCall}
-        onVideoCall={onVideoCall}
-      />
-
+      <ChatHeader conversation={conversation} partner={partner} typingUser={typingUserId} onAudioCall={onAudioCall} onVideoCall={onVideoCall} />
       <div className="messages-container">
-        {loadingMessages ? (
-          <div className="chat-loading">Loading messages...</div>
-        ) : (
-          messages.map((message) => (
-            <MessageBubble
-              key={message._id}
-              message={message}
-              own={String(message.sender?._id || message.sender) === String(currentUser?.chatId || currentUser?._id)}
-            />
-          ))
-        )}
-
-        <TypingIndicator
-          visible={Boolean(typingUserId) && String(typingUserId) !== String(currentUser?.chatId || currentUser?._id || "")}
-          user={partner}
-        />
+        {loadingMessages ? <div className="chat-loading">Loading messages...</div> : messages.map((message) => (
+          <MessageBubble key={message._id} message={message} own={String(message.sender?._id || message.sender) === currentId} />
+        ))}
+        <TypingIndicator visible={Boolean(typingUserId) && String(typingUserId) !== currentId} user={partner} />
         <div ref={messagesEndRef} />
       </div>
-
-      <MessageInput
-        onSend={sendMessage}
-        socket={socket}
-        conversation={conversation}
-        currentUser={currentUser}
-      />
+      <MessageInput onSend={sendMessage} socket={socket} conversation={conversation} currentUser={currentUser} />
     </div>
   );
 }
 
 function normalizeMessage(message) {
   if (!message) return message;
-
-  return {
-    ...message,
-    message: message.message ?? message.text ?? "",
-    attachment: message.attachment ?? message.image ?? "",
-    messageType: message.messageType || (message.attachment ? "image" : "text"),
-  };
+  return { ...message, message: message.message ?? message.text ?? "", attachment: message.attachment ?? message.image ?? "", messageType: message.messageType || (message.attachment ? "image" : "text") };
 }
 
 export default ChatWindow;

@@ -1,11 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { Mic, MicOff, Phone, PhoneOff, Video, VideoOff } from "lucide-react";
+import { startCallTone } from "../../utils/callTone";
 import "./CallOverlay.css";
 
-const ICE_SERVERS = [
-  { urls: "stun:stun.l.google.com:19302" },
-  { urls: "stun:stun1.l.google.com:19302" },
-];
+const ICE_SERVERS = [{ urls: "stun:stun.l.google.com:19302" }, { urls: "stun:stun1.l.google.com:19302" }];
 
 export default function CallOverlay({ socket, currentUser, partner, callType, incomingCall, onClose }) {
   const [status, setStatus] = useState(incomingCall ? "Incoming call" : "Calling...");
@@ -17,106 +15,42 @@ export default function CallOverlay({ socket, currentUser, partner, callType, in
   const [duration, setDuration] = useState(0);
   const peerRef = useRef(null);
   const localStreamRef = useRef(null);
-  const remoteStreamRef = useRef(null);
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
   const remoteAudioRef = useRef(null);
   const pendingCandidatesRef = useRef([]);
   const timerRef = useRef(null);
+  const ringtoneRef = useRef(null);
 
   const me = String(currentUser?.chatId || currentUser?._id || "");
   const partnerId = String(partner?._id || partner?.id || incomingCall?.callerUserId || "");
 
-  useEffect(() => {
-    if (connected) {
-      timerRef.current = window.setInterval(() => setDuration((value) => value + 1), 1000);
-    }
-    return () => window.clearInterval(timerRef.current);
-  }, [connected]);
+  useEffect(() => { ringtoneRef.current = startCallTone(); return () => ringtoneRef.current?.stop?.(); }, []);
+  useEffect(() => { if (connected) timerRef.current = window.setInterval(() => setDuration((v) => v + 1), 1000); return () => window.clearInterval(timerRef.current); }, [connected]);
 
   useEffect(() => {
     if (!socket) return;
-
-    const handleAnswered = async ({ answer }) => {
-      if (!peerRef.current || !answer) return;
-      try {
-        await peerRef.current.setRemoteDescription(new RTCSessionDescription(answer));
-        await flushCandidates();
-      } catch (err) {
-        setError(err.message || "Could not establish the call.");
-      }
-    };
-
-    const handleCandidate = async ({ candidate }) => {
-      if (!candidate) return;
-      if (!peerRef.current?.remoteDescription) {
-        pendingCandidatesRef.current.push(candidate);
-        return;
-      }
-      try {
-        await peerRef.current.addIceCandidate(new RTCIceCandidate(candidate));
-      } catch (err) {
-        console.warn("ICE candidate error", err);
-      }
-    };
-
+    const handleAnswered = async ({ answer }) => { if (!peerRef.current || !answer) return; try { await peerRef.current.setRemoteDescription(new RTCSessionDescription(answer)); await flushCandidates(); } catch (err) { setError(err.message || "Could not establish the call."); } };
+    const handleCandidate = async ({ candidate }) => { if (!candidate) return; if (!peerRef.current?.remoteDescription) { pendingCandidatesRef.current.push(candidate); return; } try { await peerRef.current.addIceCandidate(new RTCIceCandidate(candidate)); } catch (err) { console.warn("ICE candidate error", err); } };
     const handleEnded = () => finish(false);
-
-    socket.on("call-answered", handleAnswered);
-    socket.on("ice-candidate", handleCandidate);
-    socket.on("call-ended", handleEnded);
-    socket.on("call-rejected", handleEnded);
-
-    return () => {
-      socket.off("call-answered", handleAnswered);
-      socket.off("ice-candidate", handleCandidate);
-      socket.off("call-ended", handleEnded);
-      socket.off("call-rejected", handleEnded);
-    };
+    socket.on("call-answered", handleAnswered); socket.on("ice-candidate", handleCandidate); socket.on("call-ended", handleEnded); socket.on("call-rejected", handleEnded);
+    return () => { socket.off("call-answered", handleAnswered); socket.off("ice-candidate", handleCandidate); socket.off("call-ended", handleEnded); socket.off("call-rejected", handleEnded); };
   }, [socket]);
 
-  useEffect(() => {
-    if (!accepted) return;
-    startCall().catch((err) => setError(err.message || "Camera or microphone access failed."));
-    return () => cleanupMedia();
-  }, [accepted]);
+  useEffect(() => { if (!accepted) return; startCall().catch((err) => setError(err.message || "Camera or microphone access failed.")); return () => cleanupMedia(); }, [accepted]);
 
   async function createPeer() {
     const peer = new RTCPeerConnection({ iceServers: ICE_SERVERS });
     peerRef.current = peer;
-    peer.onicecandidate = (event) => {
-      if (event.candidate && partnerId) {
-        socket?.emit("ice-candidate", { to: partnerId, candidate: event.candidate });
-      }
-    };
-    peer.ontrack = (event) => {
-      const stream = event.streams?.[0];
-      if (!stream) return;
-      remoteStreamRef.current = stream;
-      if (remoteVideoRef.current) remoteVideoRef.current.srcObject = stream;
-      if (remoteAudioRef.current) remoteAudioRef.current.srcObject = stream;
-    };
-    peer.onconnectionstatechange = () => {
-      const state = peer.connectionState;
-      if (state === "connected") {
-        setConnected(true);
-        setStatus("Connected");
-      } else if (["failed", "disconnected", "closed"].includes(state)) {
-        setConnected(false);
-        if (state === "failed") setError("The call connection failed. Check your internet connection.");
-      }
-    };
+    peer.onicecandidate = (event) => { if (event.candidate && partnerId) socket?.emit("ice-candidate", { to: partnerId, candidate: event.candidate }); };
+    peer.ontrack = (event) => { const stream = event.streams?.[0]; if (!stream) return; if (remoteVideoRef.current) remoteVideoRef.current.srcObject = stream; if (remoteAudioRef.current) remoteAudioRef.current.srcObject = stream; };
+    peer.onconnectionstatechange = () => { const state = peer.connectionState; if (state === "connected") { setConnected(true); setStatus("Connected"); ringtoneRef.current?.stop?.(); } else if (["failed", "disconnected", "closed"].includes(state)) { setConnected(false); if (state === "failed") setError("The call connection failed. Check your internet connection."); } };
     return peer;
   }
 
   async function getMedia() {
-    if (!navigator.mediaDevices?.getUserMedia) {
-      throw new Error("Your browser does not support camera and microphone calls.");
-    }
-    return navigator.mediaDevices.getUserMedia({
-      audio: true,
-      video: callType === "video" ? { facingMode: "user" } : false,
-    });
+    if (!navigator.mediaDevices?.getUserMedia) throw new Error("Your browser does not support camera and microphone calls.");
+    return navigator.mediaDevices.getUserMedia({ audio: true, video: callType === "video" ? { facingMode: "user" } : false });
   }
 
   async function startCall() {
@@ -126,7 +60,6 @@ export default function CallOverlay({ socket, currentUser, partner, callType, in
     if (localVideoRef.current) localVideoRef.current.srcObject = stream;
     const peer = await createPeer();
     stream.getTracks().forEach((track) => peer.addTrack(track, stream));
-
     if (incomingCall) {
       await peer.setRemoteDescription(new RTCSessionDescription(incomingCall.offer));
       await flushCandidates();
@@ -137,14 +70,7 @@ export default function CallOverlay({ socket, currentUser, partner, callType, in
     } else {
       const offer = await peer.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: callType === "video" });
       await peer.setLocalDescription(offer);
-      socket.emit("call-user", {
-        to: partnerId,
-        conversationId: incomingCall?.conversationId,
-        callType,
-        callerUserId: me,
-        callerName: currentUser?.fullName || currentUser?.name || "Member",
-        offer,
-      });
+      socket.emit("call-user", { to: partnerId, conversationId: incomingCall?.conversationId, callType, callerUserId: me, callerName: currentUser?.fullName || currentUser?.name || "Member", offer });
     }
   }
 
@@ -152,46 +78,15 @@ export default function CallOverlay({ socket, currentUser, partner, callType, in
     if (!peerRef.current?.remoteDescription) return;
     const candidates = pendingCandidatesRef.current.splice(0);
     for (const candidate of candidates) {
-      try {
-        await peerRef.current.addIceCandidate(new RTCIceCandidate(candidate));
-      } catch (err) {
-        console.warn("Queued ICE candidate error", err);
-      }
+      try { await peerRef.current.addIceCandidate(new RTCIceCandidate(candidate)); } catch (err) { console.warn("Queued ICE candidate error", err); }
     }
   }
 
-  function toggleMute() {
-    const next = !muted;
-    localStreamRef.current?.getAudioTracks().forEach((track) => { track.enabled = !next; });
-    setMuted(next);
-  }
-
-  function toggleCamera() {
-    const next = !cameraOff;
-    localStreamRef.current?.getVideoTracks().forEach((track) => { track.enabled = !next; });
-    setCameraOff(next);
-  }
-
-  function rejectCall() {
-    if (incomingCall?.from) socket?.emit("call-rejected", { to: incomingCall.from });
-    finish(false);
-  }
-
-  function finish(notify = true) {
-    if (notify && partnerId) socket?.emit("end-call", { to: incomingCall?.from || partnerId });
-    cleanupMedia();
-    onClose?.();
-  }
-
-  function cleanupMedia() {
-    peerRef.current?.close();
-    peerRef.current = null;
-    localStreamRef.current?.getTracks().forEach((track) => track.stop());
-    localStreamRef.current = null;
-    if (localVideoRef.current) localVideoRef.current.srcObject = null;
-    if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
-    if (remoteAudioRef.current) remoteAudioRef.current.srcObject = null;
-  }
+  function toggleMute() { const next = !muted; localStreamRef.current?.getAudioTracks().forEach((track) => { track.enabled = !next; }); setMuted(next); }
+  function toggleCamera() { const next = !cameraOff; localStreamRef.current?.getVideoTracks().forEach((track) => { track.enabled = !next; }); setCameraOff(next); }
+  function rejectCall() { if (incomingCall?.from) socket?.emit("call-rejected", { to: incomingCall.from }); finish(false); }
+  function finish(notify = true) { if (notify && partnerId) socket?.emit("end-call", { to: incomingCall?.from || partnerId }); ringtoneRef.current?.stop?.(); cleanupMedia(); onClose?.(); }
+  function cleanupMedia() { peerRef.current?.close(); peerRef.current = null; localStreamRef.current?.getTracks().forEach((track) => track.stop()); localStreamRef.current = null; if (localVideoRef.current) localVideoRef.current.srcObject = null; if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null; if (remoteAudioRef.current) remoteAudioRef.current.srcObject = null; }
 
   const mins = String(Math.floor(duration / 60)).padStart(2, "0");
   const secs = String(duration % 60).padStart(2, "0");
@@ -208,40 +103,28 @@ export default function CallOverlay({ socket, currentUser, partner, callType, in
           </div>
           <span className={`call-status-dot ${connected ? "connected" : ""}`} />
         </div>
-
         {error && <div className="call-error">{error}</div>}
-
         {isVideo ? (
           <div className="call-videos">
             <video ref={remoteVideoRef} className="remote-call-video" autoPlay playsInline />
             <video ref={localVideoRef} className="local-call-video" autoPlay muted playsInline />
-            {!connected && <div className="call-video-placeholder">{incomingCall && !accepted ? "Incoming video call" : "Waiting for connection..."}</div>}
+            {!connected && <div className="call-video-placeholder">{incomingCall && !accepted ? "Waiting for your response..." : status}</div>}
           </div>
         ) : (
           <div className="audio-call-center">
+            <div className="audio-call-avatar"><img src={partner?.profileImage || "/default-avatar.svg"} alt={partner?.fullName || "Member"} /></div>
+            <h3>{partner?.fullName || incomingCall?.callerName || "Member"}</h3>
+            <p>{connected ? durationText(mins, secs) : status}</p>
             <audio ref={remoteAudioRef} autoPlay />
-            <div className="audio-call-avatar"><img src={partner?.profileImage || "/default-avatar.svg"} alt="" /></div>
-            <strong>{connected ? "Call in progress" : status}</strong>
           </div>
         )}
-
         <div className="call-controls">
-          {incomingCall && !accepted ? (
-            <>
-              <button className="call-control accept" type="button" onClick={() => setAccepted(true)}><Phone size={20} /> Accept</button>
-              <button className="call-control decline" type="button" onClick={rejectCall}><PhoneOff size={20} /> Decline</button>
-            </>
-          ) : (
-            <>
-              <button className="call-control" type="button" onClick={toggleMute}>{muted ? <MicOff size={20} /> : <Mic size={20} />}{muted ? "Unmute" : "Mute"}</button>
-              {isVideo && <button className="call-control" type="button" onClick={toggleCamera}>{cameraOff ? <VideoOff size={20} /> : <Video size={20} />}{cameraOff ? "Camera on" : "Camera off"}</button>}
-              <button className="call-control decline" type="button" onClick={() => finish(true)}><PhoneOff size={20} /> End</button>
-            </>
-          )}
+          {incomingCall && !accepted && (<><button type="button" className="call-control accept" onClick={() => { ringtoneRef.current?.stop?.(); setAccepted(true); }}><Phone size={18} />Accept</button><button type="button" className="call-control decline" onClick={rejectCall}><PhoneOff size={18} />Decline</button></>)}
+          {accepted && (<><button type="button" className="call-control" onClick={toggleMute}>{muted ? <MicOff size={18} /> : <Mic size={18} />}{muted ? "Unmute" : "Mute"}</button>{isVideo && <button type="button" className="call-control" onClick={toggleCamera}>{cameraOff ? <VideoOff size={18} /> : <Video size={18} />}{cameraOff ? "Camera on" : "Camera off"}</button>}<button type="button" className="call-control decline" onClick={() => finish(true)}><PhoneOff size={18} />End</button></>)}
         </div>
       </div>
     </div>
   );
 }
 
-function durationText(mins, secs) { return `Connected • ${mins}:${secs}`; }
+function durationText(mins, secs) { return `${mins}:${secs}`; }

@@ -1,1 +1,137 @@
-import {useRef,useState} from "react";import {Send,Image,Paperclip,Smile,Mic,Square,X} from "lucide-react";import API from "../../services/api";import "./MessageInput.css";const EMOJIS=["😊","😂","❤️","🙏","👍","🎉","😎","😢","🔥","🥰","🤝","✨"];export default function MessageInput({onSend,socket,conversation,currentUser}){const[msg,setMsg]=useState(""),[attachment,setAttachment]=useState(""),[type,setType]=useState("text"),[emoji,setEmoji]=useState(false),[recording,setRecording]=useState(false);const input=useRef(null),rec=useRef(null),chunks=useRef([]);const id=String(currentUser?.chatId||currentUser?._id||"");const upload=async file=>{const fd=new FormData();fd.append("file",file);const{data}=await API.post("/messages/upload",fd,{headers:{"Content-Type":"multipart/form-data"}});setAttachment(data.fileUrl||data.imageUrl||data.assetUrl||"");setType(file.type.startsWith("audio/")?"audio":file.type.startsWith("video/")?"video":file.type.startsWith("image/")?"image":"document")};const send=async()=>{if(!String(msg).trim()&&!attachment)return;await onSend(msg,attachment,type);setMsg("");setAttachment("");setType("text");setEmoji(false);socket?.emit("stop-typing",{conversationId:conversation?._id,sender:id})};const startRecord=async()=>{try{const stream=await navigator.mediaDevices.getUserMedia({audio:true});const rcd=new MediaRecorder(stream);rec.current=rcd;chunks.current=[];rcd.ondataavailable=e=>e.data.size&&chunks.current.push(e.data);rcd.onstop=async()=>{stream.getTracks().forEach(t=>t.stop());const blob=new Blob(chunks.current,{type:rcd.mimeType||"audio/webm"});await upload(new File([blob],`voice-${Date.now()}.webm`,{type:blob.type}))};rcd.start();setRecording(true)}catch(e){alert(e.message||"Microphone access is required for voice notes.")}};const stopRecord=()=>{rec.current?.stop();setRecording(false)};return <div className="message-input-container">{attachment&&<div className="preview-image"><a href={attachment} target="_blank" rel="noreferrer">Attachment ready ({type})</a><button type="button" onClick={()=>setAttachment("")}><X size={14}/></button></div>}{emoji&&<div className="emoji-popover">{EMOJIS.map(x=><button key={x} type="button" className="emoji-chip" onClick={()=>{setMsg(m=>m+x);setEmoji(false)}}>{x}</button>)}</div>}<div className="message-toolbar"><button type="button" onClick={()=>setEmoji(v=>!v)} title="Emoji"><Smile size={21}/></button><button type="button" onClick={()=>input.current?.click()} title="Image"><Image size={21}/></button><button type="button" onClick={()=>input.current?.click()} title="Attachment"><Paperclip size={21}/></button><button type="button" onClick={recording?stopRecord:startRecord} title={recording?"Stop recording":"Record voice note"}>{recording?<Square size={19}/>:<Mic size={21}/>}</button><input ref={input} hidden type="file" accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx" onChange={e=>{const f=e.target.files?.[0];if(f)upload(f)}}/><textarea placeholder="Write a private message..." value={msg} onChange={e=>{setMsg(e.target.value);socket?.emit("typing",{conversationId:conversation?._id,sender:id})}} onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send()}}}/><button type="button" className="send-button" onClick={send} disabled={!String(msg).trim()&&!attachment}><Send size={20}/></button></div></div>}
+import { useMemo, useRef, useState } from "react";
+import { Camera, Image, Mic, Paperclip, Send, Smile, Square, X } from "lucide-react";
+import API from "../../services/api";
+import "./MessageInput.css";
+
+const EMOJIS = ["😊", "😂", "❤️", "🙏", "👍", "🎉", "😎", "😢", "🔥", "🥰", "🤝", "✨"];
+
+function getMessageType(file) {
+  const type = String(file?.type || "").toLowerCase();
+  if (type.startsWith("audio/")) return "audio";
+  if (type.startsWith("video/")) return "video";
+  if (type.startsWith("image/")) return "image";
+  return "document";
+}
+
+export default function MessageInput({ onSend, socket, conversation, currentUser }) {
+  const [message, setMessage] = useState("");
+  const [attachment, setAttachment] = useState("");
+  const [messageType, setMessageType] = useState("text");
+  const [showEmoji, setShowEmoji] = useState(false);
+  const [recording, setRecording] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  const fileInputRef = useRef(null);
+  const imageInputRef = useRef(null);
+  const cameraInputRef = useRef(null);
+  const recorderRef = useRef(null);
+  const streamRef = useRef(null);
+  const chunksRef = useRef([]);
+  const currentId = String(currentUser?.chatId || currentUser?._id || "");
+
+  const canSend = useMemo(() => Boolean(String(message).trim()) || Boolean(attachment), [message, attachment]);
+
+  const uploadFile = async (file, autoSend = false) => {
+    if (!file) return;
+    setBusy(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const { data } = await API.post("/messages/upload", formData, { headers: { "Content-Type": "multipart/form-data" } });
+      const url = data.fileUrl || data.imageUrl || data.assetUrl || "";
+      const type = getMessageType(file);
+      if (autoSend) {
+        await onSend("", url, type);
+      } else {
+        setAttachment(url);
+        setMessageType(type);
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const send = async () => {
+    if (!canSend || busy) return;
+    setBusy(true);
+    try {
+      await onSend(message, attachment, messageType);
+      setMessage("");
+      setAttachment("");
+      setMessageType("text");
+      setShowEmoji(false);
+      socket?.emit("stop-typing", { conversationId: conversation?._id, sender: currentId });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const startRecord = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      recorderRef.current = recorder;
+      streamRef.current = stream;
+      chunksRef.current = [];
+
+      recorder.ondataavailable = (event) => { if (event.data?.size) chunksRef.current.push(event.data); };
+      recorder.onstop = async () => {
+        try {
+          const tracks = streamRef.current?.getTracks() || [];
+          tracks.forEach((track) => track.stop());
+          const blob = new Blob(chunksRef.current, { type: recorder.mimeType || "audio/webm" });
+          const file = new File([blob], `voice-${Date.now()}.webm`, { type: blob.type });
+          await uploadFile(file, true);
+        } catch (err) {
+          console.error(err);
+          alert(err.message || "Could not send voice note.");
+        } finally {
+          setRecording(false);
+        }
+      };
+
+      recorder.start();
+      setRecording(true);
+      setShowEmoji(false);
+    } catch (error) {
+      alert(error.message || "Microphone access is required for voice notes.");
+    }
+  };
+
+  const stopRecord = () => {
+    try { recorderRef.current?.stop(); } catch { setRecording(false); }
+  };
+
+  return (
+    <div className="message-input-container">
+      {attachment && (
+        <div className="preview-image attachment-preview">
+          <a href={attachment} target="_blank" rel="noreferrer">Attachment ready ({messageType})</a>
+          <button type="button" onClick={() => { setAttachment(""); setMessageType("text"); }} aria-label="Remove attachment"><X size={14} /></button>
+        </div>
+      )}
+
+      {showEmoji && (
+        <div className="emoji-popover">
+          {EMOJIS.map((emoji) => (
+            <button key={emoji} type="button" className="emoji-chip" onClick={() => { setMessage((value) => value + emoji); setShowEmoji(false); }}>{emoji}</button>
+          ))}
+        </div>
+      )}
+
+      <div className="message-toolbar">
+        <button type="button" onClick={() => setShowEmoji((value) => !value)} title="Emoji" aria-label="Emoji picker"><Smile size={21} /></button>
+        <button type="button" onClick={() => imageInputRef.current?.click()} title="Image" aria-label="Attach image"><Image size={21} /></button>
+        <button type="button" onClick={() => fileInputRef.current?.click()} title="Attachment" aria-label="Attach file"><Paperclip size={21} /></button>
+        <button type="button" onClick={() => cameraInputRef.current?.click()} title="Camera" aria-label="Open camera"><Camera size={21} /></button>
+        <button type="button" onClick={recording ? stopRecord : startRecord} title={recording ? "Stop recording" : "Record voice note"} aria-label={recording ? "Stop recording voice note" : "Record voice note"}>{recording ? <Square size={19} /> : <Mic size={21} />}</button>
+        <textarea placeholder={recording ? "Recording voice note..." : "Write a private message..."} value={message} onChange={(event) => { setMessage(event.target.value); socket?.emit("typing", { conversationId: conversation?._id, sender: currentId }); }} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); send(); } }} disabled={recording} />
+        <button type="button" className="send-button" onClick={send} disabled={!canSend || busy || recording}><Send size={20} /></button>
+      </div>
+
+      <input ref={imageInputRef} hidden type="file" accept="image/*" onChange={async (event) => { const file = event.target.files?.[0]; event.target.value = ""; if (file) await uploadFile(file, false); }} />
+      <input ref={cameraInputRef} hidden type="file" accept="image/*" capture="environment" onChange={async (event) => { const file = event.target.files?.[0]; event.target.value = ""; if (file) await uploadFile(file, false); }} />
+      <input ref={fileInputRef} hidden type="file" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt" onChange={async (event) => { const file = event.target.files?.[0]; event.target.value = ""; if (file) await uploadFile(file, false); }} />
+    </div>
+  );
+}
