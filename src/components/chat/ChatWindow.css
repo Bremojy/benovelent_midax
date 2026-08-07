@@ -16,14 +16,15 @@
 }
 
 .messages-container{
-  flex:1;
+  flex:1 1 auto;
+  min-height:0;
   overflow-y:auto;
   padding:20px;
   display:flex;
   flex-direction:column;
   gap:14px;
   background:
-    radial-gradient(circle at top right, rgba(255,122,0,.06), transparent 28%),
+    radial-gradient(circle at top right, rgba(64,93,230,.07), transparent 28%),
     linear-gradient(180deg,#f8fafc,#eef2ff 130%);
 }
 

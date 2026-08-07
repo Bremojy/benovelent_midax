@@ -22,6 +22,7 @@ export default function MessageInput({ onSend, socket, conversation, currentUser
   const [busy, setBusy] = useState(false);
 
   const fileInputRef = useRef(null);
+  const sendingRef = useRef(false);
   const imageInputRef = useRef(null);
   const cameraInputRef = useRef(null);
   const recorderRef = useRef(null);
@@ -34,6 +35,7 @@ export default function MessageInput({ onSend, socket, conversation, currentUser
   const uploadFile = async (file, autoSend = false) => {
     if (!file) return;
     setBusy(true);
+    sendingRef.current = true;
     try {
       const formData = new FormData();
       formData.append("file", file);
@@ -47,12 +49,14 @@ export default function MessageInput({ onSend, socket, conversation, currentUser
         setMessageType(type);
       }
     } finally {
+      sendingRef.current = false;
       setBusy(false);
     }
   };
 
   const send = async () => {
-    if (!canSend || busy) return;
+    if (!canSend || busy || sendingRef.current) return;
+    sendingRef.current = true;
     setBusy(true);
     try {
       await onSend(message, attachment, messageType);
@@ -62,6 +66,7 @@ export default function MessageInput({ onSend, socket, conversation, currentUser
       setShowEmoji(false);
       socket?.emit("stop-typing", { conversationId: conversation?._id, sender: currentId });
     } finally {
+      sendingRef.current = false;
       setBusy(false);
     }
   };

@@ -68,7 +68,7 @@
 }
 
 .typing-status{
-  color:#0d8f63 !important;
+  color:#405de6 !important;
   font-weight:800;
   animation:typingPulse 1s infinite;
 }
@@ -92,7 +92,7 @@
 }
 
 .chat-actions button:hover{
-  background:#ff7a00;
+  background:#405de6;
   color:#fff;
   transform:translateY(-1px);
 }

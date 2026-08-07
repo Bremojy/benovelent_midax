@@ -11,6 +11,7 @@ function ChatWindow({ conversation, socket, currentUser, onBack, onAudioCall, on
   const [typingUserId, setTypingUserId] = useState("");
   const [loadingMessages, setLoadingMessages] = useState(false);
   const messagesEndRef = useRef(null);
+  const sendLockRef = useRef(false);
   const currentId = String(currentUser?.chatId || currentUser?._id || "");
 
   const partner = useMemo(() => {
@@ -80,6 +81,9 @@ function ChatWindow({ conversation, socket, currentUser, onBack, onAudioCall, on
   async function sendMessage(text, attachment, messageType = "text") {
     if (!conversation?._id) return;
     if (!String(text || "").trim() && !attachment) return;
+    if (sendLockRef.current) return;
+
+    sendLockRef.current = true;
 
     const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const optimisticMessage = normalizeMessage({
@@ -100,12 +104,21 @@ function ChatWindow({ conversation, socket, currentUser, onBack, onAudioCall, on
     try {
       const { data } = await API.post("/messages", { conversationId: conversation._id, message: text, attachment, messageType });
       const created = normalizeMessage(data.message || data);
-      setMessages((previous) => previous.map((item) => (String(item._id) === tempId ? created : item)));
+      setMessages((previous) => {
+        const withoutTemp = previous.filter((item) => String(item._id) !== tempId);
+        if (!created?._id) return withoutTemp;
+        if (withoutTemp.some((item) => String(item._id) === String(created._id))) {
+          return withoutTemp;
+        }
+        return [...withoutTemp, created];
+      });
       // The REST API already persists and broadcasts the message on the server.
     } catch (error) {
       console.error(error);
       setMessages((previous) => previous.filter((item) => String(item._id) !== tempId));
       throw error;
+    } finally {
+      sendLockRef.current = false;
     }
   }
 

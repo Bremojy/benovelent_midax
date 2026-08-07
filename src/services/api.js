@@ -4,9 +4,15 @@ import axios from "axios";
 // BASE URL
 // ========================================
 
+const DEFAULT_REMOTE_API_URL = "https://benovelent-midax.onrender.com";
+const DEFAULT_LOCAL_API_URL = "http://localhost:5000";
+
 const BASE_URL =
   import.meta.env.VITE_API_URL ||
-  "https://benovelent-midax.onrender.com";
+  (typeof window !== "undefined" &&
+   ["localhost", "127.0.0.1", "::1"].includes(window.location.hostname)
+    ? DEFAULT_LOCAL_API_URL
+    : DEFAULT_REMOTE_API_URL);
 
 export const API_BASE_URL = BASE_URL;
 

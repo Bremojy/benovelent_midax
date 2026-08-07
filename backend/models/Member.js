@@ -65,7 +65,6 @@ trim:true,
 lowercase:true,
 unique:true,
 sparse:true,
-index:true,
 },
 
     department: {
@@ -261,7 +260,6 @@ nextOfKin: {
     type: String,
     trim: true,
     unique:true,
-index:true,
   },
 
   nationalId: {

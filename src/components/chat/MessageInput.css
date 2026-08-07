@@ -1,8 +1,11 @@
 .message-input-container{
-  position:relative;
+  position:sticky;
+  bottom:0;
+  z-index:5;
   padding:16px 18px 18px;
   background:rgba(255,255,255,.98);
   border-top:1px solid rgba(15,23,42,.06);
+  box-shadow:0 -10px 26px rgba(15,23,42,.04);
 }
 
 .preview-image{
@@ -83,8 +86,8 @@
 }
 
 .message-toolbar button:hover{
-  background:#ff7a00;
-  color:#fff;
+  background:#eef2ff;
+  color:#405de6;
 }
 
 .message-toolbar textarea{
@@ -102,17 +105,17 @@
 }
 
 .message-toolbar textarea:focus{
-  border-color:rgba(255,122,0,.36);
-  box-shadow:0 0 0 4px rgba(255,122,0,.1);
+  border-color:rgba(64,93,230,.36);
+  box-shadow:0 0 0 4px rgba(64,93,230,.12);
 }
 
 .send-button{
   width:48px !important;
   height:48px !important;
   border-radius:16px !important;
-  background:linear-gradient(135deg,#ff7a00,#ff9c37) !important;
+  background:linear-gradient(135deg,#405de6,#833ab4) !important;
   color:#fff !important;
-  box-shadow:0 14px 30px rgba(255,122,0,.22);
+  box-shadow:0 14px 30px rgba(64,93,230,.22);
 }
 
 .send-button:disabled{

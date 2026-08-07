@@ -8,11 +8,11 @@
 }
 
 .conversation-item:hover{
-  background:#fff8f2;
+  background:#f5f7ff;
 }
 
 .conversation-item.active{
-  background: linear-gradient(135deg, rgba(255,122,0,.12), rgba(255,122,0,.04));
+  background: linear-gradient(135deg, rgba(64,93,230,.12), rgba(64,93,230,.04));
 }
 
 .conversation-avatar{
@@ -80,7 +80,7 @@
   min-width:22px;
   height:22px;
   border-radius:50%;
-  background:#ff7a00;
+  background:#405de6;
   color:white;
   display:flex;
   justify-content:center;
