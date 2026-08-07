@@ -157,12 +157,12 @@ function MessageCenterPage({ title, eyebrow, description, searchPlaceholder, mem
               <div className="message-center-chat-picker compact-picker">
                 <select id="chat-person-picker" value={selectedConversation?.partner?._id || ""} onChange={(e) => { const conversation = normalizedConversations.find((item) => String(item.partner?._id) === String(e.target.value)); const person = normalizedPeople.find((x) => String(x._id) === String(e.target.value)); if (conversation) selectConversation(conversation); else if (person) startConversation(person); }}>
                   <option value="">Select from dropdown</option>
-                  {normalizedConversations.map((conversation) => (<option key={conversation._id} value={conversation.partner?._id || conversation._id}>{conversation.partner?.fullName || "Member"}{conversation.lastMessageText ? ` • ${conversation.lastMessageText}` : ""}</option>))}
-                  {normalizedPeople.filter((person) => !normalizedConversations.some((conversation) => String(conversation.partner?._id) === String(person._id))).map((person) => (<option key={person._id} value={person._id}>{person.fullName}{person.roleLabel ? ` • ${person.roleLabel}` : ""}{person.online ? " • Online" : ""}</option>))}
+                  {normalizedConversations.map((conversation) => (<option key={conversation._id} value={conversation.partner?._id || conversation._id}>{formatDisplayName(conversation.partner)}{conversation.lastMessageText ? ` • ${truncateText(conversation.lastMessageText, 42)}` : ""}</option>))}
+                  {normalizedPeople.filter((person) => !normalizedConversations.some((conversation) => String(conversation.partner?._id) === String(person._id))).map((person) => (<option key={person._id} value={person._id}>{formatDisplayName(person)}{person.roleLabel ? ` • ${person.roleLabel}` : ""}{person.online ? " • Online" : ""}</option>))}
                 </select>
               </div>
               <div className="mobile-chat-list">
-                {loadingSidebar ? <div className="chat-loading">Loading chats...</div> : normalizedConversations.length > 0 ? normalizedConversations.map((conversation) => (<button key={conversation._id} type="button" className="mobile-chat-row" onClick={() => selectConversation(conversation)}><span className="mobile-chat-row-avatar"><img src={conversation.partner?.profileImage || "/default-avatar.svg"} alt="" /></span><span className="mobile-chat-row-body"><strong>{conversation.partner?.fullName || "Member"}</strong><small>{conversation.lastMessageText || "Tap to open chat"}</small></span></button>)) : <div className="chat-empty">{emptyConversationsLabel}</div>}
+                {loadingSidebar ? <div className="chat-loading">Loading chats...</div> : normalizedConversations.length > 0 ? normalizedConversations.map((conversation) => (<button key={conversation._id} type="button" className="mobile-chat-row" onClick={() => selectConversation(conversation)}><span className="mobile-chat-row-avatar"><img src={conversation.partner?.profileImage || "/default-avatar.svg"} alt="" /></span><span className="mobile-chat-row-body"><strong>{formatDisplayName(conversation.partner)}</strong><small>{conversation.lastMessageText || "Tap to open chat"}</small></span></button>)) : <div className="chat-empty">{emptyConversationsLabel}</div>}
               </div>
             </div>
 
@@ -199,20 +199,43 @@ function normalizeMembers(items, actorId) {
     const memberNumber = String(member?.memberNumber || "").trim();
     const dedupeKey = [role, email || phone || memberNumber || id].filter(Boolean).join("|");
     if (unique.has(dedupeKey)) return;
-    unique.set(dedupeKey, { ...member, _id: id, role, roleLabel, fullName: member.fullName || member.name || "User", online: Boolean(member.online) });
+
+    const displayName = safeDisplayName(member?.fullName || member?.name || member?.username, member);
+    unique.set(dedupeKey, { ...member, _id: id, role, roleLabel, fullName: displayName, online: Boolean(member.online) });
   });
-  return Array.from(unique.values()).sort((a, b) => { const order = { superadmin: 0, admin: 1, member: 2 }; const aRank = order[String(a.role || "member").toLowerCase()] ?? 3; const bRank = order[String(b.role || "member").toLowerCase()] ?? 3; if (aRank !== bRank) return aRank - bRank; return String(a.fullName || "").localeCompare(String(b.fullName || "")); });
+  return Array.from(unique.values()).sort((a, b) => { const order = { superadmin: 0, admin: 1, member: 2 }; const aRank = order[String(a.role || "member").toLowerCase()] ?? 3; const bRank = order[String(b.role || "member").toLowerCase()] ?? 3; return aRank - bRank || String(a.fullName || "").localeCompare(String(b.fullName || "")); });
 }
 
 function normalizeConversation(conversation, currentUserId) {
   if (!conversation) return null;
   const participants = Array.isArray(conversation.participants) ? conversation.participants : [];
   const partner = conversation.partner || participants.find((member) => String(member?._id || member) !== String(currentUserId)) || null;
-  return { ...conversation, partner, lastMessageText: conversation.lastMessageText || conversation.lastMessage?.message || conversation.lastMessage?.text || "" };
+  const safePartner = partner ? { ...partner, fullName: safeDisplayName(partner.fullName || partner.name || partner.username, partner) } : null;
+  return { ...conversation, partner: safePartner, lastMessageText: conversation.lastMessageText || conversation.lastMessage?.message || conversation.lastMessage?.text || "" };
 }
 
 function normalizeConversations(items, currentUserId) {
   return (items || []).map((conversation) => normalizeConversation(conversation, currentUserId)).filter((conversation) => { if (!conversation) return false; return String(conversation.partner?.role || "").toLowerCase() !== "superadmin"; }).sort((a, b) => new Date(b.lastMessageTime || b.updatedAt || b.createdAt) - new Date(a.lastMessageTime || a.updatedAt || a.createdAt));
+}
+
+function safeDisplayName(value, fallbackSource = {}) {
+  const raw = String(value || "").trim();
+  const fallback = String(fallbackSource?.username || fallbackSource?.email || fallbackSource?.memberNumber || fallbackSource?.roleLabel || "Member").trim();
+  if (!raw) return fallback || "Member";
+  const looksLikeUrl = /^https?:\/\//i.test(raw) || raw.includes("cloudinary.com") || raw.includes("/");
+  if (looksLikeUrl) return fallback || "Member";
+  if (raw.length > 34 && /https?:|www\.|cloudinary|\/{1,}/i.test(raw)) return fallback || "Member";
+  return raw;
+}
+
+function formatDisplayName(person) {
+  return safeDisplayName(person?.fullName || person?.name || person?.username, person);
+}
+
+function truncateText(text, max = 42) {
+  const value = String(text || "").trim();
+  if (value.length <= max) return value;
+  return `${value.slice(0, max - 1)}…`;
 }
 
 export default MessageCenterPage;

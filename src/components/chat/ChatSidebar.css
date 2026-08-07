@@ -242,6 +242,44 @@
 @media (max-width: 900px){
   .modern-chat-sidebar{
     padding:14px;
+    background:#0b0b0f;
+    border-right:none;
+    gap:12px;
+  }
+
+  .chat-sidebar-top h2,
+  .chat-sidebar-eyebrow,
+  .chat-directory-summary,
+  .chat-section-label{
+    color:#f8fafc;
+  }
+
+  .chat-search,
+  .chat-directory-summary > div,
+  .conversation,
+  .member-row{
+    background:#17171d;
+    border-color:rgba(255,255,255,.08);
+    box-shadow:none;
+  }
+
+  .chat-search input{
+    color:#f8fafc;
+  }
+
+  .conversation-info h4{
+    color:#f8fafc;
+  }
+
+  .conversation-info p{
+    color:#a1a1aa;
+  }
+
+  .chat-empty,
+  .chat-loading{
+    background:#17171d;
+    color:#cbd5e1;
+    border-color:rgba(255,255,255,.08);
   }
 
   .chat-directory-summary{
@@ -256,5 +294,17 @@
 
   .chat-sidebar-top h2{
     font-size:24px;
+  }
+
+  .conversation,
+  .member-row{
+    padding:12px;
+    border-radius:16px;
+  }
+
+  .avatar img{
+    width:48px;
+    height:48px;
+    border-radius:16px;
   }
 }

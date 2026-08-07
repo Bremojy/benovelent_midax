@@ -1,11 +1,16 @@
 .message-input-container{
   position:sticky;
   bottom:0;
-  z-index:5;
-  padding:16px 18px 18px;
-  background:rgba(255,255,255,.98);
+  z-index:6;
+  padding:14px 16px calc(14px + env(safe-area-inset-bottom));
+  background:rgba(255,255,255,.96);
   border-top:1px solid rgba(15,23,42,.06);
   box-shadow:0 -10px 26px rgba(15,23,42,.04);
+  backdrop-filter:blur(18px);
+}
+
+.instagram-composer{
+  display:block;
 }
 
 .preview-image{
@@ -41,10 +46,10 @@
 
 .emoji-popover{
   position:absolute;
-  left:18px;
+  left:16px;
   bottom:92px;
   z-index:20;
-  width:min(320px, calc(100% - 36px));
+  width:min(320px, calc(100% - 32px));
   display:flex;
   flex-wrap:wrap;
   gap:8px;
@@ -67,11 +72,20 @@
 
 .message-toolbar{
   display:grid;
-  grid-template-columns:auto auto auto auto 1fr auto;
+  grid-template-columns:auto minmax(0,1fr) auto;
   gap:10px;
   align-items:end;
 }
 
+.message-toolbar-actions{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  flex-wrap:wrap;
+}
+
+.message-toolbar-actions button,
+.message-toolbar > button,
 .message-toolbar button{
   width:42px;
   height:42px;
@@ -83,21 +97,23 @@
   place-items:center;
   transition:.2s ease;
   color:#334155;
+  flex-shrink:0;
 }
 
-.message-toolbar button:hover{
+.message-toolbar-actions button:hover,
+.message-toolbar > button:hover{
   background:#eef2ff;
   color:#405de6;
 }
 
 .message-toolbar textarea{
-  min-height:42px;
+  min-height:46px;
   max-height:140px;
   resize:none;
   width:100%;
   padding:12px 14px;
   border:1px solid rgba(15,23,42,.09);
-  border-radius:16px;
+  border-radius:18px;
   background:#fff;
   outline:none;
   font-size:14px;
@@ -125,14 +141,51 @@
 
 @media(max-width:768px){
   .message-input-container{
-    padding:14px;
+    padding:12px 12px calc(12px + env(safe-area-inset-bottom));
   }
 
   .message-toolbar{
-    grid-template-columns:auto auto auto 1fr auto;
+    grid-template-columns:1fr auto;
+    gap:8px;
   }
 
-  .message-toolbar button[title="Voice note (coming soon)"]{
+  .message-toolbar-actions{
+    grid-column:1 / -1;
+    overflow-x:auto;
+    padding-bottom:2px;
+    flex-wrap:nowrap;
+    scrollbar-width:none;
+  }
+
+  .message-toolbar-actions::-webkit-scrollbar{
     display:none;
+  }
+
+  .message-toolbar textarea{
+    min-height:54px;
+    border-radius:20px;
+    font-size:15px;
+  }
+
+  .send-button{
+    width:54px !important;
+    height:54px !important;
+    border-radius:18px !important;
+  }
+}
+
+@media (max-width: 540px){
+  .message-input-container{
+    padding:10px 10px calc(10px + env(safe-area-inset-bottom));
+  }
+
+  .message-toolbar{
+    gap:8px;
+  }
+
+  .message-toolbar-actions button{
+    width:40px;
+    height:40px;
+    border-radius:13px;
   }
 }

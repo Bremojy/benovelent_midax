@@ -108,7 +108,13 @@ export default function MessageInput({ onSend, socket, conversation, currentUser
   };
 
   return (
-    <div className="message-input-container">
+    <form
+      className="message-input-container instagram-composer"
+      onSubmit={(event) => {
+        event.preventDefault();
+        send();
+      }}
+    >
       {attachment && (
         <div className="preview-image attachment-preview">
           <a href={attachment} target="_blank" rel="noreferrer">Attachment ready ({messageType})</a>
@@ -125,18 +131,39 @@ export default function MessageInput({ onSend, socket, conversation, currentUser
       )}
 
       <div className="message-toolbar">
-        <button type="button" onClick={() => setShowEmoji((value) => !value)} title="Emoji" aria-label="Emoji picker"><Smile size={21} /></button>
-        <button type="button" onClick={() => imageInputRef.current?.click()} title="Image" aria-label="Attach image"><Image size={21} /></button>
-        <button type="button" onClick={() => fileInputRef.current?.click()} title="Attachment" aria-label="Attach file"><Paperclip size={21} /></button>
-        <button type="button" onClick={() => cameraInputRef.current?.click()} title="Camera" aria-label="Open camera"><Camera size={21} /></button>
-        <button type="button" onClick={recording ? stopRecord : startRecord} title={recording ? "Stop recording" : "Record voice note"} aria-label={recording ? "Stop recording voice note" : "Record voice note"}>{recording ? <Square size={19} /> : <Mic size={21} />}</button>
-        <textarea placeholder={recording ? "Recording voice note..." : "Write a private message..."} value={message} onChange={(event) => { setMessage(event.target.value); socket?.emit("typing", { conversationId: conversation?._id, sender: currentId }); }} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); send(); } }} disabled={recording} />
-        <button type="button" className="send-button" onClick={send} disabled={!canSend || busy || recording}><Send size={20} /></button>
+        <div className="message-toolbar-actions">
+          <button type="button" onClick={() => setShowEmoji((value) => !value)} title="Emoji" aria-label="Emoji picker"><Smile size={21} /></button>
+          <button type="button" onClick={() => imageInputRef.current?.click()} title="Image" aria-label="Attach image"><Image size={21} /></button>
+          <button type="button" onClick={() => fileInputRef.current?.click()} title="Attachment" aria-label="Attach file"><Paperclip size={21} /></button>
+          <button type="button" onClick={() => cameraInputRef.current?.click()} title="Camera" aria-label="Open camera"><Camera size={21} /></button>
+          <button type="button" onClick={recording ? stopRecord : startRecord} title={recording ? "Stop recording" : "Record voice note"} aria-label={recording ? "Stop recording voice note" : "Record voice note"}>{recording ? <Square size={19} /> : <Mic size={21} />}</button>
+        </div>
+
+        <textarea
+          placeholder={recording ? "Recording voice note..." : "Message..."}
+          value={message}
+          onChange={(event) => {
+            setMessage(event.target.value);
+            socket?.emit("typing", { conversationId: conversation?._id, sender: currentId });
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" && !event.shiftKey) {
+              event.preventDefault();
+              send();
+            }
+          }}
+          disabled={recording}
+          aria-label="Send a message"
+        />
+
+        <button type="submit" className="send-button" disabled={!canSend || busy || recording} aria-label="Send message">
+          <Send size={20} />
+        </button>
       </div>
 
       <input ref={imageInputRef} hidden type="file" accept="image/*" onChange={async (event) => { const file = event.target.files?.[0]; event.target.value = ""; if (file) await uploadFile(file, false); }} />
       <input ref={cameraInputRef} hidden type="file" accept="image/*" capture="environment" onChange={async (event) => { const file = event.target.files?.[0]; event.target.value = ""; if (file) await uploadFile(file, false); }} />
       <input ref={fileInputRef} hidden type="file" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt" onChange={async (event) => { const file = event.target.files?.[0]; event.target.value = ""; if (file) await uploadFile(file, false); }} />
-    </div>
+    </form>
   );
 }

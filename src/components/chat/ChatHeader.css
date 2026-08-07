@@ -128,3 +128,28 @@
     border-radius:12px;
   }
 }
+
+@media (max-width: 900px){
+  .modern-chat-header{
+    background:#12121a;
+    border-bottom:1px solid rgba(255,255,255,.06);
+  }
+
+  .chat-user-info h3{
+    color:#f8fafc;
+  }
+
+  .chat-user-info p{
+    color:#a1a1aa;
+  }
+
+  .chat-actions button{
+    background:#23232b;
+    color:#f8fafc;
+  }
+
+  .chat-actions button:hover{
+    background:linear-gradient(135deg,#7c3aed,#c026d3);
+    color:#fff;
+  }
+}

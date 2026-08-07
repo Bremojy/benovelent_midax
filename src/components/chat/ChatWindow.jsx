@@ -55,8 +55,21 @@ function ChatWindow({ conversation, socket, currentUser, onBack, onAudioCall, on
     const handleNewMessage = (incoming) => {
       const incomingConversationId = incoming?.conversation?._id || incoming?.conversation || incoming?.conversationId;
       if (String(incomingConversationId) !== String(conversation._id)) return;
+
+      const senderId = String(incoming?.sender?._id || incoming?.sender || incoming?.senderId || "");
+      if (senderId && senderId === currentId) {
+        return;
+      }
+
       const normalized = normalizeMessage(incoming);
-      setMessages((previous) => previous.some((item) => String(item._id) === String(normalized._id)) ? previous : [...previous, normalized]);
+      setMessages((previous) => {
+        const id = String(normalized._id || "");
+        const fingerprint = messageFingerprint(normalized);
+        if (previous.some((item) => String(item._id) === id || messageFingerprint(item) === fingerprint)) {
+          return previous;
+        }
+        return [...previous, normalized];
+      });
     };
 
     const handleTyping = (senderId) => {
@@ -107,12 +120,11 @@ function ChatWindow({ conversation, socket, currentUser, onBack, onAudioCall, on
       setMessages((previous) => {
         const withoutTemp = previous.filter((item) => String(item._id) !== tempId);
         if (!created?._id) return withoutTemp;
-        if (withoutTemp.some((item) => String(item._id) === String(created._id))) {
+        if (withoutTemp.some((item) => String(item._id) === String(created._id) || messageFingerprint(item) === messageFingerprint(created))) {
           return withoutTemp;
         }
         return [...withoutTemp, created];
       });
-      // The REST API already persists and broadcasts the message on the server.
     } catch (error) {
       console.error(error);
       setMessages((previous) => previous.filter((item) => String(item._id) !== tempId));
@@ -131,7 +143,7 @@ function ChatWindow({ conversation, socket, currentUser, onBack, onAudioCall, on
   return (
     <div className="chat-window">
       <ChatHeader conversation={conversation} partner={partner} typingUser={typingUserId} onAudioCall={onAudioCall} onVideoCall={onVideoCall} />
-      <div className="messages-container">
+      <div className="messages-container" role="log" aria-live="polite" aria-label="Chat messages">
         {loadingMessages ? <div className="chat-loading">Loading messages...</div> : messages.map((message) => (
           <MessageBubble key={message._id} message={message} own={String(message.sender?._id || message.sender) === currentId} />
         ))}
@@ -145,7 +157,22 @@ function ChatWindow({ conversation, socket, currentUser, onBack, onAudioCall, on
 
 function normalizeMessage(message) {
   if (!message) return message;
-  return { ...message, message: message.message ?? message.text ?? "", attachment: message.attachment ?? message.image ?? "", messageType: message.messageType || (message.attachment ? "image" : "text") };
+  return {
+    ...message,
+    message: message.message ?? message.text ?? "",
+    attachment: message.attachment ?? message.image ?? "",
+    messageType: message.messageType || (message.attachment ? "image" : "text"),
+  };
+}
+
+function messageFingerprint(message) {
+  if (!message) return "";
+  const senderId = String(message?.sender?._id || message?.sender || message?.senderId || "");
+  const body = String(message?.message || message?.text || "").trim();
+  const attachment = String(message?.attachment || message?.image || "").trim();
+  const type = String(message?.messageType || "").trim();
+  const createdAt = String(message?.createdAt || "").slice(0, 19);
+  return [senderId, body, attachment, type, createdAt].join("|");
 }
 
 export default ChatWindow;
