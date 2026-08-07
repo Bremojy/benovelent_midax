@@ -154,3 +154,40 @@
     color:#fff;
   }
 }
+
+
+/* --- Updated dark chat experience --- */
+
+.modern-chat-header{
+  background:rgba(5,5,7,.98) !important;
+  border-bottom:1px solid rgba(255,255,255,.06) !important;
+  color:#f8fafc !important;
+}
+
+.chat-back-button{
+  width:44px;
+  height:44px;
+  border:none;
+  border-radius:14px;
+  background:#111114;
+  color:#f8fafc;
+  display:grid;
+  place-items:center;
+  flex-shrink:0;
+}
+
+.chat-user-info h3,
+.chat-user-info p,
+.chat-actions button{
+  color:#f8fafc !important;
+}
+
+.chat-actions button{
+  background:#111114 !important;
+  border:1px solid rgba(255,255,255,.06) !important;
+}
+
+.chat-actions button:hover{
+  background:linear-gradient(135deg,#7c3aed,#c026d3) !important;
+}
+

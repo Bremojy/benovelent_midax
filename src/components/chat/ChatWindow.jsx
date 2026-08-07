@@ -12,7 +12,17 @@ function ChatWindow({ conversation, socket, currentUser, onBack, onAudioCall, on
   const [loadingMessages, setLoadingMessages] = useState(false);
   const messagesEndRef = useRef(null);
   const sendLockRef = useRef(false);
-  const ownIds = useMemo(() => new Set([currentUser?.chatId, currentUser?._id, currentUser?.id, currentUser?.memberId].filter(Boolean).map((value) => String(value))), [currentUser]);
+
+  const ownIds = useMemo(
+    () =>
+      new Set(
+        [currentUser?.chatId, currentUser?._id, currentUser?.id, currentUser?.memberId]
+          .filter(Boolean)
+          .map((value) => String(value))
+      ),
+    [currentUser]
+  );
+
   const currentId = String(currentUser?.chatId || currentUser?._id || currentUser?.id || currentUser?.memberId || "");
 
   const partner = useMemo(() => {
@@ -28,6 +38,7 @@ function ChatWindow({ conversation, socket, currentUser, onBack, onAudioCall, on
     }
 
     let cancelled = false;
+
     (async () => {
       try {
         setLoadingMessages(true);
@@ -47,7 +58,9 @@ function ChatWindow({ conversation, socket, currentUser, onBack, onAudioCall, on
     };
   }, [conversation?._id]);
 
-  useEffect(() => { scrollToBottom(); }, [messages, typingUserId]);
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, typingUserId]);
 
   useEffect(() => {
     if (!socket || !conversation?._id) return;
@@ -135,7 +148,9 @@ function ChatWindow({ conversation, socket, currentUser, onBack, onAudioCall, on
     }
   }
 
-  function scrollToBottom() { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }
+  function scrollToBottom() {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }
 
   if (!conversation) {
     return <div className="chat-window-empty">Select a conversation to begin chatting.</div>;
@@ -143,14 +158,27 @@ function ChatWindow({ conversation, socket, currentUser, onBack, onAudioCall, on
 
   return (
     <div className="chat-window">
-      <ChatHeader conversation={conversation} partner={partner} typingUser={typingUserId} onAudioCall={onAudioCall} onVideoCall={onVideoCall} />
+      <ChatHeader
+        conversation={conversation}
+        partner={partner}
+        typingUser={typingUserId}
+        onAudioCall={onAudioCall}
+        onVideoCall={onVideoCall}
+        onBack={onBack}
+      />
+
       <div className="messages-container" role="log" aria-live="polite" aria-label="Chat messages">
-        {loadingMessages ? <div className="chat-loading">Loading messages...</div> : messages.map((message) => (
-          <MessageBubble key={message._id} message={message} own={String(message.sender?._id || message.sender) === currentId} />
-        ))}
+        {loadingMessages ? (
+          <div className="chat-loading">Loading messages...</div>
+        ) : (
+          messages.map((message) => (
+            <MessageBubble key={message._id} message={message} own={String(message.sender?._id || message.sender) === currentId} />
+          ))
+        )}
         <TypingIndicator visible={Boolean(typingUserId) && String(typingUserId) !== currentId} user={partner} />
         <div ref={messagesEndRef} />
       </div>
+
       <MessageInput onSend={sendMessage} socket={socket} conversation={conversation} currentUser={currentUser} />
     </div>
   );

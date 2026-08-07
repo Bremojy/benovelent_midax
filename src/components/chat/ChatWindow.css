@@ -77,3 +77,30 @@
     padding:10px 10px 12px;
   }
 }
+
+
+/* --- Updated dark chat experience --- */
+
+.chat-window,
+.chat-window-empty,
+.messages-container{
+  background:#050507 !important;
+}
+
+.chat-window-empty,
+.chat-loading{
+  color:#e5e7eb !important;
+}
+
+.messages-container{
+  background:linear-gradient(180deg,#050507,#0b0b0f 130%) !important;
+}
+
+@media (max-width: 900px){
+  .chat-window,
+  .chat-window-empty,
+  .messages-container{
+    background:#050507 !important;
+  }
+}
+

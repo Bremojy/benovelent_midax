@@ -309,3 +309,80 @@
     border-radius:16px;
   }
 }
+
+
+/* --- Updated dark chat experience --- */
+
+.modern-chat-sidebar{
+  background:#050507 !important;
+  border-right:1px solid rgba(255,255,255,.06) !important;
+}
+
+.chat-sidebar-top h2,
+.conversation-info h4,
+.chat-section-label,
+.chat-empty,
+.chat-loading,
+.chat-sidebar-eyebrow,
+.chat-directory-summary strong,
+.chat-directory-summary span,
+.conversation-bottom p,
+.conversation-top span,
+.member-row p,
+.member-row .member-chat-tag{
+  color:#f8fafc;
+}
+
+.chat-sidebar-eyebrow{
+  background:rgba(124,58,237,.12) !important;
+  color:#d8b4fe !important;
+}
+
+.chat-search,
+.chat-directory-summary > div,
+.conversation,
+.member-row{
+  background:#111114 !important;
+  border-color:rgba(255,255,255,.06) !important;
+  box-shadow:none !important;
+}
+
+.chat-search input{
+  color:#f8fafc !important;
+}
+
+.chat-directory-summary > div{
+  background:#111114 !important;
+}
+
+.conversation:hover,
+.member-row:hover{
+  background:#17171d !important;
+  border-color:rgba(124,58,237,.25) !important;
+}
+
+.conversation.active{
+  background:linear-gradient(135deg,rgba(124,58,237,.16),rgba(17,17,20,.98)) !important;
+  border-color:rgba(124,58,237,.35) !important;
+}
+
+.role-chip,
+.member-chat-tag{
+  background:rgba(124,58,237,.16) !important;
+  color:#ddd6fe !important;
+}
+
+.member-chat-tag.muted{
+  background:#1f1f27 !important;
+  color:#cbd5e1 !important;
+}
+
+.avatar img{
+  border-color:rgba(255,255,255,.08) !important;
+  background:#0f0f12 !important;
+}
+
+.online-dot{
+  border-color:#050507 !important;
+}
+

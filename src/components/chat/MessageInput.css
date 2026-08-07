@@ -276,3 +276,50 @@
     border-radius:999px !important;
   }
 }
+
+
+/* --- Updated dark chat experience --- */
+
+.message-input-container.instagram-composer{
+  background:#050507 !important;
+  border-top:1px solid rgba(255,255,255,.06) !important;
+  box-shadow:0 -18px 36px rgba(0,0,0,.35) !important;
+}
+
+.message-toolbar-actions button{
+  background:#111114 !important;
+  color:#f8fafc !important;
+  box-shadow:none !important;
+  border:1px solid rgba(255,255,255,.06) !important;
+}
+
+.message-toolbar-actions button:hover{
+  background:#17171d !important;
+}
+
+.message-toolbar textarea{
+  background:#111114 !important;
+  color:#f8fafc !important;
+  border-color:rgba(255,255,255,.08) !important;
+}
+
+.message-toolbar textarea::placeholder{
+  color:#9ca3af !important;
+}
+
+.send-button{
+  background:linear-gradient(135deg,#7c3aed,#c026d3) !important;
+}
+
+.preview-image a,
+.emoji-popover{
+  background:#111114 !important;
+  color:#f8fafc !important;
+  border-color:rgba(255,255,255,.06) !important;
+}
+
+.emoji-chip{
+  background:#1f1f27 !important;
+  color:#fff !important;
+}
+

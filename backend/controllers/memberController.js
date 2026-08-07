@@ -1331,7 +1331,7 @@ exports.getClaims = async (req, res) => {
 
 exports.getChatMembers = async (req, res) => {
     try {
-        const currentUserId = String(req.user?._id || req.auth?.chatId || "");
+        const currentUserId = String(req.user?._id || req.user?.id || req.auth?.chatId || req.auth?.id || req.user?.chatId || "").trim();
         const keyword = String(req.query.search || "").trim().toLowerCase();
         const limit = Number(req.query.limit || 500);
 

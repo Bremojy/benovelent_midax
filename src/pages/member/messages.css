@@ -366,3 +366,98 @@
     padding:10px;
   }
 }
+
+
+/* --- Updated dark chat experience --- */
+
+.message-center,
+.message-center.compact-message-center{
+  background:#050507;
+}
+
+.message-center-shell,
+.message-center-shell.chat-open{
+  background:#050507 !important;
+  border:1px solid rgba(255,255,255,.06) !important;
+  box-shadow:none !important;
+}
+
+.messages-sidebar-container{
+  background:#050507 !important;
+  border-right:1px solid rgba(255,255,255,.06) !important;
+}
+
+.messages-chat-container{
+  background:#050507 !important;
+}
+
+.message-center-hero,
+.message-center-hero.compact-message-center-hero{
+  background:#050507 !important;
+  border-color:rgba(255,255,255,.06) !important;
+}
+
+.message-center-hero-copy h1,
+.message-center-hero-copy p,
+.messages-call-banner{
+  color:#f8fafc;
+}
+
+.messages-call-banner{
+  background:rgba(124,58,237,.12);
+  border-color:rgba(124,58,237,.24);
+}
+
+.portal-chip-action.ghost{
+  background:#15151a !important;
+  color:#f8fafc !important;
+  border:1px solid rgba(255,255,255,.08) !important;
+}
+
+.messages-top-mobile-actions{
+  background:#050507 !important;
+  border-bottom:1px solid rgba(255,255,255,.06) !important;
+}
+
+.messages-top-mobile-actions button{
+  background:#111114 !important;
+  color:#f8fafc !important;
+  border:1px solid rgba(255,255,255,.06) !important;
+}
+
+.mobile-chat-chooser,
+.mobile-chat-chooser.show{
+  background:#050507 !important;
+  border-bottom:1px solid rgba(255,255,255,.06) !important;
+}
+
+.mobile-chat-chooser-head label,
+.mobile-chat-chooser-head p,
+.chat-window-empty,
+.choose-chat-empty{
+  color:#e5e7eb !important;
+}
+
+.mobile-chat-row{
+  background:#111114 !important;
+  border-color:rgba(255,255,255,.06) !important;
+  color:#f8fafc !important;
+}
+
+.mobile-chat-row-body small{
+  color:#a1a1aa !important;
+}
+
+@media (max-width: 900px){
+  .message-center-hero,
+  .messages-call-banner{
+    display:none !important;
+  }
+
+  .message-center-shell{
+    min-height:calc(100dvh - 70px) !important;
+    border:none !important;
+    border-radius:0 !important;
+  }
+}
+

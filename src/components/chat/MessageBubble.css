@@ -143,3 +143,33 @@
     font-size:14px;
   }
 }
+
+
+/* --- Updated dark chat experience --- */
+
+.message-content{
+  background:#17171d !important;
+  color:#f8fafc !important;
+  border-color:rgba(255,255,255,.06) !important;
+}
+
+.message.other .message-content{
+  background:#1f1f24 !important;
+  color:#f8fafc !important;
+}
+
+.message.own .message-content{
+  background:linear-gradient(135deg,#7c3aed,#c026d3) !important;
+  color:#fff !important;
+  box-shadow:0 12px 28px rgba(124,58,237,.22) !important;
+}
+
+.message-sender,
+.message-footer{
+  color:#d1d5db !important;
+}
+
+.message-file-link{
+  color:#e9d5ff !important;
+}
+

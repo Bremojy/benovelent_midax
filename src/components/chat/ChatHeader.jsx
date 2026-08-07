@@ -1,8 +1,13 @@
-import { Phone, Video, Info, BadgeCheck } from "lucide-react";
+import { ArrowLeft, Phone, Video, Info, BadgeCheck } from "lucide-react";
 import "./ChatHeader.css";
 
-function ChatHeader({ conversation, partner, typingUser, onAudioCall, onVideoCall }) {
-  const user = partner || conversation?.partner || conversation?.user || conversation?.participants?.find((member) => member?._id !== conversation?.currentUserId) || {};
+function ChatHeader({ conversation, partner, typingUser, onAudioCall, onVideoCall, onBack }) {
+  const user =
+    partner ||
+    conversation?.partner ||
+    conversation?.user ||
+    conversation?.participants?.find((member) => member?._id !== conversation?.currentUserId) ||
+    {};
 
   if (!conversation) {
     return <div className="chat-header empty">Select a conversation</div>;
@@ -13,6 +18,12 @@ function ChatHeader({ conversation, partner, typingUser, onAudioCall, onVideoCal
   return (
     <div className="chat-header modern-chat-header">
       <div className="chat-user">
+        {onBack ? (
+          <button type="button" className="chat-back-button" onClick={onBack} aria-label="Back to chats">
+            <ArrowLeft size={20} />
+          </button>
+        ) : null}
+
         <div className="chat-avatar">
           <img src={user.profileImage || "/default-avatar.svg"} alt={user.fullName || "Member"} loading="lazy" decoding="async" />
           {user.online && <span className="online-indicator" />}

@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Search, MessageCircle, Users, Crown, Circle, BadgeCheck } from "lucide-react";
+import { Search, MessageCircle, Users, Crown, BadgeCheck } from "lucide-react";
 import "./ChatSidebar.css";
 
 function ChatSidebar({
@@ -45,7 +45,7 @@ function ChatSidebar({
 
     return conversations.filter((conversation) => {
       const partner = conversation.partner || {};
-      const haystack = [partner.fullName, partner.username, conversation.lastMessageText]
+      const haystack = [partner.fullName, partner.username, sanitizePreviewText(conversation.lastMessageText)]
         .filter(Boolean)
         .join(" ")
         .toLowerCase();
@@ -100,7 +100,7 @@ function ChatSidebar({
                   {partner.fullName || "Member"}
                   {partner.roleLabel ? <span className="role-chip small">{partner.roleLabel}</span> : null}
                 </h4>
-                <p>{conversation.lastMessageText || "Tap to continue the conversation"}</p>
+                <p>{sanitizePreviewText(conversation.lastMessageText) || "Tap to continue the conversation"}</p>
               </div>
               {conversation.unreadCount > 0 && <span className="badge">{conversation.unreadCount}</span>}
             </button>
@@ -188,6 +188,15 @@ function rankRole(role) {
   const value = String(role || "member").toLowerCase();
   if (value === "admin") return 0;
   return 2;
+}
+
+function sanitizePreviewText(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  const looksLikeUrl = /^(https?:\/\/|www\.)/i.test(raw) || raw.includes("cloudinary.com") || raw.includes("res.cloudinary");
+  const looksLikeFilePath = raw.includes("/") && /\b(upload|avatar|photo|image|video|document|file)\b/i.test(raw);
+  if (looksLikeUrl || looksLikeFilePath) return "Attachment";
+  return raw;
 }
 
 export default ChatSidebar;
