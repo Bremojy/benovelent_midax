@@ -151,7 +151,7 @@ function ContactRow({ member, onClick }) {
       <Avatar user={member} isOnline={member.online} />
       <div className="conversation-info">
         <h4>
-          {member.fullName || "Member"}
+          {safeDisplayName(member.fullName || member.name || member.username, member)}
           {member.verified ? <BadgeCheck size={14} className="verified-dot" /> : null}
         </h4>
         <p>
@@ -193,9 +193,19 @@ function rankRole(role) {
 function sanitizePreviewText(value) {
   const raw = String(value || "").trim();
   if (!raw) return "";
-  const looksLikeUrl = /^(https?:\/\/|www\.)/i.test(raw) || raw.includes("cloudinary.com") || raw.includes("res.cloudinary");
+  const looksLikeUrl = /^(https?:\/\/|www\.)/i.test(raw) || /cloudinary|res\.cloudinary/i.test(raw);
   const looksLikeFilePath = raw.includes("/") && /\b(upload|avatar|photo|image|video|document|file)\b/i.test(raw);
   if (looksLikeUrl || looksLikeFilePath) return "Attachment";
+  return raw;
+}
+
+function safeDisplayName(value, fallbackSource = {}) {
+  const raw = String(value || "").trim();
+  const fallback = String(fallbackSource?.username || fallbackSource?.email || fallbackSource?.memberNumber || fallbackSource?.roleLabel || "Member").trim();
+  if (!raw) return fallback || "Member";
+  const looksLikeUrl = /^(https?:\/\/|www\.)/i.test(raw) || /cloudinary|res\.cloudinary/i.test(raw);
+  const looksLikeFilePath = raw.includes("/") && /\b(upload|avatar|photo|image|video|document|file)\b/i.test(raw);
+  if (looksLikeUrl || looksLikeFilePath) return fallback || "Member";
   return raw;
 }
 

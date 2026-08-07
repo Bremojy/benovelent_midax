@@ -53,6 +53,21 @@ function MessageCenterPage({
   }, []);
 
   useEffect(() => {
+    if (!isMobile && mobileChatOpen) {
+      setMobileChatOpen(false);
+    }
+  }, [isMobile, mobileChatOpen]);
+
+  useEffect(() => {
+    if (!isFullscreenChat) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isFullscreenChat]);
+
+  useEffect(() => {
     let active = true;
 
     (async () => {
@@ -164,7 +179,7 @@ function MessageCenterPage({
   const selectConversation = (conversation) => {
     if (!conversation?._id) return;
     setSelectedConversation(conversation);
-    setMobileChatOpen(true);
+    setMobileChatOpen(isMobile);
   };
 
   const startConversation = async (person) => {
@@ -187,7 +202,7 @@ function MessageCenterPage({
 
       if (existingConversation) {
         setSelectedConversation(existingConversation);
-        setMobileChatOpen(true);
+        setMobileChatOpen(isMobile);
         return;
       }
 
@@ -197,7 +212,7 @@ function MessageCenterPage({
         if (conversation) {
           setConversations((previous) => [conversation, ...previous.filter((item) => String(item._id) !== String(conversation._id))]);
           setSelectedConversation(conversation);
-          setMobileChatOpen(true);
+          setMobileChatOpen(isMobile);
           return;
         }
       }
@@ -207,7 +222,7 @@ function MessageCenterPage({
       if (conversation) {
         setConversations((previous) => [conversation, ...previous.filter((item) => String(item._id) !== String(conversation._id))]);
         setSelectedConversation(conversation);
-        setMobileChatOpen(true);
+        setMobileChatOpen(isMobile);
       }
     } catch (error) {
       setBanner(error.response?.data?.message || error.message || "Unable to start conversation.");
@@ -249,6 +264,7 @@ function MessageCenterPage({
 
   const showChooserOnMobile = isMobile && !mobileChatOpen;
   const hidePageIntroOnMobile = isMobile && mobileChatOpen;
+  const isFullscreenChat = isMobile && mobileChatOpen && Boolean(selectedConversation);
 
   return (
     <DashboardLayout>
@@ -271,110 +287,125 @@ function MessageCenterPage({
 
         {!hidePageIntroOnMobile && banner && <div className="messages-call-banner">{banner}</div>}
 
-        <div className={`message-center-shell ${mobileChatOpen ? "chat-open" : ""}`}>
-          <aside className="messages-sidebar-container desktop-chat-sidebar">
-            <ChatSidebar
-              title="Chats"
-              searchPlaceholder={searchPlaceholder}
-              members={normalizedPeople}
-              conversations={normalizedConversations}
-              selectedConversationId={selectedConversation?._id}
-              onSelectConversation={selectConversation}
-              onStartConversation={startConversation}
-              search={search}
-              setSearch={setSearch}
-              loading={loadingSidebar}
-              emptyConversationsLabel={emptyConversationsLabel}
-              emptyMembersLabel={emptyMembersLabel}
-              memberSectionLabel={memberSectionLabel}
-              conversationSectionLabel="Recent chats"
-            />
-          </aside>
+        {!isFullscreenChat && (
+          <div className={`message-center-shell ${mobileChatOpen ? "chat-open" : ""}`}>
+            <aside className="messages-sidebar-container desktop-chat-sidebar">
+              <ChatSidebar
+                title="Chats"
+                searchPlaceholder={searchPlaceholder}
+                members={normalizedPeople}
+                conversations={normalizedConversations}
+                selectedConversationId={selectedConversation?._id}
+                onSelectConversation={selectConversation}
+                onStartConversation={startConversation}
+                search={search}
+                setSearch={setSearch}
+                loading={loadingSidebar}
+                emptyConversationsLabel={emptyConversationsLabel}
+                emptyMembersLabel={emptyMembersLabel}
+                memberSectionLabel={memberSectionLabel}
+                conversationSectionLabel="Recent chats"
+              />
+            </aside>
 
-          <div className="messages-chat-container full-width-chat">
-            <div className="messages-top-mobile-actions compact-top-actions">
-              <button type="button" onClick={mobileBack} disabled={!mobileChatOpen}>
-                <ArrowLeft size={18} />
-                Back
-              </button>
-              <button type="button" className="portal-chip-action ghost" onClick={refreshChat}>
-                <RefreshCw size={16} />
-                Refresh
-              </button>
-            </div>
-
-            <div className={`mobile-chat-chooser ${showChooserOnMobile ? "show" : "hide"}`}>
-              <div className="mobile-chat-chooser-head">
-                <label htmlFor="chat-person-picker">Choose a chat</label>
-                <p>Pick a conversation or member from the list below.</p>
+            <div className="messages-chat-container full-width-chat">
+              <div className="messages-top-mobile-actions compact-top-actions">
+                <button type="button" onClick={mobileBack} disabled={!mobileChatOpen}>
+                  <ArrowLeft size={18} />
+                  Back
+                </button>
+                <button type="button" className="portal-chip-action ghost" onClick={refreshChat}>
+                  <RefreshCw size={16} />
+                  Refresh
+                </button>
               </div>
 
-              <div className="message-center-chat-picker compact-picker">
-                <select
-                  id="chat-person-picker"
-                  value={selectedConversation?.partner?._id || ""}
-                  onChange={(e) => {
-                    const conversation = normalizedConversations.find((item) => String(item.partner?._id) === String(e.target.value));
-                    const person = normalizedPeople.find((x) => String(x._id) === String(e.target.value));
-                    if (conversation) selectConversation(conversation);
-                    else if (person) startConversation(person);
-                  }}
-                >
-                  <option value="">Select from dropdown</option>
-                  {normalizedConversations.map((conversation) => (
-                    <option key={conversation._id} value={conversation.partner?._id || conversation._id}>
-                      {formatDisplayName(conversation.partner)}
-                      {conversation.lastMessageText ? ` • ${truncateText(conversation.lastMessageText, 42)}` : ""}
-                    </option>
-                  ))}
-                  {normalizedPeople
-                    .filter((person) => !normalizedConversations.some((conversation) => String(conversation.partner?._id) === String(person._id)))
-                    .map((person) => (
-                      <option key={person._id} value={person._id}>
-                        {formatDisplayName(person)}
-                        {person.roleLabel ? ` • ${person.roleLabel}` : ""}
-                        {person.online ? " • Online" : ""}
+              <div className={`mobile-chat-chooser ${showChooserOnMobile ? "show" : "hide"}`}>
+                <div className="mobile-chat-chooser-head">
+                  <label htmlFor="chat-person-picker">Choose a chat</label>
+                  <p>Pick a conversation or member from the list below.</p>
+                </div>
+
+                <div className="message-center-chat-picker compact-picker">
+                  <select
+                    id="chat-person-picker"
+                    value={selectedConversation?.partner?._id || ""}
+                    onChange={(e) => {
+                      const conversation = normalizedConversations.find((item) => String(item.partner?._id) === String(e.target.value));
+                      const person = normalizedPeople.find((x) => String(x._id) === String(e.target.value));
+                      if (conversation) selectConversation(conversation);
+                      else if (person) startConversation(person);
+                    }}
+                  >
+                    <option value="">Select from dropdown</option>
+                    {normalizedConversations.map((conversation) => (
+                      <option key={conversation._id} value={conversation.partner?._id || conversation._id}>
+                        {formatDisplayName(conversation.partner)}
+                        {conversation.lastMessageText ? ` • ${truncateText(conversation.lastMessageText, 42)}` : ""}
                       </option>
                     ))}
-                </select>
+                    {normalizedPeople
+                      .filter((person) => !normalizedConversations.some((conversation) => String(conversation.partner?._id) === String(person._id)))
+                      .map((person) => (
+                        <option key={person._id} value={person._id}>
+                          {formatDisplayName(person)}
+                          {person.roleLabel ? ` • ${person.roleLabel}` : ""}
+                          {person.online ? " • Online" : ""}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+
+                <div className="mobile-chat-list">
+                  {loadingSidebar ? (
+                    <div className="chat-loading">Loading chats...</div>
+                  ) : normalizedConversations.length > 0 ? (
+                    normalizedConversations.map((conversation) => (
+                      <button key={conversation._id} type="button" className="mobile-chat-row" onClick={() => selectConversation(conversation)}>
+                        <span className="mobile-chat-row-avatar">
+                          <img src={conversation.partner?.profileImage || "/default-avatar.svg"} alt="" />
+                        </span>
+                        <span className="mobile-chat-row-body">
+                          <strong>{formatDisplayName(conversation.partner)}</strong>
+                          <small>{sanitizePreviewText(conversation.lastMessageText) || "Tap to open chat"}</small>
+                        </span>
+                      </button>
+                    ))
+                  ) : (
+                    <div className="chat-empty">{emptyConversationsLabel}</div>
+                  )}
+                </div>
               </div>
 
-              <div className="mobile-chat-list">
-                {loadingSidebar ? (
-                  <div className="chat-loading">Loading chats...</div>
-                ) : normalizedConversations.length > 0 ? (
-                  normalizedConversations.map((conversation) => (
-                    <button key={conversation._id} type="button" className="mobile-chat-row" onClick={() => selectConversation(conversation)}>
-                      <span className="mobile-chat-row-avatar">
-                        <img src={conversation.partner?.profileImage || "/default-avatar.svg"} alt="" />
-                      </span>
-                      <span className="mobile-chat-row-body">
-                        <strong>{formatDisplayName(conversation.partner)}</strong>
-                        <small>{sanitizePreviewText(conversation.lastMessageText) || "Tap to open chat"}</small>
-                      </span>
-                    </button>
-                  ))
-                ) : (
-                  <div className="chat-empty">{emptyConversationsLabel}</div>
+              <div className={`messages-page message-center-shell-inner ${showChooserOnMobile ? "chooser-mode" : "chat-mode"}`}>
+                {(!isMobile || mobileChatOpen) && (
+                  <ChatWindow
+                    conversation={selectedConversation}
+                    socket={socket}
+                    currentUser={currentUser || authUser}
+                    onBack={mobileBack}
+                    onAudioCall={() => startCall("audio")}
+                    onVideoCall={() => startCall("video")}
+                  />
                 )}
+                {isMobile && !mobileChatOpen && <div className="chat-window-empty choose-chat-empty">Select a chat above to open the conversation.</div>}
               </div>
-            </div>
-
-            <div className={`messages-page message-center-shell-inner ${showChooserOnMobile ? "chooser-mode" : "chat-mode"}`}>
-              {(!isMobile || mobileChatOpen) && (
-                <ChatWindow
-                  conversation={selectedConversation}
-                  socket={socket}
-                  currentUser={currentUser || authUser}
-                  onBack={mobileBack}
-                  onAudioCall={() => startCall("audio")}
-                  onVideoCall={() => startCall("video")}
-                />
-              )}
-              {isMobile && !mobileChatOpen && <div className="chat-window-empty choose-chat-empty">Select a chat above to open the conversation.</div>}
             </div>
           </div>
-        </div>
+        )}
+
+        {isFullscreenChat && (
+          <div className="mobile-chat-overlay" role="dialog" aria-modal="true" aria-label="Chat conversation">
+            <ChatWindow
+              conversation={selectedConversation}
+              socket={socket}
+              currentUser={currentUser || authUser}
+              onBack={mobileBack}
+              onAudioCall={() => startCall("audio")}
+              onVideoCall={() => startCall("video")}
+            />
+          </div>
+        )}
       </div>
 
       {call && (
@@ -514,8 +545,8 @@ function safeDisplayName(value, fallbackSource = {}) {
   const raw = String(value || "").trim();
   const fallback = String(fallbackSource?.username || fallbackSource?.email || fallbackSource?.memberNumber || fallbackSource?.roleLabel || "Member").trim();
   if (!raw) return fallback || "Member";
-  const looksLikeUrl = /^(https?:\/\/|www\.)/i.test(raw) || raw.includes("cloudinary.com") || raw.includes("res.cloudinary");
-  const looksLikeFilePath = raw.includes("/") && /\b(upload|avatar|photo|image|video)\b/i.test(raw);
+  const looksLikeUrl = /^(https?:\/\/|www\.)/i.test(raw) || /cloudinary|res\.cloudinary/i.test(raw);
+  const looksLikeFilePath = raw.includes("/") && /\b(upload|avatar|photo|image|video|document|file)\b/i.test(raw);
   if (looksLikeUrl || looksLikeFilePath) return fallback || "Member";
   if (raw.length > 34 && /https?:|www\.|cloudinary|\/{2,}/i.test(raw)) return fallback || "Member";
   return raw;
@@ -524,7 +555,7 @@ function safeDisplayName(value, fallbackSource = {}) {
 function sanitizePreviewText(value) {
   const raw = String(value || "").trim();
   if (!raw) return "";
-  const looksLikeUrl = /^(https?:\/\/|www\.)/i.test(raw) || raw.includes("cloudinary.com") || raw.includes("res.cloudinary");
+  const looksLikeUrl = /^(https?:\/\/|www\.)/i.test(raw) || /cloudinary|res\.cloudinary/i.test(raw);
   const looksLikeFilePath = raw.includes("/") && /\b(upload|avatar|photo|image|video|document|file)\b/i.test(raw);
   if (looksLikeUrl || looksLikeFilePath) return "Attachment";
   return raw;

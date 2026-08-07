@@ -2,9 +2,9 @@
 .modern-chat-header{
   height:auto;
   min-height:88px;
-  background:rgba(255,255,255,.96);
+  background:rgba(5,5,7,.98);
   backdrop-filter:blur(18px);
-  border-bottom:1px solid rgba(15,23,42,.06);
+  border-bottom:1px solid rgba(255,255,255,.06);
   display:flex;
   justify-content:space-between;
   align-items:center;
@@ -56,14 +56,14 @@
 }
 
 .chat-user-info h3{
-  color:#0f172a;
+  color:#f8fafc;
   font-size:18px;
   line-height:1.2;
   font-weight:900;
 }
 
 .chat-user-info p{
-  color:#64748b;
+  color:#a1a1aa;
   font-size:13px;
   margin-top:4px;
 }
@@ -85,11 +85,13 @@
   height:44px;
   border:none;
   border-radius:14px;
-  background:#f3f5f7;
+  background:#111114;
   cursor:pointer;
   display:grid;
   place-items:center;
   transition:.2s ease;
+  color:#f8fafc;
+  border:1px solid rgba(255,255,255,.06);
 }
 
 .chat-actions button:hover{
@@ -145,7 +147,7 @@
   }
 
   .chat-actions button{
-    background:#19191f;
+    background:#111114;
     color:#f8fafc;
   }
 
