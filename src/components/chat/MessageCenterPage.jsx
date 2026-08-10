@@ -529,13 +529,41 @@ function normalizeConversation(conversation, currentUserId) {
 }
 
 function normalizeConversations(items, actor) {
-  return (items || [])
+  const unique = new Map();
+
+  (items || [])
     .map((conversation) => normalizeConversation(conversation, actor.id))
     .filter((conversation) => {
       if (!conversation) return false;
-      return String(conversation.partner?.role || "").toLowerCase() !== "superadmin";
+      if (String(conversation.partner?.role || "").toLowerCase() === "superadmin") return false;
+      if (!conversation.partner?._id) return false;
+      return !isSameUser(normalizeContact(conversation.partner, conversation.partner?.role || "member"), actor);
     })
-    .sort((a, b) => new Date(b.lastMessageTime || b.updatedAt || b.createdAt) - new Date(a.lastMessageTime || a.updatedAt || a.createdAt));
+    .sort((a, b) =>
+      new Date(b.lastMessageTime || b.updatedAt || b.createdAt) -
+      new Date(a.lastMessageTime || a.updatedAt || a.createdAt)
+    )
+    .forEach((conversation) => {
+      const partner = normalizeContact(conversation.partner, conversation.partner?.role || "member");
+      const keys = [
+        `id:${String(partner._id)}`,
+        partner.email ? `email:${partner.email}` : "",
+        partner.username ? `username:${partner.username}` : "",
+        partner.memberNumber ? `member:${partner.memberNumber}` : "",
+        (!partner.email && !partner.username && !partner.memberNumber && partner.phone)
+          ? `phone:${normalizePhone(partner.phone)}`
+          : "",
+      ].filter(Boolean);
+
+      if (!keys.some((key) => unique.has(key))) {
+        keys.forEach((key) => unique.set(key, conversation));
+      }
+    });
+
+  return Array.from(new Set(unique.values())).sort((a, b) =>
+    new Date(b.lastMessageTime || b.updatedAt || b.createdAt) -
+    new Date(a.lastMessageTime || a.updatedAt || a.createdAt)
+  );
 }
 
 function normalizeContact(user, defaultRole) {

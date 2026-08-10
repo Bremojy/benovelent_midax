@@ -26,6 +26,7 @@ export const dashboardMenus = {
     { title: "Members", icon: Users, path: "/superadmin/members" },
     { title: "Accounts", icon: Wallet, path: "/superadmin/accounts" },
     { title: "Audit", icon: ClipboardList, path: "/superadmin/audit" },
+    { title: "Data Integrity", icon: ShieldCheck, path: "/superadmin/data-integrity" },
     { title: "System", icon: ShieldCheck, path: "/superadmin/system" },
     { title: "Constitution", icon: ClipboardList, path: "/superadmin/constitution" },
     { title: "Claims", icon: HandHeart, path: "/superadmin/claims" },

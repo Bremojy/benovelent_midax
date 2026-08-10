@@ -1,6 +1,7 @@
 const express = require("express");
 const http = require("http");
 const cors = require("cors");
+const compression = require("compression");
 const mongoose = require("mongoose");
 const path = require("path");
 const fs = require("fs");
@@ -63,6 +64,7 @@ const contactRoutes = require("./routes/contactRoutes");
 const supportRequestRoutes = require("./routes/supportRequestRoutes");
 
 const auditLogRoutes = require("./routes/auditLogRoutes");
+const dataIntegrityRoutes = require("./routes/dataIntegrityRoutes");
 
 // ===============================================
 // MIDDLEWARE
@@ -77,6 +79,7 @@ app.use(
     })
 );
 
+app.use(compression({ threshold: 1024 }));
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({
     extended: true,
@@ -89,7 +92,11 @@ app.use(express.urlencoded({
 
 const { uploadRoot, documentRoot } = require("./config/uploadConfig");
 
-app.use("/uploads", express.static(uploadRoot));
+app.use("/uploads", express.static(uploadRoot, {
+    maxAge: "7d",
+    etag: true,
+    lastModified: true,
+}));
 app.use("/documents", express.static(documentRoot));
 app.use("/documents", express.static(path.join(__dirname, "..", "public", "documents")));
 
@@ -208,6 +215,7 @@ app.use("/api/superadmin", superadminRoutes);
 // Audit
 
 app.use("/api/audit-logs", auditLogRoutes);
+app.use("/api/superadmin/data-integrity", dataIntegrityRoutes);
 
 // ===============================================
 // NOT FOUND

@@ -9,7 +9,12 @@ const router = express.Router();
 
 router.get("/", async (req, res) => {
   try {
-    const slides = await Carousel.find().sort({ order: 1, createdAt: -1 });
+    res.set({
+      "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+      "Pragma": "no-cache",
+      "Expires": "0",
+    });
+    const slides = await Carousel.find().sort({ order: 1, createdAt: -1 }).lean();
     res.json(slides);
   } catch (error) {
     console.error(error);
@@ -19,7 +24,12 @@ router.get("/", async (req, res) => {
 
 router.get("/active", async (req, res) => {
   try {
-    const slides = await Carousel.find({ isActive: true }).sort({ order: 1, createdAt: -1 });
+    res.set({
+      "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+      "Pragma": "no-cache",
+      "Expires": "0",
+    });
+    const slides = await Carousel.find({ isActive: true }).sort({ order: 1, createdAt: -1 }).lean();
     res.json(slides);
   } catch (error) {
     console.error(error);

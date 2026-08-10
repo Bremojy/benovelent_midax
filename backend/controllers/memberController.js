@@ -1416,14 +1416,79 @@ exports.getChatMembers = async (req, res) => {
             };
         };
 
+        // Normalize identities across Member/Admin collections before returning
+        // contacts. This prevents a stale member record and a current admin
+        // record for the same person from appearing twice in chat.
+        const normalizeIdentity = (value) =>
+            String(value || "").trim().toLowerCase().replace(/\s+/g, " ");
+
+        const normalizePhone = (value) =>
+            String(value || "").replace(/\D/g, "");
+
+        const identityKeys = (user) => {
+            const keys = [];
+            const email = normalizeIdentity(user.email);
+            const username = normalizeIdentity(user.username);
+            const memberNumber = normalizeIdentity(user.memberNumber);
+            const phone = normalizePhone(user.phone);
+
+            if (email) keys.push(`email:${email}`);
+            if (username) keys.push(`username:${username}`);
+            if (memberNumber) keys.push(`memberNumber:${memberNumber}`);
+            if (!email && !username && !memberNumber && phone && phone.length >= 9) {
+                keys.push(`phone:${phone}`);
+            }
+            return keys;
+        };
+
         const contacts = [
             ...members.map((member) => normalizeContact(member, "member")),
             ...admins.map((admin) => normalizeContact(admin, "admin")),
-        ].filter((item) => String(item._id) !== currentUserId && String(item.role || "").toLowerCase() !== "superadmin");
+        ].filter((item) =>
+            String(item._id) !== currentUserId &&
+            String(item.role || "").toLowerCase() !== "superadmin" &&
+            String(item.status || "").toLowerCase() !== "deleted"
+        );
 
+        // Identity-aware dedupe. Prefer an active administrator/leader when
+        // both collections contain the same real person, otherwise keep the
+        // most complete/active record.
         const unique = new Map();
+        const seenKeys = new Map();
+        const score = (contact) =>
+            (contact.role === "admin" ? 20 : 10) +
+            (contact.status === "active" ? 5 : 0) +
+            (contact.profileImage ? 2 : 0) +
+            (contact.email ? 1 : 0) +
+            (contact.phone ? 1 : 0) +
+            (contact.memberNumber ? 1 : 0);
+
         contacts.forEach((contact) => {
-            unique.set(String(contact._id), contact);
+            const keys = identityKeys(contact);
+            const existingIds = new Set(keys.flatMap((key) => seenKeys.get(key) || []));
+            const existing = Array.from(existingIds)
+                .map((id) => unique.get(id))
+                .find(Boolean);
+
+            if (!existing) {
+                unique.set(contact._id, contact);
+                keys.forEach((key) => {
+                    const list = seenKeys.get(key) || [];
+                    list.push(contact._id);
+                    seenKeys.set(key, list);
+                });
+                return;
+            }
+
+            if (score(contact) > score(existing)) {
+                unique.delete(existing._id);
+                unique.set(contact._id, contact);
+                keys.forEach((key) => {
+                    const list = (seenKeys.get(key) || []).filter((id) => id !== existing._id);
+                    if (!list.includes(contact._id)) list.push(contact._id);
+                    seenKeys.set(key, list);
+                });
+            }
         });
 
         return res.json({
