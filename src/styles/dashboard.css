@@ -141,3 +141,42 @@ html[data-appearance="dark"] .settings-field textarea{
     padding-top: 12px;
   }
 }
+
+
+/* Extra responsiveness for narrow screens */
+@media (max-width: 1200px) {
+  .dashboard-content {
+    padding: 20px;
+  }
+}
+
+@media (max-width: 900px) {
+  .dashboard-page {
+    max-width: 100%;
+  }
+
+  .dashboard-container .portal-panel,
+  .dashboard-container .settings-panel,
+  .dashboard-container .portal-table {
+    border-radius: 18px;
+  }
+
+  .dashboard-container .portal-table-wrapper,
+  .dashboard-container .table-responsive {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+@media (max-width: 560px) {
+  .dashboard-content {
+    padding: 12px;
+    padding-bottom: 88px;
+  }
+
+  .dashboard-container .portal-btn,
+  .dashboard-container .primary-btn,
+  .dashboard-container button {
+    max-width: 100%;
+  }
+}

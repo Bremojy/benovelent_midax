@@ -1,7 +1,11 @@
+import { useLocation } from "react-router-dom";
 import MessageCenterPage from "../../components/chat/MessageCenterPage";
 import API from "../../services/api";
 
 export default function Messages() {
+  const location = useLocation();
+  const conversationId = location.state?.conversationId || "";
+
   return (
     <MessageCenterPage
       eyebrow="MEMBER MESSAGE CENTRE"
@@ -12,6 +16,7 @@ export default function Messages() {
       emptyMembersLabel="No members or leaders found right now."
       emptyConversationsLabel="No conversations yet - choose a contact to start."
       onRefreshHint="Member conversations refreshed."
+      initialConversationId={conversationId}
       loadContacts={async () => {
         const [membersResponse, conversationsResponse] = await Promise.allSettled([
           API.get("/member/chat-members", { params: { limit: 400 } }),

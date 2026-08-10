@@ -19,6 +19,7 @@ function MessageCenterPage({
   emptyConversationsLabel,
   loadContacts,
   onRefreshHint,
+  initialConversationId = "",
 }) {
   const { user: authUser } = useAuth();
 
@@ -37,6 +38,7 @@ function MessageCenterPage({
   const loadContactsRef = useRef(loadContacts);
   const peopleRef = useRef([]);
   const selectedConversationRef = useRef(null);
+  const initialSelectionAppliedRef = useRef(false);
 
   const actor = useMemo(() => buildActorProfile(currentUser || authUser), [currentUser, authUser]);
   const actorId = actor.id;
@@ -178,6 +180,21 @@ function MessageCenterPage({
       setSelectedConversation(normalizedConversations[0]);
     }
   }, [normalizedConversations, selectedConversation, isMobile]);
+
+  useEffect(() => {
+    initialSelectionAppliedRef.current = false;
+  }, [initialConversationId]);
+
+  useEffect(() => {
+    if (!initialConversationId || initialSelectionAppliedRef.current) return;
+    const match = normalizedConversations.find((conversation) => String(conversation._id) === String(initialConversationId));
+    if (!match) return;
+    setSelectedConversation(match);
+    initialSelectionAppliedRef.current = true;
+    if (isMobile) {
+      setMobileChatOpen(true);
+    }
+  }, [initialConversationId, normalizedConversations, isMobile]);
 
   const selectConversation = (conversation) => {
     if (!conversation?._id) return;

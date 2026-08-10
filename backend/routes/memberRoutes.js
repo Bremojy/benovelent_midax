@@ -2,6 +2,7 @@ const express = require("express");
 const profileCompleted = require("../middleware/profileCompletionMiddleware");
 const {
   uploadFields,
+  uploadArray,
   setUploadType,
 } = require("../middleware/upload");
 const router = express.Router();
@@ -22,9 +23,11 @@ const {
 
 const { getMemberContributions } = require("../controllers/contributionController");
 const { getMemberTransactions, getMemberAccounts } = require("../controllers/financeController");
+const supportRequestController = require("../controllers/supportRequestController");
 
 
 const { verifyToken: protect } = require("../middleware/authMiddleware");
+const { isMember } = require("../middleware/roleMiddleware");
 
 // ===============================
 // DASHBOARD
@@ -80,6 +83,16 @@ router.get(
   "/claims",
   protect,
   getClaims
+);
+
+// Allow members to submit support requests from the member portal.
+router.post(
+  "/claims",
+  protect,
+  isMember,
+  setUploadType("documents"),
+  uploadArray("documents", 30),
+  supportRequestController.create
 );
 
 

@@ -225,7 +225,7 @@ export const createMemberClaim =
   async (claim) => {
     const { data } =
       await API.post(
-        "/member/claims",
+        "/member/support-requests",
         claim
       );
 

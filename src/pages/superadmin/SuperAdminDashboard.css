@@ -1141,3 +1141,28 @@
     transition: none;
   }
 }
+
+@media (max-width: 560px) {
+  .admins-table {
+    min-width: 100%;
+  }
+
+  .admin-user {
+    min-width: 0;
+  }
+
+  .admin-user strong,
+  .admin-user span {
+    max-width: 100%;
+  }
+
+  .admin-modal {
+    max-height: 96vh;
+  }
+
+  .admin-form-field input,
+  .admin-form-field select,
+  .admin-form-field textarea {
+    font-size: 16px;
+  }
+}
