@@ -8,7 +8,7 @@ import {
   Pause,
   Play,
 } from "lucide-react";
-import api, { UPLOAD_URL } from "../services/api";
+import api, { resolveUploadUrl } from "../services/api";
 
 const FALLBACK_SLIDE = {
   _id: "welcome-fallback",
@@ -25,6 +25,7 @@ function Hero() {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [loading, setLoading] = useState(true);
   const [paused, setPaused] = useState(false);
+  const [imageFailed, setImageFailed] = useState(false);
   const touchStart = useRef(null);
 
   const fetchSlides = async () => {
@@ -76,6 +77,10 @@ function Hero() {
     [current?.imageUrl, current?.updatedAt]
   );
 
+  useEffect(() => {
+    setImageFailed(false);
+  }, [imageUrl]);
+
   const nextSlide = () => setCurrentSlide((previous) => (previous + 1) % visibleSlides.length);
   const previousSlide = () => setCurrentSlide((previous) => (previous - 1 + visibleSlides.length) % visibleSlides.length);
 
@@ -105,11 +110,15 @@ function Hero() {
         <img
           key={imageUrl}
           className="hero-image modern-hero-image"
-          src={imageUrl}
+          src={imageFailed ? "/hero.jpg" : imageUrl}
           alt=""
           fetchPriority="high"
           decoding="async"
+          onError={() => setImageFailed(true)}
         />
+        {imageFailed && (
+          <div className="hero-image-fallback" aria-hidden="true" />
+        )}
         <div className="hero-image-wash" />
         <div className="hero-glow hero-glow-one" />
         <div className="hero-glow hero-glow-two" />
@@ -201,12 +210,9 @@ function Hero() {
 }
 
 function buildImageUrl(value, version) {
-  const raw = String(value || "/hero.jpg");
-  if (raw.startsWith("http://") || raw.startsWith("https://") || raw.startsWith("data:") || raw.startsWith("blob:")) {
-    return version ? `${raw}${raw.includes("?") ? "&" : "?"}v=${encodeURIComponent(version)}` : raw;
-  }
-  const base = `${UPLOAD_URL}${raw.startsWith("/") ? raw : `/${raw}`}`;
-  return version ? `${base}?v=${encodeURIComponent(version)}` : base;
+  const raw = String(value || "/hero.jpg").trim();
+  const base = raw === "/hero.jpg" ? raw : resolveUploadUrl(raw);
+  return version ? `${base}${base.includes("?") ? "&" : "?"}v=${encodeURIComponent(version)}` : base;
 }
 
 export default Hero;

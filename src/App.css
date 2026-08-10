@@ -4254,18 +4254,30 @@ display:none;
 }
 
 .hero-media,
+
+.hero-image-fallback{
+  position:absolute;
+  inset:0;
+  z-index:0;
+  background:
+    radial-gradient(circle at 78% 28%, rgba(255,122,0,.25), transparent 28%),
+    linear-gradient(135deg,#16191f,#242831 55%,#111318);
+}
+
 .hero-image-wash {
   position: absolute;
   inset: 0;
 }
 
 .hero-media {
-  z-index: -2;
+  z-index: 0;
   overflow: hidden;
   background: #101114;
 }
 
 .modern-hero-image {
+  position: relative;
+  z-index: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -4872,3 +4884,23 @@ display:none;
     text-align: left;
   }
 }
+
+/* Modern public content rhythm */
+.modern-section-head{max-width:860px}
+.modern-section-head p,.modern-card p{max-width:72ch}
+.modern-card-grid>.modern-card{
+  opacity:0;
+  transform:translateY(22px);
+  animation:publicCardReveal .65s cubic-bezier(.2,.7,.2,1) forwards;
+}
+.modern-card-grid>.modern-card:nth-child(2){animation-delay:.08s}
+.modern-card-grid>.modern-card:nth-child(3){animation-delay:.16s}
+.modern-card-grid>.modern-card:nth-child(4){animation-delay:.24s}
+.modern-card-grid>.modern-card:nth-child(5){animation-delay:.32s}
+.modern-card-grid>.modern-card:nth-child(6){animation-delay:.40s}
+.modern-card-grid>.modern-card:nth-child(7){animation-delay:.48s}
+.modern-card-grid>.modern-card:nth-child(8){animation-delay:.56s}
+.modern-card{transition:transform .28s ease,box-shadow .28s ease,border-color .28s ease}
+.modern-card:hover{transform:translateY(-8px);box-shadow:0 26px 60px rgba(20,20,20,.10);border-color:rgba(255,122,0,.16)}
+@keyframes publicCardReveal{to{opacity:1;transform:translateY(0)}}
+@media(prefers-reduced-motion:reduce){.modern-card-grid>.modern-card{opacity:1;transform:none;animation:none}.modern-card{transition:none}}

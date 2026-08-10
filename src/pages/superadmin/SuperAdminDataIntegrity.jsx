@@ -33,6 +33,7 @@ export default function SuperAdminDataIntegrity() {
   const [cleaning, setCleaning] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [deletingId, setDeletingId] = useState("");
 
   const load = useCallback(async () => {
     try {
@@ -51,6 +52,27 @@ export default function SuperAdminDataIntegrity() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  const deleteDuplicateMember = async (memberId, memberName) => {
+    const confirmed = window.confirm(`Permanently delete duplicate member "${memberName || memberId}"? This is only allowed for a non-canonical duplicate with no linked records.`);
+    if (!confirmed) return;
+    try {
+      setDeletingId(memberId);
+      setError("");
+      setMessage("");
+      const { data } = await API.delete(`/superadmin/data-integrity/members/${memberId}`);
+      setReport(data?.report || null);
+      setMessage(data?.message || "Duplicate member deleted.");
+    } catch (err) {
+      const refs = err.response?.data?.references;
+      const detail = Array.isArray(refs) && refs.length
+        ? ` Linked records: ${refs.map((x) => `${x.label} (${x.count})`).join(", ")}.`
+        : "";
+      setError((err.response?.data?.message || err.message || "Unable to delete duplicate member.") + detail);
+    } finally {
+      setDeletingId("");
+    }
+  };
 
   const runCleanup = async () => {
     const confirmed = window.confirm(
@@ -120,7 +142,7 @@ export default function SuperAdminDataIntegrity() {
               {health === "clean" ? "Database integrity looks clean" : health === "attention" ? "Integrity issues need review" : "Scanning your database"}
             </strong>
             <p>
-              This tool is intentionally conservative. It archives duplicate accounts instead of hard-deleting them and never removes financial/support records.
+              This tool shows your live member count, separates duplicate identities from real members, and protects records linked to finance, support, audit or chat data. Non-linked duplicates can be permanently removed by a SuperAdmin.
             </p>
           </div>
         </section>
@@ -165,7 +187,7 @@ export default function SuperAdminDataIntegrity() {
           )}
         </section>
 
-        <DuplicatePreview title="Duplicate member groups" groups={report?.duplicateMembers} />
+        <DuplicatePreview title="Duplicate member groups" groups={report?.duplicateMembers} deletingId={deletingId} onDeleteMember={deleteDuplicateMember} />
         <DuplicatePreview title="Duplicate administrator groups" groups={report?.duplicateAdmins} />
         <DuplicatePreview title="Duplicate conversations" groups={report?.duplicateConversations?.map((x) => ({
           keep: x.keep,
@@ -189,7 +211,7 @@ function Policy({ icon, title, text }) {
   );
 }
 
-function DuplicatePreview({ title, groups }) {
+function DuplicatePreview({ title, groups, deletingId, onDeleteMember }) {
   if (!groups?.length) return null;
   return (
     <section className="portal-panel">
@@ -200,13 +222,14 @@ function DuplicatePreview({ title, groups }) {
         {groups.slice(0, 20).map((group, index) => (
           <div className="integrity-duplicate-group" key={`${group.keep}-${index}`}>
             <div className="integrity-duplicate-head">
-              <strong>Keep: {group.keep}</strong>
-              <span>{group.records?.length || 0} records</span>
+              <div><strong>Keep: {group.keep}</strong><span>{group.records?.length || 0} records</span></div>
+              {onDeleteMember && <small>Delete only the records marked duplicate below.</small>}
             </div>
             {(group.records || []).map((record) => (
               <div className="integrity-record" key={record.id}>
                 <span>{record.name || "Unnamed"}</span>
-                <small>{record.email || record.id} · {record.status || "—"}</small>
+                <small>{record.email || record.id} · {record.status || "—"} {record.id === group.keep ? "· CANONICAL" : "· DUPLICATE"}</small>
+                {onDeleteMember && record.id !== group.keep && <button type="button" className="portal-btn danger" disabled={deletingId === record.id} onClick={() => onDeleteMember(record.id, record.name)}><Trash2 size={14} />{deletingId === record.id ? "Deleting…" : "Delete duplicate"}</button>}
               </div>
             ))}
           </div>

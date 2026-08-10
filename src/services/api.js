@@ -183,5 +183,11 @@ API.interceptors.response.use(
 
 export default API;
 
-export const UPLOAD_URL =
-  BASE_URL;
+export const UPLOAD_URL = BASE_URL;
+
+export const resolveUploadUrl = (value = "") => {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  if (/^(https?:\/\/|data:|blob:)/i.test(raw)) return raw;
+  return `${BASE_URL}${raw.startsWith("/") ? "" : "/"}${raw}`;
+};

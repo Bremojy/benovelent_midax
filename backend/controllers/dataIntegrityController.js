@@ -5,6 +5,17 @@ const SuperAdmin = require("../models/SuperAdmin");
 const Conversation = require("../models/Conversation");
 const Message = require("../models/Message");
 const Carousel = require("../models/Carousel");
+const Dependent = require("../models/Dependent");
+const Contribution = require("../models/Contribution");
+const EducationSupport = require("../models/EducationSupport");
+const MedicalSupport = require("../models/MedicalSupport");
+const FuneralSupport = require("../models/FuneralSupport");
+const Finance = require("../models/Finance");
+const SupportRequest = require("../models/SupportRequest");
+const Vote = require("../models/Vote");
+const News = require("../models/News");
+const AuditLog = require("../models/AuditLog");
+const Notification = require("../models/Notification");
 
 const normalize = (value) =>
     String(value || "")
@@ -208,7 +219,8 @@ async function buildReport() {
     return {
         generatedAt: new Date().toISOString(),
         counts: {
-            members: members.length,
+            members: members.length - memberDuplicates.reduce((sum, group) => sum + Math.max(0, group.length - 1), 0),
+            liveMemberRecords: members.length,
             admins: admins.length,
             superadmins: superadmins.length,
             conversations: conversations.length,
@@ -403,6 +415,78 @@ async function removeDuplicateCarousels() {
     }
     return removed;
 }
+
+async function findMemberReferences(memberId) {
+    const id = new mongoose.Types.ObjectId(memberId);
+    const checks = [
+        [Dependent, { member: id }, "dependents"],
+        [Contribution, { member: id }, "contributions"],
+        [EducationSupport, { member: id }, "education support"],
+        [MedicalSupport, { member: id }, "medical support"],
+        [FuneralSupport, { member: id }, "funeral support"],
+        [Finance, { member: id }, "finance records"],
+        [SupportRequest, { member: id }, "support requests"],
+        [Vote, { member: id }, "votes"],
+        [News, { author: id }, "news posts"],
+        [AuditLog, { user: id }, "audit logs"],
+        [Notification, { recipient: id }, "notifications"],
+        [Conversation, { participants: id }, "conversations"],
+        [Message, { $or: [{ member: id }, { sender: id }, { recipient: id }] }, "messages"],
+    ];
+
+    const references = [];
+    for (const [Model, query, label] of checks) {
+        try {
+            const count = await Model.countDocuments(query);
+            if (count) references.push({ label, count });
+        } catch (error) {
+            // Schemas vary between modules; a missing field simply means no reference.
+        }
+    }
+    return references;
+}
+
+exports.deleteDuplicateMember = async (req, res) => {
+    try {
+        const id = String(req.params.id || "").trim();
+        if (!mongoose.isValidObjectId(id)) {
+            return res.status(400).json({ success: false, message: "Invalid member ID." });
+        }
+
+        const members = await Member.find({ isDeleted: { $ne: true }, status: { $ne: "inactive" } })
+            .select("fullName name email username memberNumber phone status profileCompletion createdAt updatedAt")
+            .lean();
+        const groups = findDuplicateGroups(members);
+        const group = groups.find((items) => items.some((item) => String(item._id) === id));
+        if (!group) {
+            return res.status(404).json({ success: false, message: "This member is not currently identified as a duplicate." });
+        }
+
+        const canonical = chooseCanonical(group)[0];
+        if (String(canonical._id) === id) {
+            return res.status(400).json({ success: false, message: "The canonical member record cannot be deleted from this screen." });
+        }
+
+        const references = await findMemberReferences(id);
+        if (references.length) {
+            return res.status(409).json({
+                success: false,
+                code: "DUPLICATE_HAS_REFERENCES",
+                message: "This duplicate is linked to existing records, so it was not hard-deleted. Use Safe Cleanup to archive it instead.",
+                references,
+            });
+        }
+
+        const deleted = await Member.findByIdAndDelete(id);
+        if (!deleted) return res.status(404).json({ success: false, message: "Member record not found." });
+
+        const report = await buildReport();
+        return res.json({ success: true, message: "Duplicate member deleted permanently.", report });
+    } catch (error) {
+        console.error("Delete duplicate member error:", error);
+        return res.status(500).json({ success: false, message: error.message || "Unable to delete duplicate member." });
+    }
+};
 
 exports.getIntegrityReport = async (req, res) => {
     try {
