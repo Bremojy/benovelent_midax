@@ -7,6 +7,7 @@ const {
     getAuditLog,
     deleteAuditLog,
     getAuditSummary,
+    getAuditCoverage,
 } = require("../controllers/auditLogController");
 
 const { verifyToken: protect } =
@@ -32,6 +33,13 @@ router.get(
 // ====================================
 // ALL LOGS
 // ====================================
+
+router.get(
+    "/coverage",
+    protect,
+    admin,
+    getAuditCoverage
+);
 
 router.get(
     "/",

@@ -31,11 +31,15 @@ function MessageBubble({
         )}
 
         {attachment && isImage && (
-          <img
-            src={attachment}
-            alt=""
-            className="message-image"
-          />
+          <a className="message-image-link" href={attachment} target="_blank" rel="noreferrer">
+            <img
+              src={attachment}
+              alt="Shared attachment"
+              className="message-image"
+              loading="lazy"
+              decoding="async"
+            />
+          </a>
         )}
 
         {isAudio && attachment && <audio controls src={attachment} style={{maxWidth:"100%"}} />}

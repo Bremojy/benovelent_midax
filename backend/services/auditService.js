@@ -10,19 +10,31 @@ const AuditLog = require("../models/AuditLog");
 
 const logActivity = async ({
   user = null,
+  userModel = "Member",
+  userRole = "member",
   action,
   module,
   description,
   ipAddress = "",
+  userAgent = "",
+  endpoint = "",
+  method = "",
+  status = "SUCCESS",
   metadata = {},
 }) => {
   try {
     await AuditLog.create({
       user,
+      userModel,
+      userRole,
       action,
       module,
       description,
       ipAddress,
+      userAgent,
+      endpoint,
+      method,
+      status,
       metadata,
       createdAt: new Date(),
     });

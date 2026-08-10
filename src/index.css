@@ -65,3 +65,21 @@ p {
   line-height: 1.8;
   color: var(--grey);
 }
+
+/* Mobile-width hardening: prevent fixed desktop assets/cards from widening the viewport. */
+html, body, #root { max-width:100%; overflow-x:hidden; }
+img, video, canvas, svg { max-width:100%; }
+button, input, select, textarea { max-width:100%; }
+.dashboard-container, .dashboard-main, .dashboard-content, .dashboard-page { min-width:0; max-width:100%; }
+@media (max-width: 900px){
+  .section-container { width:calc(100% - 28px); max-width:100%; }
+  .hero-content { margin-left:5%; margin-right:5%; }
+  .hero h1 { font-size:clamp(2.2rem,10vw,3.4rem); }
+  .hero-arrow { width:46px; height:46px; }
+  .hero-arrow-left { left:12px; }
+  .hero-arrow-right { right:12px; }
+}
+@media (max-width:560px){
+  .dashboard-content { width:100%; min-width:0; }
+  .portal-panel, .portal-module, .admin-members-page { max-width:100%; min-width:0; }
+}

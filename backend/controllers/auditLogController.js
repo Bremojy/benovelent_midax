@@ -254,6 +254,12 @@ exports.getAuditSummary = async (req, res) => {
 
             });
 
+        const [creates, updates, deletes] = await Promise.all([
+            AuditLog.countDocuments({ action: { $in: ["CREATE", "CREATED", "REGISTER", "REGISTERED", "ADD", "ADDED"] } }),
+            AuditLog.countDocuments({ action: { $in: ["UPDATE", "UPDATED", "EDIT", "EDITED", "MODIFY", "MODIFIED"] } }),
+            AuditLog.countDocuments({ action: { $in: ["DELETE", "DELETED", "REMOVE", "REMOVED"] } })
+        ]);
+
         res.json({
 
             success: true,
@@ -263,10 +269,12 @@ exports.getAuditSummary = async (req, res) => {
                 total,
 
                 todayLogs,
-
+                today: todayLogs,
                 successful,
-
-                failed
+                failed,
+                creates,
+                updates,
+                deletes
 
             }
 
@@ -288,4 +296,143 @@ exports.getAuditSummary = async (req, res) => {
 
     }
 
+};
+// =====================================================
+// AUDIT COVERAGE
+// Shows every registered account that can appear in governance
+// plus the three named leadership roles from the constitution.
+// The constitution does not name individual members, so members
+// are sourced from the live Member collection.
+// GET /api/audit-logs/coverage
+// =====================================================
+exports.getAuditCoverage = async (req, res) => {
+    try {
+        const Member = require("../models/Member");
+        const Admin = require("../models/Admin");
+        const SuperAdmin = require("../models/SuperAdmin");
+
+        const constitutionLeadership = [
+            { position: "Chairperson", name: "Moses Machila" },
+            { position: "Treasurer", name: "Immaculate" },
+            { position: "Secretary", name: "Isabela" },
+        ];
+
+        const [members, admins, superadmins] = await Promise.all([
+            Member.find({ isDeleted: { $ne: true } })
+                .select("fullName memberNumber email status role profileImage")
+                .sort({ fullName: 1 })
+                .lean(),
+            Admin.find({ status: { $ne: "deleted" } })
+                .select("fullName email status role profileImage")
+                .sort({ fullName: 1 })
+                .lean(),
+            SuperAdmin.find({ status: { $ne: "deleted" } })
+                .select("fullName email status role profileImage")
+                .sort({ fullName: 1 })
+                .lean(),
+        ]);
+
+        const accountSets = [
+            ["member", members, "Member"],
+            ["admin", admins, "Admin"],
+            ["superadmin", superadmins, "SuperAdmin"],
+        ];
+
+        const auditIds = accountSets.flatMap(([, accounts, userModel]) =>
+            accounts.map((account) => ({ id: account._id, userModel }))
+        );
+
+        const auditAggregates = auditIds.length
+            ? await AuditLog.aggregate([
+                {
+                    $match: {
+                        $or: auditIds.map(({ id, userModel }) => ({ user: id, userModel })),
+                    },
+                },
+                { $sort: { createdAt: -1 } },
+                {
+                    $group: {
+                        _id: { user: "$user", userModel: "$userModel" },
+                        total: { $sum: 1 },
+                        successful: { $sum: { $cond: [{ $eq: ["$status", "SUCCESS"] }, 1, 0] } },
+                        failed: { $sum: { $cond: [{ $eq: ["$status", "FAILED"] }, 1, 0] } },
+                        last: {
+                            $first: {
+                                createdAt: "$createdAt",
+                                action: "$action",
+                                module: "$module",
+                                description: "$description",
+                                status: "$status",
+                            },
+                        },
+                    },
+                },
+            ])
+            : [];
+
+        const auditMap = new Map(
+            auditAggregates.map((item) => [
+                `${item._id.userModel}:${String(item._id.user)}`,
+                item,
+            ])
+        );
+
+        const coverage = [];
+        for (const [role, accounts, userModel] of accountSets) {
+            for (const account of accounts) {
+                const audit = auditMap.get(`${userModel}:${String(account._id)}`) || {
+                    total: 0,
+                    successful: 0,
+                    failed: 0,
+                    last: null,
+                };
+                coverage.push({
+                    id: String(account._id),
+                    name: account.fullName || account.name || account.email || "Unnamed account",
+                    email: account.email || "",
+                    role,
+                    status: account.status || "active",
+                    memberNumber: account.memberNumber || "",
+                    profileImage: account.profileImage || "",
+                    audit: { total: audit.total || 0, successful: audit.successful || 0, failed: audit.failed || 0, last: audit.last || null },
+                });
+            }
+        }
+
+        const normalized = (value) => String(value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+        const leadership = constitutionLeadership.map((entry) => {
+            const wanted = normalized(entry.name);
+            const matched = admins.find((admin) => {
+                const haystack = [admin.fullName, admin.email].map(normalized).join(" ");
+                const first = normalized(String(admin.fullName || "").split(" ")[0]);
+                return wanted && (haystack.includes(wanted) || (wanted.length >= 5 && first.startsWith(wanted)));
+            });
+            const matchedCoverage = matched && coverage.find((item) => item.id === String(matched._id));
+            return {
+                ...entry,
+                matchedAccountId: matchedCoverage?.id || null,
+                matchedAccountName: matchedCoverage?.name || null,
+                auditCount: matchedCoverage?.audit.total || 0,
+            };
+        });
+
+        res.json({
+            success: true,
+            constitution: {
+                leadership,
+                memberNamesInDocument: 0,
+                memberNote: "The constitution describes members collectively and does not list individual member names.",
+            },
+            counts: {
+                members: members.length,
+                admins: admins.length,
+                superadmins: superadmins.length,
+                accounts: coverage.length,
+            },
+            coverage,
+        });
+    } catch (error) {
+        console.error("Audit coverage error:", error);
+        res.status(500).json({ success: false, message: error.message || "Unable to load audit coverage." });
+    }
 };

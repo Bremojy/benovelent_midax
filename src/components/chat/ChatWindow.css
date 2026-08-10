@@ -107,3 +107,5 @@
 
 
 .mobile-chat-overlay .messages-container{padding-bottom:calc(12px + env(safe-area-inset-bottom));}
+
+.chat-window{width:100%;max-width:100%;min-width:0;overflow:hidden}.messages-container{width:100%;max-width:100%;min-width:0;overflow-x:hidden;overscroll-behavior:contain}.messages-container > *{min-width:0;max-width:100%}@media(max-width:640px){.chat-window{height:100%;min-height:0}.messages-container{padding-bottom:8px}}

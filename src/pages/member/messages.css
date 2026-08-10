@@ -488,3 +488,5 @@
   position:sticky;
   bottom:0;
 }
+
+@media (max-width: 900px){html,body,#root{max-width:100%;overflow-x:hidden}.mobile-chat-overlay{height:100dvh;min-height:100dvh;max-width:100vw;overflow:hidden}.mobile-chat-overlay .chat-window{height:100dvh;max-height:100dvh;min-height:0}.mobile-chat-overlay .messages-container{min-height:0}.mobile-chat-overlay .message-input-container{flex:0 0 auto}}
