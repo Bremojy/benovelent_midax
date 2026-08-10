@@ -307,3 +307,40 @@ transform:translateY(-2px);
     min-width: 175px;
   }
 }
+
+
+.home-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  height: 42px;
+  padding: 0 16px;
+  border: none;
+  border-radius: 12px;
+  background: #f3f3f3;
+  color: #222;
+  cursor: pointer;
+  font-weight: 700;
+  transition: 0.25s;
+}
+
+.home-btn:hover {
+  transform: translateY(-2px);
+  background: #ff7a00;
+  color: #fff;
+}
+
+@media (max-width: 900px) {
+  .home-btn {
+    background: rgba(255, 122, 0, 0.12);
+    color: #ff7a00;
+    border: 1px solid rgba(255, 122, 0, 0.18);
+    height: 40px;
+    padding: 0 14px;
+    border-radius: 999px;
+  }
+
+  .home-btn span {
+    display: inline;
+  }
+}

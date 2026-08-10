@@ -1,5 +1,6 @@
 import {
   Menu,
+  ArrowLeft,
   Bell,
   MessageCircle,
   Search,
@@ -20,6 +21,9 @@ function DashboardTopbar({
   sidebarOpen,
   setSidebarOpen,
   user,
+  homePath = "/member",
+  showHomeBack = false,
+  onHomeBack,
 }) {
   const navigate = useNavigate();
   const { logout: authLogout } = useAuth();
@@ -116,16 +120,29 @@ function DashboardTopbar({
       {/* LEFT */}
       <div className="topbar-left">
 
-        <button
-          type="button"
-          className="menu-btn"
-          onClick={() =>
-            setSidebarOpen(!sidebarOpen)
-          }
-          aria-label="Toggle sidebar"
-        >
-          <Menu size={23} />
-        </button>
+        {showHomeBack ? (
+          <button
+            type="button"
+            className="home-btn"
+            onClick={onHomeBack || (() => navigate(homePath))}
+            aria-label="Go back home"
+            title="Go back home"
+          >
+            <ArrowLeft size={20} />
+            <span>Home</span>
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="menu-btn"
+            onClick={() =>
+              setSidebarOpen(!sidebarOpen)
+            }
+            aria-label="Toggle sidebar"
+          >
+            <Menu size={23} />
+          </button>
+        )}
 
         <div className="search-box">
 

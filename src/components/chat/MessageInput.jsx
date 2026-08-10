@@ -174,7 +174,7 @@ export default function MessageInput({ onSend, socket, conversation, currentUser
         </div>
       )}
 
-      <div className="message-toolbar">
+      <div className="message-toolbar instagram-toolbar">
         <div className="message-toolbar-actions">
           <button type="button" onClick={() => setShowEmoji((value) => !value)} title="Emoji" aria-label="Emoji picker">
             <Smile size={21} />
@@ -200,7 +200,7 @@ export default function MessageInput({ onSend, socket, conversation, currentUser
 
         <textarea
           ref={textareaRef}
-          placeholder={recording ? "Recording voice note..." : "Message..."}
+          placeholder={recording ? "Recording voice note..." : "Message a member..."}
           value={message}
           onChange={(event) => {
             setMessage(event.target.value);

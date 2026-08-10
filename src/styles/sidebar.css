@@ -199,3 +199,9 @@
     display: none;
   }
 }
+
+@media (max-width: 900px) {
+  .dashboard-sidebar.mobile-hidden {
+    display: none !important;
+  }
+}

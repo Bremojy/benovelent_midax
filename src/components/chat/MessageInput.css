@@ -3,15 +3,22 @@
   position:sticky;
   bottom:0;
   z-index:6;
-  padding:14px 16px calc(14px + env(safe-area-inset-bottom));
+  padding:12px 12px calc(12px + env(safe-area-inset-bottom));
   background:rgba(5,5,7,.98);
   border-top:1px solid rgba(255,255,255,.06);
-  box-shadow:0 -10px 26px rgba(0,0,0,.18);
+  box-shadow:0 -12px 28px rgba(0,0,0,.22);
   backdrop-filter:blur(18px);
 }
 
 .instagram-composer{
   display:block;
+}
+
+.instagram-toolbar{
+  display:grid;
+  grid-template-columns:auto minmax(0,1fr) auto;
+  gap:10px;
+  align-items:end;
 }
 
 .preview-image{
@@ -76,12 +83,6 @@
   font-size:18px;
 }
 
-.message-toolbar{
-  display:grid;
-  grid-template-columns:auto minmax(0,1fr) auto;
-  gap:10px;
-  align-items:end;
-}
 
 .message-toolbar-actions{
   display:flex;
@@ -90,14 +91,14 @@
   flex-wrap:wrap;
 }
 
-.message-toolbar-actions button,
+ .message-toolbar-actions button,
 .message-toolbar > button,
 .message-toolbar button{
   width:42px;
   height:42px;
   border:none;
-  border-radius:14px;
-  background:#111114;
+  border-radius:999px;
+  background:#17171d;
   cursor:pointer;
   display:grid;
   place-items:center;
@@ -106,42 +107,43 @@
   flex-shrink:0;
   border:1px solid rgba(255,255,255,.06);
 }
-
 .message-toolbar-actions button:hover,
 .message-toolbar > button:hover{
   background:#eef2ff;
   color:#405de6;
 }
 
-.message-toolbar textarea{
-  min-height:46px;
+ .message-toolbar textarea{
+  min-height:48px;
   max-height:140px;
   resize:none;
   width:100%;
-  padding:12px 14px;
+  padding:13px 16px;
   border:1px solid rgba(255,255,255,.08);
-  border-radius:18px;
-  background:#111114;
+  border-radius:999px;
+  background:#141418;
   color:#f8fafc;
   outline:none;
   font-size:14px;
-  line-height:1.5;
+  line-height:1.45;
 }
-
 .message-toolbar textarea:focus{
   border-color:rgba(64,93,230,.36);
   box-shadow:0 0 0 4px rgba(64,93,230,.12);
 }
 
+.message-toolbar textarea::placeholder{
+  color:#8b95a7;
+}
+
 .send-button{
-  width:48px !important;
-  height:48px !important;
-  border-radius:16px !important;
+  width:52px !important;
+  height:52px !important;
+  border-radius:999px !important;
   background:linear-gradient(135deg,#405de6,#833ab4) !important;
   color:#fff !important;
   box-shadow:0 14px 30px rgba(64,93,230,.22);
 }
-
 .send-button:disabled{
   opacity:.5;
   cursor:not-allowed;
@@ -152,8 +154,8 @@
     padding:12px 12px calc(12px + env(safe-area-inset-bottom));
   }
 
-  .message-toolbar{
-    grid-template-columns:1fr auto;
+  .instagram-toolbar{
+    grid-template-columns:auto minmax(0,1fr) auto;
     gap:8px;
   }
 
@@ -171,14 +173,14 @@
 
   .message-toolbar textarea{
     min-height:54px;
-    border-radius:20px;
+    border-radius:999px;
     font-size:15px;
   }
 
   .send-button{
     width:54px !important;
     height:54px !important;
-    border-radius:18px !important;
+    border-radius:999px !important;
   }
 }
 
@@ -187,14 +189,14 @@
     padding:10px 10px calc(10px + env(safe-area-inset-bottom));
   }
 
-  .message-toolbar{
+  .instagram-toolbar{
     gap:8px;
   }
 
   .message-toolbar-actions button{
     width:40px;
     height:40px;
-    border-radius:13px;
+    border-radius:999px;
   }
 }
 
@@ -211,7 +213,7 @@
     box-shadow:none;
   }
 
-  .message-toolbar-actions button:hover{
+    .message-toolbar-actions button:hover{
     background:#2b2b34;
     color:#fff;
   }
