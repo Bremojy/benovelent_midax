@@ -63,7 +63,7 @@ export default function InstallPWA() {
     };
   }, []);
 
-  if (installed) return null;
+  if (installed || (!open && !helpOpen)) return null;
 
   const install = async () => {
     if (deferred) {

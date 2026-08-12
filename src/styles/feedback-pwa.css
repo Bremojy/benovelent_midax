@@ -15,3 +15,22 @@
 .pwa-help-head span{font-size:.7rem;letter-spacing:.12em;font-weight:900;color:#ef7d00}.pwa-help-head h2{margin:.3rem 0 0;font-size:1.5rem}.pwa-help-head button{border:0;background:#f3f4f6;border-radius:10px;width:34px;height:34px;cursor:pointer}
 .pwa-help-card ol{display:grid;gap:.8rem;padding-left:1.2rem;line-height:1.55}.pwa-help-card p{color:#667085;line-height:1.55}.pwa-help-actions{display:flex;gap:.65rem;margin-top:1.2rem}.pwa-help-secondary{border:1px solid #d8dee7;background:#fff;color:#344054;border-radius:11px;padding:.65rem .8rem;font-weight:800;cursor:pointer}
 @media(max-width:560px){.pwa-install-banner{bottom:calc(12px + env(safe-area-inset-bottom))!important;grid-template-columns:auto minmax(0,1fr);row-gap:8px}.pwa-install-actions{grid-column:1 / -1;width:100%;display:grid!important;grid-template-columns:1fr auto auto}.pwa-install-now{justify-content:center;min-height:40px}.pwa-install-help,.pwa-install-close{width:40px;height:40px}.pwa-install-copy span{display:block;max-width:100%;white-space:normal}.pwa-help-card{padding:18px;border-radius:20px}}
+
+
+/* V10: keep the install prompt fully dismissible without changing install behavior. */
+.pwa-install-banner:not(.is-visible){
+  display:none !important;
+  pointer-events:none !important;
+  visibility:hidden !important;
+}
+.pwa-install-banner.is-visible{
+  display:grid !important;
+  pointer-events:auto !important;
+  visibility:visible !important;
+}
+.pwa-install-close,.pwa-install-help{
+  position:relative;
+  z-index:2;
+  touch-action:manipulation;
+  -webkit-tap-highlight-color:transparent;
+}

@@ -1,4 +1,4 @@
-const CACHE = "benovelent-shell-v9";
+const CACHE = "benovelent-shell-v10";
 const ASSETS = ["/", "/index.html", "/manifest.webmanifest", "/pwa-icon-192.png", "/pwa-icon-512.png", "/apple-touch-icon.png"];
 const DB_NAME = "benovelent-pwa";
 const DB_STORE = "calls";
@@ -96,15 +96,33 @@ self.addEventListener("fetch", (event) => {
   const request = event.request;
   const url = new URL(request.url);
   if (url.origin !== location.origin || request.method !== "GET") return;
+
+  // Never cache API responses, auth state, or realtime transports.
+  // These must remain live so dashboards and accounts never show stale data.
+  if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/socket.io/")) return;
+
   if (request.headers.has("range")) {
     event.respondWith(fetch(request));
     return;
   }
+
+  // Static assets are fast on repeat visits; HTML falls back to the network so
+  // deployments can roll forward without users being trapped on an old shell.
+  const isDocument = request.mode === "navigate" || request.destination === "document";
   event.respondWith((async () => {
+    if (!isDocument) {
+      const cached = await caches.match(request);
+      if (cached) return cached;
+    }
     try {
       const response = await fetch(request);
       if (response.ok && response.status === 200 && response.type !== "opaque") {
-        try { const cache = await caches.open(CACHE); await cache.put(request, response.clone()); } catch (cacheError) { console.debug("PWA cache write skipped:", cacheError); }
+        try {
+          const cache = await caches.open(CACHE);
+          await cache.put(request, response.clone());
+        } catch (cacheError) {
+          console.debug("PWA cache write skipped:", cacheError);
+        }
       }
       return response;
     } catch (networkError) {
