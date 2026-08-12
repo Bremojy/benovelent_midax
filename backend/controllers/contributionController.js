@@ -8,198 +8,101 @@ const Notification = require("../models/Notification");
 ===================================================== */
 
 exports.createContribution = async (req, res) => {
-
-    try {
-
-        const {
-
-            member,
-
-            month,
-
-            year,
-
-            expectedAmount,
-
-            paidAmount,
-
-            paymentMethod,
-
-            receiptNumber,
-
-            mpesaCode,
-
-            paymentDate,
-
-            notes
-
-        } = req.body;
-
-        if (
-
-            !member ||
-
-            !month ||
-
-            !year ||
-
-            expectedAmount == null
-
-        ) {
-
-            return res.status(400).json({
-
-                success:false,
-
-                message:"Member, month, year and expected amount are required."
-
-            });
-
-        }
-
-        const memberExists = await Member.findById(member);
-
-        if(!memberExists){
-
-            return res.status(404).json({
-
-                success:false,
-
-                message:"Member not found."
-
-            });
-
-        }
-
-        const exists = await Contribution.findOne({
-
-            member,
-
-            month,
-
-            year
-
-        });
-
-        if(exists){
-
-            return res.status(400).json({
-
-                success:false,
-
-                message:"Contribution for this month already exists."
-
-            });
-
-        }
-
-        const contribution = await Contribution.create({
-
-            member,
-
-            month,
-
-            year,
-
-            expectedAmount,
-
-            paidAmount:paidAmount || 0,
-
-            paymentMethod,
-
-            receiptNumber,
-
-            mpesaCode,
-
-            paymentDate,
-
-            notes
-
-        });
-
-        if((paidAmount || 0) > 0){
-
-            const finance = await Finance.create({
-
-                member,
-
-                transactionNumber:`TRX-${Date.now()}`,
-
-                type:"contribution",
-
-                category:"Monthly Contribution",
-
-                amount:paidAmount,
-
-                paymentMethod,
-
-                receiptNumber,
-
-                referenceNumber:mpesaCode,
-
-                description:`Contribution ${month}/${year}`,
-
-                status:"approved",
-
-                approvedBy:req.user._id,
-
-                approvedAt:new Date()
-
-            });
-
-            contribution.finance = finance._id;
-
-            await contribution.save();
-
-        }
-
-        await Notification.create({
-
-            recipient:member,
-
-            sender:req.user._id,
-
-            title:"Contribution Recorded",
-
-            message:`Your contribution for ${month}/${year} has been recorded.`,
-
-            type:"contribution",
-
-            referenceId:contribution._id,
-
-            referenceModel:"Contribution"
-
-        });
-
-        res.status(201).json({
-
-            success:true,
-
-            message:"Contribution created successfully.",
-
-            contribution
-
-        });
-
+  try {
+    const {
+      member,
+      employeeNumber,
+      month,
+      year,
+      expectedAmount,
+      paidAmount = 0,
+      paymentMethod,
+      receiptNumber,
+      mpesaCode,
+      paymentDate,
+      notes,
+    } = req.body || {};
+
+    if (!month || !year || expectedAmount == null) {
+      return res.status(400).json({
+        success: false,
+        message: "Month, year and expected amount are required.",
+      });
     }
 
-    catch(error){
-
-        console.error(error);
-
-        res.status(500).json({
-
-            success:false,
-
-            message:error.message
-
-        });
-
+    let memberId = member || null;
+    if (!memberId && employeeNumber) {
+      const found = await Member.findOne({ memberNumber: String(employeeNumber).trim() }).select("_id").lean();
+      memberId = found?._id || null;
+    }
+    if (!memberId) {
+      return res.status(400).json({ success: false, message: "Employee number is required." });
     }
 
+    const memberExists = await Member.exists({ _id: memberId });
+    if (!memberExists) {
+      return res.status(404).json({ success: false, message: "Employee number not found." });
+    }
+
+    const exists = await Contribution.findOne({ member: memberId, month, year });
+    if (exists) {
+      return res.status(400).json({ success: false, message: "Contribution for this month already exists." });
+    }
+
+    const contribution = await Contribution.create({
+      member: memberId,
+      month,
+      year,
+      expectedAmount: Number(expectedAmount),
+      paidAmount: Number(paidAmount || 0),
+      paymentMethod,
+      receiptNumber,
+      mpesaCode,
+      paymentDate,
+      notes,
+    });
+
+    if (Number(paidAmount || 0) > 0) {
+      const finance = await Finance.create({
+        member: memberId,
+        transactionNumber: `TRX-${Date.now()}`,
+        type: "contribution",
+        category: "Monthly Contribution",
+        amount: Number(paidAmount),
+        paymentMethod,
+        receiptNumber,
+        referenceNumber: mpesaCode,
+        description: `Contribution ${month}/${year}`,
+        status: "approved",
+        approvedBy: req.user._id,
+        approvedAt: new Date(),
+      });
+      contribution.finance = finance._id;
+      await contribution.save();
+    }
+
+    await Notification.create({
+      recipient: memberId,
+      recipientModel: "Member",
+      sender: req.user._id,
+      senderModel: String(req.user.role || "admin") === "superadmin" ? "SuperAdmin" : "Admin",
+      title: "Contribution Recorded",
+      message: `Your contribution for ${month}/${year} has been recorded.`,
+      type: "contribution",
+      referenceId: contribution._id,
+      referenceModel: "Contribution",
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: "Contribution created successfully.",
+      contribution,
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
 };
-
-
 
 /* =====================================================
    GET ALL CONTRIBUTIONS

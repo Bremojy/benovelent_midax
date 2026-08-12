@@ -1,6 +1,8 @@
 const Notification = require("../models/Notification");
 const Member = require("../models/Member");
 const { getActiveMembers, notifyMembers } = require("../services/memberBroadcastService");
+const PushSubscription = require("../models/PushSubscription");
+const { getPublicKey } = require("../services/pushService");
 
 function senderModelFromUser(user = {}) {
   const role = String(user.role || "").toLowerCase();
@@ -290,3 +292,22 @@ COMPATIBILITY ALIASES
 
 exports.markAsRead = exports.markRead;
 exports.markAllAsRead = exports.markAllRead;
+
+
+exports.getPushPublicKey = async (_req,res) => res.json({ success:true, configured:Boolean(getPublicKey()), publicKey:getPublicKey()||null });
+
+exports.savePushSubscription = async (req,res) => {
+  try {
+    const subscription=req.body?.subscription||req.body;
+    if(!subscription?.endpoint || !subscription?.keys?.p256dh || !subscription?.keys?.auth) return res.status(400).json({success:false,message:"A valid browser push subscription is required."});
+    const role=String(req.userRole||req.user?.role||"member").toLowerCase();
+    const recipientModel=role==="admin"?"Admin":role==="superadmin"?"SuperAdmin":"Member";
+    const saved=await PushSubscription.findOneAndUpdate({recipient:req.user._id,recipientModel,endpoint:String(subscription.endpoint)},{ $set:{ expirationTime:subscription.expirationTime?new Date(subscription.expirationTime):null, keys:{p256dh:String(subscription.keys.p256dh),auth:String(subscription.keys.auth)}, userAgent:String(req.headers["user-agent"]||"").slice(0,500) } },{upsert:true,new:true,setDefaultsOnInsert:true});
+    res.status(201).json({success:true,subscriptionId:saved._id});
+  } catch(error){res.status(500).json({success:false,message:error.message});}
+};
+
+exports.removePushSubscription = async (req,res) => {
+  try { const role=String(req.userRole||req.user?.role||"member").toLowerCase(); const recipientModel=role==="admin"?"Admin":role==="superadmin"?"SuperAdmin":"Member"; await PushSubscription.deleteMany({recipient:req.user._id,recipientModel,endpoint:String(req.body?.endpoint||"").trim()}); res.json({success:true}); }
+  catch(error){res.status(500).json({success:false,message:error.message});}
+};

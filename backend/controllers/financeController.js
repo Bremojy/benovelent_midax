@@ -23,136 +23,50 @@ const generateTransactionNumber = () => {
 ===================================================== */
 
 exports.createTransaction = async (req, res) => {
-
     try {
-
-        const {
-
-            member,
-
-            type,
-
-            category,
-
-            amount,
-
-            description,
-
-            paymentMethod,
-
-            referenceNumber,
-
-            receiptNumber,
-
-            notes,
-
-            transactionDate
-
-        } = req.body;
-
-        if (!member || !type || !amount) {
-
-            return res.status(400).json({
-
-                success: false,
-
-                message: "Member, type and amount are required."
-
-            });
-
+        const { member, employeeNumber, type, category, amount, description, paymentMethod, referenceNumber, receiptNumber, notes, transactionDate } = req.body || {};
+        let memberId = member || null;
+        if (!memberId && employeeNumber) {
+            const found = await Member.findOne({ memberNumber: String(employeeNumber).trim() }).select("_id").lean();
+            memberId = found?._id || null;
         }
-
-        const memberExists = await Member.findById(member);
-
-        if (!memberExists) {
-
-            return res.status(404).json({
-
-                success: false,
-
-                message: "Member not found."
-
-            });
-
+        if (!type || amount === undefined || amount === null || Number(amount) <= 0) {
+            return res.status(400).json({ success: false, message: "Transaction type and a positive amount are required." });
         }
-
+        const memberRequiredFor = new Set(["contribution", "claim", "refund"]);
+        if (memberRequiredFor.has(type) && !memberId) {
+            return res.status(400).json({ success: false, message: "Employee number is required for this transaction type." });
+        }
+        if (memberId && !await Member.exists({ _id: memberId })) {
+            return res.status(404).json({ success: false, message: "Employee number not found." });
+        }
         const transaction = await Finance.create({
-
-            member,
-
-            transactionNumber:
-                generateTransactionNumber(),
-
-            type,
-
-            category,
-
-            amount,
-
-            description,
-
-            paymentMethod,
-
-            referenceNumber,
-
-            receiptNumber,
-
-            notes,
-
+            member: memberId,
+            transactionNumber: generateTransactionNumber(),
+            type, category, amount: Number(amount), description, paymentMethod,
+            referenceNumber, receiptNumber, notes,
             transactionDate: transactionDate ? new Date(transactionDate) : new Date(),
-
-            status: "pending"
-
+            status: "approved",
+            approvedBy: req.user._id,
+            approvedAt: new Date(),
         });
-
-        await Notification.create({
-
-            recipient: member,
-
-            sender: req.user._id,
-
-            title: "Finance Update",
-
-            message:
-                `A ${type} transaction of KSh ${amount} has been created.`,
-
-            type: "finance",
-
-            referenceId: transaction._id,
-
-            referenceModel: "Finance"
-
-        });
-
-        res.status(201).json({
-
-            success: true,
-
-            message: "Transaction created successfully.",
-
-            transaction
-
-        });
-
-    }
-
-    catch (error) {
-
+        if (memberId) {
+            await Notification.create({
+                recipient: memberId,
+                recipientModel: "Member",
+                sender: req.user._id,
+                senderModel: String(req.user.role || "admin") === "superadmin" ? "SuperAdmin" : "Admin",
+                title: "Finance Update",
+                message: `A ${type} transaction of KSh ${amount} has been recorded.`,
+                type: "finance", referenceId: transaction._id, referenceModel: "Finance"
+            });
+        }
+        return res.status(201).json({ success: true, message: "Transaction created successfully.", transaction });
+    } catch (error) {
         console.error(error);
-
-        res.status(500).json({
-
-            success: false,
-
-            message: error.message
-
-        });
-
+        return res.status(500).json({ success: false, message: error.message });
     }
-
 };
-
-
 
 /* =====================================================
    GET ALL TRANSACTIONS
@@ -346,6 +260,19 @@ exports.updateTransaction = async (req, res) => {
                 transaction[field] = req.body[field];
             }
         });
+
+        if (req.body.employeeNumber !== undefined) {
+            const employeeNumber = String(req.body.employeeNumber || "").trim();
+            if (employeeNumber) {
+                const member = await Member.findOne({ memberNumber: employeeNumber }).select("_id").lean();
+                if (!member) return res.status(404).json({ success: false, message: "Employee number not found." });
+                transaction.member = member._id;
+            } else if (["contribution", "claim", "refund"].includes(transaction.type)) {
+                return res.status(400).json({ success: false, message: "Employee number is required for this transaction type." });
+            } else {
+                transaction.member = null;
+            }
+        }
 
         await transaction.save();
 
@@ -649,6 +576,58 @@ exports.getMemberTransactions = async (req, res) => {
 
 
 
+/* =====================================================
+   ADMIN LEDGER / BALANCED BOOK
+===================================================== */
+
+exports.getLedger = async (req, res) => {
+  try {
+    const year = Number(req.query.year) || new Date().getFullYear();
+    const filter = {
+      transactionDate: {
+        $gte: new Date(`${year}-01-01T00:00:00.000Z`),
+        $lt: new Date(`${year + 1}-01-01T00:00:00.000Z`),
+      },
+      status: { $in: ["approved", "completed"] },
+    };
+    if (String(req.user?.role || "").toLowerCase() === "member") filter.member = req.user._id;
+
+    const rows = await Finance.find(filter)
+      .populate("member", "fullName memberNumber")
+      .populate("approvedBy", "fullName")
+      .sort({ transactionDate: 1, createdAt: 1 })
+      .lean();
+
+    let balance = 0;
+    const creditTypes = new Set(["contribution", "income", "refund"]);
+    const entries = rows.map((row) => {
+      const credit = creditTypes.has(row.type) ? Number(row.amount || 0) : 0;
+      const debit = credit ? 0 : Number(row.amount || 0);
+      balance += credit - debit;
+      return {
+        ...row,
+        employeeNumber: row.member?.memberNumber || "",
+        debit,
+        credit,
+        runningBalance: balance,
+      };
+    });
+
+    const totals = entries.reduce((acc, row) => ({
+      credit: acc.credit + row.credit,
+      debit: acc.debit + row.debit,
+    }), { credit: 0, debit: 0 });
+
+    return res.json({
+      success: true,
+      year,
+      entries,
+      totals: { ...totals, balance: totals.credit - totals.debit },
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
 /* =====================================================
    FINANCE DASHBOARD SUMMARY
 ===================================================== */

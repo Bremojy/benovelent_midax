@@ -11,6 +11,7 @@ const {
   rejectTransaction,
   getMemberTransactions,
   getFinanceSummary,
+  getLedger,
 } = require("../controllers/financeController");
 
 const { verifyToken: protect } = require("../middleware/authMiddleware");
@@ -27,6 +28,7 @@ router.post("/", protect, isAdminOrSuperAdmin, createTransaction);
 router.get("/", protect, isAdminOrSuperAdmin, getTransactions);
 
 // Finance dashboard summary
+router.get("/ledger", protect, getLedger);
 router.get("/summary/dashboard", protect, isAdminOrSuperAdmin, getFinanceSummary);
 
 // Get member transaction history

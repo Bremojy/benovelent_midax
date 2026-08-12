@@ -10,7 +10,10 @@ const {
     markAsRead,
     markAllAsRead,
     deleteNotification,
-    clearNotifications
+    clearNotifications,
+    getPushPublicKey,
+    savePushSubscription,
+    removePushSubscription
 } = require("../controllers/notificationController");
 
 const { verifyToken: protect } = require("../middleware/authMiddleware");
@@ -25,6 +28,9 @@ router.get("/", protect, getNotifications);
 
 // Unread notification count
 router.get("/unread-count", protect, getUnreadCount);
+router.get("/push/vapid-public-key", protect, getPushPublicKey);
+router.post("/push/subscribe", protect, savePushSubscription);
+router.delete("/push/subscribe", protect, removePushSubscription);
 
 // Get single notification
 router.get("/:id", protect, getNotification);

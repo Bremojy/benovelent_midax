@@ -176,7 +176,38 @@ async function sendBulkEmailToMembers({ subject, text, html, members }) {
   return { sent: 0, skipped: "email-not-configured" };
 }
 
+async function sendTalkBeeSms({ to, message }) {
+  const url = String(process.env.TALKBEE_API_URL || "").trim();
+  const token = String(process.env.TALKBEE_API_TOKEN || "").trim();
+  const senderId = String(process.env.TALKBEE_SENDER_ID || "").trim();
+  if (!url || !token || !to || !message) return { sent: false, reason: "talkbee-not-configured" };
+
+  // TalkBee exposes messaging through its API. The concrete API endpoint is
+  // account/channel-specific, so the URL and token stay configurable in the
+  // Render environment rather than being hard-coded in the application.
+  const payload = {
+    to: String(to),
+    message: String(message),
+    ...(senderId ? { senderId } : {}),
+  };
+
+  const response = await axios.post(url, payload, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    timeout: 15000,
+  });
+
+  return { sent: true, provider: "talkbee", response: response.data };
+}
+
 async function sendSmsNotification({ to, message }) {
+  const provider = String(process.env.SMS_PROVIDER || "").toLowerCase();
+  if (provider === "talkbee" || process.env.TALKBEE_API_URL) {
+    return sendTalkBeeSms({ to, message });
+  }
+
   const url = process.env.SMS_API_URL;
   const apiKey = process.env.SMS_API_KEY;
   const senderId = process.env.SMS_SENDER_ID || "MIDAX";
@@ -185,16 +216,12 @@ async function sendSmsNotification({ to, message }) {
     return { sent: false, reason: "sms-not-configured" };
   }
 
-  await axios.post(url, {
-    to,
-    message,
-    senderId,
-  }, {
+  await axios.post(url, { to, message, senderId }, {
     headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : {},
     timeout: 15000,
   });
 
-  return { sent: true };
+  return { sent: true, provider: "generic" };
 }
 
 async function notifyMembers({ subject, text, html, smsText, broadcastSms = false, members = null }) {
@@ -211,11 +238,11 @@ async function notifyMembers({ subject, text, html, smsText, broadcastSms = fals
       .map((member) => member.phone || member.mpesaNumber)
       .filter(Boolean);
 
-    for (const phone of smsTargets.slice(0, 50)) {
-      // Best-effort; will no-op when SMS_API_URL is not configured.
+    for (const phone of smsTargets) {
       try {
-        await sendSmsNotification({ to: phone, message: smsText || text });
-        smsResult.sent += 1;
+        const result = await sendSmsNotification({ to: phone, message: smsText || text });
+        if (result?.sent) smsResult.sent += 1;
+        else smsResult.skipped = result?.reason || smsResult.skipped;
       } catch (error) {
         smsResult.error = error.message;
       }
@@ -230,6 +257,7 @@ module.exports = {
   sendEmail,
   sendBulkEmailToMembers,
   sendSmsNotification,
+  sendTalkBeeSms,
   notifyMembers,
   escapeHtml,
 };

@@ -88,6 +88,26 @@ senderModel: {
 notificationSchema.index({recipient:1,read:1});
 notificationSchema.index({createdAt:-1});
 
+notificationSchema.post("save", (notification) => {
+  try {
+    const { sendPushForNotification } = require("../services/pushService");
+    void sendPushForNotification(notification).catch((error) => console.warn("Notification push delivery skipped:", error.message));
+  } catch (error) {
+    console.warn("Notification push service unavailable:", error.message);
+  }
+});
+
+notificationSchema.post("insertMany", (notifications) => {
+  try {
+    const { sendPushForNotification } = require("../services/pushService");
+    for (const notification of notifications || []) {
+      void sendPushForNotification(notification).catch((error) => console.warn("Broadcast push delivery skipped:", error.message));
+    }
+  } catch (error) {
+    console.warn("Broadcast push service unavailable:", error.message);
+  }
+});
+
 module.exports =
     mongoose.models.Notification ||
     mongoose.model("Notification", notificationSchema);
