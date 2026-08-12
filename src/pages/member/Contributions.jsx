@@ -1,5 +1,5 @@
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import DashboardLayout from "../../layouts/DashboardLayout";
 import API from "../../services/api";
 import { buildPrintHeadHtml, printHeadStyles } from "../../utils/printHead";
@@ -11,12 +11,23 @@ export default function Contributions() {
   const [error, setError] = useState("");
   const year = new Date().getFullYear();
 
-  useEffect(() => {
-    Promise.all([API.get(`/member/accounts?year=${year}`), API.get(`/finance/ledger?year=${year}`)])
-      .then(([accounts, ledger]) => setData({ ...(accounts.data || {}), ledger: ledger.data || {} }))
-      .catch((err) => setError(err.response?.data?.message || err.message))
-      .finally(() => setLoading(false));
+  const load = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError("");
+      const [accounts, ledger] = await Promise.all([
+        API.get(`/member/accounts?year=${year}`),
+        API.get(`/finance/ledger?year=${year}`),
+      ]);
+      setData({ ...(accounts.data || {}), ledger: ledger.data || {} });
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || "Unable to load your accounts.");
+    } finally {
+      setLoading(false);
+    }
   }, [year]);
+
+  useEffect(() => { load(); }, [load]);
 
   const printPage = () => {
     const win = window.open("", "_blank", "width=1100,height=800");
@@ -90,7 +101,7 @@ export default function Contributions() {
             <h1>Accounts</h1>
             <p>Ledger-style view of your scheme activity.</p>
           </div>
-          <button className="portal-btn" onClick={printPage}>Print / Download</button>
+          <div className="portal-actions"><button className="portal-btn secondary" onClick={load} disabled={loading}>{loading ? "Refreshing…" : "Refresh"}</button><button className="portal-btn" onClick={printPage} disabled={!data}>Print / Download</button></div>
         </header>
 
         <div className="portal-stat-grid">

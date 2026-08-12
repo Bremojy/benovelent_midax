@@ -150,7 +150,7 @@ export default function AdminFinance() {
     <DashboardLayout>
       <div className="portal-module">
         <header className="portal-module-header">
-          <div><span>FINANCIAL CONTROL</span><h1>Accounts</h1><p>Monitor contributions, transactions and the Benovelent Midax financial position.</p></div>
+          <div><span>FINANCIAL CONTROL</span><h1>Accounts</h1><p>Live scheme accounts: contributions, approved transactions, support disbursements and the current ledger.</p></div>
           <div className="portal-actions">
             <button className="portal-btn secondary" onClick={startCreate}><Plus size={16} /> New transaction</button>
             <button className="portal-btn secondary" onClick={printLedger} disabled={!ledger}><span>Print ledger</span></button>

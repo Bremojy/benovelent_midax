@@ -13,6 +13,7 @@ const {
     cleanupOrphanedChatData,
     removeLegacyMemberIncome,
     getCollectionInventory,
+    getDuplicateMemberPreview,
 } = require("../controllers/dataIntegrityController");
 
 const router = express.Router();
@@ -29,6 +30,9 @@ router.post("/cleanup/self-conversations", cleanupSelfConversations);
 router.post("/cleanup/orphans", cleanupOrphanedChatData);
 router.post("/cleanup/member-income", removeLegacyMemberIncome);
 router.get("/collections", getCollectionInventory);
+// Protected preview endpoint. Browsers must call this through the authenticated
+// frontend client; direct address-bar access intentionally returns TOKEN_MISSING.
+router.get("/members/:id", getDuplicateMemberPreview);
 router.delete("/members/:id", deleteDuplicateMember);
 
 module.exports = router;

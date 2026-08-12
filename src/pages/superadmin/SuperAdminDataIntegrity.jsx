@@ -254,7 +254,7 @@ export default function SuperAdminDataIntegrity() {
             <span>SUPERADMIN · DATA GOVERNANCE</span>
             <h1>Database Integrity & Cleanup</h1>
             <p>
-              Inspect stale accounts, duplicate chats, self-conversations, orphaned records and duplicate carousel content before making any changes.
+              Inspect stale accounts, duplicate chats, self-conversations, orphaned records and duplicate carousel content before making any changes. Database endpoints are SuperAdmin-only and require the active portal session; use the controls below rather than opening API URLs directly.
             </p>
           </div>
           <div className="integrity-actions">

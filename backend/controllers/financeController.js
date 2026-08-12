@@ -717,25 +717,22 @@ exports.getMemberAccounts = async (req, res) => {
   try {
     const memberId = req.user._id;
     const year = Number(req.query.year) || new Date().getFullYear();
-    const [transactions, contributions, yearContributions, member, medical, funeral, education, allMedical, allFuneral, allEducation] = await Promise.all([
-      Finance.find({ member: memberId }).sort({ transactionDate: -1, createdAt: -1 }).lean(),
+    const yearStart = new Date(`${year}-01-01T00:00:00.000Z`);
+    const yearEnd = new Date(`${year + 1}-01-01T00:00:00.000Z`);
+    const [transactions, contributions, member, medical, funeral, education] = await Promise.all([
+      Finance.find({ member: memberId, transactionDate: { $gte: yearStart, $lt: yearEnd }, status: { $in: ["approved", "completed"] } }).sort({ transactionDate: -1, createdAt: -1 }).lean(),
       Contribution.find({ member: memberId, year }).sort({ paymentDate: -1, year: -1, month: -1, createdAt: -1 }).lean(),
-      Contribution.find({ year }).sort({ paymentDate: -1, year: -1, month: -1, createdAt: -1 }).lean(),
       Member.findById(memberId).select("fullName memberNumber").lean(),
       require("../models/MedicalSupport").find({ member: memberId }).select("status approvedAmount requestedAmount").lean(),
       require("../models/FuneralSupport").find({ member: memberId }).select("status approvedAmount requestedAmount").lean(),
       require("../models/EducationSupport").find({ member: memberId }).select("status approvedAmount requestedAmount").lean(),
-      require("../models/MedicalSupport").find({}).select("status").lean(),
-      require("../models/FuneralSupport").find({}).select("status").lean(),
-      require("../models/EducationSupport").find({}).select("status").lean(),
     ]);
     const monthly = Array.from({length:12}, (_,i) => {
       const month=i+1; const rows=contributions.filter(c=>Number(c.month)===month && Number(c.paidAmount||0)>0);
-      return {month, contributed:rows.reduce((a,c)=>a+Number(c.paidAmount||0),0), contributingMembers:rows.length};
+      return {month, contributed:rows.reduce((a,c)=>a+Number(c.paidAmount||0),0), contributingMembers:rows.length > 0 ? 1 : 0};
     });
     const claims=[...medical,...funeral,...education];
-    const allCases=[...allMedical,...allFuneral,...allEducation];
-    const ledgerBalance=transactions.reduce((sum,t)=>sum + ((t.type==="contribution"||t.type==="income")?Number(t.amount||0):-Number(t.amount||0)),0);
+    const ledgerBalance=transactions.reduce((sum,t)=>sum + ((["contribution","income","refund"].includes(t.type))?Number(t.amount||0):-Number(t.amount||0)),0);
     const supportCases = [
       ...funeral.map((item) => ({
         id: String(item._id),

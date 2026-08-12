@@ -675,6 +675,40 @@ exports.downloadDatabaseBackup = async (req, res) => {
     }
 };
 
+
+exports.getDuplicateMemberPreview = async (req, res) => {
+    try {
+        const id = String(req.params.id || "").trim();
+        if (!mongoose.isValidObjectId(id)) {
+            return res.status(400).json({ success: false, message: "Invalid member ID." });
+        }
+        const member = await Member.findById(id)
+            .select("_id fullName name email username memberNumber phone status isDeleted profileCompletion createdAt updatedAt")
+            .lean();
+        if (!member) {
+            return res.status(404).json({ success: false, message: "Member record not found." });
+        }
+        const references = await findMemberReferences(id);
+        return res.json({
+            success: true,
+            member: {
+                id: String(member._id),
+                name: member.fullName || member.name || member.email || "Unnamed",
+                email: member.email || "",
+                username: member.username || "",
+                memberNumber: member.memberNumber || "",
+                phone: member.phone || "",
+                status: member.status || "active",
+                profileCompletion: Number(member.profileCompletion || 0),
+            },
+            references,
+        });
+    } catch (error) {
+        console.error("Duplicate member preview error:", error);
+        return res.status(500).json({ success: false, message: error.message || "Unable to inspect member." });
+    }
+};
+
 exports.deleteDuplicateMember = async (req, res) => {
     try {
         const id = String(req.params.id || "").trim();

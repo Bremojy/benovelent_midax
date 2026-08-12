@@ -47,39 +47,34 @@ const API = axios.create({
 // ========================================
 
 const getToken = () => {
-  const user = JSON.parse(localStorage.getItem("user") || "null");
+  let user = null;
+  try {
+    user = JSON.parse(localStorage.getItem("user") || "null");
+  } catch (_) {
+    user = null;
+  }
+
+  const role = String(user?.role || "").trim().toLowerCase();
+  const tokenByRole = {
+    superadmin: "superAdminToken",
+    admin: "adminToken",
+    member: "memberToken",
+  };
+
+  // Prefer the authenticated account role. Do not silently use another
+  // portal's token; that can produce confusing 401/403 responses.
+  const roleKey = tokenByRole[role];
+  if (roleKey) {
+    return localStorage.getItem(roleKey);
+  }
+
+  // Only use pathname as a recovery path when the role has not yet been
+  // restored, never as a way to switch credentials between portals.
   const pathname = typeof window !== "undefined" ? window.location.pathname : "";
-  const role = String(user?.role || "").toLowerCase();
-
-  const byPortal = pathname.startsWith("/superadmin")
-    ? localStorage.getItem("superAdminToken")
-    : pathname.startsWith("/admin")
-      ? localStorage.getItem("adminToken")
-      : pathname.startsWith("/member")
-        ? localStorage.getItem("memberToken")
-        : null;
-
-  if (byPortal) {
-    return byPortal;
-  }
-
-  if (role === "superadmin") {
-    return localStorage.getItem("superAdminToken");
-  }
-
-  if (role === "admin") {
-    return localStorage.getItem("adminToken");
-  }
-
-  if (role === "member") {
-    return localStorage.getItem("memberToken");
-  }
-
-  return (
-    localStorage.getItem("memberToken") ||
-    localStorage.getItem("adminToken") ||
-    localStorage.getItem("superAdminToken")
-  );
+  if (pathname.startsWith("/superadmin")) return localStorage.getItem("superAdminToken");
+  if (pathname.startsWith("/admin")) return localStorage.getItem("adminToken");
+  if (pathname.startsWith("/member")) return localStorage.getItem("memberToken");
+  return null;
 };
 
 // ========================================

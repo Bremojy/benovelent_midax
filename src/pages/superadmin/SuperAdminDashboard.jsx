@@ -24,6 +24,8 @@ import {
 
 import "./SuperAdminDashboard.css";
 
+const money = (value) => new Intl.NumberFormat("en-KE", { style: "currency", currency: "KES", maximumFractionDigits: 0 }).format(Number(value || 0));
+
 function SuperAdminDashboard() {
   const [statistics, setStatistics] =
     useState({
