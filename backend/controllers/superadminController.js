@@ -837,3 +837,11 @@ exports.updateSettings = async (req, res) => {
     return res.status(500).json({ success: false, message: error.message });
   }
 };
+
+
+exports.getSystemStatus = async (req, res) => {
+  try {
+    const mongoose = require("mongoose");
+    res.json({ success: true, status: mongoose.connection.readyState === 1 ? "operational" : "database-connection-needed", databaseReady: mongoose.connection.readyState === 1, checkedAt: new Date().toISOString() });
+  } catch (error) { res.status(500).json({ success: false, message: error.message }); }
+};

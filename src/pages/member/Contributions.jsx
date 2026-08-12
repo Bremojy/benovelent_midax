@@ -27,7 +27,7 @@ export default function Contributions() {
     win.document.write(`
       <html>
         <head>
-          <title>Accounts — Benevolent Midax</title>
+          <title>Accounts — Benovelent Midax</title>
           ${printHeadStyles()}
         </head>
         <body>
@@ -86,7 +86,7 @@ export default function Contributions() {
       <div className="portal-module">
         <header className="portal-module-header">
           <div>
-            <span>BENEVOLENT ACCOUNTING</span>
+            <span>Benovelent ACCOUNTING</span>
             <h1>Accounts</h1>
             <p>Ledger-style view of your scheme activity.</p>
           </div>

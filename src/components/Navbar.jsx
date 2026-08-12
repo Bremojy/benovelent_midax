@@ -21,9 +21,9 @@ export default function Navbar() {
   return (
     <header className={`navbar ${scrolled ? "navbar-scrolled" : ""}`}>
       <div className="navbar-container">
-        <Link to="/" className="logo" onClick={close} aria-label="Benevolent Midax home">
+        <Link to="/" className="logo" onClick={close} aria-label="Benovelent Midax home">
           <span className="logo-icon"><svg viewBox="0 0 64 64" aria-hidden="true"><path d="M12 28c8-18 32-18 40 0-2 16-10 25-20 29C22 53 14 44 12 28Z" fill="none" stroke="currentColor" strokeWidth="4"/><path d="M18 28c7-9 21-9 28 0M22 37c6-5 14-5 20 0" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/></svg></span>
-          <span className="logo-text"><span className="logo-main">Benevolent</span><span className="logo-sub">MIDAX</span></span>
+          <span className="logo-text"><span className="logo-main">Benovelent</span><span className="logo-sub">MIDAX</span></span>
         </Link>
         <nav className={open ? "nav-links open" : "nav-links"} aria-label="Primary navigation">
           <Link to="/" className={active("/")} onClick={close}>Home</Link>

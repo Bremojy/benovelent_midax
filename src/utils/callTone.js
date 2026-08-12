@@ -1,42 +1,34 @@
-let sharedAudioContext = null;
+const DEFAULT_RINGTONE_URL = "/sounds/benovelent-call.mp3";
 
-function getAudioContext() {
-  if (typeof window === "undefined") return null;
-  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-  if (!AudioContextClass) return null;
-  if (!sharedAudioContext) sharedAudioContext = new AudioContextClass();
-  if (sharedAudioContext.state === "suspended") sharedAudioContext.resume().catch(() => {});
-  return sharedAudioContext;
-}
-
-function createTone({ frequency, duration, gainValue = 0.03, type = "sine" }) {
-  const ctx = getAudioContext();
-  if (!ctx) return null;
-  const oscillator = ctx.createOscillator();
-  const gain = ctx.createGain();
-  oscillator.type = type;
-  oscillator.frequency.value = frequency;
-  gain.gain.value = gainValue;
-  oscillator.connect(gain);
-  gain.connect(ctx.destination);
-  oscillator.start();
-  oscillator.stop(ctx.currentTime + duration / 1000);
-  return { oscillator, gain };
-}
-
+/**
+ * Start the Benovelent call ringtone.
+ * The local bundled asset is the default; VITE_CALL_RINGTONE_URL may override it
+ * with another browser-playable audio URL when needed.
+ */
 export function startCallTone() {
   if (typeof window === "undefined") return { stop() {} };
-  let stopped = false;
-  const timers = [];
-  let step = 0;
-  const pattern = [[880, 140], [660, 140], [0, 220]];
-  const schedule = () => {
-    if (stopped) return;
-    const [frequency, duration] = pattern[step % pattern.length];
-    step += 1;
-    if (frequency > 0) createTone({ frequency, duration, gainValue: 0.035, type: "sine" });
-    timers.push(window.setTimeout(schedule, duration + 80));
+
+  const configured = String(import.meta.env.VITE_CALL_RINGTONE_URL || "").trim();
+  const src = configured || DEFAULT_RINGTONE_URL;
+  const audio = new Audio(src);
+
+  audio.loop = true;
+  audio.preload = "auto";
+  audio.volume = 0.8;
+
+  const playPromise = audio.play();
+  if (playPromise?.catch) {
+    playPromise.catch(() => {
+      // Browser autoplay policies can block sound until the user has interacted.
+      // Keep the audio ready; the caller UI will stop it on accept/reject/end.
+    });
+  }
+
+  return {
+    stop() {
+      audio.pause();
+      audio.currentTime = 0;
+      audio.src = "";
+    },
   };
-  schedule();
-  return { stop() { stopped = true; timers.forEach((timer) => window.clearTimeout(timer)); } };
 }

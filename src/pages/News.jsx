@@ -111,10 +111,10 @@ function News() {
         <div className="news-video-overlay" />
         <div className="news-header">
           <Newspaper size={55} className="news-icon" />
-          <span className="news-kicker">BENEVOLENT MIDAX • NEWSROOM</span>
+          <span className="news-kicker">Benovelent MIDAX • NEWSROOM</span>
           <h1>Stories, Updates & Community Voice</h1>
           <p>
-            Stay informed about support activities, announcements, community decisions and the people behind Benevolent Midax.
+            Stay informed about support activities, announcements, community decisions and the people behind Benovelent Midax.
           </p>
         </div>
       </section>

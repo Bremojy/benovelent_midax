@@ -37,7 +37,7 @@ function ContributionCard({
 
                     <p>
 
-                        Your Benevolent Midax contributions
+                        Your Benovelent Midax contributions
 
                     </p>
 

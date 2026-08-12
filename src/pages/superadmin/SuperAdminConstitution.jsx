@@ -6,7 +6,7 @@ import API, { resolveApiUrl } from "../../services/api";
 export default function SuperAdminConstitution() {
   const [fileInfo, setFileInfo] = useState({
     fileUrl: "/documents/benevolent-midax-constitution.pdf",
-    fileName: "Benevolent Midax Constitution.pdf",
+    fileName: "Benovelent Midax Constitution.pdf",
   });
   const [selectedFile, setSelectedFile] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -30,7 +30,7 @@ export default function SuperAdminConstitution() {
         const content = section?.content || data?.file || {};
         setFileInfo({
           fileUrl: content.fileUrl || "/documents/benevolent-midax-constitution.pdf",
-          fileName: content.fileName || "Benevolent Midax Constitution.pdf",
+          fileName: content.fileName || "Benovelent Midax Constitution.pdf",
         });
       } catch (err) {
         if (active) {

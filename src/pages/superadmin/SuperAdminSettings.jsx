@@ -248,7 +248,7 @@ export default function SuperAdminSettings() {
       setError("");
       const form = new FormData();
       form.append("image", uploadFile);
-      form.append("title", carouselForm.title || "Benevolent Midax");
+      form.append("title", carouselForm.title || "Benovelent Midax");
       form.append("description", carouselForm.description || "");
       form.append("buttonText", carouselForm.buttonText || "Discover More");
       form.append("buttonLink", carouselForm.buttonLink || "/about");

@@ -10,6 +10,10 @@ const { notifyMembers } = require("../services/memberBroadcastService");
 exports.createNews = async (req, res) => {
 
     try {
+        const coverFile = req.files?.coverImage?.[0];
+        const imageFiles = req.files?.images || [];
+        const attachmentFiles = req.files?.attachments || [];
+        const fileUrl = (file) => file?.path || file?.secure_url || file?.url || "";
 
         const {
             title,
@@ -46,6 +50,15 @@ exports.createNews = async (req, res) => {
 
         const existing = await News.findOne({ slug });
 
+        const parseArray = (value) => {
+            if (Array.isArray(value)) return value;
+            if (!value) return [];
+            try { const parsed = JSON.parse(value); return Array.isArray(parsed) ? parsed : []; } catch { return String(value).split(",").map((item) => item.trim()).filter(Boolean); }
+        };
+        const parsedImages = parseArray(images);
+        const parsedAttachments = parseArray(attachments);
+        const parsedTags = parseArray(tags);
+
         if (existing) {
 
             return res.status(400).json({
@@ -67,11 +80,11 @@ exports.createNews = async (req, res) => {
 
             category,
 
-            coverImage,
+            coverImage: fileUrl(coverFile) || coverImage || "",
 
-            images,
+            images: imageFiles.length ? imageFiles.map(fileUrl) : (parsedImages),
 
-            attachments,
+            attachments: attachmentFiles.length ? attachmentFiles.map(file => ({ url: fileUrl(file), name: file.originalname || file.filename || "Attachment", type: file.mimetype || "" })) : (parsedAttachments),
 
             tags,
 

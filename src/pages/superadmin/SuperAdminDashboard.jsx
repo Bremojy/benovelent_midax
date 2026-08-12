@@ -37,6 +37,8 @@ function SuperAdminDashboard() {
   const [loading, setLoading] =
     useState(true);
 
+  const [systemOnline, setSystemOnline] = useState(null);
+
   const [error, setError] =
     useState("");
 
@@ -49,17 +51,12 @@ function SuperAdminDashboard() {
       setLoading(true);
       setError("");
 
-      const [
-        statisticsResponse,
-        adminsResponse,
-      ] = await Promise.all([
+      const [statisticsResponse, adminsResponse, systemResponse] = await Promise.all([
         getSuperAdminAdminStatistics(),
-
-        getSuperAdmins({
-          page: 1,
-          limit: 5,
-        }),
+        getSuperAdmins({ page: 1, limit: 5 }),
+        API.get("/superadmin/system/status").catch(() => null),
       ]);
+      setSystemOnline(Boolean(systemResponse?.data?.success));
 
       if (
         statisticsResponse?.success
@@ -134,7 +131,7 @@ function SuperAdminDashboard() {
 
             <p>
               Manage administrators,
-              members and the Benevolent
+              members and the Benovelent
               Midax system from one place.
             </p>
 
@@ -463,16 +460,8 @@ function SuperAdminDashboard() {
               SYSTEM STATUS
             </span>
 
-            <h2>
-              Benevolent Midax is
-              operational
-            </h2>
-
-            <p>
-              Administrator authentication,
-              member management and system
-              controls are available.
-            </p>
+            <h2>{systemOnline === false ? "System connection needs attention" : "System status"}</h2>
+            <p>{systemOnline === false ? "The live system-status check could not be completed." : "Live administrator statistics and system controls are available."}</p>
 
           </div>
 
@@ -480,7 +469,7 @@ function SuperAdminDashboard() {
 
             <span className="system-status-dot" />
 
-            Operational
+            {systemOnline === null ? "Checking..." : systemOnline ? "Operational" : "Needs attention"}
 
           </div>
 

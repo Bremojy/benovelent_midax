@@ -499,7 +499,7 @@ function AdminMembers() { const { role }=useAuth(); const isSuperAdmin=role==="s
 
             <p>
               Create and manage
-              Benevolent Midax member
+              Benovelent Midax member
               accounts.
             </p>
           </div>
@@ -1644,7 +1644,7 @@ function CredentialsModal({
 }) {
   const handleCopy = async () => {
     const text = `
-Benevolent Midax Member Account
+Benovelent Midax Member Account
 
 Name: ${result.fullName || "—"}
 Member Number: ${

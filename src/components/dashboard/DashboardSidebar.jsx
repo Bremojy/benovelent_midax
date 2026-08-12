@@ -16,7 +16,7 @@ function DashboardSidebar({ role, sidebarOpen, setSidebarOpen, mobileHidden = fa
   return (
     <aside className={`${sidebarOpen ? "dashboard-sidebar open" : "dashboard-sidebar"} ${mobileHidden ? "mobile-hidden" : ""}`} aria-label="Dashboard navigation">
       <div className="sidebar-header">
-        <div className="sidebar-brand"><h2>Benevolent Midax</h2><span className="sidebar-role">{roleLabel}</span></div>
+        <div className="sidebar-brand"><h2>Benovelent Midax</h2><span className="sidebar-role">{roleLabel}</span></div>
         <button type="button" className="close-sidebar" onClick={() => setSidebarOpen?.(false)} aria-label="Close sidebar"><X size={22} /></button>
       </div>
       <nav className="sidebar-menu" aria-label={`${roleLabel} navigation`}>

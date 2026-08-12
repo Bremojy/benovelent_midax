@@ -121,7 +121,7 @@ export default function Polls({ mode = "member" }) {
         <body>
           ${buildPrintHeadHtml({
             title: `Poll Results — ${poll.title || "Community Vote"}`,
-            subtitle: "Official poll results for the Benevolent Fund Scheme.",
+            subtitle: "Official poll results for the Benovelent Fund Scheme.",
           })}
           <p class="print-note">Total votes: ${Number(data?.totalVotes || poll.totalVotes || 0)}</p>
           <table>
@@ -158,7 +158,7 @@ export default function Polls({ mode = "member" }) {
             <p>
               {isAdmin
                 ? "Create polls, delete outdated ones, view live results and print detailed reports."
-                : "Have your say on Benevolent Midax decisions and community matters."}
+                : "Have your say on Benovelent Midax decisions and community matters."}
             </p>
           </div>
           <button className="poll-refresh" onClick={load} disabled={loading}>

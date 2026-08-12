@@ -136,8 +136,8 @@ export default function AdminFinance() {
     const rows = Array.isArray(ledger?.entries) ? ledger.entries : [];
     const totals = ledger?.totals || {};
     win.document.write(`
-      <html><head><title>Benevolent Midax Ledger</title>${printHeadStyles()}</head><body>
-      ${buildPrintHeadHtml({ title: `Benevolent Fund Ledger — ${ledger?.year || new Date().getFullYear()}`, subtitle: "Official scheme financial ledger." })}
+      <html><head><title>Benovelent Midax Ledger</title>${printHeadStyles()}</head><body>
+      ${buildPrintHeadHtml({ title: `Benovelent Fund Ledger — ${ledger?.year || new Date().getFullYear()}`, subtitle: "Official scheme financial ledger." })}
       <p class="print-note">Credits: ${number(totals.credit)} • Debits: ${number(totals.debit)} • Balance: ${number(totals.balance)}</p>
       <table><thead><tr><th>Date</th><th>Employee number</th><th>Description</th><th>Debit</th><th>Credit</th><th>Balance</th></tr></thead><tbody>
       ${rows.map((row) => `<tr><td>${date(row.transactionDate || row.createdAt)}</td><td>${escapeHtml(row.employeeNumber || "—")}</td><td>${escapeHtml(row.description || row.category || row.type || "—")}</td><td>${number(row.debit)}</td><td>${number(row.credit)}</td><td>${number(row.runningBalance)}</td></tr>`).join("")}
@@ -150,7 +150,7 @@ export default function AdminFinance() {
     <DashboardLayout>
       <div className="portal-module">
         <header className="portal-module-header">
-          <div><span>FINANCIAL CONTROL</span><h1>Accounts</h1><p>Monitor contributions, transactions and the Benevolent Midax financial position.</p></div>
+          <div><span>FINANCIAL CONTROL</span><h1>Accounts</h1><p>Monitor contributions, transactions and the Benovelent Midax financial position.</p></div>
           <div className="portal-actions">
             <button className="portal-btn secondary" onClick={startCreate}><Plus size={16} /> New transaction</button>
             <button className="portal-btn secondary" onClick={printLedger} disabled={!ledger}><span>Print ledger</span></button>
@@ -190,7 +190,7 @@ export default function AdminFinance() {
 
 
         <section className="portal-panel">
-          <div className="portal-module-header"><div><span>DOUBLE-ENTRY STYLE VIEW</span><h2>Benevolent Fund Ledger</h2><p>Credits increase the fund balance; debits record support, expenses and withdrawals.</p></div></div>
+          <div className="portal-module-header"><div><span>DOUBLE-ENTRY STYLE VIEW</span><h2>Benovelent Fund Ledger</h2><p>Credits increase the fund balance; debits record support, expenses and withdrawals.</p></div></div>
           <div className="portal-stat-grid">
             <Stat label="Credits" value={number(ledger?.totals?.credit)} />
             <Stat label="Debits" value={number(ledger?.totals?.debit)} />

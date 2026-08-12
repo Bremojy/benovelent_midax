@@ -69,7 +69,7 @@ export default function Dependents() {
         <section className="member-page-header">
           <span>MEMBER RECORDS</span>
           <h1>Dependents</h1>
-          <p>Keep the people covered by your Benevolent Midax membership up to date.</p>
+          <p>Keep the people covered by your Benovelent Midax membership up to date.</p>
         </section>
 
         {error && <div className="support-alert error">{error}</div>}

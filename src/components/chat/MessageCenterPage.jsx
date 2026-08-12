@@ -102,13 +102,27 @@ function MessageCenterPage({
     });
 
     newSocket.on("connect", () => {
-      newSocket.emit("user-online", actorId);
+      newSocket.emit("user-online", { userId: actorId, role: currentUser?.role || authUser?.role || "member" });
     });
 
     newSocket.on("connect_error", (error) => {
       console.error("Chat socket connection error:", error);
       setBanner("Chat connection failed. Calls require the live Socket.IO server to be reachable.");
     });
+
+    const handleCallNotification = (payload) => {
+      const title = payload?.title || "Incoming call";
+      const body = payload?.message || "Someone is calling you.";
+      setBanner(`${title}: ${body}`);
+      if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
+        try { new Notification(title, { body, tag: `call-${payload?.callerUserId || Date.now()}` }); } catch {}
+      }
+    };
+    const handlePresence = (payload) => {
+      const onlineIds = new Set((payload?.users || []).map((item) => String(item.userId)));
+      setPeople((prev) => prev.map((person) => ({ ...person, online: onlineIds.has(String(person._id)) })));
+      setConversations((prev) => prev.map((conversation) => ({ ...conversation, partner: conversation.partner ? { ...conversation.partner, online: onlineIds.has(String(conversation.partner._id)) } : conversation.partner })));
+    };
 
     const handleIncomingCall = (payload) => {
       if (!payload?.offer || !payload?.from) return;
@@ -126,10 +140,14 @@ function MessageCenterPage({
     };
 
     newSocket.on("incoming-call", handleIncomingCall);
+    newSocket.on("new-call-notification", handleCallNotification);
+    newSocket.on("online-users", handlePresence);
     setSocket(newSocket);
 
     return () => {
       newSocket.off("incoming-call", handleIncomingCall);
+      newSocket.off("new-call-notification", handleCallNotification);
+      newSocket.off("online-users", handlePresence);
       newSocket.disconnect();
       setSocket(null);
     };

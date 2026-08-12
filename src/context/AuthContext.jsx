@@ -36,7 +36,7 @@ const INACTIVITY_TIMEOUT = 30 * 60 * 1000;
 // Key used to synchronize logout
 // between multiple browser tabs/windows.
 const SESSION_EVENT_KEY =
-  "benevolentMidaxSessionEvent";
+  "benovelentMidaxSessionEvent";
 
 // ========================================
 // CLEAR STORED SESSION
@@ -51,7 +51,7 @@ const clearStoredSession = () => {
 
   // Also remove inactivity timestamp.
   localStorage.removeItem(
-    "benevolentMidaxLastActivity"
+    "benovelentMidaxLastActivity"
   );
 };
 
@@ -176,7 +176,7 @@ const saveSession = (
 
   // Start a fresh inactivity period.
   localStorage.setItem(
-    "benevolentMidaxLastActivity",
+    "benovelentMidaxLastActivity",
     String(Date.now())
   );
 };
@@ -294,7 +294,7 @@ export function AuthProvider({
       const now = Date.now();
 
       localStorage.setItem(
-        "benevolentMidaxLastActivity",
+        "benovelentMidaxLastActivity",
         String(now)
       );
 
@@ -337,7 +337,7 @@ export function AuthProvider({
           const lastActivity =
             Number(
               localStorage.getItem(
-                "benevolentMidaxLastActivity"
+                "benovelentMidaxLastActivity"
               )
             );
 
@@ -447,7 +447,7 @@ export function AuthProvider({
           // activity timestamp, create one.
           if (!lastActivity) {
             localStorage.setItem(
-              "benevolentMidaxLastActivity",
+              "benovelentMidaxLastActivity",
               String(Date.now())
             );
           }

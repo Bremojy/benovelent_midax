@@ -100,7 +100,7 @@ function Hero() {
   return (
     <section
       className="hero modern-hero"
-      aria-label="Benevolent Midax welcome carousel"
+      aria-label="Benovelent Midax welcome carousel"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
       onTouchStart={handleTouchStart}
@@ -128,7 +128,7 @@ function Hero() {
         <div className="modern-hero-copy" key={current?._id || currentSlide}>
           <div className="hero-welcome-pill">
             <HeartHandshake size={16} />
-            <span>WELCOME TO BENEVOLENT MIDAX</span>
+            <span>WELCOME TO Benovelent MIDAX</span>
           </div>
 
           <p className="hero-label">COMMUNITY · COMPASSION · SUPPORT</p>

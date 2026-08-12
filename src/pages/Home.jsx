@@ -11,7 +11,7 @@ export default function Home() {
       <main className="public-modern-page">
         <section className="modern-section">
           <div className="modern-section-head">
-            <span className="eyebrow">BENEVOLENT FUND SCHEME</span>
+            <span className="eyebrow">Benovelent FUND SCHEME</span>
             <h2>Better life is better when you stand together.</h2>
             <p>The constitution says the scheme supports members and families by supplementing last-expense budgets for funerals and medical bills. Members contribute Ksh 500 and the agreed minimum book balance is Ksh 500,000.</p>
           </div>
@@ -31,7 +31,7 @@ export default function Home() {
           </div>
           <div className="modern-card-grid">
             <Quick icon={Users} title="See our leaders" text="Meet the leadership representatives." to="/leaders" />
-            <Quick icon={Images} title="Benevolent gallery" text="View community collections." to="/gallery" />
+            <Quick icon={Images} title="Benovelent gallery" text="View community collections." to="/gallery" />
             <Quick icon={FileText} title="Constitution" text="Read the official scheme rules." to="/constitution" />
             <Quick icon={MessageCircle} title="Contact us" text="Send a question or request." to="/contact" />
           </div>
@@ -67,7 +67,7 @@ export default function Home() {
         <div className="quick-pop modern-quick-pop">
           <span><Sparkles size={14} /> Quick link</span>
           <Link to="/leaders">See our leaders</Link>
-          <Link to="/gallery">See our Benevolent gallery collections</Link>
+          <Link to="/gallery">See our Benovelent gallery collections</Link>
         </div>
       </main>
     </>

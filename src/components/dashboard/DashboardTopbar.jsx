@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 
 import { useEffect, useState } from "react";
+import socket from "../../sockets/socket";
 import API, { UPLOAD_URL } from "../../services/api";
 
 import { useNavigate } from "react-router-dom";
@@ -52,11 +53,11 @@ function DashboardTopbar({
 
     loadUnread();
     const interval = window.setInterval(loadUnread, 30000);
-
-    return () => {
-      mounted = false;
-      window.clearInterval(interval);
-    };
+    const onNotification = () => { if (mounted) { setUnreadNotifications((v) => Number(v) + 1); loadUnread(); } };
+    if (!socket.connected) socket.connect();
+    socket.on("new-notification", onNotification);
+    socket.on("new-call-notification", onNotification);
+    return () => { mounted = false; window.clearInterval(interval); socket.off("new-notification", onNotification); socket.off("new-call-notification", onNotification); };
   }, [user?.unreadNotifications, normalizedRole]);
 
   const initials = (
@@ -86,6 +87,7 @@ function DashboardTopbar({
   const goToMessages = () => {
     if (normalizedRole === "member") navigate("/member/messages");
     else if (normalizedRole === "admin") navigate("/admin/messages");
+    else navigate("/superadmin/messages");
 
   };
 

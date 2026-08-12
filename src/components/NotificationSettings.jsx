@@ -32,7 +32,7 @@ export default function NotificationSettings() {
     try {
       setBusy(true); setMessage("");
       const permission = Notification.permission === "granted" ? "granted" : await Notification.requestPermission();
-      if (permission !== "granted") { setStatus("denied"); setMessage("Notifications are not enabled. Open your phone/browser notification settings to allow them for Benevolent Midax."); return; }
+      if (permission !== "granted") { setStatus("denied"); setMessage("Notifications are not enabled. Open your phone/browser notification settings to allow them for Benovelent Midax."); return; }
       const keyResponse = await API.get("/notifications/push/vapid-public-key");
       const publicKey = keyResponse.data?.publicKey;
       if (!publicKey) { setStatus("unconfigured"); setMessage("Phone notification service is not configured on the server yet."); return; }
@@ -52,7 +52,7 @@ export default function NotificationSettings() {
         <div className="settings-icon"><Bell size={20} /></div>
         <div><span>PHONE NOTIFICATIONS</span><h2>Enable app notifications</h2></div>
       </div>
-      <p className="settings-description">Allow Benevolent Midax to alert you about new messages, finance updates and important announcements even when the installed app is not open.</p>
+      <p className="settings-description">Allow Benovelent Midax to alert you about new messages, finance updates and important announcements even when the installed app is not open.</p>
       {!supported && <div className="settings-message error"><ShieldAlert size={16}/> This device/browser does not support web push notifications.</div>}
       {status === "denied" && <div className="settings-message error"><ShieldAlert size={16}/> Notifications are blocked. Enable them in your phone/browser settings, then return here.</div>}
       {message && <div className="settings-message success"><CheckCircle2 size={16}/> {message}</div>}

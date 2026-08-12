@@ -34,7 +34,7 @@ export default function SuperAdminSystem() {
           <div>
             <span>INFRASTRUCTURE</span>
             <h1>System Health</h1>
-            <p>Verify the live Benevolent Midax API and database connection.</p>
+            <p>Verify the live Benovelent Midax API and database connection.</p>
           </div>
           <button className="portal-btn" onClick={check}>
             <RefreshCw size={16} /> Run Health Check
@@ -49,7 +49,7 @@ export default function SuperAdminSystem() {
             </div>
             <div className="portal-stat">
               <span>APPLICATION</span>
-              <strong>{details?.application || "Benevolent Midax API"}</strong>
+              <strong>{details?.application || "Benovelent Midax API"}</strong>
             </div>
             <div className="portal-stat">
               <span>DATABASE</span>
@@ -64,7 +64,7 @@ export default function SuperAdminSystem() {
           <div className={`system-health-banner ${online ? "online" : "offline"}`}>
             {online ? <CheckCircle2 size={23} /> : <XCircle size={23} />}
             <div>
-              <strong>{online ? "Benevolent Midax is operational" : "Backend connection needs attention"}</strong>
+              <strong>{online ? "Benovelent Midax is operational" : "Backend connection needs attention"}</strong>
               <p>
                 The portal is checking the backend configured through
                 <strong> VITE_API_URL</strong>. This prevents production from accidentally checking localhost.

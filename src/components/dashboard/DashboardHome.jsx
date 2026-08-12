@@ -44,7 +44,7 @@ function DashboardHome({
           </h1>
 
           <p>
-            Manage Benevolent Midax from one
+            Manage Benovelent Midax from one
             beautiful dashboard.
           </p>
 

@@ -41,6 +41,9 @@ senderModel: {
     type: String,
     enum: [
         "message",
+        "call",
+        "audio_call",
+        "video_call",
         "reaction",
         "news",
         "poll",

@@ -45,7 +45,7 @@ export default function PortalSettings() {
     bio: user?.bio || "",
   });
   const [themeColor, setThemeColor] = useState(user?.themeColor || "#ff7a00");
-  const [appearance, setAppearance] = useState(() => localStorage.getItem("benevolentMidaxAppearance") || "light");
+  const [appearance, setAppearance] = useState(() => localStorage.getItem("benovelentMidaxAppearance") || "light");
   const [photo, setPhoto] = useState(null);
   const [photoPreview, setPhotoPreview] = useState(user?.profileImage || "");
   const [passwords, setPasswords] = useState({
@@ -226,7 +226,7 @@ const saveAppearance = async (value) => {
   setAppearance(value);
   try {
     document.documentElement.setAttribute("data-appearance", value);
-    localStorage.setItem("benevolentMidaxAppearance", value);
+    localStorage.setItem("benovelentMidaxAppearance", value);
     const response = isMember
       ? await updateMemberSettings({ appearance: value })
       : isAdmin

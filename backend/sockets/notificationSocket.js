@@ -107,7 +107,7 @@ module.exports = (io, socket) => {
 
             if (!notification) return;
 
-            notification.isRead = true;
+            notification.read = true;
 
             notification.readAt = new Date();
 
@@ -148,13 +148,13 @@ module.exports = (io, socket) => {
 
                     recipient: userId,
 
-                    isRead: false
+                    read: false
 
                 },
 
                 {
 
-                    isRead: true,
+                    read: true,
 
                     readAt: new Date()
 
@@ -193,7 +193,7 @@ module.exports = (io, socket) => {
 
                 recipient: userId,
 
-                isRead: false
+                read: false
 
             });
 

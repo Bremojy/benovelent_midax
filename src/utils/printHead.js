@@ -10,7 +10,7 @@ function escapeHtml(input) {
 }
 
 export function buildPrintHeadHtml({
-  title = "Benevolent Midax Report",
+  title = "Benovelent Midax Report",
   subtitle = "",
   bodyClass = "",
 } = {}) {
@@ -20,8 +20,8 @@ export function buildPrintHeadHtml({
         <div class="print-header-left">
           <img class="print-letterhead-logo" src="/print-letterhead.png" alt="Midax letterhead" />
           <div class="print-header-copy">
-            <p class="print-eyebrow">Benevolent Fund Scheme</p>
-            <h1>Benevolent Midax</h1>
+            <p class="print-eyebrow">Benovelent Fund Scheme</p>
+            <h1>Benovelent Midax</h1>
             <p class="print-subtitle">${escapeHtml(subtitle || "Standing together in trust, accountability and support.")}</p>
           </div>
         </div>

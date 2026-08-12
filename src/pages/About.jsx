@@ -14,11 +14,11 @@ export default function About() {
         <div className="modern-hero-overlay" />
         <div className="modern-hero-content">
           <div>
-            <span className="modern-kicker"><Sparkles size={14} /> ABOUT MIDAX & BENEVOLENT</span>
-            <h1>Midax Petroleum Marketing and the Benevolent scheme were built around people, service and family support.</h1>
+            <span className="modern-kicker"><Sparkles size={14} /> ABOUT MIDAX & Benovelent</span>
+            <h1>Midax Petroleum Marketing and the Benovelent scheme were built around people, service and family support.</h1>
             <p>
               The letterhead shows Midax Petroleum Marketing as a service-focused company offering fuels, lubricants, LPG gas, service and carwash.
-              Benevolent Midax carries that same care into a support scheme for members and their families.
+              Benovelent Midax carries that same care into a support scheme for members and their families.
             </p>
             <div className="modern-hero-actions">
               <Link to="/contact" className="modern-btn">Your member voice is needed <MessageCircle size={17} /></Link>
@@ -29,7 +29,7 @@ export default function About() {
             <div className="modern-panel-grid">
               <Link to="/contact" className="modern-metric"><strong>Member voice</strong><span>Every member has right to speak</span></Link>
               <Link to="/privacy-policy" className="modern-metric"><strong>Privacy</strong><span>Information can only be accessed by superAdmin; your information is protected</span></Link>
-              <Link to="/services" className="modern-metric"><strong>Support</strong><span>Detailed information about the Benevolent Midax Constitution services</span></Link>
+              <Link to="/services" className="modern-metric"><strong>Support</strong><span>Detailed information about the Benovelent Midax Constitution services</span></Link>
             </div>
           </div>
         </div>
@@ -38,20 +38,20 @@ export default function About() {
       <section className="modern-section">
         <div className="modern-section-head">
           <span className="eyebrow">HISTORY</span>
-          <h2>About the Midax family and why Benevolent Midax exists</h2>
+          <h2>About the Midax family and why Benovelent Midax exists</h2>
         </div>
         <div className="modern-split">
           <div className="modern-card">
             <h3>About Midax company</h3>
             <p>
               Midax is presented in the supplied letterhead as a petroleum marketing business serving Nairobi with fuels, lubricants, LPG gas, service and carwash.
-              This website keeps that family-and-service feel while focusing on the Benevolent fund scheme.
+              This website keeps that family-and-service feel while focusing on the Benovelent fund scheme.
             </p>
           </div>
           <div className="modern-card">
-            <h3>Why Benevolent Midax came up</h3>
+            <h3>Why Benovelent Midax came up</h3>
             <p>
-              The scheme was formed so members can stand together during medical and funeral needs. According to the supplied brief, the Benevolent constitution started in May 2023 with contributions of Ksh 300, then moved to Ksh 500 in January 2025.
+              The scheme was formed so members can stand together during medical and funeral needs. According to the supplied brief, the Benovelent constitution started in May 2023 with contributions of Ksh 300, then moved to Ksh 500 in January 2025.
             </p>
           </div>
         </div>

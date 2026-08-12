@@ -201,6 +201,7 @@ const SuperAdminDataIntegrity = lazy(() => import("./pages/superadmin/SuperAdmin
 const SuperAdminConstitution = lazy(() => import("./pages/superadmin/SuperAdminConstitution"));
 const SuperAdminNotifications = lazy(() => import("./pages/superadmin/SuperAdminNotifications"));
 const SuperAdminMessages = lazy(() => import("./pages/superadmin/SuperAdminMessages"));
+const SuperAdminNews = lazy(() => import("./pages/superadmin/SuperAdminNews"));
 
 
 // =====================================================
@@ -591,6 +592,7 @@ function AppContent() {
           <Route path="/superadmin/audit" element={<ProtectedRoute allowedRoles={["superadmin"]}><SuperAdminAudit /></ProtectedRoute>} />
           <Route path="/superadmin/notifications" element={<ProtectedRoute allowedRoles={["superadmin"]}><SuperAdminNotifications /></ProtectedRoute>} />
           <Route path="/superadmin/messages" element={<ProtectedRoute allowedRoles={["superadmin"]}><SuperAdminMessages /></ProtectedRoute>} />
+          <Route path="/superadmin/news" element={<ProtectedRoute allowedRoles={["superadmin"]}><SuperAdminNews /></ProtectedRoute>} />
           <Route path="/superadmin/claims" element={<ProtectedRoute allowedRoles={["superadmin"]}><AdminClaims /></ProtectedRoute>} />
           <Route path="/superadmin/support" element={<ProtectedRoute allowedRoles={["superadmin"]}><AdminSupport /></ProtectedRoute>} />
           <Route path="/superadmin/settings" element={<ProtectedRoute allowedRoles={["superadmin"]}><SuperAdminSettings /></ProtectedRoute>} />

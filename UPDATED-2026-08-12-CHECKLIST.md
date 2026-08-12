@@ -1,7 +1,0 @@
-- Modern interaction system retained
-- PWA manifest + service worker + install prompt added
-- Native feedback collections added for admin/superadmin
-- Google Forms feedback collections added for admin/superadmin
-- Member feedback submission added
-- Response viewing added for admin/superadmin
-- No node_modules included

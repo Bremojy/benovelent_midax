@@ -1,131 +1,27 @@
-import {
-  Bell,
-  Wallet,
-  Calendar,
-  HandHeart,
-  Megaphone,
-  Cake,
-} from "lucide-react";
-
+import { Bell, Wallet, Calendar, HandHeart, Megaphone, Phone, Video, AlertCircle } from "lucide-react";
+import { useEffect, useState } from "react";
+import API from "../../services/api";
 import "./NotificationCenter.css";
 
-const notifications = [
-
-  {
-    id: 1,
-    icon: Wallet,
-    color: "#16a34a",
-    title: "Contribution Received",
-    message: "Your July contribution has been recorded successfully.",
-    time: "5 min ago",
-  },
-
-  {
-    id: 2,
-    icon: HandHeart,
-    color: "#ff7a00",
-    title: "Claim Update",
-    message: "Your assistance request is under review.",
-    time: "20 min ago",
-  },
-
-  {
-    id: 3,
-    icon: Megaphone,
-    color: "#2563eb",
-    title: "Announcement",
-    message: "Monthly meeting this Saturday at 2:00 PM.",
-    time: "1 hour ago",
-  },
-
-  {
-    id: 4,
-    icon: Calendar,
-    color: "#9333ea",
-    title: "Upcoming Event",
-    message: "Annual General Meeting starts next week.",
-    time: "Yesterday",
-  },
-
-  {
-    id: 5,
-    icon: Cake,
-    color: "#ec4899",
-    title: "Birthday",
-    message: "Wish Jane Wanjiku a happy birthday today.",
-    time: "Today",
-  },
-
-];
+const iconFor = (type = "system") => {
+  const t = String(type).toLowerCase();
+  if (t.includes("contribution") || t.includes("finance") || t.includes("payment")) return Wallet;
+  if (t.includes("claim") || t.includes("medical") || t.includes("funeral") || t.includes("education")) return HandHeart;
+  if (t.includes("news") || t.includes("announcement")) return Megaphone;
+  if (t.includes("video")) return Video;
+  if (t.includes("call")) return Phone;
+  if (t.includes("poll") || t.includes("event")) return Calendar;
+  return AlertCircle;
+};
 
 export default function NotificationCenter() {
-
-  return (
-
-    <div className="notification-card">
-
-      <div className="notification-header">
-
-        <h2>
-
-          <Bell size={22} />
-
-          Notifications
-
-        </h2>
-
-        <button>
-
-          View All
-
-        </button>
-
-      </div>
-
-      <div className="notification-list">
-
-        {notifications.map(item => {
-
-          const Icon = item.icon;
-
-          return (
-
-            <div
-              key={item.id}
-              className="notification-item"
-            >
-
-              <div
-                className="notification-icon"
-                style={{
-                  background: item.color
-                }}
-              >
-
-                <Icon size={20} color="#fff"/>
-
-              </div>
-
-              <div className="notification-content">
-
-                <h4>{item.title}</h4>
-
-                <p>{item.message}</p>
-
-              </div>
-
-              <small>{item.time}</small>
-
-            </div>
-
-          );
-
-        })}
-
-      </div>
-
+  const [notifications, setNotifications] = useState([]);
+  const load = async () => { try { const { data } = await API.get("/notifications", { params: { limit: 6 } }); setNotifications(Array.isArray(data?.notifications) ? data.notifications : []); } catch {} };
+  useEffect(() => { load(); const id = window.setInterval(load, 30000); return () => window.clearInterval(id); }, []);
+  return <div className="notification-card">
+    <div className="notification-header"><h2><Bell size={22} />Notifications</h2><a href="/member/notifications">View All</a></div>
+    <div className="notification-list">
+      {notifications.length === 0 ? <div className="notification-empty">No notifications yet.</div> : notifications.map((item) => { const Icon = iconFor(item.type); return <div key={item._id} className={`notification-item ${item.read ? "read" : "unread"}`}><div className="notification-icon"><Icon size={20} /></div><div className="notification-content"><h4>{item.title}</h4><p>{item.message}</p></div><small>{item.createdAt ? new Date(item.createdAt).toLocaleString([], { dateStyle: "medium", timeStyle: "short" }) : ""}</small></div>; })}
     </div>
-
-  );
-
+  </div>;
 }
