@@ -8,6 +8,8 @@ const {
     deepScanCarouselDuplicates,
     deleteDuplicateMember,
     downloadDatabaseBackup,
+    downloadHumanBackup,
+    printHumanBackup,
     printDatabaseDetails,
     cleanupSelfConversations,
     cleanupOrphanedChatData,
@@ -22,6 +24,8 @@ router.use(protect, superAdmin);
 
 router.get("/", getIntegrityReport);
 router.get("/backup", downloadDatabaseBackup);
+router.get("/backup/human", downloadHumanBackup);
+router.get("/backup/human/print", printHumanBackup);
 router.get("/print-database", printDatabaseDetails);
 router.post("/cleanup", runSafeCleanup);
 router.post("/cleanup/carousels", cleanupCarouselDuplicates);

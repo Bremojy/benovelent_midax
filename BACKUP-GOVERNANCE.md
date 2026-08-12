@@ -29,3 +29,13 @@ The backup endpoint uses the backend's existing `MONGO_URI`. Keep the actual `MO
 4. Open **Data Integrity** and click **Scan Again**.
 5. Use **Backup database** for a downloadable application-data snapshot.
 6. Use **Print report** for a paper/PDF-ready integrity report.
+
+## Human-readable backup and permanent account deletion
+
+The Data Integrity page also provides **Human backup** and **Print backup** actions. These create the same live application snapshot in a readable HTML format with collection names, record counts and labelled fields so the record can be opened offline, printed or saved as a PDF from the browser.
+
+SuperAdmin deletion of a member or administrator is now **permanent**. Member deletion removes the member account and linked personal, support, contribution/finance, notification, feedback and chat records. Administrator deletion removes the administrator account, its legacy portal chat shadow profile and linked chat records, while dependent financial/support approval references are cleared and administrator-owned news/polls are removed rather than leaving broken database references.
+
+Before a permanent deletion, download a **Human backup** from Data Integrity and store it in a controlled offline location. Technical JSON remains available when machine-readable backup data is needed.
+
+Portal Admin/SuperAdmin chat profiles use a deterministic `portalOwnerId` / `portalOwnerRole` link so deleted administrator accounts cannot leave hidden Member records that block reuse of an email or username.

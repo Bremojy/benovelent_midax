@@ -16,6 +16,9 @@ const Notification = require("../models/Notification");
 const FeedbackCollection = require("../models/FeedbackCollection");
 const Carousel = require("../models/Carousel");
 const Contribution = require("../models/Contribution");
+const createAuditLog = require("../utils/createAuditLog");
+const { deleteAdminPermanently } = require("../utils/permanentAccountDeletion");
+const generateTemporaryPassword = require("../utils/generateTemporaryPassword");
 const mongoose = require("mongoose");
 
 
@@ -70,10 +73,11 @@ exports.createAdmin = async (req, res) => {
     // CHECK EXISTING ADMIN
     // -----------------------------------------------
 
-    const existingAdmin =
-      await Admin.findOne({
-        email: normalizedEmail,
-      });
+    const [existingAdmin, existingMember, existingSuperAdmin] = await Promise.all([
+      Admin.findOne({ email: normalizedEmail }),
+      Member.findOne({ email: normalizedEmail, role: "member", isDeleted: { $ne: true } }),
+      SuperAdmin.findOne({ email: normalizedEmail }),
+    ]);
 
     if (existingAdmin) {
       return res.status(409).json({
@@ -83,6 +87,30 @@ exports.createAdmin = async (req, res) => {
         code: "ADMIN_EXISTS",
       });
     }
+
+    if (existingMember) {
+      return res.status(409).json({
+        success: false,
+        message: "This email is already used by a member account.",
+        code: "EMAIL_USED_BY_MEMBER",
+      });
+    }
+
+    if (existingSuperAdmin) {
+      return res.status(409).json({
+        success: false,
+        message: "This email is reserved for a SuperAdmin account.",
+        code: "EMAIL_USED_BY_SUPERADMIN",
+      });
+    }
+
+    // Remove a legacy shadow chat profile only after confirming no live portal
+    // account with this email exists. This prevents stale duplicate errors.
+    await Member.deleteMany({
+      email: normalizedEmail,
+      role: "admin",
+      notes: { $regex: "^Auto-synced portal chat profile for admin\\.$", $options: "i" },
+    });
 
     // -----------------------------------------------
     // CREATE ADMIN
@@ -567,12 +595,7 @@ exports.resetAdminPassword =
       // GENERATE TEMPORARY PASSWORD
       // ---------------------------------------------
 
-      const temporaryPassword =
-        `MIDAX@${Math.floor(
-          100000 +
-            Math.random() *
-              900000
-        )}`;
+      const temporaryPassword = generateTemporaryPassword();
 
       admin.password =
         temporaryPassword;
@@ -619,50 +642,38 @@ exports.resetAdminPassword =
 // DELETE ADMIN
 // ======================================================
 
-exports.deleteAdmin = async (
-  req,
-  res
-) => {
+exports.deleteAdmin = async (req, res) => {
   try {
-    const { id } =
-      req.params;
+    const { id } = req.params;
+    const result = await deleteAdminPermanently(id, req.user._id);
 
-    const admin =
-      await Admin.findById(id);
-
-    if (!admin) {
-      return res.status(404).json({
-        success: false,
-        message:
-          "Administrator not found.",
-      });
-    }
-
-    await Admin.findByIdAndDelete(
-      id
-    );
+    await createAuditLog({
+      user: req.user._id,
+      userRole: "superadmin",
+      action: "DELETE_PERMANENTLY",
+      module: "Administrator",
+      description: `Permanently deleted administrator ${result.admin.fullName || result.admin.name || result.admin.email || id}.`,
+      metadata: {
+        deletedAdminId: String(result.admin._id),
+        summary: result.summary,
+      },
+      req,
+    });
 
     return res.json({
       success: true,
-
-      message:
-        "Administrator removed successfully.",
+      permanent: true,
+      message: "Administrator was permanently deleted. Reusing the same credentials is now allowed.",
+      summary: result.summary,
     });
-
   } catch (error) {
-    console.error(
-      "Delete Admin Error:",
-      error
-    );
-
-    return res.status(500).json({
+    console.error("Permanent admin deletion error:", error);
+    return res.status(error.statusCode || 500).json({
       success: false,
-      message:
-        "Unable to remove administrator.",
+      message: error.message || "Unable to permanently delete administrator.",
     });
   }
 };
-
 
 // ======================================================
 // ADMIN STATISTICS

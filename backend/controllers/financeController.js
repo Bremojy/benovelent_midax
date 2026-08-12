@@ -286,7 +286,7 @@ exports.updateTransaction = async (req, res) => {
             const linked = await Contribution.findOne({ finance: transaction._id });
             if (linked) {
                 linked.member = transaction.member || linked.member;
-                linked.expectedAmount = Math.max(Number(linked.expectedAmount || 0), Number(transaction.amount || 0));
+                linked.expectedAmount = Number(transaction.amount || 0);
                 linked.paidAmount = Number(transaction.amount || 0);
                 linked.paymentMethod = transaction.paymentMethod;
                 linked.receiptNumber = transaction.receiptNumber || linked.receiptNumber;
@@ -332,49 +332,36 @@ exports.updateTransaction = async (req, res) => {
 ===================================================== */
 
 exports.deleteTransaction = async (req, res) => {
-
     try {
-
         const transaction = await Finance.findById(req.params.id);
-
         if (!transaction) {
-
             return res.status(404).json({
-
                 success: false,
-
-                message: "Transaction not found."
-
+                message: "Transaction not found.",
             });
+        }
 
+        const linkedContribution = await Contribution.findOne({ finance: transaction._id }).select("_id month year").lean();
+        if (linkedContribution) {
+            return res.status(409).json({
+                success: false,
+                code: "LINKED_CONTRIBUTION",
+                message: "This transaction is linked to a contribution. Edit it from the contribution record or delete the contribution first to keep the financial ledger consistent.",
+            });
         }
 
         await transaction.deleteOne();
-
-        res.json({
-
+        return res.json({
             success: true,
-
-            message: "Transaction deleted successfully."
-
+            message: "Transaction deleted successfully.",
         });
-
-    }
-
-    catch (error) {
-
+    } catch (error) {
         console.error(error);
-
-        res.status(500).json({
-
+        return res.status(500).json({
             success: false,
-
-            message: error.message
-
+            message: error.message,
         });
-
     }
-
 };
 
 

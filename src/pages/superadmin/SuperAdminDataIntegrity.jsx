@@ -56,6 +56,55 @@ export default function SuperAdminDataIntegrity() {
 
   useEffect(() => { load(); }, [load]);
 
+  const downloadHumanBackup = async () => {
+    try {
+      setError("");
+      setMessage("");
+      const { data, headers } = await API.get("/superadmin/data-integrity/backup/human", {
+        params: { _ts: Date.now() },
+        responseType: "blob",
+        timeout: 120000,
+      });
+      const blob = new Blob([data], { type: headers["content-type"] || "text/html" });
+      const url = window.URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      const disposition = headers["content-disposition"] || "";
+      const match = disposition.match(/filename="?([^";]+)"?/i);
+      anchor.href = url;
+      anchor.download = match?.[1] || `benevolent-midax-human-backup-${new Date().toISOString().slice(0, 10)}.html`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.setTimeout(() => window.URL.revokeObjectURL(url), 1000);
+      setMessage("Human-readable backup downloaded. It can be opened, printed or stored offline.");
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || "Unable to create human-readable backup.");
+    }
+  };
+
+  const printHumanBackup = async () => {
+    try {
+      setError("");
+      const { data } = await API.get("/superadmin/data-integrity/backup/human/print", {
+        responseType: "text",
+        timeout: 120000,
+        params: { _ts: Date.now() },
+      });
+      const popup = window.open("", "benevolentHumanBackupPrint", "width=1200,height=900");
+      if (!popup) {
+        setError("Your browser blocked the print window. Allow pop-ups for this site and try again.");
+        return;
+      }
+      popup.document.open();
+      popup.document.write(data);
+      popup.document.close();
+      popup.focus();
+      setMessage("Human-readable backup opened for printing.");
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || "Unable to open printable backup.");
+    }
+  };
+
   const downloadBackup = async () => {
     try {
       setError("");
@@ -274,9 +323,17 @@ export default function SuperAdminDataIntegrity() {
               <Sparkles size={16} />
               {cleaning ? "Cleaning..." : "Run Safe Cleanup"}
             </button>
-            <button className="portal-btn light" onClick={downloadBackup} disabled={loading || cleaning || cleaningCarousels}>
+            <button className="portal-btn light" onClick={downloadHumanBackup} disabled={loading || cleaning || cleaningCarousels}>
               <Download size={16} />
-              Backup database
+              Human backup
+            </button>
+            <button className="portal-btn light" onClick={printHumanBackup} disabled={loading || cleaning || cleaningCarousels}>
+              <Printer size={16} />
+              Print backup
+            </button>
+            <button className="portal-btn light" onClick={downloadBackup} disabled={loading || cleaning || cleaningCarousels}>
+              <Database size={16} />
+              Technical JSON
             </button>
             <button className="portal-btn light" onClick={printReport} disabled={!report || loading || cleaning || cleaningCarousels}>
               <Printer size={16} />

@@ -32,11 +32,22 @@ async function ensureChatProfile(user) {
   if (role === 'member') return user;
 
   const payload = buildChatProfilePayload(user);
-  const existing = await Member.findOne({
-    email: payload.email,
-    role: payload.role,
+  let existing = await Member.findOne({
+    portalOwnerId: user._id,
+    portalOwnerRole: role,
     isDeleted: { $ne: true },
   });
+
+  // Backward compatibility for chat profiles created before portalOwnerId was
+  // introduced. Once found, the deterministic ownership link is stamped on it.
+  if (!existing && payload.email) {
+    existing = await Member.findOne({
+      email: payload.email,
+      role: payload.role,
+      notes: { $regex: `^Auto-synced portal chat profile for ${role}\\.$`, $options: "i" },
+      isDeleted: { $ne: true },
+    });
+  }
 
   if (existing) {
     existing.fullName = payload.fullName;
@@ -45,6 +56,8 @@ async function ensureChatProfile(user) {
     existing.profileImage = payload.profileImage || existing.profileImage || '';
     existing.status = 'active';
     existing.verified = true;
+    existing.portalOwnerId = user._id;
+    existing.portalOwnerRole = role;
     existing.lastSeen = new Date();
     existing.online = Boolean(user.online);
     await existing.save();
@@ -60,6 +73,8 @@ async function ensureChatProfile(user) {
     email: payload.email,
     password: user.password || 'PortalChatOnly123!',
     role: payload.role,
+    portalOwnerId: user._id,
+    portalOwnerRole: role,
     profileImage: payload.profileImage,
     bio: payload.notes,
     joinDate: payload.joinDate,

@@ -436,6 +436,45 @@ exports.updateContribution = async (req, res) => {
 
         await contribution.save();
 
+        // Keep the linked finance ledger entry synchronized with the
+        // contribution record. A contribution and its finance transaction
+        // represent one accounting event in this application.
+        if (contribution.finance) {
+            const finance = await Finance.findById(contribution.finance);
+            if (finance) {
+                finance.member = contribution.member;
+                finance.type = "contribution";
+                finance.category = finance.category || "Monthly Contribution";
+                finance.amount = Number(contribution.paidAmount || 0);
+                finance.paymentMethod = contribution.paymentMethod || finance.paymentMethod;
+                finance.receiptNumber = contribution.receiptNumber || "";
+                finance.referenceNumber = contribution.mpesaCode || "";
+                finance.transactionDate = contribution.paymentDate || finance.transactionDate;
+                finance.description = `Contribution ${contribution.month}/${contribution.year}`;
+                finance.notes = contribution.notes || "";
+                await finance.save();
+            }
+        } else if (Number(contribution.paidAmount || 0) > 0) {
+            const finance = await Finance.create({
+                member: contribution.member,
+                transactionNumber: `TRX-${Date.now()}-${String(contribution._id).slice(-6)}`,
+                type: "contribution",
+                category: "Monthly Contribution",
+                amount: Number(contribution.paidAmount || 0),
+                paymentMethod: contribution.paymentMethod || "M-PESA",
+                receiptNumber: contribution.receiptNumber || "",
+                referenceNumber: contribution.mpesaCode || "",
+                description: `Contribution ${contribution.month}/${contribution.year}`,
+                transactionDate: contribution.paymentDate || new Date(),
+                status: "approved",
+                approvedBy: req.user._id,
+                approvedAt: new Date(),
+                notes: contribution.notes || "",
+            });
+            contribution.finance = finance._id;
+            await contribution.save();
+        }
+
         res.json({
 
             success: true,

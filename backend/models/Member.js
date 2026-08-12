@@ -144,6 +144,21 @@ sparse:true,
       trim: true,
     },
 
+    // Portal chat profiles for Admin/SuperAdmin accounts are represented in
+    // the Member collection for backwards compatibility with the chat schema.
+    // These immutable link fields identify the originating portal account so
+    // an administrator can be permanently removed without leaving a hidden
+    // duplicate profile behind.
+    portalOwnerId: {
+      type: mongoose.Schema.Types.ObjectId,
+      default: null,
+    },
+    portalOwnerRole: {
+      type: String,
+      enum: ["admin", "superadmin"],
+      default: null,
+    },
+
     // =====================================
 // PERSONAL INFORMATION
 // =====================================
@@ -543,6 +558,7 @@ memberSchema.pre("save", async function () {
 // INDEXES
 // =====================================
 
+memberSchema.index({ portalOwnerId: 1, portalOwnerRole: 1 }, { sparse: true });
 memberSchema.index({ status: 1 });
 memberSchema.index({ online: 1 });
 

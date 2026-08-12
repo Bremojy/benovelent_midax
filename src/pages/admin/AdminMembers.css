@@ -2358,3 +2358,23 @@ input[type="number"]::-webkit-outer-spin-button {
     grid-template-columns: 1fr;
   }
 }
+
+
+/* =====================================================
+   SuperAdmin member-account credentials
+===================================================== */
+.admin-member-temp-password-card{
+  margin:16px 0;
+  padding:16px 18px;
+  border:1px solid rgba(233,125,0,.22);
+  border-radius:16px;
+  background:linear-gradient(135deg,#fff8ee,#fff);
+  box-shadow:0 8px 24px rgba(31,41,55,.06);
+}
+.admin-member-temp-password-card strong{display:block;color:#9a5413;font-size:14px;margin-bottom:4px}
+.admin-member-temp-password-card p{margin:0;color:#6f737b;font-size:13px;line-height:1.5}
+.admin-member-temp-password-row{display:flex;gap:10px;margin-top:12px}
+.admin-member-temp-password-row input{flex:1;min-width:0;border:1px solid #dfe3e8;border-radius:12px;padding:12px 14px;background:#fff;font:inherit}
+.admin-member-temp-password-generate{border:0;border-radius:12px;padding:0 16px;background:#ef7d00;color:#fff;font-weight:700;cursor:pointer}
+.admin-member-temp-password-generate:hover{filter:brightness(.96)}
+@media(max-width:600px){.admin-member-temp-password-row{flex-direction:column}.admin-member-temp-password-generate{min-height:44px}}

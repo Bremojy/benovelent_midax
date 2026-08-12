@@ -31,6 +31,8 @@ export default function AdminFinance() {
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [editingContribution, setEditingContribution] = useState(null);
+  const [contributionForm, setContributionForm] = useState({ expectedAmount: "", paidAmount: "", paymentMethod: "M-PESA", receiptNumber: "", mpesaCode: "", paymentDate: today, notes: "" });
   const [bulkForm, setBulkForm] = useState({ month: new Date().getMonth() + 1, year: new Date().getFullYear(), amount: "500", paymentDate: today, recordAsCollected: true, notes: "Monthly payroll deduction" });
   const [bulkSaving, setBulkSaving] = useState(false);
 
@@ -57,6 +59,14 @@ export default function AdminFinance() {
 
   useEffect(() => { load(); }, []);
 
+  useEffect(() => {
+    if (!editing && !editingContribution) return;
+    const timer = window.setTimeout(() => {
+      document.getElementById("finance-editor")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 50);
+    return () => window.clearTimeout(timer);
+  }, [editing, editingContribution]);
+
   const number = (value) => new Intl.NumberFormat("en-KE", { style: "currency", currency: "KES", maximumFractionDigits: 0 }).format(Number(value || 0));
   const first = (...keys) => { for (const key of keys) if (summary?.[key] !== undefined) return summary[key]; return 0; };
 
@@ -70,10 +80,12 @@ export default function AdminFinance() {
 
   const startCreate = () => {
     setEditing(null);
+    setEditingContribution(null);
     setForm(EMPTY_FORM);
   };
 
   const startEdit = (transaction) => {
+    setEditingContribution(null);
     setEditing(transaction);
     setForm({
       employeeNumber: transaction?.member?.memberNumber || transaction.employeeNumber || "",
@@ -87,6 +99,48 @@ export default function AdminFinance() {
       transactionDate: transaction?.transactionDate ? new Date(transaction.transactionDate).toISOString().slice(0, 10) : today,
       notes: transaction?.notes || "",
     });
+  };
+
+  const startEditContribution = (contribution) => {
+    setEditing(null);
+    setEditingContribution(contribution);
+    setContributionForm({
+      expectedAmount: contribution?.expectedAmount ?? "",
+      paidAmount: contribution?.paidAmount ?? "",
+      paymentMethod: contribution?.paymentMethod || "M-PESA",
+      receiptNumber: contribution?.receiptNumber || "",
+      mpesaCode: contribution?.mpesaCode || "",
+      paymentDate: contribution?.paymentDate ? new Date(contribution.paymentDate).toISOString().slice(0, 10) : today,
+      notes: contribution?.notes || "",
+    });
+    setError("");
+    setMessage("");
+  };
+
+  const saveContribution = async (event) => {
+    event.preventDefault();
+    if (!editingContribution?._id) return;
+    try {
+      setSaving(true);
+      setError("");
+      const response = await API.put(`/contributions/${editingContribution._id}`, {
+        expectedAmount: Number(contributionForm.expectedAmount),
+        paidAmount: Number(contributionForm.paidAmount),
+        paymentMethod: contributionForm.paymentMethod,
+        receiptNumber: contributionForm.receiptNumber,
+        mpesaCode: contributionForm.mpesaCode,
+        paymentDate: contributionForm.paymentDate || today,
+        notes: contributionForm.notes,
+      });
+      if (!response.data?.success) throw new Error(response.data?.message || "Unable to update contribution.");
+      setMessage("Contribution updated and its linked finance record synchronized.");
+      setEditingContribution(null);
+      await load();
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || "Unable to update contribution.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const saveTransaction = async (event) => {
@@ -211,7 +265,7 @@ export default function AdminFinance() {
           </form>
         </section>
 
-        <section className="portal-panel">
+        <section id="finance-editor" className="portal-panel">
           <h2>{editing ? "Edit Transaction" : "Add Transaction"}</h2>
           <form onSubmit={saveTransaction} className="portal-form-grid">
             <label className="portal-field"><span>Employee number</span><input type="text" autoComplete="off" value={form.employeeNumber} onChange={(e) => setForm({ ...form, employeeNumber: e.target.value })} placeholder="Enter employee number" inputMode="text" required={form.type === "contribution" || form.type === "claim" || form.type === "refund"} /></label>
@@ -245,6 +299,25 @@ export default function AdminFinance() {
           </tbody></table></div>
         </section>
 
+        {editingContribution && (
+          <section id="finance-editor" className="portal-panel contribution-editor-panel">
+            <div className="portal-module-header">
+              <div><span>CONTRIBUTION EDITOR</span><h2>Edit contribution</h2><p>{editingContribution.member?.fullName || editingContribution.member?.memberNumber || "Member"} · {editingContribution.month || "—"}/{editingContribution.year || "—"}</p></div>
+              <button type="button" className="portal-btn secondary" onClick={() => setEditingContribution(null)}>Cancel</button>
+            </div>
+            <form onSubmit={saveContribution} className="portal-form-grid">
+              <label className="portal-field"><span>Expected amount</span><input type="number" min="0" step="0.01" value={contributionForm.expectedAmount} onChange={(e) => setContributionForm({ ...contributionForm, expectedAmount: e.target.value })} required /></label>
+              <label className="portal-field"><span>Paid amount</span><input type="number" min="0" step="0.01" value={contributionForm.paidAmount} onChange={(e) => setContributionForm({ ...contributionForm, paidAmount: e.target.value })} required /></label>
+              <label className="portal-field"><span>Payment method</span><select value={contributionForm.paymentMethod} onChange={(e) => setContributionForm({ ...contributionForm, paymentMethod: e.target.value })}><option>M-PESA</option><option>Bank</option><option>Cash</option><option>Cheque</option><option>Payroll</option></select></label>
+              <label className="portal-field"><span>Payment date</span><input type="date" value={contributionForm.paymentDate} onChange={(e) => setContributionForm({ ...contributionForm, paymentDate: e.target.value })} /></label>
+              <label className="portal-field"><span>Receipt number</span><input type="text" value={contributionForm.receiptNumber} onChange={(e) => setContributionForm({ ...contributionForm, receiptNumber: e.target.value })} /></label>
+              <label className="portal-field"><span>M-PESA / reference code</span><input type="text" value={contributionForm.mpesaCode} onChange={(e) => setContributionForm({ ...contributionForm, mpesaCode: e.target.value })} /></label>
+              <label className="portal-field portal-field-wide"><span>Notes</span><textarea rows="3" value={contributionForm.notes} onChange={(e) => setContributionForm({ ...contributionForm, notes: e.target.value })} /></label>
+              <div className="portal-actions"><button className="portal-btn" disabled={saving} type="submit">{saving ? "Saving..." : "Update contribution"}</button></div>
+            </form>
+          </section>
+        )}
+
         <section className="portal-panel">
           <h2>Recent Transactions</h2>
           {sortedTransactions.length === 0 ? <div className="portal-empty">No finance transactions returned.</div> :
@@ -256,8 +329,8 @@ export default function AdminFinance() {
         <section className="portal-panel">
           <div className="portal-module-header"><div><span>PAYROLL RECORDS</span><h2>Contributions</h2><p>These records are generated from the scheme-wide payroll contribution process.</p></div><div className="portal-stat"><span>Member count</span><strong>{sortedContributions.length ? new Set(sortedContributions.map((x) => String(x.member?._id || x.member?.memberNumber || x.member))).size : 0}</strong><small>records shown</small></div></div>
           {sortedContributions.length === 0 ? <div className="portal-empty">No contribution records returned.</div> :
-            <div className="portal-table-wrap"><table className="portal-table"><thead><tr><th>Date</th><th>Member</th><th>Period</th><th>Expected</th><th>Paid</th><th>Status</th></tr></thead><tbody>
-              {sortedContributions.slice(0, 30).map((x, i) => <tr key={x._id || i}><td>{date(x.paymentDate || x.createdAt)}</td><td>{x.member?.fullName || x.member?.memberNumber || "Member"}</td><td>{x.month || "—"} {x.year || ""}</td><td>{number(x.expectedAmount)}</td><td>{number(x.paidAmount)}</td><td><span className="portal-badge">{x.status || "Recorded"}</span></td></tr>)}
+            <div className="portal-table-wrap"><table className="portal-table"><thead><tr><th>Date</th><th>Member</th><th>Period</th><th>Expected</th><th>Paid</th><th>Status</th><th>Actions</th></tr></thead><tbody>
+              {sortedContributions.slice(0, 30).map((x, i) => <tr key={x._id || i}><td>{date(x.paymentDate || x.createdAt)}</td><td>{x.member?.fullName || x.member?.memberNumber || "Member"}</td><td>{x.month || "—"} {x.year || ""}</td><td>{number(x.expectedAmount)}</td><td>{number(x.paidAmount)}</td><td><span className="portal-badge">{x.status || "Recorded"}</span></td><td><button type="button" className="portal-btn secondary" onClick={() => startEditContribution(x)}><Edit3 size={14} /> Edit</button></td></tr>)}
             </tbody></table></div>}
         </section>
       </div>

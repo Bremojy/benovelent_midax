@@ -11,6 +11,8 @@ const EducationSupport = require("../models/EducationSupport");
 const MedicalSupport = require("../models/MedicalSupport");
 const FuneralSupport = require("../models/FuneralSupport");
 const { resolveStoredFileUrl } = require("../utils/uploadUrl");
+const { deleteMemberPermanently } = require("../utils/permanentAccountDeletion");
+const generateTemporaryPassword = require("../utils/generateTemporaryPassword");
 
 /* =====================================================
    ADMIN DASHBOARD
@@ -220,6 +222,7 @@ exports.createMember = async (req, res) => {
       department,
       position,
       monthlyContribution,
+      temporaryPassword: requestedTemporaryPassword,
     } = req.body;
 
     // ==========================================
@@ -285,22 +288,46 @@ exports.createMember = async (req, res) => {
     }
 
     // ==========================================
-    // CHECK EMAIL ONLY IF PROVIDED
+    // CHECK EMAIL ACROSS ALL LOGIN ROLES
     // ==========================================
 
     if (cleanEmail) {
-      const existingEmail =
-        await Member.findOne({
-          email: cleanEmail,
-        });
+      const [existingEmail, existingAdmin, existingSuperAdmin] = await Promise.all([
+        Member.findOne({ email: cleanEmail }),
+        Admin.findOne({ email: cleanEmail }),
+        SuperAdmin.findOne({ email: cleanEmail }),
+      ]);
 
       if (existingEmail) {
         return res.status(400).json({
           success: false,
-          message:
-            "A member with this email already exists.",
+          message: existingEmail.role === "admin" || existingEmail.role === "superadmin"
+            ? "This email belongs to a portal account and cannot be reused for a member while that account exists."
+            : "A member with this email already exists.",
         });
       }
+
+      if (existingAdmin) {
+        return res.status(400).json({
+          success: false,
+          message: "This email is already used by an administrator account.",
+        });
+      }
+
+      if (existingSuperAdmin) {
+        return res.status(400).json({
+          success: false,
+          message: "This email is reserved for a SuperAdmin account.",
+        });
+      }
+
+      // Remove an orphaned legacy Admin chat profile left by older versions.
+      // The real Admin account has already been confirmed absent above.
+      await Member.deleteMany({
+        email: cleanEmail,
+        role: "admin",
+        notes: { $regex: "^Auto-synced portal chat profile for admin\\.$", $options: "i" },
+      });
     }
 
     // ==========================================
@@ -326,8 +353,24 @@ exports.createMember = async (req, res) => {
     // TEMPORARY PASSWORD
     // ==========================================
 
-    const temporaryPassword =
-      `MIDAX@${Math.floor(100000 + Math.random() * 900000)}`;
+    const requestedTemp = String(requestedTemporaryPassword || "").trim();
+    const isSuperAdminCreator = String(req.user?.role || "").toLowerCase() === "superadmin";
+
+    if (requestedTemp && !isSuperAdminCreator) {
+      return res.status(403).json({
+        success: false,
+        message: "Only a SuperAdmin can choose a member temporary password.",
+      });
+    }
+
+    if (requestedTemp && requestedTemp.length < 8) {
+      return res.status(400).json({
+        success: false,
+        message: "Temporary password must contain at least 8 characters.",
+      });
+    }
+
+    const temporaryPassword = requestedTemp || generateTemporaryPassword();
 
     // Member schema hashes plaintext passwords in its pre-save hook.
 
@@ -783,53 +826,36 @@ exports.activateMember = async (req,res)=>{
    SOFT DELETE MEMBER
 ===================================================== */
 
-exports.deleteMember = async (req,res)=>{
+exports.deleteMember = async (req, res) => {
+  try {
+    const result = await deleteMemberPermanently(req.params.id);
 
-  try{
-
-    const member =
-      await Member.findById(req.params.id);
-
-    if(!member){
-
-      return res.status(404).json({
-
-        success:false,
-
-        message:"Member not found."
-
-      });
-
-    }
-
-    member.isDeleted = true;
-
-    member.online = false;
-
-    await member.save();
-
-    res.json({
-
-      success:true,
-
-      message:"Member deleted successfully."
-
+    await createAuditLog({
+      user: req.user._id,
+      userRole: "superadmin",
+      action: "DELETE_PERMANENTLY",
+      module: "Member",
+      description: `Permanently deleted member ${result.member.fullName || result.member.memberNumber || result.member.email || req.params.id} and linked personal/chat records.`,
+      metadata: {
+        deletedMemberId: String(result.member._id),
+        summary: result.summary,
+      },
+      req,
     });
 
-  }
-
-  catch(error){
-
-    res.status(500).json({
-
-      success:false,
-
-      message:error.message
-
+    return res.json({
+      success: true,
+      permanent: true,
+      message: "Member and all linked personal and chat records were permanently deleted.",
+      summary: result.summary,
     });
-
+  } catch (error) {
+    console.error("Permanent member deletion error:", error);
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.message || "Unable to permanently delete member.",
+    });
   }
-
 };
 
 /* =====================================================

@@ -598,6 +598,132 @@ function redactForBackup(value, key = "") {
     return value;
 }
 
+
+const humanLabel = (value) => String(value || "")
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/[_.-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+
+const humanValue = (value) => {
+    if (value === null || value === undefined || value === "") return "—";
+    if (Array.isArray(value)) {
+        if (!value.length) return "—";
+        return value.map((item) => humanValue(item)).join("; ");
+    }
+    if (value instanceof Date) return value.toLocaleString("en-KE");
+    if (typeof value === "object") {
+        return Object.entries(value)
+            .map(([key, child]) => `${humanLabel(key)}: ${humanValue(child)}`)
+            .join(" · ");
+    }
+    if (typeof value === "boolean") return value ? "Yes" : "No";
+    return String(value);
+};
+
+const renderHumanRecord = (document) => {
+    const safe = (value) => String(value ?? "").replace(/[&<>\"']/g, (character) => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;",
+    }[character]));
+    const rows = Object.entries(redactForBackup(document))
+        .filter(([key]) => key !== "__v")
+        .map(([key, value]) => `<tr><th>${safe(humanLabel(key))}</th><td>${safe(humanValue(value))}</td></tr>`)
+        .join("");
+    return `<table class="record"><tbody>${rows || `<tr><td>No readable fields.</td></tr>`}</tbody></table>`;
+};
+
+const buildHumanBackupHtml = async ({ autoPrint = false } = {}) => {
+    if (mongoose.connection.readyState !== 1 || !mongoose.connection.db) {
+        const error = new Error("Database is not currently connected.");
+        error.statusCode = 503;
+        throw error;
+    }
+
+    const collections = await mongoose.connection.db
+        .listCollections({}, { nameOnly: true })
+        .toArray();
+
+    const sorted = collections
+        .map((item) => item.name)
+        .filter(Boolean)
+        .sort((a, b) => a.localeCompare(b));
+
+    const sections = [];
+    for (const collectionName of sorted) {
+        const documents = await mongoose.connection.db.collection(collectionName).find({}).toArray();
+        const meaning = {
+            admins: "Administrator accounts",
+            auditlogs: "Security and activity history",
+            carousels: "Homepage carousel content",
+            contactmessages: "Public contact messages",
+            contributions: "Member contribution records",
+            conversations: "Chat conversations",
+            dependents: "Registered member dependents",
+            educationsupports: "Education support applications",
+            feedbackcollections: "Feedback forms and responses",
+            finances: "Financial transactions and ledger records",
+            funeralsupports: "Funeral support applications",
+            leaders: "Public leadership profiles",
+            medicalsupports: "Medical support applications",
+            members: "Member accounts and profiles",
+            messages: "Chat messages and attachments",
+            news: "News and announcements",
+            notifications: "Portal notifications",
+            polls: "Polls created for members",
+            pushsubscriptions: "Browser push notification subscriptions",
+            supportrequests: "General member support requests",
+            superadmins: "SuperAdmin accounts",
+            votes: "Poll votes",
+            websitecontents: "Editable public website content",
+        }[collectionName] || "Application records";
+
+        sections.push(`<section class="collection"><div class="collection-title"><div><span class="eyebrow">${humanLabel(collectionName)}</span><h2>${humanLabel(collectionName)}</h2><p>${meaning}</p></div><strong>${documents.length} record${documents.length === 1 ? "" : "s"}</strong></div>${documents.length ? documents.map((doc, index) => `<article class="record-card"><h3>Record ${index + 1}</h3>${renderHumanRecord(doc)}</article>`).join("") : `<div class="empty">No records are currently stored in this collection.</div>`}</section>`);
+    }
+
+    const timestamp = new Date();
+    const safe = (value) => String(value ?? "").replace(/[&<>\"']/g, (character) => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;",
+    }[character]));
+
+    return `<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Benevolent Midax — Human Database Backup</title>
+<style>
+@page{size:A4;margin:14mm}*{box-sizing:border-box}body{margin:0;background:#f5f6f8;color:#202531;font-family:Inter,Arial,sans-serif;line-height:1.45}.sheet{max-width:1080px;margin:0 auto;background:#fff;padding:28px}.cover{border:1px solid #ece7df;border-radius:18px;padding:28px;background:linear-gradient(135deg,#fff8ef,#fff)}.brand{font-size:12px;font-weight:800;letter-spacing:.18em;color:#c66b15;text-transform:uppercase}.cover h1{font-family:Georgia,serif;font-size:34px;margin:8px 0 10px}.muted{color:#6e7580}.meta{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:20px}.meta div{padding:14px;border:1px solid #eee;border-radius:12px;background:#fafafa}.meta small{display:block;color:#7c828a;text-transform:uppercase;letter-spacing:.08em;font-weight:700;font-size:10px;margin-bottom:4px}.collection{margin-top:28px;break-before:auto}.collection-title{display:flex;justify-content:space-between;gap:20px;align-items:flex-end;border-bottom:2px solid #ef7d00;padding-bottom:10px}.collection-title h2{margin:2px 0 3px;font-size:23px}.collection-title p{margin:0;color:#6e7580}.collection-title>strong{font-size:14px;white-space:nowrap}.eyebrow{font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:#c66b15;font-weight:800}.record-card{margin-top:12px;border:1px solid #e8eaed;border-radius:12px;overflow:hidden;break-inside:avoid}.record-card h3{margin:0;padding:10px 12px;background:#f7f8fa;font-size:13px}.record{width:100%;border-collapse:collapse}.record th,.record td{border-top:1px solid #eceef1;padding:8px 10px;vertical-align:top;text-align:left;font-size:11px}.record th{width:30%;background:#fcfcfd;color:#4d5560}.empty{padding:16px;border:1px dashed #d7dbe0;color:#737985;border-radius:10px}.note{margin-top:20px;padding:14px;border-radius:12px;background:#fff7e8;border:1px solid #f3d29a;color:#6c5123;font-size:12px}.page-break{page-break-before:always}.footer{margin-top:30px;padding-top:12px;border-top:1px solid #eee;color:#7b818b;font-size:10px;text-align:center}@media(max-width:700px){.sheet{padding:16px}.meta{grid-template-columns:1fr}.collection-title{align-items:flex-start;flex-direction:column}}
+</style></head><body><main class="sheet">
+<section class="cover"><div class="brand">Benevolent Midax · Data Governance</div><h1>Human-Readable Database Backup</h1><p class="muted">A complete application-data snapshot prepared for SuperAdmin records, review, printing and offline reference.</p><div class="meta"><div><small>Generated</small>${safe(timestamp.toLocaleString("en-KE"))}</div><div><small>Database</small>${safe(mongoose.connection.name || "Connected database")}</div><div><small>Collections</small>${safe(sorted.length)}</div></div><div class="note"><strong>Security note:</strong> Passwords, access tokens, reset tokens, API keys, OTPs and other sensitive secret fields are intentionally redacted. This document is a human-readable record, not a credential recovery document.</div></section>
+${sections.join("")}
+<div class="footer">Benevolent Midax · Confidential SuperAdmin data record · Generated ${safe(timestamp.toLocaleString("en-KE"))}</div>
+</main>${autoPrint ? `<script>window.onload=()=>window.print();</script>` : ""}</body></html>`;
+};
+
+exports.downloadHumanBackup = async (req, res) => {
+    try {
+        const html = await buildHumanBackupHtml({ autoPrint: false });
+        const safeTimestamp = new Date().toISOString().replace(/[:.]/g, "-");
+        res.setHeader("Content-Type", "text/html; charset=utf-8");
+        res.setHeader("Content-Disposition", `attachment; filename="benevolent-midax-human-backup-${safeTimestamp}.html"`);
+        res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, private");
+        return res.send(html);
+    } catch (error) {
+        console.error("Human backup download error:", error);
+        return res.status(error.statusCode || 500).json({ success: false, message: error.message || "Unable to create human-readable backup." });
+    }
+};
+
+exports.printHumanBackup = async (req, res) => {
+    try {
+        const html = await buildHumanBackupHtml({ autoPrint: true });
+        res.setHeader("Content-Type", "text/html; charset=utf-8");
+        res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, private");
+        return res.send(html);
+    } catch (error) {
+        console.error("Human backup print error:", error);
+        return res.status(error.statusCode || 500).json({ success: false, message: error.message || "Unable to create printable human-readable backup." });
+    }
+};
+
 exports.printDatabaseDetails = async (req, res) => {
     try {
         if (mongoose.connection.readyState !== 1 || !mongoose.connection.db) {

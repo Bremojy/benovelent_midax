@@ -244,10 +244,7 @@ function AdminMembers() { const { role }=useAuth(); const isSuperAdmin=role==="s
 
     const confirmed =
       window.confirm(
-        `Are you sure you want to remove ${
-          member.fullName ||
-          "this member"
-        }?`
+        `PERMANENT DELETION\n\n${member.fullName || "This member"} and the member's profile, dependents, support records, contribution/finance records, notifications and chat messages/conversations will be permanently deleted. This cannot be undone.\n\nMake sure a backup has been downloaded from Data Integrity first. Continue?`
       );
 
     if (!confirmed) return;
@@ -1001,6 +998,7 @@ function AdminMembers() { const { role }=useAuth(); const isSuperAdmin=role==="s
             member={
               editingMember
             }
+            isSuperAdmin={isSuperAdmin}
             onClose={() => {
               setShowMemberForm(
                 false
@@ -1123,6 +1121,7 @@ function MemberFormModal({
   member,
   onClose,
   onSave,
+  isSuperAdmin = false,
 }) {
   const editing = Boolean(member);
 
@@ -1156,6 +1155,8 @@ function MemberFormModal({
 
   const [formError, setFormError] =
     useState("");
+
+  const [temporaryPassword, setTemporaryPassword] = useState("");
 
   const handleChange = (event) => {
     const {
@@ -1192,6 +1193,9 @@ function MemberFormModal({
 
       await onSave({
         ...form,
+        ...(isSuperAdmin && !editing && temporaryPassword.trim()
+          ? { temporaryPassword: temporaryPassword.trim() }
+          : {}),
       });
     } catch (error) {
       setFormError(
@@ -1254,6 +1258,33 @@ function MemberFormModal({
               temporary password after
               the account is created.
             </p>
+          </div>
+        )}
+
+        {!editing && isSuperAdmin && (
+          <div className="admin-member-temp-password-card">
+            <div>
+              <strong>Temporary password</strong>
+              <p>Set the first-login password yourself, or leave it empty and the system will generate one securely.</p>
+            </div>
+            <div className="admin-member-temp-password-row">
+              <input
+                type="text"
+                value={temporaryPassword}
+                onChange={(event) => setTemporaryPassword(event.target.value)}
+                placeholder="Example: MIDAX@2026"
+                autoComplete="new-password"
+                minLength={8}
+                maxLength={72}
+              />
+              <button
+                type="button"
+                className="admin-member-temp-password-generate"
+                onClick={() => setTemporaryPassword(`MIDAX@${Math.floor(100000 + Math.random() * 900000)}`)}
+              >
+                Generate
+              </button>
+            </div>
           </div>
         )}
 
