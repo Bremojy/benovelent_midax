@@ -95,6 +95,19 @@ export default function SuperAdminDataIntegrity() {
     }
   };
 
+  const printDatabaseDetails = async () => {
+    try {
+      setError("");
+      const { data } = await API.get("/superadmin/data-integrity/print-database", { responseType: "text", timeout: 120000, params: { _ts: Date.now() } });
+      const popup = window.open("", "benevolentDatabasePrint", "width=1400,height=900");
+      if (!popup) { setError("Your browser blocked the print window. Allow pop-ups for this site and try again."); return; }
+      popup.document.open(); popup.document.write(data); popup.document.close(); popup.focus();
+      setMessage("Full live database print view opened. Sensitive credential/token fields are redacted.");
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || "Unable to print the live database.");
+    }
+  };
+
   const printReport = () => {
     if (!report) {
       setError("Run a database scan before printing the report.");
@@ -151,6 +164,18 @@ export default function SuperAdminDataIntegrity() {
     }
   };
 
+  const deepScanCarousels = async () => {
+    if (!window.confirm("Run a deep carousel scan? The backend will inspect Cloudinary/public image URLs, refresh SHA-256 hashes, then remove only confirmed duplicate slides while keeping the newest copy.")) return;
+    try {
+      setCleaningCarousels(true); setError(""); setMessage("");
+      const { data } = await API.post("/superadmin/data-integrity/cleanup/carousels/deep");
+      setReport(data?.report || null);
+      setMessage(data?.message || "Deep carousel scan completed.");
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || "Deep carousel scan failed.");
+    } finally { setCleaningCarousels(false); }
+  };
+
   const cleanCarouselDuplicates = async () => {
     const confirmed = window.confirm(
       "Remove only duplicate carousel slides? The newest matching slide will be kept. Other member, finance and chat records will not be changed."
@@ -191,6 +216,22 @@ export default function SuperAdminDataIntegrity() {
     }
   };
 
+  const runDirectAction = async (path, confirmText, successFallback) => {
+    if (!window.confirm(confirmText)) return;
+    try {
+      setCleaning(true); setError(""); setMessage("");
+      const { data } = await API.post(path);
+      setReport(data?.report || null);
+      setMessage(data?.message || successFallback);
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || "Database action failed.");
+    } finally { setCleaning(false); }
+  };
+
+  const scrollToSection = (id) => {
+    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
   const health = useMemo(() => {
     if (!report) return "checking";
     const c = report.counts || {};
@@ -221,11 +262,15 @@ export default function SuperAdminDataIntegrity() {
               <RefreshCw size={16} className={loading ? "spin" : ""} />
               {loading ? "Scanning..." : "Scan Again"}
             </button>
-            <button className="portal-btn light" onClick={cleanCarouselDuplicates} disabled={loading || cleaning || cleaningCarousels || !(report?.counts?.duplicateCarouselGroups)}>
+            <button className="portal-btn light" onClick={cleanCarouselDuplicates} disabled={loading || cleaning || cleaningCarousels}>
               <Trash2 size={16} />
               {cleaningCarousels ? "Cleaning carousel..." : "Clean carousel duplicates"}
             </button>
-            <button className="portal-btn primary" onClick={runCleanup} disabled={loading || cleaning || cleaningCarousels || health === "clean"}>
+            <button className="portal-btn light" onClick={deepScanCarousels} disabled={loading || cleaning || cleaningCarousels}>
+              <Database size={16} />
+              Deep scan carousel
+            </button>
+            <button className="portal-btn primary" onClick={runCleanup} disabled={loading || cleaning || cleaningCarousels}>
               <Sparkles size={16} />
               {cleaning ? "Cleaning..." : "Run Safe Cleanup"}
             </button>
@@ -236,6 +281,14 @@ export default function SuperAdminDataIntegrity() {
             <button className="portal-btn light" onClick={printReport} disabled={!report || loading || cleaning || cleaningCarousels}>
               <Printer size={16} />
               Print report
+            </button>
+            <button className="portal-btn light" onClick={printDatabaseDetails} disabled={loading || cleaning || cleaningCarousels}>
+              <Database size={16} />
+              Print all database details
+            </button>
+            <button className="portal-btn light" onClick={() => scrollToSection("integrity-actions-panel")}>
+              <ShieldCheck size={16} />
+              All controls
             </button>
           </div>
         </header>
@@ -257,7 +310,7 @@ export default function SuperAdminDataIntegrity() {
           </div>
         </section>
 
-        <section className="portal-panel integrity-database-panel">
+        <section id="integrity-database" className="portal-panel integrity-database-panel">
           <div className="audit-section-head">
             <div>
               <span>DATABASE CONNECTION</span>
@@ -292,6 +345,40 @@ export default function SuperAdminDataIntegrity() {
           </div>
         </section>
 
+        <section id="integrity-snapshot" className="portal-panel integrity-snapshot-panel">
+          <div className="audit-section-head">
+            <div>
+              <span>LIVE SNAPSHOT · CLICK TO CONTROL</span>
+              <h2>Every finding is actionable</h2>
+              <p>Select an issue below to jump directly to its safe control.</p>
+            </div>
+          </div>
+          <div className="integrity-action-grid">
+            <button type="button" onClick={() => scrollToSection("integrity-duplicates")}><strong>{report?.counts?.duplicateCarouselGroups ?? 0}</strong><span>Carousel duplicates</span></button>
+            <button type="button" onClick={() => scrollToSection("integrity-duplicates")}><strong>{report?.counts?.selfConversations ?? 0}</strong><span>Self-conversations</span></button>
+            <button type="button" onClick={() => scrollToSection("integrity-duplicates")}><strong>{report?.counts?.orphanConversations ?? 0}</strong><span>Orphan conversations</span></button>
+            <button type="button" onClick={() => scrollToSection("integrity-duplicates")}><strong>{report?.counts?.duplicateMemberGroups ?? 0}</strong><span>Duplicate members</span></button>
+            <button type="button" onClick={() => scrollToSection("integrity-actions-panel")}><strong>Backup</strong><span>Download database snapshot</span></button>
+            <button type="button" onClick={() => scrollToSection("integrity-actions-panel")}><strong>Print</strong><span>Print complete report</span></button>
+          </div>
+        </section>
+
+        <section id="integrity-actions-panel" className="portal-panel integrity-actions-panel">
+          <div className="audit-section-head"><div><span>SUPERADMIN CONTROL ROOM</span><h2>All database controls</h2><p>These actions operate on the live MongoDB database through the protected SuperAdmin API.</p></div></div>
+          <div className="integrity-control-grid">
+            <button onClick={load} disabled={loading}><RefreshCw size={18}/><span><strong>Refresh live data</strong><small>Re-scan MongoDB now</small></span></button>
+            <button onClick={cleanCarouselDuplicates} disabled={cleaningCarousels}><Trash2 size={18}/><span><strong>Clean duplicate carousels</strong><small>Keep newest matching slide</small></span></button>
+            <button onClick={deepScanCarousels} disabled={cleaningCarousels}><Database size={18}/><span><strong>Deep scan carousel images</strong><small>Hash Cloudinary/public images before dedupe</small></span></button>
+            <button onClick={() => runDirectAction("/superadmin/data-integrity/cleanup/self-conversations", "Remove all self-conversations and their messages?", "Self-conversation cleanup completed.")}><Trash2 size={18}/><span><strong>Remove self-conversations</strong><small>Delete invalid self-chat shells and messages</small></span></button>
+            <button onClick={() => runDirectAction("/superadmin/data-integrity/cleanup/orphans", "Remove orphan conversations and messages that no longer have valid owners?", "Orphan cleanup completed.")}><Trash2 size={18}/><span><strong>Clean orphaned chat data</strong><small>Remove records pointing to missing accounts</small></span></button>
+            <button onClick={() => runDirectAction("/superadmin/data-integrity/cleanup/member-income", "Remove legacy personal monthly-income fields from member documents?", "Legacy monthly-income fields removed.")}><ShieldCheck size={18}/><span><strong>Remove legacy income field</strong><small>Does not touch finance ledger income</small></span></button>
+            <button onClick={downloadBackup} disabled={loading || cleaning}><Download size={18}/><span><strong>Backup entire database</strong><small>All collections, security fields redacted</small></span></button>
+            <button onClick={printReport} disabled={!report}><Printer size={18}/><span><strong>Print full report</strong><small>Governance-ready printable snapshot</small></span></button>
+            <button onClick={printDatabaseDetails} disabled={loading || cleaning}><Database size={18}/><span><strong>Print all database details</strong><small>Live records with sensitive fields redacted</small></span></button>
+            <button onClick={() => scrollToSection("integrity-duplicates")}><Database size={18}/><span><strong>Review all findings</strong><small>Open every detected issue</small></span></button>
+          </div>
+        </section>
+
         <section className="portal-panel">
           <div className="audit-section-head">
             <div>
@@ -313,7 +400,7 @@ export default function SuperAdminDataIntegrity() {
           )}
         </section>
 
-        <DuplicatePreview title="Duplicate member groups" groups={report?.duplicateMembers} deletingId={deletingId} onDeleteMember={deleteDuplicateMember} />
+        <div id="integrity-duplicates"></div><DuplicatePreview title="Duplicate member groups" groups={report?.duplicateMembers} deletingId={deletingId} onDeleteMember={deleteDuplicateMember} />
         <DuplicatePreview title="Duplicate administrator groups" groups={report?.duplicateAdmins} />
         <DuplicatePreview title="Self-conversations" groups={report?.selfConversations?.map((x) => ({
           keep: "REMOVE",

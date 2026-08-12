@@ -28,6 +28,7 @@ const {
   getSettings,
   updateSettings,
   getSystemStatus,
+  getPortalOverview,
 } = require("../controllers/superadminController");
 
 
@@ -58,6 +59,7 @@ router.put("/change-password", changePassword);
 router.get("/settings", getSettings);
 router.put("/settings", updateSettings);
 router.get("/system/status", getSystemStatus);
+router.get("/overview", getPortalOverview);
 
 
 // ======================================================

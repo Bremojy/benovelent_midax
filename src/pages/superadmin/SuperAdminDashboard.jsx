@@ -19,6 +19,7 @@ import API from "../../services/api";
 import {
   getSuperAdminAdminStatistics,
   getSuperAdmins,
+  getSuperAdminPortalOverview,
 } from "../../services/superAdminService";
 
 import "./SuperAdminDashboard.css";
@@ -39,6 +40,7 @@ function SuperAdminDashboard() {
     useState(true);
 
   const [systemOnline, setSystemOnline] = useState(null);
+  const [overview, setOverview] = useState(null);
 
   const [error, setError] =
     useState("");
@@ -52,12 +54,14 @@ function SuperAdminDashboard() {
       setLoading(true);
       setError("");
 
-      const [statisticsResponse, adminsResponse, systemResponse] = await Promise.all([
+      const [statisticsResponse, adminsResponse, systemResponse, overviewResponse] = await Promise.all([
         getSuperAdminAdminStatistics(),
         getSuperAdmins({ page: 1, limit: 5 }),
         API.get("/superadmin/system/status").catch(() => null),
+        getSuperAdminPortalOverview().catch(() => null),
       ]);
       setSystemOnline(Boolean(systemResponse?.data?.success));
+      setOverview(overviewResponse?.overview || null);
 
       if (
         statisticsResponse?.success
@@ -241,6 +245,19 @@ function SuperAdminDashboard() {
 
         </section>
 
+
+        <section className="superadmin-live-overview">
+          <div className="superadmin-panel-header"><div><span>LIVE CONTROL CENTRE</span><h2>Everything happening across Benovelent Midax</h2><p>Refresh this panel to inspect current members, support, communication, finance and content activity.</p></div></div>
+          <div className="superadmin-live-grid">
+            <LiveCard label="Members" value={overview?.members?.total ?? 0} detail={`${overview?.members?.active ?? 0} active · ${overview?.members?.online ?? 0} online`} />
+            <LiveCard label="Pending support" value={overview?.support?.pending ?? 0} detail={`Funeral ${overview?.support?.funeral ?? 0} · Medical ${overview?.support?.medical ?? 0} · Education ${overview?.support?.education ?? 0}`} />
+            <LiveCard label="Administrators" value={overview?.leadership?.administrators ?? statistics.total ?? 0} detail={`${overview?.leadership?.activeAdministrators ?? statistics.active ?? 0} active`} />
+            <LiveCard label="Conversations" value={overview?.communication?.conversations ?? 0} detail={`${overview?.communication?.messages ?? 0} messages · ${overview?.communication?.unreadNotifications ?? 0} unread notifications`} />
+            <LiveCard label="Published news" value={overview?.content?.publishedNews ?? 0} detail={`${overview?.content?.activeFeedbackCollections ?? 0} active feedback collections`} />
+            <LiveCard label="Book balance" value={money(overview?.finance?.bookBalance)} detail={`${overview?.support?.approvedClaims ?? 0} approved finance claims`} />
+          </div>
+          <div className="superadmin-live-links"><QuickAction icon={<UserPlus size={19}/>} title="Add Administrator" description="Create a new administrator" href="/superadmin/admins"/><QuickAction icon={<Users size={19}/>} title="Members" description="Review member accounts" href="/superadmin/members"/><QuickAction icon={<ShieldCheck size={19}/>} title="Database Integrity" description="Inspect and control live MongoDB data" href="/superadmin/data-integrity"/><QuickAction icon={<ArrowRight size={19}/>} title="System Settings" description="Manage portal configuration" href="/superadmin/settings"/></div>
+        </section>
 
         {/* ==========================================
             MAIN GRID
@@ -486,6 +503,8 @@ function SuperAdminDashboard() {
 // ======================================================
 // DASHBOARD STAT
 // ======================================================
+
+function LiveCard({label,value,detail}){return <div className="superadmin-live-card"><span>{label}</span><strong>{value}</strong><small>{detail}</small></div>}
 
 function DashboardStat({
   label,

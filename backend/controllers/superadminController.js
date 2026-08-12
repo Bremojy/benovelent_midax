@@ -2,6 +2,21 @@ const bcrypt = require("bcryptjs");
 const { resolveStoredFileUrl } = require("../utils/uploadUrl");
 
 const Admin = require("../models/Admin");
+const Member = require("../models/Member");
+const SuperAdmin = require("../models/SuperAdmin");
+const Finance = require("../models/Finance");
+const FuneralSupport = require("../models/FuneralSupport");
+const MedicalSupport = require("../models/MedicalSupport");
+const EducationSupport = require("../models/EducationSupport");
+const SupportRequest = require("../models/SupportRequest");
+const News = require("../models/News");
+const Conversation = require("../models/Conversation");
+const Message = require("../models/Message");
+const Notification = require("../models/Notification");
+const FeedbackCollection = require("../models/FeedbackCollection");
+const Carousel = require("../models/Carousel");
+const mongoose = require("mongoose");
+
 
 // ======================================================
 // CREATE ADMIN
@@ -844,4 +859,54 @@ exports.getSystemStatus = async (req, res) => {
     const mongoose = require("mongoose");
     res.json({ success: true, status: mongoose.connection.readyState === 1 ? "operational" : "database-connection-needed", databaseReady: mongoose.connection.readyState === 1, checkedAt: new Date().toISOString() });
   } catch (error) { res.status(500).json({ success: false, message: error.message }); }
+};
+
+
+exports.getPortalOverview = async (req, res) => {
+  try {
+    const [
+      members, activeMembers, onlineMembers, admins, activeAdmins, superadmins,
+      pendingFuneral, pendingMedical, pendingEducation, pendingGeneral,
+      approvedClaims, bookBalance, news, conversations, messages, unreadNotifications,
+      activeFeedback, carouselSlides,
+      feedbackResponseAgg,
+    ] = await Promise.all([
+      Member.countDocuments({ role: "member", isDeleted: false }),
+      Member.countDocuments({ role: "member", status: "active", isDeleted: false }),
+      Member.countDocuments({ role: "member", online: true, isDeleted: false }),
+      Admin.countDocuments({ status: { $ne: "deleted" } }),
+      Admin.countDocuments({ status: "active" }),
+      SuperAdmin.countDocuments({ status: { $nin: ["inactive", "deleted"] } }),
+      FuneralSupport.countDocuments({ status: { $in: ["Pending", "Under Review"] } }),
+      MedicalSupport.countDocuments({ status: { $in: ["Pending", "Under Review"] }, isDeleted: { $ne: true } }),
+      EducationSupport.countDocuments({ status: "Pending" }),
+      SupportRequest.countDocuments({ status: { $in: ["Pending", "Under Review"] } }),
+      Finance.countDocuments({ type: "claim", status: { $in: ["approved", "completed"] } }),
+      Finance.aggregate([{ $match: { status: { $in: ["approved", "completed"] } } }, { $group: { _id: null, total: { $sum: { $cond: [{ $in: ["$type", ["contribution", "income"]] }, "$amount", { $multiply: ["$amount", -1] }] } } } }]),
+      News.countDocuments({ published: true, status: "published" }),
+      Conversation.countDocuments({}),
+      Message.countDocuments({}),
+      Notification.countDocuments({ recipient: req.user._id, read: false }),
+      FeedbackCollection.countDocuments({ status: "active" }),
+      Carousel.countDocuments({ isActive: true }),
+      FeedbackCollection.aggregate([{ $unwind: "$responses" }, { $count: "count" }]),
+    ]);
+
+    return res.json({
+      success: true,
+      overview: {
+        system: { online: true, database: mongoose.connection.readyState === 1, databaseName: mongoose.connection.name || "" },
+        members: { total: members, active: activeMembers, online: onlineMembers },
+        leadership: { administrators: admins, activeAdministrators: activeAdmins, superadmins },
+        support: { pending: Number(pendingFuneral) + Number(pendingMedical) + Number(pendingEducation) + Number(pendingGeneral), funeral: pendingFuneral, medical: pendingMedical, education: pendingEducation, general: pendingGeneral, approvedClaims },
+        finance: { bookBalance: Number(bookBalance?.[0]?.total || 0) },
+        communication: { conversations, messages, unreadNotifications },
+        content: { publishedNews: news, activeFeedbackCollections: activeFeedback, feedbackResponses: Number(feedbackResponseAgg?.[0]?.count || 0), activeCarouselSlides: carouselSlides },
+        generatedAt: new Date().toISOString(),
+      },
+    });
+  } catch (error) {
+    console.error("SuperAdmin portal overview error:", error);
+    return res.status(500).json({ success: false, message: error.message || "Unable to load portal overview." });
+  }
 };

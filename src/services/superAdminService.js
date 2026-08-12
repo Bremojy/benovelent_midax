@@ -237,6 +237,11 @@ export const updateSuperAdminSettings = async (settings) => {
   return data;
 };
 
+export const getSuperAdminPortalOverview = async () => {
+  const { data } = await API.get("/superadmin/overview", { params: { _ts: Date.now() } });
+  return data;
+};
+
 // ======================================================
 // DEFAULT EXPORT
 // ======================================================
@@ -256,4 +261,5 @@ export default {
   changeSuperAdminPassword,
   getSuperAdminSettings,
   updateSuperAdminSettings,
+  getSuperAdminPortalOverview,
 };

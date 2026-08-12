@@ -177,6 +177,11 @@ exports.getDashboard = async (req, res) => {
                 read:false
 
             });
+        const [pendingFuneral, pendingMedical, pendingEducation] = await Promise.all([
+            FuneralSupport.countDocuments({ member: member._id, status: { $in: ["Pending", "Under Review"] } }),
+            MedicalSupport.countDocuments({ member: member._id, status: { $in: ["Pending", "Under Review"] }, isDeleted: { $ne: true } }),
+            EducationSupport.countDocuments({ member: member._id, status: "Pending" }),
+        ]);
 
         // ==========================================
         // BENEFIT ELIGIBILITY
@@ -235,6 +240,13 @@ exports.getDashboard = async (req, res) => {
                     unreadMessages,
 
                     unreadNotifications,
+
+                    pendingSupport: {
+                        total: Number(pendingFuneral) + Number(pendingMedical) + Number(pendingEducation),
+                        funeral: pendingFuneral,
+                        medical: pendingMedical,
+                        education: pendingEducation,
+                    },
 
                     membershipStatus:
                         member.status,

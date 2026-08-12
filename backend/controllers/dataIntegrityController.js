@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const crypto = require("crypto");
 const Member = require("../models/Member");
 const Admin = require("../models/Admin");
 const SuperAdmin = require("../models/SuperAdmin");
@@ -25,6 +26,53 @@ const normalize = (value) =>
 
 const normalizePhone = (value) =>
     String(value || "").replace(/\D/g, "");
+
+const canonicalizeCarouselUrl = (value) => {
+    const raw = String(value || '').trim();
+    if (!raw) return '';
+    try {
+        const url = new URL(raw);
+        // Cloudinary image URLs may differ only by transformation parameters.
+        // Compare the underlying public asset path so legacy duplicate uploads
+        // are still detected even when one was resized/cropped.
+        const marker = '/upload/';
+        const index = url.pathname.indexOf(marker);
+        if (index >= 0) {
+            let path = url.pathname.slice(index + marker.length);
+            const segments = path.split('/').filter(Boolean);
+            while (segments.length && (segments[0].startsWith('v') && /^v\d+$/.test(segments[0]))) {
+                segments.shift();
+            }
+            // Remove common transformation segments (f_auto,q_auto,w_...,c_...,
+            // g_...,e_...) before comparing the underlying public asset.
+            while (segments.length && /^(f_|q_|w_|h_|c_|g_|e_|dpr_|ar_|vc_|fl_|so_|du_|bo_)/i.test(segments[0])) {
+                segments.shift();
+            }
+            return `cloudinary:${segments.join('/')}`.toLowerCase();
+        }
+        url.search = '';
+        url.hash = '';
+        return url.toString().toLowerCase();
+    } catch (_) {
+        return raw.split('?')[0].split('#')[0].toLowerCase();
+    }
+};
+
+const carouselDuplicateKey = (slide) => {
+    const hash = normalize(slide.contentHash);
+    if (hash) return `hash:${hash}`;
+
+    const canonicalImage = canonicalizeCarouselUrl(slide.imageUrl);
+    const meta = [
+        canonicalImage,
+        normalize(slide.title),
+        normalize(slide.description),
+        normalize(slide.buttonText),
+        normalize(slide.buttonLink),
+    ].join('|');
+
+    return `meta:${meta}`;
+};
 
 const identityKeys = (record) => {
     const keys = [];
@@ -171,9 +219,7 @@ async function buildReport() {
 
     const carouselGroups = new Map();
     carousels.forEach((slide) => {
-        const key = slide.contentHash
-            ? `hash:${normalize(slide.contentHash)}`
-            : `meta:${normalize(slide.imageUrl)}|${normalize(slide.title)}|${normalize(slide.description)}`;
+        const key = carouselDuplicateKey(slide);
         if (!carouselGroups.has(key)) carouselGroups.set(key, []);
         carouselGroups.get(key).push(slide);
     });
@@ -435,14 +481,42 @@ async function removeLegacyMonthlyIncome() {
     return result.modifiedCount || 0;
 }
 
+async function reindexCarouselHashes() {
+    const slides = await Carousel.find({}).select("_id imageUrl contentHash").lean();
+    let scanned = 0;
+    let hashed = 0;
+    let failed = 0;
+    for (const slide of slides.slice(0, 150)) {
+        const url = String(slide.imageUrl || "").trim();
+        if (!/^https?:\/\//i.test(url)) continue;
+        scanned += 1;
+        try {
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), 12000);
+            const response = await fetch(url, { signal: controller.signal, redirect: "follow" });
+            clearTimeout(timer);
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const buffer = Buffer.from(await response.arrayBuffer());
+            if (!buffer.length) throw new Error("Empty image");
+            const hash = crypto.createHash("sha256").update(buffer).digest("hex");
+            if (hash && hash !== slide.contentHash) {
+                await Carousel.updateOne({ _id: slide._id }, { $set: { contentHash: hash } });
+            }
+            hashed += 1;
+        } catch (error) {
+            failed += 1;
+            console.warn(`Carousel hash scan failed for ${slide._id}: ${error.message}`);
+        }
+    }
+    return { scanned, hashed, failed };
+}
+
 async function removeDuplicateCarousels() {
     const slides = await Carousel.find({}).select("_id imageUrl contentHash title description createdAt updatedAt").lean();
     const groups = new Map();
 
     slides.forEach((slide) => {
-        const key = slide.contentHash
-            ? `hash:${normalize(slide.contentHash)}`
-            : `meta:${normalize(slide.imageUrl)}|${normalize(slide.title)}|${normalize(slide.description)}`;
+        const key = carouselDuplicateKey(slide);
         if (!groups.has(key)) groups.set(key, []);
         groups.get(key).push(slide);
     });
@@ -523,6 +597,29 @@ function redactForBackup(value, key = "") {
     }
     return value;
 }
+
+exports.printDatabaseDetails = async (req, res) => {
+    try {
+        if (mongoose.connection.readyState !== 1 || !mongoose.connection.db) {
+            return res.status(503).json({ success: false, message: "Database is not currently connected." });
+        }
+        const collections = await mongoose.connection.db.listCollections({}, { nameOnly: true }).toArray();
+        const escapeHtml = (value) => String(value ?? "").replace(/[&<>\"']/g, (character) => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", "\"":"&quot;", "'":"&#39;" }[character]));
+        const sections = [];
+        for (const item of collections.sort((a,b) => a.name.localeCompare(b.name))) {
+            const docs = await mongoose.connection.db.collection(item.name).find({}).toArray();
+            const rows = docs.map((doc, index) => `<tr><td>${index + 1}</td><td><pre>${escapeHtml(JSON.stringify(redactForBackup(doc), null, 2))}</pre></td></tr>`).join("");
+            sections.push(`<section><h2>${escapeHtml(item.name)} <span>(${docs.length})</span></h2><table><thead><tr><th>#</th><th>Record</th></tr></thead><tbody>${rows || `<tr><td colspan="2">No records.</td></tr>`}</tbody></table></section>`);
+        }
+        const html = `<!doctype html><html><head><meta charset="utf-8"><title>Benevolent Midax — Full Database Print</title><style>@page{size:A4 landscape;margin:10mm}body{font-family:Arial,sans-serif;color:#222;margin:0}header{border-bottom:3px solid #ef7d00;padding:12px 0;margin-bottom:15px}h1{margin:0;font-size:22px}h2{margin:22px 0 8px;font-size:16px;background:#f6f6f6;padding:8px;border-left:4px solid #ef7d00}h2 span{font-weight:400;color:#777}table{width:100%;border-collapse:collapse;table-layout:fixed}th,td{border:1px solid #ddd;padding:6px;vertical-align:top;font-size:9px}th{background:#f0f0f0;text-align:left}td:first-child{width:35px;text-align:center}pre{white-space:pre-wrap;word-break:break-word;margin:0;font:8px/1.35 Consolas,monospace}section{break-inside:auto;margin-bottom:16px}.note{font-size:11px;color:#666;line-height:1.5}</style></head><body><header><h1>Benevolent Midax — Full Database Print</h1><p class="note">Generated ${escapeHtml(new Date().toLocaleString("en-KE"))}. Credential/token fields are redacted for security. This printout reflects the live MongoDB database at generation time.</p></header>${sections.join("")}<script>window.onload=()=>window.print()</script></body></html>`;
+        res.setHeader("Content-Type", "text/html; charset=utf-8");
+        res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, private");
+        return res.send(html);
+    } catch (error) {
+        console.error("Full database print error:", error);
+        return res.status(500).json({ success: false, message: error.message || "Unable to print database details." });
+    }
+};
 
 exports.downloadDatabaseBackup = async (req, res) => {
     try {
@@ -656,6 +753,23 @@ exports.getIntegrityReport = async (req, res) => {
     }
 };
 
+exports.deepScanCarouselDuplicates = async (req, res) => {
+    try {
+        const result = await reindexCarouselHashes();
+        const removed = await removeDuplicateCarousels();
+        const report = await buildReport();
+        return res.json({
+            success: true,
+            message: `Deep carousel scan finished: ${result.scanned} remote slide${result.scanned === 1 ? "" : "s"} scanned, ${result.hashed} image hash${result.hashed === 1 ? "" : "es"} refreshed, ${removed} duplicate slide${removed === 1 ? "" : "s"} removed.`,
+            result: { ...result, removedDuplicateCarousels: removed },
+            report,
+        });
+    } catch (error) {
+        console.error("Deep carousel scan error:", error);
+        return res.status(500).json({ success: false, message: error.message || "Deep carousel scan failed." });
+    }
+};
+
 exports.cleanupCarouselDuplicates = async (req, res) => {
     try {
         const removedDuplicateCarousels = await removeDuplicateCarousels();
@@ -712,5 +826,58 @@ exports.runSafeCleanup = async (req, res) => {
     } catch (error) {
         console.error("Data integrity cleanup error:", error);
         res.status(500).json({ success: false, message: error.message || "Cleanup failed." });
+    }
+};
+
+
+exports.cleanupSelfConversations = async (req, res) => {
+    try {
+        const result = await removeSelfConversations();
+        const report = await buildReport();
+        return res.json({ success: true, message: `Removed ${result.removedConversations} self-conversation${result.removedConversations === 1 ? '' : 's'} and ${result.removedMessages} related message${result.removedMessages === 1 ? '' : 's'}.`, result, report });
+    } catch (error) {
+        console.error("Self-conversation cleanup error:", error);
+        return res.status(500).json({ success: false, message: error.message || "Unable to clean self-conversations." });
+    }
+};
+
+exports.cleanupOrphanedChatData = async (req, res) => {
+    try {
+        const result = await removeOrphans();
+        const report = await buildReport();
+        return res.json({ success: true, message: `Removed ${result.removedConversations} orphan conversation${result.removedConversations === 1 ? '' : 's'} and ${result.removedMessages} orphan message${result.removedMessages === 1 ? '' : 's'}.`, result, report });
+    } catch (error) {
+        console.error("Orphan cleanup error:", error);
+        return res.status(500).json({ success: false, message: error.message || "Unable to clean orphaned chat data." });
+    }
+};
+
+exports.removeLegacyMemberIncome = async (req, res) => {
+    try {
+        const removed = await removeLegacyMonthlyIncome();
+        const report = await buildReport();
+        return res.json({ success: true, message: `Removed legacy monthly-income fields from ${removed} member record${removed === 1 ? '' : 's'}.`, result: { removedLegacyMonthlyIncome: removed }, report });
+    } catch (error) {
+        console.error("Legacy monthly income cleanup error:", error);
+        return res.status(500).json({ success: false, message: error.message || "Unable to remove legacy member income fields." });
+    }
+};
+
+exports.getCollectionInventory = async (req, res) => {
+    try {
+        if (mongoose.connection.readyState !== 1 || !mongoose.connection.db) {
+            return res.status(503).json({ success: false, message: "Database is not currently connected." });
+        }
+        const collections = await mongoose.connection.db.listCollections({}, { nameOnly: true }).toArray();
+        const inventory = [];
+        for (const item of collections) {
+            const name = item.name;
+            const count = await mongoose.connection.db.collection(name).countDocuments();
+            inventory.push({ name, count });
+        }
+        inventory.sort((a,b) => a.name.localeCompare(b.name));
+        return res.json({ success: true, database: { name: mongoose.connection.name, connected: true }, collections: inventory });
+    } catch (error) {
+        return res.status(500).json({ success: false, message: error.message || "Unable to inspect collections." });
     }
 };

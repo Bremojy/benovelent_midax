@@ -1174,3 +1174,22 @@
     padding-right: 13px;
   }
 }
+
+/* Modern administrator creation experience */
+.admin-modal-overlay { background: rgba(10, 12, 18, .58); backdrop-filter: blur(10px); }
+.admin-modal { border: 1px solid rgba(255,255,255,.25); border-radius: 26px; box-shadow: 0 28px 90px rgba(0,0,0,.28); overflow: hidden; max-width: 760px; }
+.admin-modal-header { padding: 24px 28px 20px; background: linear-gradient(180deg, rgba(255,247,238,.98), rgba(255,255,255,.98)); }
+.admin-modal-header h2 { font-size: 30px; letter-spacing: -.03em; }
+.admin-form { padding: 24px 28px 28px; background: #fff; }
+.admin-form-grid { gap: 18px; }
+.form-group label { font-weight: 700; margin-bottom: 9px; color: #2d3035; }
+.input-wrapper { min-height: 58px; border-radius: 16px; background: #f7f8fa; border: 1px solid #e2e4e8; padding: 0 15px; box-shadow: inset 0 1px 0 rgba(255,255,255,.9); transition: .18s ease; }
+.input-wrapper:focus-within { background: #fff; border-color: #ff8b00; box-shadow: 0 0 0 4px rgba(255,139,0,.12); }
+.input-wrapper svg { color: #77808b; flex: 0 0 auto; }
+.input-wrapper input, .input-wrapper select { font-size: 16px; font-weight: 500; }
+.password-toggle { border-radius: 10px; }
+.admin-form-message { border-radius: 14px; margin: 0 28px 4px; }
+.admin-form-actions { padding-top: 8px; }
+.submit-admin-btn { border-radius: 14px; min-height: 50px; padding: 0 20px; box-shadow: 0 10px 24px rgba(255,139,0,.20); }
+.cancel-btn { border-radius: 14px; min-height: 50px; }
+@media (max-width: 720px) { .admin-modal { width: calc(100vw - 24px); } .admin-form, .admin-modal-header { padding-left: 18px; padding-right: 18px; } .admin-form-message { margin-left: 18px; margin-right: 18px; } }

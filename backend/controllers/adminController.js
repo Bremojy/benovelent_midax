@@ -3,6 +3,13 @@ const Member = require("../models/Member");
 const { sendEmail, sendSmsNotification } = require("../services/memberBroadcastService");
 const calculateProfileCompletion = require("../utils/calculateProfileCompletion");
 const Finance = require("../models/Finance");
+const FeedbackCollection = require("../models/FeedbackCollection");
+const Notification = require("../models/Notification");
+const News = require("../models/News");
+const SupportRequest = require("../models/SupportRequest");
+const EducationSupport = require("../models/EducationSupport");
+const MedicalSupport = require("../models/MedicalSupport");
+const FuneralSupport = require("../models/FuneralSupport");
 const { resolveStoredFileUrl } = require("../utils/uploadUrl");
 
 /* =====================================================
@@ -23,6 +30,14 @@ exports.getDashboard = async (req, res) => {
       totalLeaders,
       bookBalance,
       approvedClaims,
+      pendingFuneral,
+      pendingMedical,
+      pendingEducation,
+      pendingSupportRequests,
+      publishedNews,
+      unreadNotifications,
+      feedbackCollections,
+      feedbackResponses,
     ] = await Promise.all([
       Member.countDocuments({ role: "member", isDeleted: false }),
       Member.countDocuments({ role: "member", status: "active", isDeleted: false }),
@@ -35,6 +50,14 @@ exports.getDashboard = async (req, res) => {
       require("../models/Admin").countDocuments({ status: { $ne: "deleted" } }),
       Finance.aggregate([{ $match: { status: { $in: ["approved", "completed"] } } }, { $group: { _id: null, total: { $sum: { $cond: [{ $in: ["$type", ["contribution", "income"]] }, "$amount", { $multiply: ["$amount", -1] }] } } } }]),
       Finance.countDocuments({ type: "claim", status: { $in: ["approved", "completed"] } }),
+      FuneralSupport.countDocuments({ status: { $in: ["Pending", "Under Review"] } }),
+      MedicalSupport.countDocuments({ status: { $in: ["Pending", "Under Review"] } }),
+      EducationSupport.countDocuments({ status: "Pending" }),
+      SupportRequest.countDocuments({ status: { $in: ["Pending", "Under Review"] } }),
+      News.countDocuments({ published: true, status: "published" }),
+      Notification.countDocuments({ recipient: req.user._id, read: false }),
+      FeedbackCollection.countDocuments({ status: "active" }),
+      FeedbackCollection.aggregate([{ $unwind: "$responses" }, { $count: "count" }]),
     ]);
 
     const incompleteMembers = (await Member.find({ role: "member", isDeleted: false, profileCompleted: { $ne: true } }).select("fullName memberNumber profileCompletion").sort({ profileCompletion: 1, createdAt: -1 }).limit(20).lean()).map((m) => ({ ...m, missingFields: calculateProfileCompletion(m).missingFields }));
@@ -53,6 +76,17 @@ exports.getDashboard = async (req, res) => {
         totalLeaders,
         bookBalance: Number(bookBalance?.[0]?.total || 0),
         approvedClaims,
+        pendingSupport: {
+          total: Number(pendingFuneral) + Number(pendingMedical) + Number(pendingEducation) + Number(pendingSupportRequests),
+          funeral: pendingFuneral,
+          medical: pendingMedical,
+          education: pendingEducation,
+          general: pendingSupportRequests,
+        },
+        publishedNews,
+        unreadNotifications,
+        activeFeedbackCollections: feedbackCollections,
+        feedbackResponses: Number(feedbackResponses?.[0]?.count || 0),
         incompleteMembers,
       },
     });
