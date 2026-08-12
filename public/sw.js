@@ -40,7 +40,40 @@ self.addEventListener("notificationclick", (event) => {
 });
 
 self.addEventListener("fetch", (event) => {
-  const url = new URL(event.request.url);
-  if (url.origin !== location.origin || event.request.method !== "GET") return;
-  event.respondWith(fetch(event.request).then((response) => { const copy = response.clone(); caches.open(CACHE).then((cache) => cache.put(event.request, copy)); return response; }).catch(() => caches.match(event.request).then((response) => response || caches.match("/"))));
+  const request = event.request;
+  const url = new URL(request.url);
+
+  if (url.origin !== location.origin || request.method !== "GET") return;
+
+  // Media/video requests frequently use HTTP Range and receive 206 Partial Content.
+  // CacheStorage does not accept partial responses, so bypass the cache entirely.
+  if (request.headers.has("range")) {
+    event.respondWith(fetch(request));
+    return;
+  }
+
+  event.respondWith((async () => {
+    try {
+      const response = await fetch(request);
+
+      // Cache only complete, successful responses. In particular, never cache 206.
+      if (response.ok && response.status === 200 && response.type !== "opaque") {
+        try {
+          const cache = await caches.open(CACHE);
+          await cache.put(request, response.clone());
+        } catch (cacheError) {
+          // A cache failure must never turn a successful network request into an app error.
+          console.debug("PWA cache write skipped:", cacheError);
+        }
+      }
+
+      return response;
+    } catch (networkError) {
+      const cached = await caches.match(request);
+      if (cached) return cached;
+      const shell = await caches.match("/");
+      if (shell) return shell;
+      return new Response("Offline", { status: 503, statusText: "Offline" });
+    }
+  })());
 });

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, ExternalLink, MessageSquarePlus, Star, Trash2, Plus, X } from "lucide-react";
-import { getFeedbackCollections, createFeedbackCollection, deleteFeedbackCollection, submitFeedback, getFeedbackResponses } from "../services/feedbackService";
-import { useLocation } from "react-router-dom";
+import { getFeedbackCollections, createFeedbackCollection, deleteFeedbackCollection, submitFeedback, getFeedbackResponses, createBuiltInFeedback } from "../services/feedbackService";
+import { useLocation, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 
 const questionTypes = ["short_text", "long_text", "email", "number", "rating", "single_choice", "multiple_choice"];
@@ -59,8 +59,10 @@ function QuestionControl({ question, value, onChange }) {
 
 export default function Feedback() {
   const location = useLocation();
+  const navigate = useNavigate();
   const role = location.pathname.startsWith("/member") ? "member" : location.pathname.startsWith("/superadmin") ? "superadmin" : "admin";
   const canManage = role !== "member";
+  const isSuperAdmin = role === "superadmin";
   const [items, setItems] = useState([]);
   const [active, setActive] = useState(null);
   const [step, setStep] = useState(0);
@@ -87,7 +89,8 @@ export default function Feedback() {
   const openResponses = async item => { try { const r = await getFeedbackResponses(item._id); setResponses(r.data.responses || []); setActive({ ...item, showResponses: true }); } catch { toast.error("Could not load responses"); } };
 
   return <div className="portal-page feedback-page">
-    <div className="portal-module-header"><div><span>COMMUNITY VOICE</span><h1>Feedback</h1><p>Share your experience, ideas and suggestions with the Benovelent Fund Scheme.</p></div></div>
+    <div className="feedback-mobile-back"><button type="button" className="feedback-back-button" onClick={() => navigate(-1)}><ChevronLeft size={18} /> Back</button></div>
+    <div className="portal-module-header feedback-page-header"><div><span>COMMUNITY VOICE</span><h1>Feedback</h1><p>Share your experience, ideas and suggestions with the Benovelent Fund Scheme.</p></div>{isSuperAdmin && <button type="button" className="btn btn-primary" onClick={async () => { try { const r = await createBuiltInFeedback(); setItems(prev => prev.some(x => x._id === r.data.collection?._id) ? prev : [r.data.collection, ...prev]); toast.success(r.data.existing ? "Built-in feedback is already active." : "Built-in experience feedback launched for all users."); } catch (e) { toast.error(e.response?.data?.message || "Could not launch built-in feedback"); } }}><MessageSquarePlus size={16} /> Launch experience check-in</button>}</div>
     {canManage && <AdminComposer onCreated={c => setItems(prev => [c, ...prev])} />}
     {loading ? <div className="feedback-skeleton">Loading feedback…</div> : <div className="feedback-card-grid">{items.map(item => <article className="interactive-card feedback-card" key={item._id}>
       <div className="feedback-card-top"><span className="feedback-badge">{item.kind === "native" ? "Native" : "Google Forms"}</span>{canManage && <button type="button" className="icon-btn" onClick={async () => { await deleteFeedbackCollection(item._id); setItems(x => x.filter(y => y._id !== item._id)); toast.success("Deleted"); }}><Trash2 size={16} /></button>}</div>

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, RefreshCw } from "lucide-react";
-import { io } from "socket.io-client";
+import socketClient from "../../sockets/socket";
 import DashboardLayout from "../../layouts/DashboardLayout";
 import ChatSidebar from "./ChatSidebar";
 import ChatWindow from "./ChatWindow";
@@ -95,11 +95,10 @@ function MessageCenterPage({
     if (!actorId) return;
 
     const token = getToken(currentUser?.role || authUser?.role);
-    const newSocket = io(import.meta.env.VITE_API_URL || "https://benovelent-midax.onrender.com", {
-      transports: ["websocket", "polling"],
-      auth: { token },
-      query: { token },
-    });
+    const newSocket = socketClient;
+    newSocket.auth = { token };
+    newSocket.io.opts.query = { token };
+    if (!newSocket.connected) newSocket.connect();
 
     newSocket.on("connect", () => {
       newSocket.emit("user-online", { userId: actorId, role: currentUser?.role || authUser?.role || "member" });
@@ -148,7 +147,6 @@ function MessageCenterPage({
       newSocket.off("incoming-call", handleIncomingCall);
       newSocket.off("new-call-notification", handleCallNotification);
       newSocket.off("online-users", handlePresence);
-      newSocket.disconnect();
       setSocket(null);
     };
   }, [actorId, currentUser?.role, authUser?.role]);

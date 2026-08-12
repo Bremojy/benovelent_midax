@@ -220,7 +220,7 @@ export default function Profile() {
               )}
               <Field label="Occupation" value={member.occupation} onChange={(v) => set("occupation", v)} />
               <Field label="Employer" value={member.employer} onChange={(v) => set("employer", v)} />
-              <Field label="Monthly income" type="number" value={member.monthlyIncome} onChange={(v) => set("monthlyIncome", v)} />
+              <Field label="Monthly income" type="number" inputMode="decimal" min="0" step="0.01" value={member.monthlyIncome} onChange={(v) => set("monthlyIncome", v)} />
               <Field label="M-Pesa number" value={member.mpesaNumber} onChange={(v) => set("mpesaNumber", v)} />
               <Field label="Bank name" value={member.bankName} onChange={(v) => set("bankName", v)} />
               <Field label="Bank branch" value={member.bankBranch} onChange={(v) => set("bankBranch", v)} />
@@ -270,7 +270,7 @@ export default function Profile() {
   );
 }
 
-function Field({ label, value, onChange, type = "text", disabled = false, required = false }) {
+function Field({ label, value, onChange, type = "text", disabled = false, required = false, inputMode, min, step }) {
   return (
     <label className="portal-field">
       <span>{label}</span>

@@ -71,7 +71,7 @@ exports.submit = async (req, res) => {
   if (doc.startDate && now < doc.startDate) return res.status(400).json({ success: false, message: "Feedback collection has not started yet." });
   if (doc.endDate && now > doc.endDate) return res.status(400).json({ success: false, message: "Feedback collection has closed." });
   if (doc.kind !== "native") return res.status(400).json({ success: false, message: "Only native feedback can be submitted here." });
-  const memberId = req.user.role === "member" ? req.user._id : null;
+  const memberId = req.user._id;
   if (doc.preventDuplicate && memberId && doc.responses.some((r) => String(r.member) === String(memberId))) {
     return res.status(409).json({ success: false, message: "You have already submitted this feedback." });
   }
@@ -84,6 +84,32 @@ exports.submit = async (req, res) => {
   doc.responses.push({ member: doc.anonymous ? null : memberId, anonymous: doc.anonymous, answers });
   await doc.save();
   res.status(201).json({ success: true, message: "Thank you for your feedback." });
+};
+
+
+exports.ensureBuiltIn = async (req, res) => {
+  const title = "Benovelent Website Experience Check-in";
+  const existing = await FeedbackCollection.findOne({ title });
+  if (existing) return res.json({ success: true, collection: visible(existing), existing: true });
+
+  const doc = await FeedbackCollection.create({
+    title,
+    description: "We want to improve the Benovelent website for members and the leadership team. Tell us what feels good, what is exhausting, and what you would like us to build next.",
+    kind: "native",
+    questions: normalizeQuestions([
+      { id: "experience", type: "rating", label: "How would you rate your overall website experience?", required: true },
+      { id: "feature", type: "long_text", label: "What feature would you like us to add or improve next?", required: true },
+      { id: "exhausting", type: "long_text", label: "What part of using the website is exhausting, confusing or frustrating you?", required: true },
+      { id: "positive", type: "long_text", label: "What is working well for you and should we keep?", required: false },
+    ]),
+    anonymous: false,
+    preventDuplicate: true,
+    status: "active",
+    createdBy: req.user._id,
+    createdByRole: req.user.role,
+  });
+
+  res.status(201).json({ success: true, collection: visible(doc), existing: false });
 };
 
 exports.responses = async (req, res) => {

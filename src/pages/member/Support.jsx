@@ -280,7 +280,7 @@ export default function Support() {
                   <Field label="School"><input type="text" value={form.school} onChange={(e) => set("school", e.target.value)} /></Field>
                   <Field label="Admission Number"><input type="text" value={form.admissionNumber} onChange={(e) => set("admissionNumber", e.target.value)} /></Field>
                   <Field label="Purpose"><textarea rows="4" value={form.purpose} onChange={(e) => set("purpose", e.target.value)} /></Field>
-                  <Field label="Repayment Period (months)"><input type="number" min="1" value={form.repaymentPeriodMonths} onChange={(e) => set("repaymentPeriodMonths", e.target.value)} /></Field>
+                  <Field label="Repayment Period (months)"><input type="number" inputMode="numeric" min="1" step="1" value={form.repaymentPeriodMonths} onChange={(e) => set("repaymentPeriodMonths", e.target.value)} /></Field>
                 </>
               )}
 
@@ -338,7 +338,7 @@ export default function Support() {
               </div>
 
               <Field label="Requested Amount (KES)">
-                <input type="number" min="0" value={form.requestedAmount} onChange={(e) => set("requestedAmount", e.target.value)} />
+                <input type="number" inputMode="decimal" min="0" step="0.01" value={form.requestedAmount} onChange={(e) => set("requestedAmount", e.target.value)} />
               </Field>
 
               <button className="support-submit-button" type="submit" disabled={submitting}>
