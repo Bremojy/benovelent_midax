@@ -43,7 +43,8 @@ export function buildPrintHeadHtml({
 export function printHeadStyles() {
   return `
     <style>
-      @page { size: A4; margin: 16mm; }
+      /* Browser print uses the letterhead image extracted from public/LETTER HEAD.docx. */
+      @page { size: Letter; margin: 12mm; }
       body {
         font-family: Arial, sans-serif;
         color: #1f2328;

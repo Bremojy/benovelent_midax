@@ -14,6 +14,7 @@ import {
   Edit3,
 } from "lucide-react";
 import DashboardLayout from "../../layouts/DashboardLayout";
+import NotificationSettings from "../../components/NotificationSettings";
 import API, { resolveApiUrl } from "../../services/api";
 import { useAuth } from "../../context/AuthContext";
 import "../../styles/portalModule.css";
@@ -412,6 +413,7 @@ export default function SuperAdminSettings() {
 
   return (
     <DashboardLayout>
+      <NotificationSettings />
       <div className="portal-module">
         <header className="portal-module-header">
           <div>
@@ -476,11 +478,11 @@ export default function SuperAdminSettings() {
                     <div className="portal-form-grid">
                       <div className="portal-field">
                         <label>Title</label>
-                        <input value={sections[item.key]?.title || ""} onChange={(e) => patchSection(item.key, { title: e.target.value })} />
+                        <input type="text" value={sections[item.key]?.title || ""} onChange={(e) => patchSection(item.key, { title: e.target.value })} />
                       </div>
                       <div className="portal-field">
                         <label>Subtitle</label>
-                        <input value={sections[item.key]?.subtitle || ""} onChange={(e) => patchSection(item.key, { subtitle: e.target.value })} />
+                        <input type="text" value={sections[item.key]?.subtitle || ""} onChange={(e) => patchSection(item.key, { subtitle: e.target.value })} />
                       </div>
                       <div className="portal-field" style={{ gridColumn: "1 / -1" }}>
                         <label>Description</label>
@@ -551,15 +553,15 @@ export default function SuperAdminSettings() {
                     </div>
                     <div className="portal-field">
                       <label>Title</label>
-                      <input value={carouselForm.title} onChange={(e) => setCarouselForm((p) => ({ ...p, title: e.target.value }))} />
+                      <input type="text" value={carouselForm.title} onChange={(e) => setCarouselForm((p) => ({ ...p, title: e.target.value }))} />
                     </div>
                     <div className="portal-field">
                       <label>Button text</label>
-                      <input value={carouselForm.buttonText} onChange={(e) => setCarouselForm((p) => ({ ...p, buttonText: e.target.value }))} />
+                      <input type="text" value={carouselForm.buttonText} onChange={(e) => setCarouselForm((p) => ({ ...p, buttonText: e.target.value }))} />
                     </div>
                     <div className="portal-field">
                       <label>Button link</label>
-                      <input value={carouselForm.buttonLink} onChange={(e) => setCarouselForm((p) => ({ ...p, buttonLink: e.target.value }))} />
+                      <input type="text" value={carouselForm.buttonLink} onChange={(e) => setCarouselForm((p) => ({ ...p, buttonLink: e.target.value }))} />
                     </div>
                     <div className="portal-field">
                       <label>Order</label>
@@ -592,16 +594,16 @@ export default function SuperAdminSettings() {
                         <article key={slide._id} className="carousel-admin-card">
                           <img src={normalizeImagePath(slide.imageUrl)} alt={slide.title || "Carousel"} />
                           <div>
-                            <input value={slide.title || ""} onChange={(e) => setSlides((prev) => prev.map((x) => x._id === slide._id ? { ...x, title: e.target.value } : x))} />
+                            <input type="text" value={slide.title || ""} onChange={(e) => setSlides((prev) => prev.map((x) => x._id === slide._id ? { ...x, title: e.target.value } : x))} />
                             <textarea rows="3" value={slide.description || ""} onChange={(e) => setSlides((prev) => prev.map((x) => x._id === slide._id ? { ...x, description: e.target.value } : x))} />
                             <div className="portal-form-grid">
                               <div className="portal-field">
                                 <label>Button text</label>
-                                <input value={slide.buttonText || ""} onChange={(e) => setSlides((prev) => prev.map((x) => x._id === slide._id ? { ...x, buttonText: e.target.value } : x))} />
+                                <input type="text" value={slide.buttonText || ""} onChange={(e) => setSlides((prev) => prev.map((x) => x._id === slide._id ? { ...x, buttonText: e.target.value } : x))} />
                               </div>
                               <div className="portal-field">
                                 <label>Button link</label>
-                                <input value={slide.buttonLink || ""} onChange={(e) => setSlides((prev) => prev.map((x) => x._id === slide._id ? { ...x, buttonLink: e.target.value } : x))} />
+                                <input type="text" value={slide.buttonLink || ""} onChange={(e) => setSlides((prev) => prev.map((x) => x._id === slide._id ? { ...x, buttonLink: e.target.value } : x))} />
                               </div>
                               <div className="portal-field">
                                 <label>Order</label>
@@ -637,11 +639,11 @@ export default function SuperAdminSettings() {
                   <form className="portal-form-grid" onSubmit={saveLeader}>
                     <div className="portal-field">
                       <label>Name</label>
-                      <input value={leaderDraft.name} onChange={(e) => setLeaderDraft((p) => ({ ...p, name: e.target.value }))} />
+                      <input type="text" value={leaderDraft.name} onChange={(e) => setLeaderDraft((p) => ({ ...p, name: e.target.value }))} />
                     </div>
                     <div className="portal-field">
                       <label>Position</label>
-                      <input value={leaderDraft.position} onChange={(e) => setLeaderDraft((p) => ({ ...p, position: e.target.value }))} />
+                      <input type="text" value={leaderDraft.position} onChange={(e) => setLeaderDraft((p) => ({ ...p, position: e.target.value }))} />
                     </div>
                     <div className="portal-field">
                       <label>Order</label>
@@ -685,8 +687,8 @@ export default function SuperAdminSettings() {
                         <article key={leader._id} className="carousel-admin-card">
                           <img src={normalizeImagePath(leader.imageUrl) || "/default-avatar.svg"} alt={leader.name || "Leader"} />
                           <div>
-                            <input value={leader.name || ""} readOnly />
-                            <input value={leader.position || ""} readOnly />
+                            <input type="text" value={leader.name || ""} readOnly />
+                            <input type="text" value={leader.position || ""} readOnly />
                             <textarea rows="3" value={leader.bio || ""} readOnly />
                             <div className="portal-actions">
                               <button className="portal-btn" type="button" onClick={() => editLeader(leader)}>Edit</button>
@@ -721,7 +723,7 @@ export default function SuperAdminSettings() {
                     </div>
                     <div className="portal-field" style={{ gridColumn: "1 / -1" }}>
                       <label>Optional caption</label>
-                      <input value={galleryFile ? galleryFile.name : ""} readOnly placeholder="Selected file name appears here" />
+                      <input type="text" value={galleryFile ? galleryFile.name : ""} readOnly placeholder="Selected file name appears here" />
                     </div>
                     <button className="portal-btn" type="submit" disabled={savingGallery}>
                       <Save size={16} /> {savingGallery ? "Uploading..." : "Upload image"}

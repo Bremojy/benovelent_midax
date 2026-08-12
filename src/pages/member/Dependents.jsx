@@ -79,25 +79,25 @@ export default function Dependents() {
           <section className="support-form-card">
             <div className="support-section-heading"><span>{editing ? "EDIT RECORD" : "NEW RECORD"}</span><h2>{editing ? "Update Dependent" : "Add Dependent"}</h2></div>
             <form onSubmit={submit}>
-              <Field label="Full Name"><input value={form.fullName} onChange={(e)=>set("fullName",e.target.value)} required /></Field>
+              <Field label="Full Name"><input type="text" value={form.fullName} onChange={(e)=>set("fullName",e.target.value)} required /></Field>
               <div className="support-two-col">
                 <Field label="Relationship"><select value={form.relationship} onChange={(e)=>set("relationship",e.target.value)} required><option value="">Select</option>{["Spouse","Son","Daughter","Father","Mother","Brother","Sister","Guardian","Other"].map(x=><option key={x}>{x}</option>)}</select></Field>
                 <Field label="Gender"><select value={form.gender} onChange={(e)=>set("gender",e.target.value)} required><option value="">Select</option><option>Male</option><option>Female</option><option>Other</option></select></Field>
               </div>
               <div className="support-two-col">
                 <Field label="Date of Birth"><input type="date" value={form.dateOfBirth} onChange={(e)=>set("dateOfBirth",e.target.value)} required /></Field>
-                <Field label="Phone"><input value={form.phone} onChange={(e)=>set("phone",e.target.value)} /></Field>
+                <Field label="Phone"><input type="tel" inputMode="tel" value={form.phone} onChange={(e)=>set("phone",e.target.value)} /></Field>
               </div>
               <div className="support-two-col">
-                <Field label="National ID"><input value={form.nationalId} onChange={(e)=>set("nationalId",e.target.value)} /></Field>
-                <Field label="County"><input value={form.county} onChange={(e)=>set("county",e.target.value)} /></Field>
+                <Field label="National ID"><input type="text" value={form.nationalId} onChange={(e)=>set("nationalId",e.target.value)} /></Field>
+                <Field label="County"><input type="text" value={form.county} onChange={(e)=>set("county",e.target.value)} /></Field>
               </div>
-              <Field label="School / Institution"><input value={form.school} onChange={(e)=>set("school",e.target.value)} /></Field>
+              <Field label="School / Institution"><input type="text" value={form.school} onChange={(e)=>set("school",e.target.value)} /></Field>
               <div className="support-two-col">
-                <Field label="Admission Number"><input value={form.admissionNumber} onChange={(e)=>set("admissionNumber",e.target.value)} /></Field>
+                <Field label="Admission Number"><input type="text" value={form.admissionNumber} onChange={(e)=>set("admissionNumber",e.target.value)} /></Field>
                 <Field label="Education Level"><select value={form.educationLevel} onChange={(e)=>set("educationLevel",e.target.value)}><option value="">Select</option>{["Primary","Junior Secondary","Secondary","College","University","TVET","Other"].map(x=><option key={x}>{x}</option>)}</select></Field>
               </div>
-              <Field label="Address"><input value={form.address} onChange={(e)=>set("address",e.target.value)} /></Field>
+              <Field label="Address"><input type="text" value={form.address} onChange={(e)=>set("address",e.target.value)} /></Field>
               <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
                 <button className="support-submit-button" type="submit" disabled={saving}>{saving ? "Saving..." : editing ? "Update Dependent" : "Add Dependent"}</button>
                 {editing && <button type="button" className="support-cancel-button" onClick={()=>{setEditing(null);setForm(empty);}}>Cancel</button>}

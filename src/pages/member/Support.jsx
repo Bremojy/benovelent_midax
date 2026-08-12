@@ -229,7 +229,7 @@ export default function Support() {
               {form.type === "other" && (
                 <>
                   <Field label="Your support type">
-                    <input value={form.customType || ""} onChange={(e) => set("customType", e.target.value)} required />
+                    <input type="text" value={form.customType || ""} onChange={(e) => set("customType", e.target.value)} required />
                   </Field>
                   <Field label="Brief description">
                     <textarea rows="4" value={form.caseDescription || ""} onChange={(e) => set("caseDescription", e.target.value)} required />
@@ -245,8 +245,8 @@ export default function Support() {
                       {dependents.map((d) => <option key={d._id} value={d._id}>{d.fullName || d.name || "Dependent"}</option>)}
                     </select>
                   </Field>
-                  <Field label="Hospital Name"><input value={form.hospitalName} onChange={(e) => set("hospitalName", e.target.value)} /></Field>
-                  <Field label="Hospital Location"><input value={form.hospitalLocation} onChange={(e) => set("hospitalLocation", e.target.value)} /></Field>
+                  <Field label="Hospital Name"><input type="text" value={form.hospitalName} onChange={(e) => set("hospitalName", e.target.value)} /></Field>
+                  <Field label="Hospital Location"><input type="text" value={form.hospitalLocation} onChange={(e) => set("hospitalLocation", e.target.value)} /></Field>
                   <Field label="Diagnosis"><textarea rows="4" value={form.diagnosis} onChange={(e) => set("diagnosis", e.target.value)} /></Field>
                 </>
               )}
@@ -259,13 +259,13 @@ export default function Support() {
                       <option value="Dependent">Dependent</option>
                     </select>
                   </Field>
-                  <Field label="Deceased Name"><input value={form.deceasedName} onChange={(e) => set("deceasedName", e.target.value)} /></Field>
-                  <Field label="Relationship"><input value={form.relationship} onChange={(e) => set("relationship", e.target.value)} /></Field>
+                  <Field label="Deceased Name"><input type="text" value={form.deceasedName} onChange={(e) => set("deceasedName", e.target.value)} /></Field>
+                  <Field label="Relationship"><input type="text" value={form.relationship} onChange={(e) => set("relationship", e.target.value)} /></Field>
                   <div className="support-two-col">
                     <Field label="Date of Death"><input type="date" value={form.dateOfDeath} onChange={(e) => set("dateOfDeath", e.target.value)} /></Field>
                     <Field label="Burial Date"><input type="date" value={form.burialDate} onChange={(e) => set("burialDate", e.target.value)} /></Field>
                   </div>
-                  <Field label="Burial Location"><input value={form.burialLocation} onChange={(e) => set("burialLocation", e.target.value)} /></Field>
+                  <Field label="Burial Location"><input type="text" value={form.burialLocation} onChange={(e) => set("burialLocation", e.target.value)} /></Field>
                 </>
               )}
 
@@ -277,8 +277,8 @@ export default function Support() {
                       {dependents.map((d) => <option key={d._id} value={d._id}>{d.fullName || d.name || "Dependent"}</option>)}
                     </select>
                   </Field>
-                  <Field label="School"><input value={form.school} onChange={(e) => set("school", e.target.value)} /></Field>
-                  <Field label="Admission Number"><input value={form.admissionNumber} onChange={(e) => set("admissionNumber", e.target.value)} /></Field>
+                  <Field label="School"><input type="text" value={form.school} onChange={(e) => set("school", e.target.value)} /></Field>
+                  <Field label="Admission Number"><input type="text" value={form.admissionNumber} onChange={(e) => set("admissionNumber", e.target.value)} /></Field>
                   <Field label="Purpose"><textarea rows="4" value={form.purpose} onChange={(e) => set("purpose", e.target.value)} /></Field>
                   <Field label="Repayment Period (months)"><input type="number" min="1" value={form.repaymentPeriodMonths} onChange={(e) => set("repaymentPeriodMonths", e.target.value)} /></Field>
                 </>

@@ -127,7 +127,7 @@ export const getAdminMember = async (
 ) => {
   if (!memberId) {
     throw new Error(
-      "Member ID is required."
+      "Employee number is required."
     );
   }
 
@@ -171,7 +171,7 @@ export const updateAdminMember = async (
 ) => {
   if (!memberId) {
     throw new Error(
-      "Member ID is required."
+      "Employee number is required."
     );
   }
 
@@ -199,7 +199,7 @@ export const deleteAdminMember = async (
 ) => {
   if (!memberId) {
     throw new Error(
-      "Member ID is required."
+      "Employee number is required."
     );
   }
 
@@ -220,7 +220,7 @@ export const suspendAdminMember = async (
 ) => {
   if (!memberId) {
     throw new Error(
-      "Member ID is required."
+      "Employee number is required."
     );
   }
 
@@ -241,7 +241,7 @@ export const activateAdminMember = async (
 ) => {
   if (!memberId) {
     throw new Error(
-      "Member ID is required."
+      "Employee number is required."
     );
   }
 
@@ -262,7 +262,7 @@ export const restoreAdminMember = async (
 ) => {
   if (!memberId) {
     throw new Error(
-      "Member ID is required."
+      "Employee number is required."
     );
   }
 
@@ -282,7 +282,7 @@ export const resetAdminMemberPassword =
   async (memberId) => {
     if (!memberId) {
       throw new Error(
-        "Member ID is required."
+        "Employee number is required."
       );
     }
 

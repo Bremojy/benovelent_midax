@@ -12,8 +12,8 @@ export default function Contributions() {
   const year = new Date().getFullYear();
 
   useEffect(() => {
-    API.get(`/member/accounts?year=${year}`)
-      .then((response) => setData(response.data))
+    Promise.all([API.get(`/member/accounts?year=${year}`), API.get(`/finance/ledger?year=${year}`)])
+      .then(([accounts, ledger]) => setData({ ...(accounts.data || {}), ledger: ledger.data || {} }))
       .catch((err) => setError(err.response?.data?.message || err.message))
       .finally(() => setLoading(false));
   }, [year]);
@@ -33,7 +33,7 @@ export default function Contributions() {
         <body>
           ${buildPrintHeadHtml({
             title: `Accounts Ledger — ${year}`,
-            subtitle: "Ledger-style report generated from the Benevolent Midax portal.",
+            subtitle: "Official member account statement.",
           })}
           <p class="print-note">Contributed this year: ${money(totals.contributedThisYear)} • Ledger balance: ${money(totals.ledgerBalance)} • Cases helped: ${Number(totals.totalCasesHelped || 0)} • Pending claims: ${Number(totals.pendingClaims || 0)}</p>
           <h3>Monthly contribution summary</h3>
@@ -51,15 +51,15 @@ export default function Contributions() {
           </table>
           <h3 style="margin-top:22px;">Ledger entries</h3>
           <table>
-            <thead><tr><th>Date</th><th>Type</th><th>Description</th><th>Amount</th><th>Status</th></tr></thead>
+            <thead><tr><th>Date</th><th>Description</th><th>Debit</th><th>Credit</th><th>Running balance</th></tr></thead>
             <tbody>
-              ${transactions.map((x) => `
+              ${(data?.ledger?.entries || []).map((x) => `
                 <tr>
                   <td>${x.transactionDate ? new Date(x.transactionDate).toLocaleDateString("en-KE") : "—"}</td>
-                  <td>${escapeHtml(x.type || "—")}</td>
-                  <td>${escapeHtml(x.description || x.category || "—")}</td>
-                  <td>${money(x.amount)}</td>
-                  <td>${escapeHtml(x.status || "—")}</td>
+                  <td>${escapeHtml(x.description || x.category || x.type || "—")}</td>
+                  <td>${money(x.debit)}</td>
+                  <td>${money(x.credit)}</td>
+                  <td>${money(x.runningBalance)}</td>
                 </tr>
               `).join("")}
             </tbody>
@@ -121,23 +121,14 @@ export default function Contributions() {
         </section>
 
         <section className="portal-panel">
-          <h2>Ledger</h2>
+          <h2>Your ledger</h2>
+          <p className="print-note">Account statements are view-only for members.</p>
           <div className="portal-table-wrap">
             <table className="portal-table">
-              <thead>
-                <tr><th>Date</th><th>Type</th><th>Description</th><th>Amount</th><th>Status</th></tr>
-              </thead>
-              <tbody>
-                {([...((data?.transactions || []))].sort((a, b) => new Date(b.transactionDate || b.createdAt || 0) - new Date(a.transactionDate || a.createdAt || 0))).map((x, i) => (
-                  <tr key={x._id || i}>
-                    <td>{x.transactionDate ? new Date(x.transactionDate).toLocaleDateString("en-KE") : "—"}</td>
-                    <td>{x.type}</td>
-                    <td>{x.description || x.category || "—"}</td>
-                    <td>{money(x.amount)}</td>
-                    <td><span className="portal-badge">{x.status}</span></td>
-                  </tr>
-                ))}
-              </tbody>
+              <thead><tr><th>Date</th><th>Description</th><th>Debit</th><th>Credit</th><th>Running balance</th></tr></thead>
+              <tbody>{(data?.ledger?.entries || []).map((x, i) => (
+                <tr key={x._id || i}><td>{x.transactionDate ? new Date(x.transactionDate).toLocaleDateString("en-KE") : "—"}</td><td>{x.description || x.category || x.type || "—"}</td><td>{x.debit ? money(x.debit) : "—"}</td><td>{x.credit ? money(x.credit) : "—"}</td><td>{money(x.runningBalance)}</td></tr>
+              ))}{!data?.ledger?.entries?.length && <tr><td colSpan="5">No approved account entries for this year.</td></tr>}</tbody>
             </table>
           </div>
         </section>

@@ -195,7 +195,7 @@ export default function AdminSupport() {
               </div>
               <div className="portal-field">
                 <label>Subject</label>
-                <input value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} placeholder="e.g. Claim update" />
+                <input type="text" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} placeholder="e.g. Claim update" />
               </div>
               <div className="portal-field" style={{ marginTop: 12 }}>
                 <label>

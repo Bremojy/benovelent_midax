@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 import DashboardLayout from "../../layouts/DashboardLayout";
+import NotificationSettings from "../../components/NotificationSettings";
 import useMemberDashboard from "../../hooks/useMemberDashboard";
 import { updateMemberProfile, changeMemberPassword } from "../../services/memberService";
 
@@ -105,6 +106,8 @@ function Settings() {
 
       <div className="settings-page">
 
+        <NotificationSettings />
+
         <div className="settings-header">
 
           <h1>
@@ -180,6 +183,8 @@ function Settings() {
               </label>
 
               <input
+                type="tel"
+                inputMode="tel"
                 name="phone"
                 value={form.phone}
                 onChange={handleChange}

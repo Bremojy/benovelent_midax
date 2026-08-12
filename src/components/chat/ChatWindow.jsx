@@ -10,6 +10,7 @@ function ChatWindow({ conversation, socket, currentUser, onBack, onAudioCall, on
   const [messages, setMessages] = useState([]);
   const [typingUserId, setTypingUserId] = useState("");
   const [loadingMessages, setLoadingMessages] = useState(false);
+  const [chatError, setChatError] = useState("");
   const messagesEndRef = useRef(null);
   const sendLockRef = useRef(false);
 
@@ -42,12 +43,14 @@ function ChatWindow({ conversation, socket, currentUser, onBack, onAudioCall, on
     (async () => {
       try {
         setLoadingMessages(true);
+        setChatError("");
         const { data } = await API.get(`/messages/conversation/${conversation._id}`);
         if (cancelled) return;
         const items = Array.isArray(data) ? data : data.messages || [];
         setMessages(items.map(normalizeMessage));
       } catch (error) {
         console.error(error);
+        if (!cancelled) setChatError(error.response?.data?.message || error.message || "Unable to load this conversation.");
       } finally {
         if (!cancelled) setLoadingMessages(false);
       }
@@ -129,6 +132,7 @@ function ChatWindow({ conversation, socket, currentUser, onBack, onAudioCall, on
     scrollToBottom();
 
     try {
+      setChatError("");
       const { data } = await API.post("/messages", { conversationId: conversation._id, message: text, attachment, messageType });
       const created = normalizeMessage(data.message || data);
       setMessages((previous) => {
@@ -142,6 +146,7 @@ function ChatWindow({ conversation, socket, currentUser, onBack, onAudioCall, on
     } catch (error) {
       console.error(error);
       setMessages((previous) => previous.filter((item) => String(item._id) !== tempId));
+      setChatError(error.response?.data?.message || error.message || "Message could not be sent. Check your connection and try again.");
       throw error;
     } finally {
       sendLockRef.current = false;
@@ -166,6 +171,8 @@ function ChatWindow({ conversation, socket, currentUser, onBack, onAudioCall, on
         onVideoCall={onVideoCall}
         onBack={onBack}
       />
+
+      {chatError && <div className="chat-error-banner" role="alert"><span>{chatError}</span><button type="button" onClick={() => setChatError("")} aria-label="Dismiss chat error">Dismiss</button></div>}
 
       <div className="messages-container" role="log" aria-live="polite" aria-label="Chat messages">
         {loadingMessages ? (

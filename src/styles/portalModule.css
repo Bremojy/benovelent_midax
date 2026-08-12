@@ -113,3 +113,5 @@
 
 .portal-btn.primary{background:linear-gradient(135deg,#ff7a00,#ff9b3d);color:#fff;border-color:transparent;box-shadow:0 8px 20px rgba(255,122,0,.18)}
 .portal-btn.primary:hover{filter:brightness(1.03);transform:translateY(-1px)}
+
+.ledger-credit{font-weight:700}.ledger-debit{font-weight:700}.ledger-running-balance{font-weight:800}.ledger-muted{color:#667085}.ledger-total-row td{font-weight:800;border-top:2px solid #dfe4ea;background:#f8fafc}@media(max-width:700px){.portal-table-wrap{overflow-x:auto}.portal-table{min-width:760px}}

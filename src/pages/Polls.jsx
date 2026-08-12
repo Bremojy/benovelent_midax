@@ -121,7 +121,7 @@ export default function Polls({ mode = "member" }) {
         <body>
           ${buildPrintHeadHtml({
             title: `Poll Results — ${poll.title || "Community Vote"}`,
-            subtitle: "Official results generated from the Benevolent Midax polling module.",
+            subtitle: "Official poll results for the Benevolent Fund Scheme.",
           })}
           <p class="print-note">Total votes: ${Number(data?.totalVotes || poll.totalVotes || 0)}</p>
           <table>
@@ -177,7 +177,7 @@ export default function Polls({ mode = "member" }) {
             </div>
             <form onSubmit={submitPoll}>
               <div className="poll-form-grid">
-                <label>Title<input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="e.g. Preferred community support priority" /></label>
+                <label>Title<input type="text" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="e.g. Preferred community support priority" /></label>
                 <label>End date<input type="datetime-local" value={form.endDate} onChange={(e) => setForm({ ...form, endDate: e.target.value })} /></label>
                 <label className="full">Description<textarea rows="3" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Explain what members are voting on." /></label>
                 <label>Poll type<select value={form.pollType} onChange={(e) => setForm({ ...form, pollType: e.target.value })}><option value="single">Single choice</option><option value="multiple">Multiple choice</option></select></label>
@@ -186,7 +186,7 @@ export default function Polls({ mode = "member" }) {
                 <strong>Options</strong>
                 {form.options.map((option, index) => (
                   <div className="poll-option-input" key={index}>
-                    <input value={option} onChange={(e) => {
+                    <input type="text" value={option} onChange={(e) => {
                       const next = [...form.options]; next[index] = e.target.value; setForm({ ...form, options: next });
                     }} placeholder={`Option ${index + 1}`} />
                     {form.options.length > 2 && (

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Camera, Check, Eye, EyeOff, LockKeyhole, Palette, Save, ShieldCheck } from "lucide-react";
 import DashboardLayout from "../layouts/DashboardLayout";
+import NotificationSettings from "../components/NotificationSettings";
 import { useAuth } from "../context/AuthContext";
 import {
   changeMemberPassword,
@@ -261,6 +262,7 @@ const saveAppearance = async (value) => {
         {error && <div className="settings-message error">{error}</div>}
 
         <div className="portal-settings-grid">
+          <NotificationSettings />
           <section className="settings-panel">
             <div className="settings-panel-heading">
               <div className="settings-icon"><Camera size={20} /></div>
