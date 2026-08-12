@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, Wallet, HandHeart, MessageCircle, UserRound, UserPlus, ShieldCheck, ClipboardList, Headphones, Vote } from "lucide-react";
+import { LayoutDashboard, Users, Wallet, HandHeart, MessageCircle, UserRound, UserPlus, ShieldCheck, ClipboardList, Headphones, Vote, MessageSquarePlus } from "lucide-react";
 
 export const dashboardMenus = {
   member: [
@@ -10,6 +10,7 @@ export const dashboardMenus = {
     { title: "Claim", icon: HandHeart, path: "/member/claims" },
     { title: "Chat", icon: MessageCircle, path: "/member/messages" },
     { title: "Polls", icon: Vote, path: "/member/polls" },
+    { title: "Feedback", icon: MessageSquarePlus, path: "/member/feedback" },
   ],
   admin: [
     { title: "Dashboard", icon: LayoutDashboard, path: "/admin" },
@@ -19,6 +20,7 @@ export const dashboardMenus = {
     { title: "Support", icon: Headphones, path: "/admin/support" },
     { title: "Chat", icon: MessageCircle, path: "/admin/messages" },
     { title: "Polls", icon: Vote, path: "/admin/polls" },
+    { title: "Feedback", icon: MessageSquarePlus, path: "/admin/feedback" },
   ],
   superadmin: [
     { title: "Dashboard", icon: LayoutDashboard, path: "/superadmin" },
@@ -32,5 +34,6 @@ export const dashboardMenus = {
     { title: "Claims", icon: HandHeart, path: "/superadmin/claims" },
     { title: "Settings", icon: ShieldCheck, path: "/superadmin/settings" },
     { title: "Polls", icon: Vote, path: "/superadmin/polls" },
+    { title: "Feedback", icon: MessageSquarePlus, path: "/superadmin/feedback" },
   ],
 };

@@ -17,6 +17,7 @@ import {
 } from "./context/AuthContext.jsx";
 
 import "./index.css";
+import "./styles/feedback-pwa.css";
 import "./App.css";
 
 createRoot(
@@ -38,3 +39,4 @@ createRoot(
   </StrictMode>
 
 );
+if ("serviceWorker" in navigator) { window.addEventListener("load", () => navigator.serviceWorker.register("/sw.js").catch(() => {})); }

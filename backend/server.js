@@ -55,6 +55,7 @@ const educationSupportRoutes = require("./routes/educationSupportRoutes");
 const dependentRoutes = require("./routes/dependentRoutes");
 
 const pollRoutes = require("./routes/pollRoutes");
+const feedbackRoutes = require("./routes/feedbackRoutes");
 const voteRoutes = require("./routes/voteRoutes");
 
 const conversationRoutes = require("./routes/conversationRoutes");
@@ -205,6 +206,7 @@ app.use("/api/website", websiteRoutes);
 // Polls
 
 app.use("/api/polls", pollRoutes);
+app.use("/api/feedback", feedbackRoutes);
 app.use("/api/votes", voteRoutes);
 
 // Administration

@@ -19,6 +19,7 @@ import Footer from "./components/Footer";
 import ThemeBootstrap from "./components/ThemeBootstrap";
 import CookieConsent from "./components/CookieConsent";
 import GlobalMotion from "./components/GlobalMotion";
+import InstallPWA from "./components/InstallPWA";
 
 import "./App.css";
 import "./styles/interaction-system.css";
@@ -71,6 +72,7 @@ const PortalSettings = lazy(
 );
 
 const Polls = lazy(() => import("./pages/Polls"));
+const Feedback = lazy(() => import("./pages/Feedback"));
 const PortalGuide = lazy(() => import("./pages/member/PortalGuide"));
 
 
@@ -272,6 +274,7 @@ function AppContent() {
       <GlobalMotion />
       <PublicNavbar />
       <CookieConsent />
+      <InstallPWA />
 
       <Suspense
         fallback={<LoadingScreen />}
@@ -403,6 +406,7 @@ function AppContent() {
           <Route path="/admin/notifications" element={<ProtectedRoute allowedRoles={["admin"]}><AdminNotifications /></ProtectedRoute>} />
           <Route path="/admin/settings" element={<ProtectedRoute allowedRoles={["admin"]}><PortalSettings /></ProtectedRoute>} />
           <Route path="/admin/polls" element={<ProtectedRoute allowedRoles={["admin"]}><Polls mode="admin" /></ProtectedRoute>} />
+          <Route path="/admin/feedback" element={<ProtectedRoute allowedRoles={["admin"]}><Feedback /></ProtectedRoute>} />
 
 
           {/* =================================================
@@ -544,6 +548,7 @@ function AppContent() {
           <Route path="/member/dependents" element={<ProtectedRoute allowedRoles={["member"]}><Dependents /></ProtectedRoute>} />
           <Route path="/member/guide" element={<ProtectedRoute allowedRoles={["member"]}><PortalGuide /></ProtectedRoute>} />
           <Route path="/member/polls" element={<ProtectedRoute allowedRoles={["member"]}><Polls mode="member" /></ProtectedRoute>} />
+          <Route path="/member/feedback" element={<ProtectedRoute allowedRoles={["member"]}><Feedback /></ProtectedRoute>} />
 
 
           {/* =================================================
@@ -594,6 +599,7 @@ function AppContent() {
           <Route path="/superadmin/system" element={<ProtectedRoute allowedRoles={["superadmin"]}><SuperAdminSystem /></ProtectedRoute>} />
           <Route path="/superadmin/constitution" element={<ProtectedRoute allowedRoles={["superadmin"]}><SuperAdminConstitution /></ProtectedRoute>} />
           <Route path="/superadmin/polls" element={<ProtectedRoute allowedRoles={["superadmin"]}><Polls mode="superadmin" /></ProtectedRoute>} />
+          <Route path="/superadmin/feedback" element={<ProtectedRoute allowedRoles={["superadmin"]}><Feedback /></ProtectedRoute>} />
 
 
           {/* =================================================
