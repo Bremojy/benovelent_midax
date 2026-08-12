@@ -453,13 +453,38 @@ exports.deleteDuplicateMember = async (req, res) => {
             return res.status(400).json({ success: false, message: "Invalid member ID." });
         }
 
+        // Make the delete action resilient to a stale report. The integrity page
+        // can remain open while another cleanup/delete changes the database.
+        const currentMember = await Member.findById(id)
+            .select("_id fullName name email username memberNumber phone status isDeleted profileCompletion createdAt updatedAt")
+            .lean();
+
+        if (!currentMember || currentMember.isDeleted === true || String(currentMember.status || "") === "inactive") {
+            // Idempotent success: the requested cleanup has already happened.
+            const report = await buildReport();
+            return res.json({
+                success: true,
+                alreadyRemoved: true,
+                message: "Member record was already removed or archived. The integrity report has been refreshed.",
+                report,
+            });
+        }
+
         const members = await Member.find({ isDeleted: { $ne: true }, status: { $ne: "inactive" } })
             .select("fullName name email username memberNumber phone status profileCompletion createdAt updatedAt")
             .lean();
         const groups = findDuplicateGroups(members);
         const group = groups.find((items) => items.some((item) => String(item._id) === id));
         if (!group) {
-            return res.status(404).json({ success: false, message: "This member is not currently identified as a duplicate." });
+            // Do not turn a stale scan into a generic 404. The record still exists,
+            // but it is now unique; require the UI to refresh before another action.
+            const report = await buildReport();
+            return res.status(409).json({
+                success: false,
+                code: "STALE_INTEGRITY_REPORT",
+                message: "This member is no longer identified as a duplicate. The integrity report has been refreshed; review the current results before deleting it.",
+                report,
+            });
         }
 
         const canonical = chooseCanonical(group)[0];

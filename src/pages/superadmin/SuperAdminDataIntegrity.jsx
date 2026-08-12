@@ -65,10 +65,20 @@ export default function SuperAdminDataIntegrity() {
       setMessage(data?.message || "Duplicate member deleted.");
     } catch (err) {
       const refs = err.response?.data?.references;
+      const responseReport = err.response?.data?.report;
       const detail = Array.isArray(refs) && refs.length
         ? ` Linked records: ${refs.map((x) => `${x.label} (${x.count})`).join(", ")}.`
         : "";
-      setError((err.response?.data?.message || err.message || "Unable to delete duplicate member.") + detail);
+
+      // A report can become stale while the page is open. Prefer the server's
+      // refreshed report and surface a clear message rather than a raw 404.
+      if (responseReport) setReport(responseReport);
+      if (err.response?.status === 409 && err.response?.data?.code === "STALE_INTEGRITY_REPORT") {
+        setMessage(err.response.data.message || "The integrity report changed. It has been refreshed.");
+        setError("");
+      } else {
+        setError((err.response?.data?.message || err.message || "Unable to delete duplicate member.") + detail);
+      }
     } finally {
       setDeletingId("");
     }
