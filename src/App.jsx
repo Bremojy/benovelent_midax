@@ -6,10 +6,8 @@ import {
   useLocation,
 } from "react-router-dom";
 
-import {
-  lazy,
-  Suspense,
-} from "react";
+import { lazy, Suspense } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 
 import ScrollToTop from "./components/ScrollToTop";
 
@@ -20,8 +18,10 @@ import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 import ThemeBootstrap from "./components/ThemeBootstrap";
 import CookieConsent from "./components/CookieConsent";
+import GlobalMotion from "./components/GlobalMotion";
 
 import "./App.css";
+import "./styles/interaction-system.css";
 
 // =====================================================
 // PUBLIC PAGES
@@ -269,6 +269,7 @@ function AppContent() {
   return (
     <>
       <ThemeBootstrap />
+      <GlobalMotion />
       <PublicNavbar />
       <CookieConsent />
 
@@ -276,7 +277,16 @@ function AppContent() {
         fallback={<LoadingScreen />}
       >
 
-        <Routes>
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.div
+            key={location.pathname}
+            className="page-transition-shell"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
+          >
+            <Routes location={location}>
 
           {/* =================================================
               PUBLIC PORTAL
@@ -600,7 +610,9 @@ function AppContent() {
             }
           />
 
-        </Routes>
+            </Routes>
+          </motion.div>
+        </AnimatePresence>
 
       </Suspense>
 
