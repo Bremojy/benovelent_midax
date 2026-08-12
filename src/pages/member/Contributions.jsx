@@ -97,6 +97,7 @@ export default function Contributions() {
           <Stat label="Contributed this year" value={money(totals.contributedThisYear)} />
           <Stat label="Ledger balance" value={money(totals.ledgerBalance)} />
           <Stat label="Cases helped" value={totals.totalCasesHelped || 0} />
+          <Stat label="Approved support" value={money(totals.approvedSupportTotal)} />
           <Stat label="Pending claims" value={totals.pendingClaims || 0} />
         </div>
 
@@ -115,6 +116,28 @@ export default function Contributions() {
                     <td>{m.contributingMembers}</td>
                   </tr>
                 ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section className="portal-panel">
+          <div className="portal-module-header">
+            <div><span>YOUR SUPPORT HISTORY</span><h2>Support cases & amounts</h2><p>Approved support is shown here so your account page reflects the same case values recorded by the scheme.</p></div>
+          </div>
+          <div className="portal-table-wrap">
+            <table className="portal-table">
+              <thead><tr><th>Support type</th><th>Status</th><th>Requested</th><th>Approved / helped</th></tr></thead>
+              <tbody>
+                {(data?.supportCases || []).map((x) => (
+                  <tr key={x.id}>
+                    <td>{String(x.supportType || "support").replace(/^[a-z]/, (c) => c.toUpperCase())}</td>
+                    <td><span className="portal-badge">{x.status || "—"}</span></td>
+                    <td>{money(x.requestedAmount)}</td>
+                    <td><strong>{money(x.approvedAmount)}</strong></td>
+                  </tr>
+                ))}
+                {!data?.supportCases?.length && <tr><td colSpan="4">No support cases recorded for your account.</td></tr>}
               </tbody>
             </table>
           </div>

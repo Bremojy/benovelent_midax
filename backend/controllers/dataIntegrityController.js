@@ -116,7 +116,7 @@ async function buildReport() {
         SuperAdmin.find({ status: { $nin: ["inactive", "deleted"] } }).select("fullName name email username memberNumber phone status createdAt updatedAt").lean(),
         Conversation.find({}).select("_id participants active updatedAt createdAt lastMessage").lean(),
         Message.find({}).select("_id conversation sender createdAt").lean(),
-        Carousel.find({}).select("_id imageUrl title description isActive order createdAt updatedAt").lean(),
+        Carousel.find({}).select("_id imageUrl contentHash title description isActive order createdAt updatedAt").lean(),
     ]);
 
     const memberDuplicates = findDuplicateGroups(members);
@@ -135,6 +135,16 @@ async function buildReport() {
 
     const conversationIds = new Set(conversations.map((x) => String(x._id)));
     const orphanMessages = messages.filter((message) => !conversationIds.has(String(message.conversation)));
+
+    const selfConversations = conversations
+        .filter((conversation) => {
+            const ids = (conversation.participants || []).map(String).filter(Boolean);
+            return ids.length > 0 && new Set(ids).size < 2;
+        })
+        .map((conversation) => ({
+            id: String(conversation._id),
+            participants: (conversation.participants || []).map(String),
+        }));
 
     const conversationGroups = new Map();
     conversations
@@ -161,11 +171,9 @@ async function buildReport() {
 
     const carouselGroups = new Map();
     carousels.forEach((slide) => {
-        const key = [
-            normalize(slide.imageUrl),
-            normalize(slide.title),
-            normalize(slide.description),
-        ].join("|");
+        const key = slide.contentHash
+            ? `hash:${normalize(slide.contentHash)}`
+            : `meta:${normalize(slide.imageUrl)}|${normalize(slide.title)}|${normalize(slide.description)}`;
         if (!carouselGroups.has(key)) carouselGroups.set(key, []);
         carouselGroups.get(key).push(slide);
     });
@@ -231,6 +239,7 @@ async function buildReport() {
             duplicateConversationGroups: duplicateConversations.length,
             orphanConversations: orphanConversations.length,
             orphanMessages: orphanMessages.length,
+            selfConversations: selfConversations.length,
             duplicateCarouselGroups: duplicateCarousels.length,
             crossCollectionIdentityCollisions: identityCollisions.length,
         },
@@ -246,6 +255,7 @@ async function buildReport() {
             conversation: String(x.conversation),
             sender: String(x.sender),
         })),
+        selfConversations,
         duplicateCarousels,
         identityCollisions,
     };
@@ -391,6 +401,25 @@ async function removeOrphans() {
     return { removedConversations, removedMessages };
 }
 
+async function removeSelfConversations() {
+    const conversations = await Conversation.find({}).select("_id participants").lean();
+    const ids = conversations
+        .filter((conversation) => {
+            const participants = (conversation.participants || []).map(String).filter(Boolean);
+            return participants.length > 0 && new Set(participants).size < 2;
+        })
+        .map((conversation) => conversation._id);
+
+    if (!ids.length) return { removedConversations: 0, removedMessages: 0 };
+
+    const messages = await Message.deleteMany({ conversation: { $in: ids } });
+    const conversationsDeleted = await Conversation.deleteMany({ _id: { $in: ids } });
+    return {
+        removedConversations: conversationsDeleted.deletedCount || 0,
+        removedMessages: messages.deletedCount || 0,
+    };
+}
+
 async function removeLegacyMonthlyIncome() {
     // Personal monthly income is no longer collected or exposed.
     // Remove the legacy field from existing member documents without touching finance ledger income.
@@ -402,11 +431,13 @@ async function removeLegacyMonthlyIncome() {
 }
 
 async function removeDuplicateCarousels() {
-    const slides = await Carousel.find({}).select("_id imageUrl title description createdAt updatedAt").lean();
+    const slides = await Carousel.find({}).select("_id imageUrl contentHash title description createdAt updatedAt").lean();
     const groups = new Map();
 
     slides.forEach((slide) => {
-        const key = [normalize(slide.imageUrl), normalize(slide.title), normalize(slide.description)].join("|");
+        const key = slide.contentHash
+            ? `hash:${normalize(slide.contentHash)}`
+            : `meta:${normalize(slide.imageUrl)}|${normalize(slide.title)}|${normalize(slide.description)}`;
         if (!groups.has(key)) groups.set(key, []);
         groups.get(key).push(slide);
     });
@@ -534,6 +565,28 @@ exports.getIntegrityReport = async (req, res) => {
     }
 };
 
+exports.cleanupCarouselDuplicates = async (req, res) => {
+    try {
+        const removedDuplicateCarousels = await removeDuplicateCarousels();
+        const report = await buildReport();
+        res.set("Cache-Control", "no-store");
+        return res.json({
+            success: true,
+            message: removedDuplicateCarousels
+                ? `Removed ${removedDuplicateCarousels} duplicate carousel slide${removedDuplicateCarousels === 1 ? "" : "s"}.`
+                : "No duplicate carousel slides were found.",
+            result: { removedDuplicateCarousels },
+            report,
+        });
+    } catch (error) {
+        console.error("Carousel cleanup error:", error);
+        return res.status(500).json({
+            success: false,
+            message: error.message || "Carousel cleanup failed.",
+        });
+    }
+};
+
 exports.runSafeCleanup = async (req, res) => {
     try {
         const requested = String(req.body?.scope || "safe").toLowerCase();
@@ -548,6 +601,7 @@ exports.runSafeCleanup = async (req, res) => {
         if (requested === "conversations" || requested === "safe" || requested === "all") {
             result.mergedDuplicateConversations = await mergeDuplicateConversations();
             result.orphans = await removeOrphans();
+            result.selfConversations = await removeSelfConversations();
         }
         if (requested === "carousel" || requested === "safe" || requested === "all") {
             result.removedDuplicateCarousels = await removeDuplicateCarousels();

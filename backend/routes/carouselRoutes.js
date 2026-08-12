@@ -44,10 +44,32 @@ router.post("/upload", protect, isSuperAdmin, setUploadType("carousel"), uploadS
     }
 
     const { title, description, buttonText, buttonLink, order } = req.body;
+    const normalizedTitle = String(title || "Benevolent Midax").trim();
+    const normalizedDescription = String(description || "").trim();
+    const imageUrl = resolveStoredFileUrl(req.file, "/uploads/carousel");
+    const contentHash = String(req.file.contentHash || "");
+
+    const duplicate = await Carousel.findOne({
+      $or: [
+        ...(contentHash ? [{ contentHash }] : []),
+        { imageUrl, title: normalizedTitle, description: normalizedDescription },
+      ],
+    }).lean();
+
+    if (duplicate) {
+      return res.status(409).json({
+        success: false,
+        code: "DUPLICATE_CAROUSEL",
+        message: "This carousel image/content already exists. Use the existing slide instead of creating a duplicate.",
+        slide: duplicate,
+      });
+    }
+
     const slide = await Carousel.create({
-      imageUrl: resolveStoredFileUrl(req.file, "/uploads/carousel"),
-      title: title || "Benevolent Midax",
-      description: description || "",
+      imageUrl,
+      contentHash,
+      title: normalizedTitle,
+      description: normalizedDescription,
       buttonText: buttonText || "Discover More",
       buttonLink: buttonLink || "/about",
       order: Number(order) || 0,
@@ -70,6 +92,7 @@ router.post("/", protect, isSuperAdmin, async (req, res) => {
 
     const slide = await Carousel.create({
       imageUrl,
+      contentHash: "",
       title,
       description,
       buttonText,

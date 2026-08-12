@@ -1,3 +1,4 @@
+const crypto = require("crypto");
 const { upload, useCloudinary, uploadBufferToCloudinary } = require("../config/uploadConfig");
 
 const decorateCloudinaryFile = (cloudResult, uploadType, sourceFile = {}) => {
@@ -31,6 +32,9 @@ const uploadFilesToCloudinary = async (req) => {
 
   if (req.file) {
     const sourceFile = req.file;
+    if (sourceFile.buffer) {
+      sourceFile.contentHash = crypto.createHash("sha256").update(sourceFile.buffer).digest("hex");
+    }
     const result = await uploadBufferToCloudinary(sourceFile, uploadType);
     req.file = decorateCloudinaryFile(result, uploadType, sourceFile);
   }

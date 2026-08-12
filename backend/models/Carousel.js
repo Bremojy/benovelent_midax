@@ -7,6 +7,12 @@ const carouselSchema = new mongoose.Schema(
       required: true,
     },
 
+    contentHash: {
+      type: String,
+      default: "",
+      index: true,
+    },
+
     title: {
       type: String,
       required: true,

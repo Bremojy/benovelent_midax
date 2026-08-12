@@ -4,6 +4,7 @@ const superAdmin = require("../middleware/superAdminMiddleware");
 const {
     getIntegrityReport,
     runSafeCleanup,
+    cleanupCarouselDuplicates,
     deleteDuplicateMember,
 } = require("../controllers/dataIntegrityController");
 
@@ -13,6 +14,7 @@ router.use(protect, superAdmin);
 
 router.get("/", getIntegrityReport);
 router.post("/cleanup", runSafeCleanup);
+router.post("/cleanup/carousels", cleanupCarouselDuplicates);
 router.delete("/members/:id", deleteDuplicateMember);
 
 module.exports = router;

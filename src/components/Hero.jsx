@@ -32,7 +32,6 @@ function Hero() {
     try {
       const response = await api.get("/carousel/active", {
         params: { _ts: Date.now() },
-        headers: { "Cache-Control": "no-cache" },
       });
 
       const freshSlides = Array.isArray(response.data)

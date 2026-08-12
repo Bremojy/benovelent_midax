@@ -730,12 +730,37 @@ exports.getMemberAccounts = async (req, res) => {
       require("../models/EducationSupport").find({}).select("status").lean(),
     ]);
     const monthly = Array.from({length:12}, (_,i) => {
-      const month=i+1; const rows=yearContributions.filter(c=>Number(c.month)===month && Number(c.paidAmount||0)>0);
-      return {month, contributed:rows.reduce((a,c)=>a+Number(c.paidAmount||0),0), contributingMembers:new Set(rows.map(c=>String(c.member))).size};
+      const month=i+1; const rows=contributions.filter(c=>Number(c.month)===month && Number(c.paidAmount||0)>0);
+      return {month, contributed:rows.reduce((a,c)=>a+Number(c.paidAmount||0),0), contributingMembers:rows.length};
     });
     const claims=[...medical,...funeral,...education];
     const allCases=[...allMedical,...allFuneral,...allEducation];
     const ledgerBalance=transactions.reduce((sum,t)=>sum + ((t.type==="contribution"||t.type==="income")?Number(t.amount||0):-Number(t.amount||0)),0);
-    res.json({success:true,member,year,transactions,monthly,totals:{contributedThisYear:contributions.reduce((a,c)=>a+Number(c.paidAmount||0),0),ledgerBalance,totalCasesHelped:allCases.filter(c=>["Approved","Paid","Disbursed","Completed","Closed"].includes(c.status)).length,pendingClaims:claims.filter(c=>["Pending","Under Review"].includes(c.status)).length}});
+    const supportCases = [
+      ...funeral.map((item) => ({
+        id: String(item._id),
+        supportType: "funeral",
+        status: item.status,
+        requestedAmount: Number(item.requestedAmount || 0),
+        approvedAmount: Number(item.approvedAmount || 0),
+      })),
+      ...medical.map((item) => ({
+        id: String(item._id),
+        supportType: "medical",
+        status: item.status,
+        requestedAmount: Number(item.requestedAmount || 0),
+        approvedAmount: Number(item.approvedAmount || 0),
+      })),
+      ...education.map((item) => ({
+        id: String(item._id),
+        supportType: "education",
+        status: item.status,
+        requestedAmount: Number(item.requestedAmount || 0),
+        approvedAmount: Number(item.approvedAmount || 0),
+      })),
+    ].sort((a, b) => String(b.id).localeCompare(String(a.id)));
+    const approvedSupportTotal = supportCases.reduce((sum, item) =>
+      sum + (["Approved","Paid","Disbursed","Completed","Closed"].includes(item.status) ? Number(item.approvedAmount || 0) : 0), 0);
+    res.json({success:true,member,year,transactions,monthly,supportCases,totals:{contributedThisYear:contributions.reduce((a,c)=>a+Number(c.paidAmount||0),0),ledgerBalance,totalCasesHelped:claims.filter(c=>["Approved","Paid","Disbursed","Completed","Closed"].includes(c.status)).length,pendingClaims:claims.filter(c=>["Pending","Under Review"].includes(c.status)).length,approvedSupportTotal}});
   } catch(error){res.status(500).json({success:false,message:error.message});}
 };

@@ -23,6 +23,7 @@ const COUNT_ITEMS = [
   ["duplicateConversationGroups", "Duplicate conversation groups"],
   ["orphanConversations", "Orphan conversations"],
   ["orphanMessages", "Orphan messages"],
+  ["selfConversations", "Self-conversations"],
   ["duplicateCarouselGroups", "Duplicate carousel groups"],
   ["crossCollectionIdentityCollisions", "Cross-collection identity collisions"],
 ];
@@ -34,6 +35,7 @@ export default function SuperAdminDataIntegrity() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [deletingId, setDeletingId] = useState("");
+  const [cleaningCarousels, setCleaningCarousels] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -41,7 +43,6 @@ export default function SuperAdminDataIntegrity() {
       setError("");
       const { data } = await API.get("/superadmin/data-integrity", {
         params: { _ts: Date.now() },
-        headers: { "Cache-Control": "no-cache" },
       });
       setReport(data?.report || null);
     } catch (err) {
@@ -84,6 +85,26 @@ export default function SuperAdminDataIntegrity() {
     }
   };
 
+  const cleanCarouselDuplicates = async () => {
+    const confirmed = window.confirm(
+      "Remove only duplicate carousel slides? The newest matching slide will be kept. Other member, finance and chat records will not be changed."
+    );
+    if (!confirmed) return;
+
+    try {
+      setCleaningCarousels(true);
+      setError("");
+      setMessage("");
+      const { data } = await API.post("/superadmin/data-integrity/cleanup/carousels");
+      setReport(data?.report || null);
+      setMessage(data?.message || "Carousel cleanup completed.");
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || "Carousel cleanup failed.");
+    } finally {
+      setCleaningCarousels(false);
+    }
+  };
+
   const runCleanup = async () => {
     const confirmed = window.confirm(
       "Run SAFE cleanup? Duplicate accounts will be archived, duplicate conversations will be merged, orphaned chat data will be removed, and duplicate carousel slides will be removed. Financial and support records are preserved."
@@ -113,6 +134,7 @@ export default function SuperAdminDataIntegrity() {
       c.duplicateConversationGroups ||
       c.orphanConversations ||
       c.orphanMessages ||
+      c.selfConversations ||
       c.duplicateCarouselGroups
     ) ? "attention" : "clean";
   }, [report]);
@@ -125,7 +147,7 @@ export default function SuperAdminDataIntegrity() {
             <span>SUPERADMIN · DATA GOVERNANCE</span>
             <h1>Database Integrity & Cleanup</h1>
             <p>
-              Inspect stale accounts, duplicate chats, orphaned records and duplicate carousel content before making any changes.
+              Inspect stale accounts, duplicate chats, self-conversations, orphaned records and duplicate carousel content before making any changes.
             </p>
           </div>
           <div className="integrity-actions">
@@ -133,7 +155,11 @@ export default function SuperAdminDataIntegrity() {
               <RefreshCw size={16} className={loading ? "spin" : ""} />
               {loading ? "Scanning..." : "Scan Again"}
             </button>
-            <button className="portal-btn primary" onClick={runCleanup} disabled={loading || cleaning || health === "clean"}>
+            <button className="portal-btn light" onClick={cleanCarouselDuplicates} disabled={loading || cleaning || cleaningCarousels || !(report?.counts?.duplicateCarouselGroups)}>
+              <Trash2 size={16} />
+              {cleaningCarousels ? "Cleaning carousel..." : "Clean carousel duplicates"}
+            </button>
+            <button className="portal-btn primary" onClick={runCleanup} disabled={loading || cleaning || cleaningCarousels || health === "clean"}>
               <Sparkles size={16} />
               {cleaning ? "Cleaning..." : "Run Safe Cleanup"}
             </button>
@@ -199,6 +225,10 @@ export default function SuperAdminDataIntegrity() {
 
         <DuplicatePreview title="Duplicate member groups" groups={report?.duplicateMembers} deletingId={deletingId} onDeleteMember={deleteDuplicateMember} />
         <DuplicatePreview title="Duplicate administrator groups" groups={report?.duplicateAdmins} />
+        <DuplicatePreview title="Self-conversations" groups={report?.selfConversations?.map((x) => ({
+          keep: "REMOVE",
+          records: [{ id: x.id, name: "Self-conversation", status: "invalid" }],
+        }))} />
         <DuplicatePreview title="Duplicate conversations" groups={report?.duplicateConversations?.map((x) => ({
           keep: x.keep,
           records: [{ id: x.keep, name: `Keep conversation`, status: "canonical" }, ...x.remove.map((id) => ({ id, name: "Remove/merge duplicate conversation", status: "duplicate" }))],

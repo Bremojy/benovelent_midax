@@ -270,7 +270,11 @@ export default function SuperAdminSettings() {
         isActive: true,
       });
     } catch (err) {
-      setError(err.response?.data?.message || err.message || "Unable to upload carousel slide.");
+      if (err.response?.status === 409 && err.response?.data?.code === "DUPLICATE_CAROUSEL") {
+        setError("This image/content is already in the carousel. The existing slide was kept, so no duplicate was created.");
+      } else {
+        setError(err.response?.data?.message || err.message || "Unable to upload carousel slide.");
+      }
     } finally {
       setSavingCarousel(false);
     }

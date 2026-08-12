@@ -13,6 +13,7 @@ const MedicalSupport = require("../models/MedicalSupport");
 const FuneralSupport = require("../models/FuneralSupport");
 const EducationSupport = require("../models/EducationSupport");
 const { resolveStoredFileUrl } = require("../utils/uploadUrl");
+const { ensureChatProfile } = require("../utils/chatProfile");
 
 const calculateProfileCompletion =
 require("../utils/calculateProfileCompletion");
@@ -1328,7 +1329,7 @@ exports.getClaims = async (req, res) => {
 
 exports.getChatMembers = async (req, res) => {
     try {
-        const currentUserId = String(req.user?._id || req.user?.id || req.auth?.chatId || req.auth?.id || req.user?.chatId || "").trim();
+        const currentUserId = String(req.auth?.chatId || req.user?.chatMemberId || req.user?._id || req.user?.id || "").trim();
         const keyword = String(req.query.search || "").trim().toLowerCase();
         const limit = Number(req.query.limit || 500);
 
@@ -1360,14 +1361,14 @@ exports.getChatMembers = async (req, res) => {
             ];
         }
 
-        const [members, admins, conversations] = await Promise.all([
+        const [members, adminRecords, conversations] = await Promise.all([
             Member.find({ ...memberFilter, role: "member" })
                 .select("fullName username profileImage online lastSeen status memberNumber department position phone email role")
                 .sort({ role: 1, fullName: 1 })
                 .limit(limit)
                 .lean(),
             Admin.find(adminFilter)
-                .select("fullName name email phone profileImage online lastSeen status role position")
+                .select("_id fullName name username email phone profileImage online lastSeen status role position memberNumber")
                 .limit(limit)
                 .lean(),
             Conversation.find({
@@ -1438,9 +1439,36 @@ exports.getChatMembers = async (req, res) => {
             return keys;
         };
 
+        // Conversations are stored against Member chat-profile IDs. Leadership
+        // accounts therefore use their mirrored chat profile ID instead of the
+        // Admin collection ID; otherwise an administrator can see themselves
+        // as a contact and open a self-conversation.
+        const adminProfiles = await Promise.all(
+            adminRecords.map(async (admin) => {
+                try {
+                    const profile = await ensureChatProfile(admin);
+                    if (profile) {
+                        return {
+                            ...(typeof profile.toObject === "function" ? profile.toObject() : profile),
+                            role: "admin",
+                            status: "active",
+                            sourceAdminId: String(admin._id),
+                            position: admin.position || profile.position || "",
+                        };
+                    }
+                } catch (profileError) {
+                    console.error("Admin chat profile sync error:", profileError);
+                }
+                return {
+                    ...admin,
+                    role: "admin",
+                };
+            })
+        );
+
         const contacts = [
             ...members.map((member) => normalizeContact(member, "member")),
-            ...admins.map((admin) => normalizeContact(admin, "admin")),
+            ...adminProfiles.map((admin) => normalizeContact(admin, "admin")),
         ].filter((item) =>
             String(item._id) !== currentUserId &&
             String(item.role || "").toLowerCase() !== "superadmin" &&

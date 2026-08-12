@@ -78,19 +78,27 @@ const allowedOrigins = String(process.env.CORS_ORIGINS || "https://benovelent-mi
     .map((origin) => origin.trim())
     .filter(Boolean);
 
-app.use(
-    cors({
-        origin(origin, callback) {
-            if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
-            return callback(new Error("Origin not allowed by CORS."));
-        },
-        credentials: true,
-        methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-        allowedHeaders: ["Origin", "X-Requested-With", "Content-Type", "Accept", "Authorization"],
-        optionsSuccessStatus: 204,
-    })
-);
-app.options(/.*/, cors());
+const corsOptions = {
+    origin(origin, callback) {
+        if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+        return callback(new Error("Origin not allowed by CORS."));
+    },
+    credentials: true,
+    methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: [
+        "Origin",
+        "X-Requested-With",
+        "Content-Type",
+        "Accept",
+        "Authorization",
+        "Cache-Control",
+        "Pragma",
+    ],
+    optionsSuccessStatus: 204,
+};
+
+app.use(cors(corsOptions));
+app.options(/.*/, cors(corsOptions));
 
 app.use(compression({ threshold: 1024 }));
 app.use(express.json({ limit: "10mb" }));
