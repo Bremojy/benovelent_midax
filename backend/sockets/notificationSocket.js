@@ -44,22 +44,31 @@ module.exports = (io, socket) => {
 
             } = data;
 
+            const recipientActor = await (async () => {
+                for (const [candidateRole, Model] of Object.entries({ member: require("../models/Member"), admin: require("../models/Admin"), superadmin: require("../models/SuperAdmin") })) {
+                    const user = await Model.findById(recipient).select("_id").lean();
+                    if (user) return { role: candidateRole };
+                }
+                return null;
+            })();
+            const senderActor = sender ? await (async () => {
+                for (const [candidateRole, Model] of Object.entries({ member: require("../models/Member"), admin: require("../models/Admin"), superadmin: require("../models/SuperAdmin") })) {
+                    const user = await Model.findById(sender).select("_id").lean();
+                    if (user) return { role: candidateRole };
+                }
+                return null;
+            })() : null;
+            const modelName = (role) => role === "superadmin" ? "SuperAdmin" : role === "admin" ? "Admin" : "Member";
             const notification = await Notification.create({
-
                 recipient,
-
-                sender,
-
+                recipientModel: modelName(recipientActor?.role),
+                sender: sender || null,
+                senderModel: modelName(senderActor?.role),
                 title,
-
                 message,
-
                 type,
-
                 referenceId,
-
                 referenceModel
-
             });
 
             const receiverSocket = getSocket(recipient);

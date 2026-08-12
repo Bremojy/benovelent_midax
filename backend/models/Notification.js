@@ -74,6 +74,12 @@ senderModel: {
         default:"notifications"
     },
 
+    suppressPush:{
+        type:Boolean,
+        default:false,
+        select:false
+    },
+
     read:{
         type:Boolean,
         default:false
@@ -92,6 +98,7 @@ notificationSchema.index({recipient:1,read:1});
 notificationSchema.index({createdAt:-1});
 
 notificationSchema.post("save", (notification) => {
+  if (notification?.suppressPush) return;
   try {
     const { sendPushForNotification } = require("../services/pushService");
     void sendPushForNotification(notification).catch((error) => console.warn("Notification push delivery skipped:", error.message));

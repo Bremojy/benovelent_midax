@@ -772,17 +772,30 @@ exports.getMemberAccounts = async (req, res) => {
     const standardMonthlyDeduction = [...deductionCounts.entries()].sort((a, b) => b[1] - a[1] || b[0] - a[0])[0]?.[0] || 500;
 
     const creditTypes = new Set(["contribution", "income", "refund"]);
+    const groupedLedger = new Map();
+    for (const row of transactions) {
+      const dateValue = row.transactionDate || row.createdAt;
+      const day = dateValue ? new Date(dateValue).toISOString().slice(0, 10) : "unknown";
+      const type = String(row.type || "other");
+      const category = String(row.category || "scheme activity");
+      const key = `${day}|${type}|${category}`;
+      const amount = Number(row.amount || 0);
+      const existing = groupedLedger.get(key) || { date: dateValue, type, category, totalAmount: 0, count: 0 };
+      existing.totalAmount += amount;
+      existing.count += 1;
+      groupedLedger.set(key, existing);
+    }
     let balance = 0;
-    const ledgerEntries = transactions.map((row) => {
-      const credit = creditTypes.has(row.type) ? Number(row.amount || 0) : 0;
-      const debit = credit ? 0 : Number(row.amount || 0);
+    const ledgerEntries = [...groupedLedger.values()].sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0)).map((row) => {
+      const credit = creditTypes.has(row.type) ? row.totalAmount : 0;
+      const debit = credit ? 0 : row.totalAmount;
       balance += credit - debit;
       return {
-        date: row.transactionDate || row.createdAt,
+        date: row.date,
         type: row.type,
         category: row.category,
-        description: row.description,
-        amount: Number(row.amount || 0),
+        description: `Scheme ${row.type} activity (${row.count} record${row.count === 1 ? "" : "s"})`,
+        amount: row.totalAmount,
         debit,
         credit,
         runningBalance: balance,
@@ -828,7 +841,7 @@ exports.getMemberAccounts = async (req, res) => {
         pendingCases: pendingSupportTotal,
         approvedSupportTotal,
       },
-      notice: "This member Accounts view is intentionally scheme-wide. Individual contribution amounts and personal finance records are not displayed to members.",
+      notice: "General scheme account view.",
     });
   } catch (error) {
     console.error("Scheme-wide member accounts error:", error);

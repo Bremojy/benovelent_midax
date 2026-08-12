@@ -36,7 +36,7 @@ export default function Contributions() {
     const totals = data.totals || {};
     win.document.write(`
       <html><head><title>Benovelent MIDAX Scheme Accounts</title>${printHeadStyles()}</head><body>
-      ${buildPrintHeadHtml({ title: `Benovelent MIDAX Scheme Accounts — ${year}`, subtitle: "General member account statement. Individual member contribution details are intentionally excluded." })}
+      ${buildPrintHeadHtml({ title: `Benovelent MIDAX Scheme Accounts — ${year}`, subtitle: "General Benovelent MIDAX scheme account statement." })}
       <p class="print-note">Standard monthly payroll deduction: ${money(data.standardMonthlyDeduction)} • Active members: ${Number(data.activeMembers || 0)} • Total collected: ${money(totals.totalCollected)} • Outstanding: ${money(totals.outstanding)}</p>
       <h3>Monthly scheme contribution summary</h3>
       <table><thead><tr><th>Month</th><th>Expected</th><th>Collected</th><th>Outstanding</th><th>Members charged</th></tr></thead><tbody>
@@ -69,7 +69,7 @@ export default function Contributions() {
         </header>
 
         <section className="portal-panel">
-          <div className="portal-alert success"><strong>Payroll contribution model:</strong> members do not enter or view personal contribution amounts. The scheme sets one monthly deduction and Admin records the payroll run for the membership as a whole.</div>
+          <div className="portal-alert success"><strong>Payroll contribution model:</strong> the scheme applies one standard monthly deduction across the membership.</div>
         </section>
 
         <div className="portal-stat-grid">
@@ -100,7 +100,7 @@ export default function Contributions() {
 
         <section className="portal-grid two">
           <article className="portal-panel"><h2>Support summary</h2><div className="portal-stat-grid"><Stat label="All support cases" value={data?.support?.totalCases || 0} /><Stat label="Approved cases" value={data?.support?.approvedCases || 0} /><Stat label="Pending cases" value={data?.support?.pendingCases || 0} /><Stat label="Approved support" value={money(data?.support?.approvedSupportTotal)} /></div></article>
-          <article className="portal-panel"><h2>Scheme ledger</h2><div className="portal-stat-grid"><Stat label="Credits" value={money(data?.totals?.ledgerCredits)} /><Stat label="Debits" value={money(data?.totals?.ledgerDebits)} /><Stat label="Closing balance" value={money(data?.totals?.ledgerBalance)} /></div><p className="print-note">Individual member names, employee numbers and personal contribution records are intentionally not displayed here.</p></article>
+          <article className="portal-panel"><h2>Scheme ledger</h2><div className="portal-stat-grid"><Stat label="Credits" value={money(data?.totals?.ledgerCredits)} /><Stat label="Debits" value={money(data?.totals?.ledgerDebits)} /><Stat label="Closing balance" value={money(data?.totals?.ledgerBalance)} /></div><p className="print-note">This is a shared scheme account view for members.</p></article>
         </section>
 
         <section className="portal-panel"><h2>Recent scheme ledger activity</h2><div className="portal-table-wrap"><table className="portal-table"><thead><tr><th>Date</th><th>Type</th><th>Category</th><th>Description</th><th>Debit</th><th>Credit</th><th>Balance</th></tr></thead><tbody>

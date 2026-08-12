@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { ArrowLeft, RefreshCw } from "lucide-react";
 import socketClient from "../../sockets/socket";
 import DashboardLayout from "../../layouts/DashboardLayout";
@@ -6,6 +7,7 @@ import ChatSidebar from "./ChatSidebar";
 import ChatWindow from "./ChatWindow";
 import CallOverlay from "./CallOverlay";
 import API from "../../services/api";
+import { getPendingCall, removePendingCall } from "../../utils/pushCallStore";
 import { useAuth } from "../../context/AuthContext";
 import "../../pages/member/messages.css";
 
@@ -22,6 +24,7 @@ function MessageCenterPage({
   initialConversationId = "",
 }) {
   const { user: authUser } = useAuth();
+  const location = useLocation();
 
   const [currentUser, setCurrentUser] = useState(authUser || null);
   const [socket, setSocket] = useState(null);
@@ -150,6 +153,34 @@ function MessageCenterPage({
       setSocket(null);
     };
   }, [actorId, currentUser?.role, authUser?.role]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search || "");
+    const callId = params.get("incomingPushCall");
+    if (!callId) return;
+    let active = true;
+    (async () => {
+      const pending = await getPendingCall(callId);
+      if (!active || !pending?.data) return;
+      const action = String(params.get("callAction") || "open");
+      const payload = pending.data;
+      if (action === "decline") {
+        if (socketClient.connected && payload.from) socketClient.emit("call-rejected", { to: payload.from });
+        await removePendingCall(callId);
+        window.history.replaceState({}, "", location.pathname);
+        return;
+      }
+      setCall({
+        direction: "incoming",
+        incomingCall: payload,
+        callType: payload.callType === "video" ? "video" : "audio",
+        partner: { _id: payload.callerUserId, fullName: payload.callerName || "Member", profileImage: payload.profileImage || "" },
+      });
+      await removePendingCall(callId);
+      window.history.replaceState({}, "", location.pathname);
+    })();
+    return () => { active = false; };
+  }, [location.pathname, location.search]);
 
   const loadChatData = async () => {
     try {

@@ -73,7 +73,7 @@ export default function AdminDashboard() {
 
   const pulse = useMemo(
     () => [
-      { label: "Online members", value: val("onlineMembers"), icon: Users },
+      { label: "Live members", value: val("onlineMembers"), icon: Users },
       { label: "Pending support", value: stats.pendingSupport?.total || 0, icon: HandHeart },
       { label: "Unread notifications", value: stats.unreadNotifications || 0, icon: Bell },
       { label: "Published news", value: stats.publishedNews || 0, icon: Newspaper },
@@ -107,7 +107,7 @@ export default function AdminDashboard() {
           </div>
           <div className="portal-hero-orbit" aria-hidden="true">
             <div className="orbit-glow" />
-            <div className="orbit-card"><Activity size={18} /><span>LIVE</span><strong>{stats.onlineMembers || 0}</strong><small>members online</small></div>
+            <div className="orbit-card"><Activity size={18} /><span>LIVE PRESENCE</span><strong>{stats.onlineMembers || 0}</strong><small>members currently online</small></div>
             <div className="orbit-mini"><CheckCircle2 size={16} /> System active</div>
           </div>
         </section>

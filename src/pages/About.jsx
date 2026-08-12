@@ -28,7 +28,7 @@ export default function About() {
           <div className="modern-hero-panel">
             <div className="modern-panel-grid">
               <Link to="/contact" className="modern-metric"><strong>Member voice</strong><span>Every member has right to speak</span></Link>
-              <Link to="/privacy-policy" className="modern-metric"><strong>Privacy</strong><span>Information can only be accessed by superAdmin; your information is protected</span></Link>
+              <Link to="/privacy-policy" className="modern-metric"><strong>Privacy</strong><span>Your information is handled with care and protected through the portal</span></Link>
               <Link to="/services" className="modern-metric"><strong>Support</strong><span>Detailed information about the Benovelent Midax Constitution services</span></Link>
             </div>
           </div>

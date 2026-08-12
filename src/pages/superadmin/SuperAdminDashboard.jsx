@@ -54,6 +54,15 @@ export default function SuperAdminDashboard() {
 
   useEffect(() => { loadDashboard(); }, []);
 
+  const uniqueRecentAdmins = [];
+  const seenAdmins = new Set();
+  for (const admin of recentAdmins) {
+    const key = String(admin?._id || admin?.email || admin?.fullName || admin?.name || "").toLowerCase();
+    if (!key || seenAdmins.has(key)) continue;
+    seenAdmins.add(key);
+    uniqueRecentAdmins.push(admin);
+  }
+
   return (
     <DashboardLayout>
       <div className="superadmin-dashboard v7-portal">
@@ -78,7 +87,7 @@ export default function SuperAdminDashboard() {
         {error && <div className="portal-alert"><ShieldAlert size={18} /> {error}</div>}
 
         <section className="portal-metric-grid v8-super-metrics">
-          <Metric label="Members" value={overview?.members?.total ?? 0} caption={`${overview?.members?.online ?? 0} online`} icon={<Users />} />
+          <Metric label="Members" value={overview?.members?.total ?? 0} caption="Total scheme members" icon={<Users />} />
           <Metric label="Support cases" value={overview?.support?.pending ?? 0} caption="pending" icon={<HandHeart />} tone="green" />
           <Metric label="Administrators" value={overview?.leadership?.administrators ?? statistics.total} caption={`${overview?.leadership?.activeAdministrators ?? statistics.active} active`} icon={<UserCog />} tone="violet" />
           <Metric label="Messages" value={overview?.communication?.messages ?? 0} caption={`${overview?.communication?.conversations ?? 0} conversations`} icon={<MessageCircle />} tone="blue" />
@@ -104,8 +113,7 @@ export default function SuperAdminDashboard() {
             <div className="panel-heading"><div><span className="panel-kicker">LIVE PLATFORM HEALTH</span><h2>Signals across the system.</h2><p>Current operational indicators from the live portal API.</p></div></div>
             <div className="health-list">
               <HealthRow label="System connection" value={systemOnline === null ? "Checking" : systemOnline ? "Operational" : "Needs attention"} good={systemOnline !== false} />
-              <HealthRow label="Active administrators" value={statistics.active} good={true} />
-              <HealthRow label="Suspended administrators" value={statistics.suspended} good={statistics.suspended === 0} />
+              <HealthRow label="Administrator status" value={`${statistics.active} active · ${statistics.suspended} suspended`} good={statistics.suspended === 0} />
               <HealthRow label="Pending support" value={overview?.support?.pending ?? 0} good={(overview?.support?.pending ?? 0) < 10} />
             </div>
           </article>
@@ -125,7 +133,7 @@ export default function SuperAdminDashboard() {
           <article className="portal-panel modern-panel">
             <div className="panel-heading"><div><span className="panel-kicker">ADMINISTRATION</span><h2>Recent administrators</h2></div><a className="panel-link" href="/superadmin/admins">View all <ArrowUpRight size={16} /></a></div>
             <div className="activity-list">
-              {recentAdmins.map((admin, index) => <div className="activity-row" key={admin._id || index}><div className="activity-avatar violet">{getInitials(admin.fullName || admin.name)}</div><div className="activity-copy"><strong>{admin.fullName || admin.name || "Administrator"}</strong><span>{admin.email || "No email"}</span></div><span className="status-pill">{capitalize(admin.status || "active")}</span></div>)}
+              {uniqueRecentAdmins.map((admin, index) => <div className="activity-row" key={admin._id || index}><div className="activity-avatar violet">{getInitials(admin.fullName || admin.name)}</div><div className="activity-copy"><strong>{admin.fullName || admin.name || "Administrator"}</strong><span>{admin.email || "No email"}</span></div><span className="status-pill">{capitalize(admin.status || "active")}</span></div>)}
               {!recentAdmins.length && <div className="portal-empty">No administrators returned.</div>}
             </div>
           </article>

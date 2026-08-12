@@ -1,37 +1,90 @@
-const CACHE = "benovelent-shell-v7";
+const CACHE = "benovelent-shell-v9";
 const ASSETS = ["/", "/index.html", "/manifest.webmanifest", "/pwa-icon-192.png", "/pwa-icon-512.png", "/apple-touch-icon.png"];
+const DB_NAME = "benovelent-pwa";
+const DB_STORE = "calls";
+
+function openDb() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, 1);
+    request.onupgradeneeded = () => request.result.createObjectStore(DB_STORE);
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function savePendingCall(id, payload) {
+  try {
+    const db = await openDb();
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(DB_STORE, "readwrite");
+      tx.objectStore(DB_STORE).put(payload, id);
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error);
+    });
+    db.close();
+  } catch (error) {
+    console.warn("PWA call storage failed:", error);
+  }
+}
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(ASSETS)).then(() => self.skipWaiting()));
 });
 
 self.addEventListener("activate", (event) => {
-  event.waitUntil(caches.keys().then((keys) => Promise.all(keys.filter((key) => key !== CACHE).map((key) => caches.delete(key)))).then(() => self.clients.claim()));
+  event.waitUntil(
+    caches.keys()
+      .then((keys) => Promise.all(keys.filter((key) => key !== CACHE).map((key) => caches.delete(key))))
+      .then(() => self.clients.claim())
+  );
 });
 
 self.addEventListener("push", (event) => {
   let payload = {};
   try { payload = event.data ? event.data.json() : {}; } catch { payload = { body: event.data?.text?.() || "You have a new Benovelent MIDAX update." }; }
-  const title = payload.title || "Benovelent MIDAX";
+
+  const type = String(payload?.data?.type || payload?.type || "notification").toLowerCase();
+  const isIncomingCall = ["incoming_call", "audio_call", "video_call"].includes(type) || Boolean(payload?.data?.incomingCall);
+  const title = payload.title || (isIncomingCall ? (type === "video_call" ? "Incoming video call" : "Incoming audio call") : "Benovelent MIDAX");
   const options = {
-    body: payload.body || "You have a new update.",
+    body: payload.body || (isIncomingCall ? "Someone is calling you." : "You have a new update."),
     icon: payload.icon || "/pwa-icon-192.png",
     badge: payload.badge || "/pwa-icon-192.png",
-    tag: payload.tag || "benevolent-notification",
+    image: payload.image,
+    tag: payload.tag || (isIncomingCall ? `benovelent-call-${payload?.data?.callId || "incoming"}` : "benovelent-notification"),
     renotify: true,
+    requireInteraction: isIncomingCall,
+    vibrate: isIncomingCall ? [300, 120, 300, 120, 600] : [120, 60, 120],
+    actions: isIncomingCall ? [
+      { action: "answer", title: "Answer" },
+      { action: "decline", title: "Decline" },
+    ] : [],
     data: payload.data || { link: "/" },
   };
-  event.waitUntil(self.registration.showNotification(title, options));
+
+  event.waitUntil((async () => {
+    if (isIncomingCall) {
+      const callId = String(payload?.data?.callId || `call-${Date.now()}`);
+      await savePendingCall(callId, { ...payload, data: { ...(payload.data || {}), callId, incomingCall: true } });
+      options.data = { ...(payload.data || {}), callId, incomingCall: true, link: `/member/messages?incomingPushCall=${encodeURIComponent(callId)}` };
+    }
+    await self.registration.showNotification(title, options);
+  })());
 });
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const link = event.notification?.data?.link || "/";
+  const data = event.notification?.data || {};
+  const action = event.action || "open";
+  const callId = data.callId ? encodeURIComponent(String(data.callId)) : "";
+  let link = data.link || "/";
+  if (data.incomingCall || callId) link = `/member/messages?incomingPushCall=${callId}&callAction=${encodeURIComponent(action)}`;
+
   event.waitUntil((async () => {
     const clientList = await clients.matchAll({ type: "window", includeUncontrolled: true });
     for (const client of clientList) {
       if ("focus" in client) {
-        try { await client.navigate(link); } catch { /* ignore */ }
+        try { await client.navigate(link); } catch {}
         return client.focus();
       }
     }
@@ -42,31 +95,17 @@ self.addEventListener("notificationclick", (event) => {
 self.addEventListener("fetch", (event) => {
   const request = event.request;
   const url = new URL(request.url);
-
   if (url.origin !== location.origin || request.method !== "GET") return;
-
-  // Media/video requests frequently use HTTP Range and receive 206 Partial Content.
-  // CacheStorage does not accept partial responses, so bypass the cache entirely.
   if (request.headers.has("range")) {
     event.respondWith(fetch(request));
     return;
   }
-
   event.respondWith((async () => {
     try {
       const response = await fetch(request);
-
-      // Cache only complete, successful responses. In particular, never cache 206.
       if (response.ok && response.status === 200 && response.type !== "opaque") {
-        try {
-          const cache = await caches.open(CACHE);
-          await cache.put(request, response.clone());
-        } catch (cacheError) {
-          // A cache failure must never turn a successful network request into an app error.
-          console.debug("PWA cache write skipped:", cacheError);
-        }
+        try { const cache = await caches.open(CACHE); await cache.put(request, response.clone()); } catch (cacheError) { console.debug("PWA cache write skipped:", cacheError); }
       }
-
       return response;
     } catch (networkError) {
       const cached = await caches.match(request);

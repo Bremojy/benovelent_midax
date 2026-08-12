@@ -6,6 +6,7 @@ const Message = require("../models/Message");
 const Conversation = require("../models/Conversation");
 const Notification = require("../models/Notification");
 const { addUser, removeUser } = require("./onlineUsers");
+const { sendPushToRecipient } = require("../services/pushService");
 
 const modelsByRole = { member: Member, admin: Admin, superadmin: SuperAdmin };
 
@@ -67,10 +68,31 @@ module.exports = (io, socket) => {
     const notificationType = normalizedType === "video" ? "video_call" : "audio_call";
     const title = normalizedType === "video" ? "Incoming video call" : "Incoming audio call";
     const message = `${caller.user.fullName || callerName || "A member"} is calling you.`;
+    const recipientModel = recipient.role === "superadmin" ? "SuperAdmin" : recipient.role === "admin" ? "Admin" : "Member";
+    const callerModel = caller.role === "superadmin" ? "SuperAdmin" : caller.role === "admin" ? "Admin" : "Member";
+    const callId = `${socket.id}-${Date.now()}`;
+    const incomingPayload = {
+      from: socket.id,
+      callerUserId: String(caller.user._id),
+      callerName: caller.user.fullName || callerName || "Member",
+      callerRole: caller.role,
+      conversationId: conversationId || "",
+      callType: normalizedType,
+      offer,
+      callId,
+    };
     try {
-      await Notification.create({ recipient: recipient.user._id, recipientModel: recipient.role === "superadmin" ? "SuperAdmin" : recipient.role === "admin" ? "Admin" : "Member", sender: caller.user._id, senderModel: caller.role === "superadmin" ? "SuperAdmin" : caller.role === "admin" ? "Admin" : "Member", title, message, type: notificationType, icon: normalizedType === "video" ? "videocam" : "call" });
-    } catch (error) { console.warn("Could not save call notification:", error.message); }
-    io.to(String(to)).emit("incoming-call", { from: socket.id, callerUserId: String(caller.user._id), callerName: caller.user.fullName || callerName || "Member", callerRole: caller.role, conversationId, callType: normalizedType, offer });
+      await Notification.create({ recipient: recipient.user._id, recipientModel, sender: caller.user._id, senderModel: callerModel, title, message, type: notificationType, icon: normalizedType === "video" ? "videocam" : "call", suppressPush: true });
+      await sendPushToRecipient({
+        recipient: recipient.user._id,
+        recipientModel,
+        title,
+        message,
+        link: recipient.role === "admin" ? "/admin/messages" : recipient.role === "superadmin" ? "/superadmin/messages" : "/member/messages",
+        data: { type: "incoming_call", callType: normalizedType, incomingCall: true, callId, ...incomingPayload },
+      });
+    } catch (error) { console.warn("Could not save/deliver call notification:", error.message); }
+    io.to(String(to)).emit("incoming-call", incomingPayload);
     io.to(String(to)).emit("new-call-notification", { title, message, callType: normalizedType, callerUserId: String(caller.user._id), callerName: caller.user.fullName || callerName || "Member" });
   });
 
