@@ -344,3 +344,11 @@ transform:translateY(-2px);
     display: inline;
   }
 }
+
+/* V7 floating command bar */
+.dashboard-topbar{height:78px;padding:0 26px;background:rgba(255,255,255,.72);border-bottom:1px solid rgba(15,23,42,.07);box-shadow:0 10px 30px rgba(15,23,42,.035)}
+.topbar-left{gap:14px}.menu-btn,.home-btn,.icon-btn{border:1px solid rgba(15,23,42,.06);background:rgba(248,250,252,.94);box-shadow:0 8px 18px rgba(15,23,42,.045)}
+.search-box{display:flex;align-items:center;gap:10px;padding:0 15px;height:44px;border:1px solid rgba(15,23,42,.06);background:rgba(248,250,252,.92);box-shadow:inset 0 1px 0 rgba(255,255,255,.75)}
+.search-box input{padding:0;font-size:13px}.topbar-right{gap:10px}.icon-btn{width:44px;height:44px;border-radius:13px}.avatar{width:45px;height:45px;box-shadow:0 10px 20px rgba(15,23,42,.12)}
+.dashboard-container.portal-role-superadmin .icon-btn:hover,.dashboard-container.portal-role-superadmin .menu-btn:hover{background:#f2eaff;color:#6d28d9}.dashboard-container.portal-role-member .icon-btn:hover,.dashboard-container.portal-role-member .menu-btn:hover{background:#eaf9f0;color:#159447}
+@media(max-width:900px){.dashboard-topbar{height:70px;padding:0 14px}.topbar-left{gap:8px}.icon-btn{width:40px;height:40px}.user-box{max-width:44px}.avatar{width:40px;height:40px}}

@@ -1,38 +1,202 @@
-import { useEffect, useState } from "react";
-import { RefreshCw, Users, UserCheck, UserX, Ban, Wallet, HandHeart, Bell, Newspaper, MessageCircle, ClipboardList, ArrowRight } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  Activity,
+  ArrowUpRight,
+  Bell,
+  CheckCircle2,
+  ClipboardList,
+  HandHeart,
+  MessageCircle,
+  Newspaper,
+  RefreshCw,
+  ShieldCheck,
+  Sparkles,
+  Users,
+  Wallet,
+  UserCheck,
+  UserX,
+  Ban,
+} from "lucide-react";
 import { Link } from "react-router-dom";
 import DashboardLayout from "../../layouts/DashboardLayout";
-import { getAdminDashboard, getMemberStatistics, getRecentMembers, getContributionSummary } from "../../services/adminService";
+import {
+  getAdminDashboard,
+  getMemberStatistics,
+  getRecentMembers,
+  getContributionSummary,
+} from "../../services/adminService";
 import "./AdminDashboard.css";
 import "../../styles/portalModule.css";
 
-export default function AdminDashboard(){
- const [stats,setStats]=useState({});const [recent,setRecent]=useState([]);const [contrib,setContrib]=useState({});const [loading,setLoading]=useState(true);const [error,setError]=useState("");
- const load=async()=>{try{setLoading(true);setError("");const [,s,r,c]=await Promise.all([getAdminDashboard(),getMemberStatistics(),getRecentMembers(),getContributionSummary()]);setStats(s?.statistics||s||{});setRecent(r?.members||r?.recentMembers||[]);setContrib(c?.summary||c||{});}catch(e){setError(e.response?.data?.message||e.message||"Unable to load administrator dashboard.");}finally{setLoading(false)}};
- useEffect(()=>{load()},[]);
- const val=(...keys)=>{for(const k of keys)if(stats?.[k]!==undefined)return stats[k];return 0};
- if(loading)return <DashboardLayout><div className="admin-dashboard-loading"><div className="admin-loading-spinner"><RefreshCw className="spinning"/></div><h2>Loading administration dashboard</h2><p>Fetching current member and finance information...</p></div></DashboardLayout>;
- return <DashboardLayout><div className="admin-dashboard">
- <header className="admin-dashboard-header"><div><span className="admin-eyebrow">ADMINISTRATION</span><h1>Welcome to the Admin Portal</h1><p>Manage members, finance, claims and member support.</p></div><button className="admin-refresh-btn" onClick={load}><RefreshCw size={17}/> Refresh</button></header>
- {error&&<div className="admin-inline-error">{error}</div>}
- <section className="admin-stat-grid">
- <Stat icon={<Users/>} label="Total Members" value={val("totalMembers","total","count")} />
- <Stat icon={<UserCheck/>} label="Active Members" value={val("activeMembers","active")} type="success"/>
- <Stat icon={<UserX/>} label="Inactive Members" value={val("inactiveMembers","inactive")} type="warning"/>
- <Stat icon={<Ban/>} label="Suspended" value={val("suspendedMembers","suspended")} type="danger"/>
- </section>
- <section className="admin-stat-grid"><Stat icon={<Users/>} label="Profiles 100%" value={val("completedProfiles")} /><Stat icon={<UserX/>} label="Profiles incomplete" value={val("incompleteProfiles")} type="warning" /><Stat icon={<Users/>} label="Leaders" value={val("totalLeaders")} /><Stat icon={<HandHeart/>} label="Approved cases" value={val("approvedClaims")} type="success" /></section>
- <section className="admin-overview-grid">
-  <div className="admin-overview-card"><div className="overview-card-header"><div><span>MEMBERSHIP</span><h2>Member Overview</h2></div><div className="overview-icon"><Users size={21}/></div></div><div className="overview-mini-grid"><div><span>Total</span><strong>{val("totalMembers","total","count")}</strong></div><div><span>Active</span><strong>{val("activeMembers","active")}</strong></div><div><span>Inactive</span><strong>{val("inactiveMembers","inactive")}</strong></div><div><span>Suspended</span><strong>{val("suspendedMembers","suspended")}</strong></div></div></div>
-  <div className="admin-overview-card"><div className="overview-card-header"><div><span>CONSTITUTION ACCOUNTING</span><h2>Book balance</h2></div><div className="overview-icon"><Wallet size={21}/></div></div><div className="overview-mini-grid"><div><span>Book balance</span><strong>{money(val("bookBalance"))}</strong></div><div><span>Minimum required</span><strong>{money(500000)}</strong></div><div><span>Approved cases</span><strong>{val("approvedClaims")}</strong></div><div><span>Verified members</span><strong>{val("verifiedMembers")}</strong></div></div></div>
- </section>
- <section className="admin-overview-card"><div className="overview-card-header"><div><span>PROFILE COMPLETION</span><h2>Members needing attention</h2></div></div>{(stats.incompleteMembers||[]).length===0?<div className="portal-empty">All current member profiles are complete.</div>:<div className="portal-table-wrap"><table className="portal-table"><thead><tr><th>Member</th><th>Completion</th><th>Missing</th></tr></thead><tbody>{stats.incompleteMembers.map((m)=><tr key={m._id}><td>{m.fullName||m.memberNumber}</td><td>{m.profileCompletion||0}%</td><td>{(m.missingFields||[]).join(", ")}</td></tr>)}</tbody></table></div>}</section>
- <section className="admin-live-panel"><div className="admin-section-heading"><span>LIVE CONTROL CENTRE</span><h2>What is happening right now</h2><p>These figures come from the live portal API.</p></div><div className="admin-live-grid"><LiveItem icon={<Users/>} label="Online members" value={val("onlineMembers")}/><LiveItem icon={<HandHeart/>} label="Pending support" value={stats.pendingSupport?.total||0}/><LiveItem icon={<Bell/>} label="Unread notifications" value={stats.unreadNotifications||0}/><LiveItem icon={<Newspaper/>} label="Published news" value={stats.publishedNews||0}/><LiveItem icon={<ClipboardList/>} label="Active feedback" value={stats.activeFeedbackCollections||0}/><LiveItem icon={<MessageCircle/>} label="Feedback responses" value={stats.feedbackResponses||0}/></div><div className="admin-live-detail-row"><span>Pending funeral: {stats.pendingSupport?.funeral||0}</span><span>Medical: {stats.pendingSupport?.medical||0}</span><span>Education: {stats.pendingSupport?.education||0}</span><span>General: {stats.pendingSupport?.general||0}</span></div></section>
- <section className="admin-quick-section"><div className="admin-section-heading"><span>WORKSPACE</span><h2>Quick Actions</h2></div><div className="admin-quick-grid"><Quick href="/admin/members" icon={<Users/>} title="Manage Members" text="Create, edit and manage member accounts."/><Quick href="/admin/finance" icon={<Wallet/>} title="Finance" text="Review contributions and transactions."/><Quick href="/admin/claims" icon={<HandHeart/>} title="Claims" text="Review assistance applications."/><Quick href="/admin/support" icon={<HandHeart/>} title="Member Support" text="Process support cases."/><Quick href="/admin/messages" icon={<MessageCircle/>} title="Message Centre" text="Open member conversations."/><Quick href="/admin/notifications" icon={<Bell/>} title="Notifications" text="Review portal notifications."/></div></section>
- <section className="admin-overview-card"><div className="overview-card-header"><div><span>RECENT ACTIVITY</span><h2>Recently Registered Members</h2></div><Link to="/admin/members" className="admin-refresh-btn">View all</Link></div>{recent.length===0?<div className="portal-empty">No recent members returned.</div>:<div className="portal-table-wrap"><table className="portal-table"><thead><tr><th>Name</th><th>Member Number</th><th>Email</th><th>Status</th></tr></thead><tbody>{recent.slice(0,8).map((m,i)=><tr key={m._id||i}><td>{m.fullName||"Member"}</td><td>{m.memberNumber||"—"}</td><td>{m.email||"—"}</td><td><span className="portal-badge">{m.status||"Active"}</span></td></tr>)}</tbody></table></div>}</section>
- </div></DashboardLayout>
+const money = (value) =>
+  new Intl.NumberFormat("en-KE", {
+    style: "currency",
+    currency: "KES",
+    maximumFractionDigits: 0,
+  }).format(Number(value || 0));
+
+export default function AdminDashboard() {
+  const [stats, setStats] = useState({});
+  const [recent, setRecent] = useState([]);
+  const [contrib, setContrib] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  const load = async () => {
+    try {
+      setLoading(true);
+      setError("");
+      const [, s, r, c] = await Promise.all([
+        getAdminDashboard(),
+        getMemberStatistics(),
+        getRecentMembers(),
+        getContributionSummary(),
+      ]);
+      setStats(s?.statistics || s || {});
+      setRecent(r?.members || r?.recentMembers || []);
+      setContrib(c?.summary || c || {});
+    } catch (e) {
+      setError(e.response?.data?.message || e.message || "Unable to load administrator dashboard.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  const val = (...keys) => {
+    for (const key of keys) if (stats?.[key] !== undefined) return stats[key];
+    return 0;
+  };
+
+  const pulse = useMemo(
+    () => [
+      { label: "Online members", value: val("onlineMembers"), icon: Users },
+      { label: "Pending support", value: stats.pendingSupport?.total || 0, icon: HandHeart },
+      { label: "Unread notifications", value: stats.unreadNotifications || 0, icon: Bell },
+      { label: "Published news", value: stats.publishedNews || 0, icon: Newspaper },
+      { label: "Active feedback", value: stats.activeFeedbackCollections || 0, icon: ClipboardList },
+      { label: "Feedback responses", value: stats.feedbackResponses || 0, icon: MessageCircle },
+    ],
+    [stats]
+  );
+
+  if (loading) {
+    return (
+      <DashboardLayout>
+        <div className="portal-loading-card"><RefreshCw className="spinning" size={20} /> Loading your admin control centre…</div>
+      </DashboardLayout>
+    );
+  }
+
+  return (
+    <DashboardLayout>
+      <div className="admin-dashboard v7-portal">
+        <section className="portal-hero admin-hero">
+          <div className="portal-hero-copy">
+            <span className="portal-kicker"><Sparkles size={14} /> OPERATIONS · PEOPLE · ACTION</span>
+            <h1>Run Benovelent MIDAX with clarity.</h1>
+            <p>One live workspace for members, support, communication and daily administration.</p>
+            <div className="portal-hero-actions">
+              <Link className="portal-primary-btn" to="/admin/members"><Users size={17} /> Manage members</Link>
+              <Link className="portal-secondary-btn" to="/admin/support"><HandHeart size={17} /> Review support</Link>
+              <button className="portal-ghost-btn" onClick={load}><RefreshCw size={16} /> Refresh</button>
+            </div>
+          </div>
+          <div className="portal-hero-orbit" aria-hidden="true">
+            <div className="orbit-glow" />
+            <div className="orbit-card"><Activity size={18} /><span>LIVE</span><strong>{stats.onlineMembers || 0}</strong><small>members online</small></div>
+            <div className="orbit-mini"><CheckCircle2 size={16} /> System active</div>
+          </div>
+        </section>
+
+        {error && <div className="portal-alert">{error}</div>}
+
+        <section className="portal-metric-grid four">
+          <Metric icon={<Users />} label="Total members" value={val("totalMembers", "total", "count")} caption={`${val("activeMembers", "active")} active`} />
+          <Metric icon={<Wallet />} label="Book balance" value={money(val("bookBalance"))} caption={`${val("verifiedMembers")} verified members`} tone="violet" />
+          <Metric icon={<HandHeart />} label="Support cases" value={val("approvedClaims")} caption={`${stats.pendingSupport?.total || 0} pending`} tone="green" />
+          <Metric icon={<MessageCircle />} label="Communication" value={stats.feedbackResponses || 0} caption={`${stats.unreadNotifications || 0} unread notifications`} tone="blue" />
+        </section>
+
+        <section className="portal-grid two">
+          <article className="portal-panel modern-panel">
+            <div className="panel-heading">
+              <div><span className="panel-kicker">MEMBERSHIP PULSE</span><h2>Know what needs attention.</h2><p>Current membership health from the live admin API.</p></div>
+              <Link to="/admin/members" className="panel-link">Open <ArrowUpRight size={16} /></Link>
+            </div>
+            <div className="pulse-list">
+              <PulseRow icon={<UserCheck />} label="Active members" value={val("activeMembers", "active")} tone="green" />
+              <PulseRow icon={<UserX />} label="Incomplete profiles" value={val("incompleteProfiles")} tone="amber" />
+              <PulseRow icon={<Ban />} label="Suspended" value={val("suspendedMembers", "suspended")} tone="rose" />
+              <PulseRow icon={<ShieldCheck />} label="Approved support cases" value={val("approvedClaims")} tone="violet" />
+            </div>
+          </article>
+
+          <article className="portal-panel modern-panel admin-live-panel-v7">
+            <div className="panel-heading">
+              <div><span className="panel-kicker">LIVE CONTROL CENTRE</span><h2>The portal, right now.</h2><p>Quick signals across operations.</p></div>
+            </div>
+            <div className="live-signal-grid">
+              {pulse.map(({ label, value, icon: Icon }) => (
+                <div className="live-signal" key={label}><div className="signal-icon"><Icon size={16} /></div><div><strong>{value}</strong><span>{label}</span></div></div>
+              ))}
+            </div>
+          </article>
+        </section>
+
+        <section className="portal-panel modern-panel">
+          <div className="panel-heading"><div><span className="panel-kicker">WORKSPACE</span><h2>Quick actions</h2><p>Jump straight into the work that matters.</p></div></div>
+          <div className="quick-action-grid">
+            <Quick href="/admin/members" icon={<Users />} title="Members" text="Create, edit and manage accounts." />
+            <Quick href="/admin/finance" icon={<Wallet />} title="Accounts & Finance" text="Review contributions and transactions." />
+            <Quick href="/admin/claims" icon={<HandHeart />} title="Claims" text="Review assistance applications." />
+            <Quick href="/admin/messages" icon={<MessageCircle />} title="Message centre" text="Continue active conversations." />
+            <Quick href="/admin/notifications" icon={<Bell />} title="Notifications" text="Check alerts and broadcasts." />
+            <Quick href="/admin/support" icon={<ClipboardList />} title="Support desk" text="Process member support cases." />
+          </div>
+        </section>
+
+        <section className="portal-grid two">
+          <article className="portal-panel modern-panel">
+            <div className="panel-heading"><div><span className="panel-kicker">RECENT MEMBERS</span><h2>Latest registrations</h2></div><Link to="/admin/members" className="panel-link">View all <ArrowUpRight size={16} /></Link></div>
+            <div className="activity-list">
+              {recent.slice(0, 6).map((member, index) => (
+                <div className="activity-row" key={member._id || index}>
+                  <div className="activity-avatar">{(member.fullName || "M").split(" ").map(x => x[0]).join("").slice(0,2).toUpperCase()}</div>
+                  <div className="activity-copy"><strong>{member.fullName || "Member"}</strong><span>{member.memberNumber || "No member number"} · {member.email || "No email"}</span></div>
+                  <span className="status-pill">{member.status || "Active"}</span>
+                </div>
+              ))}
+              {recent.length === 0 && <div className="portal-empty">No recent registrations returned.</div>}
+            </div>
+          </article>
+          <article className="portal-panel modern-panel">
+            <div className="panel-heading"><div><span className="panel-kicker">FINANCIAL SNAPSHOT</span><h2>Contribution pulse</h2></div><Link to="/admin/finance" className="panel-link">Open finance <ArrowUpRight size={16} /></Link></div>
+            <div className="finance-hero"><span>Total recorded contributions</span><strong>{money(contrib.totalContributions || contrib.total || 0)}</strong><small>Live summary from the finance service.</small></div>
+            <div className="finance-mini-grid">
+              <div><span>This month</span><strong>{money(contrib.monthlyContributions || contrib.thisMonth || 0)}</strong></div>
+              <div><span>Book balance</span><strong>{money(val("bookBalance"))}</strong></div>
+              <div><span>Pending support</span><strong>{stats.pendingSupport?.total || 0}</strong></div>
+              <div><span>Approved cases</span><strong>{val("approvedClaims")}</strong></div>
+            </div>
+          </article>
+        </section>
+      </div>
+    </DashboardLayout>
+  );
 }
-function Stat({icon,label,value,type=""}){return <div className={`admin-stat-card ${type}`}><div className="stat-card-top"><div className="stat-icon">{icon}</div><span className="stat-label">{label}</span></div><div className="stat-value">{value}</div></div>}
-function LiveItem({icon,label,value}){return <div className="admin-live-item"><div className="live-item-icon">{icon}</div><div><span>{label}</span><strong>{value}</strong></div></div>}
-function Quick({href,icon,title,text}){return <Link to={href} className="admin-quick-action"><div className="quick-action-icon">{icon}</div><div><h3>{title}</h3><p>{text}</p></div><span className="quick-arrow">→</span></Link>}
-const money=v=>new Intl.NumberFormat("en-KE",{style:"currency",currency:"KES",maximumFractionDigits:0}).format(Number(v||0));
+
+function Metric({ icon, label, value, caption, tone = "orange" }) {
+  return <div className={`portal-metric tone-${tone}`}><div className="metric-icon">{icon}</div><div className="metric-copy"><span>{label}</span><strong>{value}</strong><small>{caption}</small></div></div>;
+}
+
+function PulseRow({ icon, label, value, tone }) {
+  return <div className="pulse-row"><div className={`pulse-icon ${tone}`}>{icon}</div><span>{label}</span><strong>{value}</strong></div>;
+}
+
+function Quick({ href, icon, title, text }) {
+  return <Link className="quick-action-v7" to={href}><div className="quick-icon">{icon}</div><div><strong>{title}</strong><span>{text}</span></div><ArrowUpRight size={17} /></Link>;
+}

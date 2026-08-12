@@ -1,4 +1,4 @@
-const CACHE = "benovelent-shell-v6";
+const CACHE = "benovelent-shell-v7";
 const ASSETS = ["/", "/index.html", "/manifest.webmanifest", "/pwa-icon-192.png", "/pwa-icon-512.png", "/apple-touch-icon.png"];
 
 self.addEventListener("install", (event) => {

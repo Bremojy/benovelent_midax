@@ -205,3 +205,12 @@
     display: none !important;
   }
 }
+
+/* V7 portal navigation refresh */
+.dashboard-sidebar{background:linear-gradient(180deg,#17191e 0%,#0f1115 100%);border-right:1px solid rgba(255,255,255,.07);box-shadow:16px 0 40px rgba(15,23,42,.08)}
+.sidebar-header{background:transparent;border-bottom-color:rgba(255,255,255,.06)}
+.sidebar-link{border:1px solid transparent}
+.sidebar-link:hover{background:rgba(255,255,255,.06);transform:translateX(3px);color:#fff}
+.sidebar-link.active{box-shadow:0 12px 28px rgba(255,122,0,.22)}
+.dashboard-container.portal-role-superadmin .sidebar-link.active{background:linear-gradient(135deg,#7c3aed,#5b21b6);box-shadow:0 12px 28px rgba(109,40,217,.26)}
+.dashboard-container.portal-role-member .sidebar-link.active{background:linear-gradient(135deg,#1a9b4f,#11703d);box-shadow:0 12px 28px rgba(21,148,71,.24)}
