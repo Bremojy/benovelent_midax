@@ -248,6 +248,8 @@ function SuperAdminDashboard() {
         </section>
 
 
+        <section className="superadmin-pwa-card"><div className="superadmin-panel-header"><div><span>PWA STATUS</span><h2>Benovelent MIDAX app readiness</h2><p>Browser-side installation and service-worker status.</p></div><button type="button" className="superadmin-view-link" onClick={() => window.dispatchEvent(new Event("benovelent:open-install"))}>Install / Help</button></div><div className="superadmin-pwa-grid"><PwaCheck label="Standalone" value={window.matchMedia?.("(display-mode: standalone)")?.matches ? "Installed" : "Browser"}/><PwaCheck label="Service Worker" value={"serviceWorker" in navigator ? "Supported" : "Unavailable"}/><PwaCheck label="Manifest" value="Configured"/><PwaCheck label="App name" value="Benovelent MIDAX"/></div></section>
+
         <section className="superadmin-live-overview">
           <div className="superadmin-panel-header"><div><span>LIVE CONTROL CENTRE</span><h2>Everything happening across Benovelent Midax</h2><p>Refresh this panel to inspect current members, support, communication, finance and content activity.</p></div></div>
           <div className="superadmin-live-grid">
@@ -545,6 +547,8 @@ function DashboardStat({
 // ======================================================
 // QUICK ACTION
 // ======================================================
+
+function PwaCheck({label,value}){return <div className="superadmin-pwa-check"><span>{label}</span><strong>{value}</strong></div>}
 
 function QuickAction({
   icon,

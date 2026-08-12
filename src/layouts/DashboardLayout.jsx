@@ -41,7 +41,7 @@ function DashboardLayout({ children }) {
   const goHome = () => navigate(basePath);
 
   return (
-    <div className={`dashboard-container ${mobileSubpage ? "dashboard-mobile-subpage" : ""}`}>
+    <div className={`dashboard-container portal-role-${String((role || user?.role || "member").toLowerCase())} ${mobileSubpage ? "dashboard-mobile-subpage" : ""}`}>
       <DashboardSidebar
         role={role}
         sidebarOpen={sidebarOpen}

@@ -6,6 +6,7 @@ import {
   Search,
   Settings,
   LogOut,
+  Download as DownloadIcon,
 } from "lucide-react";
 
 import { useEffect, useState } from "react";
@@ -96,6 +97,8 @@ function DashboardTopbar({
     else if (normalizedRole === "admin") navigate("/admin/notifications");
     else navigate("/superadmin/notifications");
   };
+
+  const openInstall = () => window.dispatchEvent(new Event("benovelent:open-install"));
 
   const goToSettings = () => {
     if (normalizedRole === "member") navigate("/member/settings");
@@ -202,6 +205,8 @@ function DashboardTopbar({
             </span>
           )}
         </button>
+
+        <button type="button" className="icon-btn install-topbar-btn" onClick={openInstall} aria-label="Install Benovelent MIDAX" title="Install Benovelent MIDAX"><DownloadIcon size={20}/></button>
 
         {/* SETTINGS */}
 

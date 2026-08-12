@@ -1,5 +1,5 @@
-const CACHE = "benevolent-shell-v2";
-const ASSETS = ["/", "/index.html", "/manifest.webmanifest", "/pwa-icon-192.png", "/pwa-icon-512.png"];
+const CACHE = "benovelent-shell-v6";
+const ASSETS = ["/", "/index.html", "/manifest.webmanifest", "/pwa-icon-192.png", "/pwa-icon-512.png", "/apple-touch-icon.png"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(ASSETS)).then(() => self.skipWaiting()));
@@ -11,8 +11,8 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("push", (event) => {
   let payload = {};
-  try { payload = event.data ? event.data.json() : {}; } catch { payload = { body: event.data?.text?.() || "You have a new Benevolent Midax update." }; }
-  const title = payload.title || "Benevolent Midax";
+  try { payload = event.data ? event.data.json() : {}; } catch { payload = { body: event.data?.text?.() || "You have a new Benovelent MIDAX update." }; }
+  const title = payload.title || "Benovelent MIDAX";
   const options = {
     body: payload.body || "You have a new update.",
     icon: payload.icon || "/pwa-icon-192.png",
