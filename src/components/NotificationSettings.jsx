@@ -16,12 +16,31 @@ export default function NotificationSettings() {
 
   const supported = typeof window !== "undefined" && "Notification" in window && "serviceWorker" in navigator && "PushManager" in window;
 
+  const ensureSubscription = async () => {
+    const keyResponse = await API.get("/notifications/push/vapid-public-key");
+    const publicKey = keyResponse.data?.publicKey;
+    if (!publicKey || Notification.permission !== "granted") return false;
+    const registration = await navigator.serviceWorker.ready;
+    let subscription = await registration.pushManager.getSubscription();
+    if (!subscription) {
+      subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(publicKey) });
+    }
+    await API.post("/notifications/push/subscribe", { subscription: subscription.toJSON() });
+    return true;
+  };
+
   const refresh = async () => {
     if (!supported) { setStatus("unsupported"); return; }
     if (Notification.permission === "denied") { setStatus("denied"); return; }
     try {
       const { data } = await API.get("/notifications/push/vapid-public-key");
-      setStatus(data?.configured ? (Notification.permission === "granted" ? "granted" : "ready") : "unconfigured");
+      if (!data?.configured) { setStatus("unconfigured"); return; }
+      if (Notification.permission === "granted") {
+        await ensureSubscription();
+        setStatus("granted");
+      } else {
+        setStatus("ready");
+      }
     } catch { setStatus(Notification.permission === "granted" ? "granted" : "ready"); }
   };
 
@@ -33,12 +52,8 @@ export default function NotificationSettings() {
       setBusy(true); setMessage("");
       const permission = Notification.permission === "granted" ? "granted" : await Notification.requestPermission();
       if (permission !== "granted") { setStatus("denied"); setMessage("Notifications are not enabled. Open your phone/browser notification settings to allow them for Benovelent Midax."); return; }
-      const keyResponse = await API.get("/notifications/push/vapid-public-key");
-      const publicKey = keyResponse.data?.publicKey;
-      if (!publicKey) { setStatus("unconfigured"); setMessage("Phone notification service is not configured on the server yet."); return; }
-      const registration = await navigator.serviceWorker.ready;
-      const subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(publicKey) });
-      await API.post("/notifications/push/subscribe", { subscription: subscription.toJSON() });
+      const subscribed = await ensureSubscription();
+      if (!subscribed) { setStatus("unconfigured"); setMessage("Phone notification service is not configured on the server yet."); return; }
       setStatus("granted");
       setMessage("Phone notifications are enabled for this device.");
     } catch (error) {

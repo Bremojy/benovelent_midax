@@ -273,7 +273,7 @@ nextOfKin: {
   phone: {
     type: String,
     trim: true,
-    unique:true,
+    default: "",
   },
 
   nationalId: {

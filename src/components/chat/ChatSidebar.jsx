@@ -155,7 +155,7 @@ function ContactRow({ member, onClick }) {
           {member.verified ? <BadgeCheck size={14} className="verified-dot" /> : null}
         </h4>
         <p>
-          {member.roleLabel || roleLabel(member.role)} · {member.online ? "Online now" : member.lastSeen ? `Last seen ${new Date(member.lastSeen).toLocaleDateString()}` : "Offline"}
+          {member.roleLabel || roleLabel(member.role)} · {formatPresence(member)}
         </p>
       </div>
       <span className={`member-chat-tag ${member.conversationId ? "" : "muted"}`}>
@@ -197,6 +197,14 @@ function sanitizePreviewText(value) {
   const looksLikeFilePath = raw.includes("/") && /\b(upload|avatar|photo|image|video|document|file)\b/i.test(raw);
   if (looksLikeUrl || looksLikeFilePath) return "Attachment";
   return raw;
+}
+
+function formatPresence(member) {
+  if (member?.online) return "Online now";
+  if (!member?.lastSeen) return "Offline";
+  const date = new Date(member.lastSeen);
+  if (Number.isNaN(date.getTime())) return "Offline";
+  return `Last seen ${date.toLocaleString(undefined, { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}`;
 }
 
 function safeDisplayName(value, fallbackSource = {}) {

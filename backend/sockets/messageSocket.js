@@ -1,4 +1,3 @@
-const jwt = require("jsonwebtoken");
 const Member = require("../models/Member");
 const Admin = require("../models/Admin");
 const SuperAdmin = require("../models/SuperAdmin");
@@ -9,27 +8,146 @@ const { addUser, removeUser } = require("./onlineUsers");
 const { sendPushToRecipient } = require("../services/pushService");
 
 const modelsByRole = { member: Member, admin: Admin, superadmin: SuperAdmin };
+const activeCalls = new Map();
 
 async function resolveActor(id, hintedRole = "") {
-  const role = String(hintedRole || "").toLowerCase();
-  if (modelsByRole[role]) {
-    const user = await modelsByRole[role].findById(id).select("_id fullName role").lean();
-    if (user) return { user, role };
+  const requestedRole = String(hintedRole || "").toLowerCase();
+  const chatId = String(id || "").trim();
+  if (!chatId) return null;
+
+  async function fromPortal(Model, role) {
+    const owner = await Model.findById(chatId).select("_id fullName name role profileImage email phone online lastSeen").lean();
+    if (owner) return { user: owner, role, chatId: String(owner._id) };
+    const profile = await Member.findOne({ _id: chatId, portalOwnerRole: role, portalOwnerId: { $ne: null } }).select("_id portalOwnerId portalOwnerRole fullName profileImage online lastSeen").lean();
+    if (!profile) return null;
+    const portalOwner = await Model.findById(profile.portalOwnerId).select("_id fullName name role profileImage email phone online lastSeen").lean();
+    if (!portalOwner) return null;
+    return { user: portalOwner, role, chatId: String(profile._id) };
   }
+
+  if (requestedRole === "admin") {
+    const result = await fromPortal(Admin, "admin");
+    if (result) return result;
+  }
+  if (requestedRole === "superadmin") {
+    const result = await fromPortal(SuperAdmin, "superadmin");
+    if (result) return result;
+  }
+  if (requestedRole === "member") {
+    const member = await Member.findById(chatId).select("_id fullName name role profileImage email phone online lastSeen portalOwnerId portalOwnerRole").lean();
+    if (member) return { user: member, role: member.portalOwnerRole || "member", chatId: String(member._id) };
+  }
+
+  const member = await Member.findById(chatId).select("_id fullName name role profileImage email phone online lastSeen portalOwnerId portalOwnerRole").lean();
+  if (member) {
+    if (member.portalOwnerId && member.portalOwnerRole === "admin") {
+      const admin = await Admin.findById(member.portalOwnerId).select("_id fullName name role profileImage email phone online lastSeen").lean();
+      if (admin) return { user: admin, role: "admin", chatId: String(member._id) };
+    }
+    if (member.portalOwnerId && member.portalOwnerRole === "superadmin") {
+      const superadmin = await SuperAdmin.findById(member.portalOwnerId).select("_id fullName name role profileImage email phone online lastSeen").lean();
+      if (superadmin) return { user: superadmin, role: "superadmin", chatId: String(member._id) };
+    }
+    return { user: member, role: "member", chatId: String(member._id) };
+  }
+
   for (const [candidateRole, Model] of Object.entries(modelsByRole)) {
-    const user = await Model.findById(id).select("_id fullName role").lean();
-    if (user) return { user, role: candidateRole };
+    const user = await Model.findById(chatId).select("_id fullName name role profileImage email phone online lastSeen").lean();
+    if (user) return { user, role: candidateRole, chatId: String(user._id) };
   }
   return null;
 }
 
-async function savePresence(id, role, online, socketId = "") {
-  const Model = modelsByRole[String(role || "member").toLowerCase()] || Member;
-  await Model.findByIdAndUpdate(id, { online, socketId: online ? socketId : "", lastSeen: new Date() });
+function modelName(role) {
+  return role === "superadmin" ? "SuperAdmin" : role === "admin" ? "Admin" : "Member";
+}
+
+async function savePresence(actor, online, socketId = "") {
+  if (!actor?.user?._id) return;
+  const Model = modelsByRole[String(actor.role || "member").toLowerCase()] || Member;
+  const update = online
+    ? { online: true, socketId, lastSeen: new Date() }
+    : { online: false, socketId: "", lastSeen: new Date() };
+  await Model.findByIdAndUpdate(actor.user._id, update).catch(() => null);
+  if (actor.chatId && String(actor.chatId) !== String(actor.user._id)) {
+    await Member.findByIdAndUpdate(actor.chatId, update).catch(() => null);
+  }
 }
 
 function broadcastPresence(io) {
   io.emit("online-users", { users: require("./onlineUsers").getUsers() });
+}
+
+async function deliverCallNotification({ recipient, caller, callType, title, message, callId, incomingPayload, missed = false }) {
+  const recipientModel = modelName(recipient.role);
+  const callerModel = modelName(caller.role);
+  const type = missed ? "call" : callType === "video" ? "video_call" : "audio_call";
+  const notification = await Notification.create({
+    recipient: recipient.user._id,
+    recipientModel,
+    sender: caller.user._id,
+    senderModel: callerModel,
+    title,
+    message,
+    type,
+    icon: callType === "video" ? "videocam" : "call",
+    // The push is sent explicitly below so one call never produces duplicate
+    // notifications from both the Mongoose hook and this realtime flow.
+    suppressPush: true,
+    referenceId: undefined,
+    referenceModel: "Call",
+  });
+  await sendPushToRecipient({
+    recipient: recipient.user._id,
+    recipientModel,
+    title,
+    message,
+    link: recipient.role === "admin" ? "/admin/messages" : recipient.role === "superadmin" ? "/superadmin/messages" : "/member/messages",
+    data: {
+      type: missed ? "missed_call" : "incoming_call",
+      callType,
+      incomingCall: !missed,
+      missedCall: missed,
+      role: recipient.role,
+      callId,
+      callerUserId: String(caller.chatId),
+      callerName: caller.user.fullName || caller.user.name || "Member",
+      callerRole: caller.role,
+      incomingPayload: missed ? undefined : incomingPayload,
+    },
+  }).catch((error) => console.warn("Call push skipped:", error.message));
+  return notification;
+}
+
+function clearCall(callId) {
+  const call = activeCalls.get(callId);
+  if (call?.timeout) clearTimeout(call.timeout);
+  activeCalls.delete(callId);
+  return call;
+}
+
+async function markMissedCall(callId, reason = "missed") {
+  const call = activeCalls.get(callId);
+  if (!call || call.answered || call.missedNotified) return;
+  call.missedNotified = true;
+  activeCalls.set(callId, call);
+  try {
+    const notification = await deliverCallNotification({
+      recipient: call.recipient,
+      caller: call.caller,
+      callType: call.callType,
+      title: call.callType === "video" ? "Missed video call" : "Missed audio call",
+      message: `${call.caller.user.fullName || call.caller.user.name || "A member"} ${reason === "declined" ? "called you" : "tried to call you"}.`,
+      callId,
+      incomingPayload: call.incomingPayload,
+      missed: true,
+    });
+    const io = call.io;
+    io?.to(String(call.recipientChatId)).emit("missed-call", { notification, callId, callType: call.callType, callerUserId: String(call.caller.chatId), callerName: call.caller.user.fullName || call.caller.user.name || "Member" });
+    io?.to(String(call.recipientChatId)).emit("new-notification", notification);
+  } catch (error) {
+    console.warn("Could not create missed call notification:", error.message);
+  }
 }
 
 module.exports = (io, socket) => {
@@ -41,10 +159,14 @@ module.exports = (io, socket) => {
       const actor = await resolveActor(userId, hintedRole);
       if (!actor) return;
       socket.data.userId = String(actor.user._id);
+      socket.data.chatId = String(actor.chatId);
       socket.data.role = actor.role;
-      addUser(actor.user._id, socket.id, actor.role);
-      socket.join(String(actor.user._id));
-      await savePresence(actor.user._id, actor.role, true, socket.id);
+      addUser(actor.chatId, socket.id, actor.role);
+      socket.join(String(actor.chatId));
+      // Join the real portal-account room as well as the chat-profile room.
+      // Admin/SuperAdmin notifications are stored against their portal account.
+      if (String(actor.user._id) !== String(actor.chatId)) socket.join(String(actor.user._id));
+      await savePresence(actor, true, socket.id);
       broadcastPresence(io);
     } catch (error) { console.warn("Could not persist online state:", error.message); }
   });
@@ -52,11 +174,9 @@ module.exports = (io, socket) => {
   socket.on("join-conversation", (conversationId) => { if (conversationId) socket.join(String(conversationId)); });
 
   socket.on("send-message", async (data) => {
-    try {
-      const { conversationId, sender, text, image, file, replyTo, messageType, messageId } = data || {};
-      if (!conversationId) return;
-      io.to(String(conversationId)).emit("new-message", { _id: messageId, conversation: conversationId, sender, message: text || "", attachment: image || file || "", messageType: messageType || (image || file ? "image" : "text"), replyTo, createdAt: new Date() });
-    } catch (err) { console.warn("Message relay failed:", err.message); }
+    const { conversationId, sender, text, image, file, replyTo, messageType, messageId } = data || {};
+    if (!conversationId) return;
+    io.to(String(conversationId)).emit("new-message", { _id: messageId, conversation: conversationId, sender, message: text || "", attachment: image || file || "", messageType: messageType || (image || file ? "image" : "text"), replyTo, createdAt: new Date() });
   });
 
   socket.on("call-user", async ({ to, conversationId, callType, offer, callerUserId, callerName, callerRole }) => {
@@ -65,54 +185,86 @@ module.exports = (io, socket) => {
     const caller = await resolveActor(callerUserId || socket.data.userId, callerRole || socket.data.role);
     if (!recipient || !caller) return;
     const normalizedType = callType === "video" ? "video" : "audio";
-    const notificationType = normalizedType === "video" ? "video_call" : "audio_call";
     const title = normalizedType === "video" ? "Incoming video call" : "Incoming audio call";
-    const message = `${caller.user.fullName || callerName || "A member"} is calling you.`;
-    const recipientModel = recipient.role === "superadmin" ? "SuperAdmin" : recipient.role === "admin" ? "Admin" : "Member";
-    const callerModel = caller.role === "superadmin" ? "SuperAdmin" : caller.role === "admin" ? "Admin" : "Member";
-    const callId = `${socket.id}-${Date.now()}`;
+    const message = `${caller.user.fullName || caller.user.name || callerName || "A member"} is calling you.`;
+    const callId = `${String(caller.user._id)}-${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
     const incomingPayload = {
-      from: socket.id,
-      callerUserId: String(caller.user._id),
-      callerName: caller.user.fullName || callerName || "Member",
+      from: String(caller.chatId),
+      callerSocketId: socket.id,
+      callerUserId: String(caller.chatId),
+      callerName: caller.user.fullName || caller.user.name || callerName || "Member",
       callerRole: caller.role,
+      role: recipient.role,
+      callerProfileImage: caller.user.profileImage || "",
       conversationId: conversationId || "",
       callType: normalizedType,
       offer,
       callId,
     };
+    const active = { io, recipient, caller, recipientChatId: String(recipient.chatId), callerChatId: String(caller.chatId), callType: normalizedType, callId, incomingPayload, answered: false, missedNotified: false, timeout: null };
+    active.timeout = setTimeout(() => { void markMissedCall(callId, "missed"); }, 35000);
+    activeCalls.set(callId, active);
+
     try {
-      await Notification.create({ recipient: recipient.user._id, recipientModel, sender: caller.user._id, senderModel: callerModel, title, message, type: notificationType, icon: normalizedType === "video" ? "videocam" : "call", suppressPush: true });
-      await sendPushToRecipient({
-        recipient: recipient.user._id,
-        recipientModel,
-        title,
-        message,
-        link: recipient.role === "admin" ? "/admin/messages" : recipient.role === "superadmin" ? "/superadmin/messages" : "/member/messages",
-        data: { type: "incoming_call", callType: normalizedType, incomingCall: true, callId, ...incomingPayload },
-      });
+      const notification = await deliverCallNotification({ recipient, caller, callType: normalizedType, title, message, callId, incomingPayload, missed: false });
+      io.to(String(caller.chatId)).emit("call-started", { callId, recipientUserId: String(recipient.chatId), callType: normalizedType });
+      io.to(String(to)).emit("incoming-call", incomingPayload);
+      io.to(String(to)).emit("new-call-notification", { title, message, callType: normalizedType, callId, callerUserId: String(caller.chatId), callerName: incomingPayload.callerName, notification });
     } catch (error) { console.warn("Could not save/deliver call notification:", error.message); }
-    io.to(String(to)).emit("incoming-call", incomingPayload);
-    io.to(String(to)).emit("new-call-notification", { title, message, callType: normalizedType, callerUserId: String(caller.user._id), callerName: caller.user.fullName || callerName || "Member" });
   });
 
-  socket.on("call-rejected", ({ to }) => { if (to) io.to(String(to)).emit("call-rejected"); });
-  socket.on("call-answer", ({ to, answer }) => { if (to && answer) io.to(String(to)).emit("call-answered", { answer }); });
+  socket.on("call-answer", async ({ to, answer, callId }) => {
+    const call = callId ? activeCalls.get(String(callId)) : null;
+    if (call) {
+      call.answered = true;
+      if (call.timeout) clearTimeout(call.timeout);
+      activeCalls.set(call.callId, call);
+    }
+    if (to && answer) io.to(String(to)).emit("call-answered", { answer, callId: callId || "" });
+  });
+
+  socket.on("call-rejected", async ({ to, callId }) => {
+    const call = callId ? activeCalls.get(String(callId)) : null;
+    if (to) io.to(String(to)).emit("call-rejected", { callId: callId || "" });
+    if (call) clearCall(call.callId);
+  });
+
   socket.on("ice-candidate", ({ to, candidate }) => { if (to && candidate) io.to(String(to)).emit("ice-candidate", { candidate }); });
-  socket.on("end-call", ({ to }) => { if (to) io.to(String(to)).emit("call-ended"); });
+
+  socket.on("end-call", async ({ to, callId }) => {
+    const call = callId ? activeCalls.get(String(callId)) : null;
+    if (call && !call.answered) await markMissedCall(call.callId, "missed");
+    if (to) io.to(String(to)).emit("call-ended", { callId: callId || "" });
+    if (call) clearCall(call.callId);
+  });
 
   socket.on("typing", ({ conversationId, sender }) => { if (conversationId) socket.to(String(conversationId)).emit("typing", sender); });
   socket.on("stop-typing", ({ conversationId, sender }) => { if (conversationId) socket.to(String(conversationId)).emit("stop-typing", sender); });
 
   socket.on("seen-message", async ({ messageId }) => {
-    try { const message = await Message.findById(messageId); if (!message) return; message.seen = true; await message.save(); io.to(String(message.sender)).emit("message-seen", messageId); } catch (error) { console.warn("Seen message update failed:", error.message); }
+    try {
+      const message = await Message.findById(messageId);
+      if (!message) return;
+      message.seenBy = Array.from(new Set([...(message.seenBy || []).map(String), String(socket.data.userId || "")].filter(Boolean)));
+      message.seenAt = new Date();
+      message.delivered = true;
+      message.deliveredAt = message.deliveredAt || new Date();
+      await message.save();
+      io.to(String(message.sender)).emit("message-seen", messageId);
+    } catch (error) { console.warn("Seen message update failed:", error.message); }
   });
 
   socket.on("disconnect", async () => {
     const userId = socket.data?.userId;
+    const chatId = socket.data?.chatId || userId;
     const role = socket.data?.role || "member";
-    removeUser(socket.id);
-    try { if (userId) await savePresence(userId, role, false, ""); } catch (error) { console.warn("Could not persist offline state:", error.message); }
-    broadcastPresence(io);
+    const removed = removeUser(socket.id);
+    try {
+      if (userId && removed?.offline) {
+        const actor = await resolveActor(chatId, role);
+        if (actor) await savePresence(actor, false, "");
+      }
+      broadcastPresence(io);
+    } catch (error) { console.warn("Could not persist offline state:", error.message); }
   });
 };

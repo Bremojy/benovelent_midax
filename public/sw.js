@@ -1,4 +1,4 @@
-const CACHE = "benovelent-shell-v10";
+const CACHE = "benovelent-shell-v11";
 const ASSETS = ["/", "/index.html", "/manifest.webmanifest", "/pwa-icon-192.png", "/pwa-icon-512.png", "/apple-touch-icon.png"];
 const DB_NAME = "benovelent-pwa";
 const DB_STORE = "calls";
@@ -45,15 +45,16 @@ self.addEventListener("push", (event) => {
 
   const type = String(payload?.data?.type || payload?.type || "notification").toLowerCase();
   const isIncomingCall = ["incoming_call", "audio_call", "video_call"].includes(type) || Boolean(payload?.data?.incomingCall);
-  const title = payload.title || (isIncomingCall ? (type === "video_call" ? "Incoming video call" : "Incoming audio call") : "Benovelent MIDAX");
+  const isMissedCall = ["missed_call", "missed_audio_call", "missed_video_call"].includes(type) || Boolean(payload?.data?.missedCall);
+  const title = payload.title || (isIncomingCall ? (type === "video_call" ? "Incoming video call" : "Incoming audio call") : isMissedCall ? "Missed call" : "Benovelent MIDAX");
   const options = {
-    body: payload.body || (isIncomingCall ? "Someone is calling you." : "You have a new update."),
+    body: payload.body || (isIncomingCall ? "Someone is calling you." : isMissedCall ? "You missed a call." : "You have a new update."),
     icon: payload.icon || "/pwa-icon-192.png",
     badge: payload.badge || "/pwa-icon-192.png",
     image: payload.image,
     tag: payload.tag || (isIncomingCall ? `benovelent-call-${payload?.data?.callId || "incoming"}` : "benovelent-notification"),
     renotify: true,
-    requireInteraction: isIncomingCall,
+    requireInteraction: isIncomingCall || isMissedCall,
     vibrate: isIncomingCall ? [300, 120, 300, 120, 600] : [120, 60, 120],
     actions: isIncomingCall ? [
       { action: "answer", title: "Answer" },
@@ -65,8 +66,16 @@ self.addEventListener("push", (event) => {
   event.waitUntil((async () => {
     if (isIncomingCall) {
       const callId = String(payload?.data?.callId || `call-${Date.now()}`);
-      await savePendingCall(callId, { ...payload, data: { ...(payload.data || {}), callId, incomingCall: true } });
-      options.data = { ...(payload.data || {}), callId, incomingCall: true, link: `/member/messages?incomingPushCall=${encodeURIComponent(callId)}` };
+      const incomingPayload = payload?.data?.incomingPayload || {};
+      const callData = {
+        ...(payload.data || {}),
+        ...incomingPayload,
+        callId,
+        incomingCall: true,
+        role: payload?.data?.role || incomingPayload?.role || "member",
+      };
+      await savePendingCall(callId, { ...payload, data: callData });
+      options.data = { ...callData, link: `/member/messages?incomingPushCall=${encodeURIComponent(callId)}` };
     }
     await self.registration.showNotification(title, options);
   })());
@@ -78,7 +87,11 @@ self.addEventListener("notificationclick", (event) => {
   const action = event.action || "open";
   const callId = data.callId ? encodeURIComponent(String(data.callId)) : "";
   let link = data.link || "/";
-  if (data.incomingCall || callId) link = `/member/messages?incomingPushCall=${callId}&callAction=${encodeURIComponent(action)}`;
+  if (data.incomingCall && callId) {
+    const base = data.role === "admin" ? "/admin/messages" : data.role === "superadmin" ? "/superadmin/messages" : "/member/messages";
+    link = `${base}?incomingPushCall=${callId}&callAction=${encodeURIComponent(action)}`;
+  } else if (data.role === "admin") link = "/admin/messages";
+  else if (data.role === "superadmin") link = "/superadmin/messages";
 
   event.waitUntil((async () => {
     const clientList = await clients.matchAll({ type: "window", includeUncontrolled: true });

@@ -3,6 +3,9 @@ const { getChatActorId } = require("../utils/chatProfile");
 const Message = require("../models/Message");
 const Conversation = require("../models/Conversation");
 const Notification = require("../models/Notification");
+const Member = require("../models/Member");
+const Admin = require("../models/Admin");
+const SuperAdmin = require("../models/SuperAdmin");
 const { resolveStoredFileUrl } = require("../utils/uploadUrl");
 
 /* =====================================================
@@ -36,6 +39,11 @@ exports.sendMessage = async (req, res) => {
                 success: false,
                 message: "Conversation not found.",
             });
+        }
+
+        const isParticipant = (conversation.participants || []).some((participant) => String(participant) === String(actorId));
+        if (!isParticipant) {
+            return res.status(403).json({ success: false, message: "You are not a participant in this conversation." });
         }
 
         const bodyText = String(message ?? text ?? "").trim();
@@ -93,10 +101,23 @@ exports.sendMessage = async (req, res) => {
             const senderModel = String(req.user?.role || "member")
                 .toLowerCase()
                 .replace(/^./, (char) => char.toUpperCase());
+            const notificationTargets = await Promise.all(recipients.map(async (recipientId) => {
+                const chatProfile = await Member.findById(recipientId).select("portalOwnerId portalOwnerRole role").lean();
+                if (chatProfile?.portalOwnerId && chatProfile?.portalOwnerRole) {
+                    return { recipient: chatProfile.portalOwnerId, recipientModel: chatProfile.portalOwnerRole === "admin" ? "Admin" : chatProfile.portalOwnerRole === "superadmin" ? "SuperAdmin" : "Member" };
+                }
+                if (chatProfile) return { recipient: recipientId, recipientModel: "Member" };
+                const [admin, superadmin] = await Promise.all([
+                    Admin.findById(recipientId).select("_id").lean(),
+                    SuperAdmin.findById(recipientId).select("_id").lean(),
+                ]);
+                if (admin) return { recipient: recipientId, recipientModel: "Admin" };
+                if (superadmin) return { recipient: recipientId, recipientModel: "SuperAdmin" };
+                return { recipient: recipientId, recipientModel: "Member" };
+            }));
             const notifications = await Notification.insertMany(
-                recipients.map((recipient) => ({
-                    recipient,
-                    recipientModel: "Member",
+                notificationTargets.map((target) => ({
+                    ...target,
                     sender: actorId,
                     senderModel,
                     title,
@@ -111,6 +132,7 @@ exports.sendMessage = async (req, res) => {
             notifications.forEach((notification) => {
                 io?.to(notification.recipient.toString()).emit("new-notification", notification);
             });
+            await Promise.all(notificationTargets.filter((target) => target.recipientModel === "Member").map((target) => Member.findByIdAndUpdate(target.recipient, { $inc: { unreadMessages: 1, unreadNotifications: 1 } }).catch(() => null)));
         }
 
         return res.status(201).json({

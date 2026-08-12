@@ -116,7 +116,7 @@ function MessageCenterPage({
       const title = payload?.title || "Incoming call";
       const body = payload?.message || "Someone is calling you.";
       setBanner(`${title}: ${body}`);
-      if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
+      if (typeof document !== "undefined" && document.visibilityState !== "visible" && typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
         try { new Notification(title, { body, tag: `call-${payload?.callerUserId || Date.now()}` }); } catch {}
       }
     };
@@ -141,14 +141,25 @@ function MessageCenterPage({
       });
     };
 
+    const handleMissedCall = (payload) => {
+      const title = payload?.callType === "video" ? "Missed video call" : "Missed audio call";
+      const body = `${payload?.callerName || "A member"} tried to call you.`;
+      setBanner(`${title}: ${body}`);
+      if (typeof document !== "undefined" && document.visibilityState !== "visible" && typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
+        try { new Notification(title, { body, tag: `missed-call-${payload?.callId || Date.now()}` }); } catch {}
+      }
+    };
+
     newSocket.on("incoming-call", handleIncomingCall);
     newSocket.on("new-call-notification", handleCallNotification);
+    newSocket.on("missed-call", handleMissedCall);
     newSocket.on("online-users", handlePresence);
     setSocket(newSocket);
 
     return () => {
       newSocket.off("incoming-call", handleIncomingCall);
       newSocket.off("new-call-notification", handleCallNotification);
+      newSocket.off("missed-call", handleMissedCall);
       newSocket.off("online-users", handlePresence);
       setSocket(null);
     };

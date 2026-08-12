@@ -7,6 +7,7 @@ const ICE_SERVERS = [{ urls: "stun:stun.l.google.com:19302" }, { urls: "stun:stu
 
 export default function CallOverlay({ socket, currentUser, partner, callType, incomingCall, onClose }) {
   const [status, setStatus] = useState(incomingCall ? "Incoming call" : "Calling...");
+  const [callId, setCallId] = useState(incomingCall?.callId || "");
   const [connected, setConnected] = useState(false);
   const [muted, setMuted] = useState(false);
   const [cameraOff, setCameraOff] = useState(callType !== "video");
@@ -33,8 +34,10 @@ export default function CallOverlay({ socket, currentUser, partner, callType, in
     const handleAnswered = async ({ answer }) => { if (!peerRef.current || !answer) return; try { await peerRef.current.setRemoteDescription(new RTCSessionDescription(answer)); await flushCandidates(); } catch (err) { setError(err.message || "Could not establish the call."); } };
     const handleCandidate = async ({ candidate }) => { if (!candidate) return; if (!peerRef.current?.remoteDescription) { pendingCandidatesRef.current.push(candidate); return; } try { await peerRef.current.addIceCandidate(new RTCIceCandidate(candidate)); } catch (err) { console.warn("ICE candidate error", err); } };
     const handleEnded = () => finish(false);
+    const handleStarted = ({ callId: startedCallId }) => { if (startedCallId) setCallId(String(startedCallId)); };
+    socket.on("call-started", handleStarted);
     socket.on("call-answered", handleAnswered); socket.on("ice-candidate", handleCandidate); socket.on("call-ended", handleEnded); socket.on("call-rejected", handleEnded);
-    return () => { socket.off("call-answered", handleAnswered); socket.off("ice-candidate", handleCandidate); socket.off("call-ended", handleEnded); socket.off("call-rejected", handleEnded); };
+    return () => { socket.off("call-started", handleStarted); socket.off("call-answered", handleAnswered); socket.off("ice-candidate", handleCandidate); socket.off("call-ended", handleEnded); socket.off("call-rejected", handleEnded); };
   }, [socket]);
 
   useEffect(() => { if (!accepted) return; startCall().catch((err) => setError(err.message || "Camera or microphone access failed.")); return () => cleanupMedia(); }, [accepted]);
@@ -65,7 +68,7 @@ export default function CallOverlay({ socket, currentUser, partner, callType, in
       await flushCandidates();
       const answer = await peer.createAnswer();
       await peer.setLocalDescription(answer);
-      socket.emit("call-answer", { to: incomingCall.from, answer });
+      socket.emit("call-answer", { to: incomingCall.from, answer, callId: incomingCall.callId || callId });
       setStatus("Connecting...");
     } else {
       const offer = await peer.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: callType === "video" });
@@ -84,8 +87,8 @@ export default function CallOverlay({ socket, currentUser, partner, callType, in
 
   function toggleMute() { const next = !muted; localStreamRef.current?.getAudioTracks().forEach((track) => { track.enabled = !next; }); setMuted(next); }
   function toggleCamera() { const next = !cameraOff; localStreamRef.current?.getVideoTracks().forEach((track) => { track.enabled = !next; }); setCameraOff(next); }
-  function rejectCall() { if (incomingCall?.from) socket?.emit("call-rejected", { to: incomingCall.from }); finish(false); }
-  function finish(notify = true) { if (notify && partnerId) socket?.emit("end-call", { to: incomingCall?.from || partnerId }); ringtoneRef.current?.stop?.(); cleanupMedia(); onClose?.(); }
+  function rejectCall() { if (incomingCall?.from) socket?.emit("call-rejected", { to: incomingCall.from, callId: incomingCall.callId || callId }); finish(false); }
+  function finish(notify = true) { if (notify && partnerId) socket?.emit("end-call", { to: incomingCall?.from || partnerId, callId: incomingCall?.callId || callId }); ringtoneRef.current?.stop?.(); cleanupMedia(); onClose?.(); }
   function cleanupMedia() { peerRef.current?.close(); peerRef.current = null; localStreamRef.current?.getTracks().forEach((track) => track.stop()); localStreamRef.current = null; if (localVideoRef.current) localVideoRef.current.srcObject = null; if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null; if (remoteAudioRef.current) remoteAudioRef.current.srcObject = null; }
 
   const mins = String(Math.floor(duration / 60)).padStart(2, "0");

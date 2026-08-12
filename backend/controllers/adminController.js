@@ -1,5 +1,7 @@
 const bcrypt = require("bcryptjs");
 const Member = require("../models/Member");
+const Admin = require("../models/Admin");
+const SuperAdmin = require("../models/SuperAdmin");
 const { sendEmail, sendSmsNotification } = require("../services/memberBroadcastService");
 const calculateProfileCompletion = require("../utils/calculateProfileCompletion");
 const Finance = require("../models/Finance");
@@ -335,16 +337,12 @@ exports.createMember = async (req, res) => {
     // ==========================================
 
     if (cleanUsername) {
-      const existingUsername =
-        await Member.findOne({
-          username: cleanUsername,
-        });
+      const existingUsername = await Member.findOne({ username: cleanUsername });
 
       if (existingUsername) {
         return res.status(400).json({
           success: false,
-          message:
-            "A member with this username already exists.",
+          message: "A member with this username already exists.",
         });
       }
     }
@@ -456,10 +454,23 @@ exports.createMember = async (req, res) => {
     // CREATE MEMBER
     // ==========================================
 
-    const member =
-      await Member.create(
-        memberData
-      );
+    let member;
+    try {
+      member = await Member.create(memberData);
+    } catch (createError) {
+      if (createError?.code === 11000) {
+        const key = Object.keys(createError.keyPattern || {})[0] || "field";
+        const value = createError.keyValue?.[key] ?? "";
+        const label = key.includes("nextOfKin.phone") ? "next-of-kin phone" : key.replace(/\./g, " ");
+        return res.status(409).json({
+          success: false,
+          code: "DUPLICATE_MEMBER_FIELD",
+          message: `A member with this ${label} already exists. Duplicate value: ${value || "(blank)"}.`,
+          field: key,
+        });
+      }
+      throw createError;
+    }
 
     // ==========================================
     // SEND INVITE CREDENTIALS

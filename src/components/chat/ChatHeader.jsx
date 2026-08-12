@@ -1,6 +1,12 @@
 import { ArrowLeft, Phone, Video, Info, BadgeCheck } from "lucide-react";
 import "./ChatHeader.css";
 
+function formatLastSeen(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "offline";
+  return date.toLocaleString(undefined, { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
 function ChatHeader({ conversation, partner, typingUser, onAudioCall, onVideoCall, onBack }) {
   const user =
     partner ||
@@ -35,7 +41,7 @@ function ChatHeader({ conversation, partner, typingUser, onAudioCall, onVideoCal
             {user.verified ? <BadgeCheck size={16} className="verified-dot" /> : null}
             {role ? <span className="role-chip">{role}</span> : null}
           </div>
-          {typingUser ? <p className="typing-status">Typing...</p> : <p>{user.online ? "Online" : "Offline"}</p>}
+          {typingUser ? <p className="typing-status">Typing...</p> : <p>{user.online ? "Online now" : user.lastSeen ? `Last seen ${formatLastSeen(user.lastSeen)}` : "Offline"}</p>}
         </div>
       </div>
 

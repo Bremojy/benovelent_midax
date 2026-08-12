@@ -3,6 +3,7 @@ const Member = require("../models/Member");
 const { getActiveMembers, notifyMembers } = require("../services/memberBroadcastService");
 const PushSubscription = require("../models/PushSubscription");
 const { getPublicKey } = require("../services/pushService");
+const { getIO } = require("../sockets/socket");
 
 function senderModelFromUser(user = {}) {
   const role = String(user.role || "").toLowerCase();
@@ -127,6 +128,7 @@ CREATE NOTIFICATION
 exports.createNotification = async (req, res) => {
   try {
     const notification = await Notification.create(req.body);
+    getIO()?.to(String(notification.recipient)).emit("new-notification", notification);
 
     return res.status(201).json({
       success: true,

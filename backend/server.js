@@ -261,20 +261,28 @@ if (!process.env.MONGO_URI) {
 }
 
 const PORT = process.env.PORT || 5000;
+const { runMigrations } = require("./utils/runMigrations");
 
-server.listen(PORT, "0.0.0.0", () => {
-    console.log("======================================");
-    console.log(`🚀 Server Running on ${PORT}`);
-    console.log(`🔌 Socket.IO     : Enabled`);
-    console.log(`🛡 Environment   : ${process.env.NODE_ENV || "development"}`);
-    console.log("======================================");
-});
+if (!server.listening) {
+    server.listen(PORT, "0.0.0.0", () => {
+        console.log("======================================");
+        console.log(`🚀 Server Running on ${PORT}`);
+        console.log(`🔌 Socket.IO     : Enabled`);
+        console.log(`🛡 Environment   : ${process.env.NODE_ENV || "development"}`);
+        console.log("======================================");
+    });
+}
 
 let reconnectTimer;
 const connectDatabase = async () => {
     try {
         await mongoose.connect(process.env.MONGO_URI, { serverSelectionTimeoutMS: 15000 });
         console.log("✅ MongoDB Connected");
+        try {
+            await runMigrations();
+        } catch (migrationError) {
+            console.error("❌ Database migration failed:", migrationError.message);
+        }
         if (reconnectTimer) { clearInterval(reconnectTimer); reconnectTimer = undefined; }
     } catch (err) {
         console.error("❌ MongoDB Connection Failed:", err.message);
