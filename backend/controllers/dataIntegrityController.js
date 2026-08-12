@@ -226,6 +226,11 @@ async function buildReport() {
 
     return {
         generatedAt: new Date().toISOString(),
+        database: {
+            connected: mongoose.connection.readyState === 1,
+            name: mongoose.connection.name || "",
+            host: mongoose.connection.host || "",
+        },
         counts: {
             members: members.length - memberDuplicates.reduce((sum, group) => sum + Math.max(0, group.length - 1), 0),
             liveMemberRecords: members.length,
@@ -486,6 +491,92 @@ async function findMemberReferences(memberId) {
     }
     return references;
 }
+
+
+const SENSITIVE_BACKUP_KEYS = new Set([
+    "password",
+    "passwordHash",
+    "resetToken",
+    "resetPasswordToken",
+    "verificationToken",
+    "refreshToken",
+    "accessToken",
+    "token",
+    "otp",
+    "otpCode",
+    "secret",
+    "apiKey",
+    "privateKey",
+    "twoFactorSecret",
+]);
+
+function redactForBackup(value, key = "") {
+    if (value === null || value === undefined) return value;
+    if (SENSITIVE_BACKUP_KEYS.has(String(key))) return "[REDACTED_FOR_SECURITY]";
+    if (value instanceof Date) return value.toISOString();
+    if (value && typeof value.toHexString === "function" && value._bsontype === "ObjectId") {
+        return value.toHexString();
+    }
+    if (Array.isArray(value)) return value.map((item) => redactForBackup(item, ""));
+    if (typeof value === "object") {
+        return Object.fromEntries(Object.entries(value).map(([childKey, childValue]) => [childKey, redactForBackup(childValue, childKey)]));
+    }
+    return value;
+}
+
+exports.downloadDatabaseBackup = async (req, res) => {
+    try {
+        if (mongoose.connection.readyState !== 1 || !mongoose.connection.db) {
+            return res.status(503).json({
+                success: false,
+                message: "Database is not currently connected. Try the backup again after the database reports connected.",
+            });
+        }
+
+        const collections = await mongoose.connection.db
+            .listCollections({}, { nameOnly: true })
+            .toArray();
+
+        const collectionNames = collections
+            .map((item) => item.name)
+            .filter(Boolean)
+            .sort((a, b) => String(a).localeCompare(String(b)));
+
+        const backupCollections = {};
+        for (const collectionName of collectionNames) {
+            const documents = await mongoose.connection.db
+                .collection(collectionName)
+                .find({})
+                .toArray();
+            backupCollections[collectionName] = documents.map((document) => redactForBackup(document));
+        }
+
+        const timestamp = new Date();
+        const safeTimestamp = timestamp.toISOString().replace(/[:.]/g, "-");
+        const payload = {
+            backupVersion: 1,
+            application: "Benevolent Midax",
+            generatedAt: timestamp.toISOString(),
+            database: mongoose.connection.name || "",
+            collectionCount: collectionNames.length,
+            securityNote: "Application credential/token fields are redacted from this browser-download backup. Financial, support, member, communication, audit and website data remain included.",
+            collections: backupCollections,
+        };
+
+        const body = JSON.stringify(payload, null, 2);
+        res.status(200);
+        res.setHeader("Content-Type", "application/json; charset=utf-8");
+        res.setHeader("Content-Disposition", `attachment; filename="benevolent-midax-database-backup-${safeTimestamp}.json"`);
+        res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, private");
+        return res.send(body);
+    } catch (error) {
+        console.error("Database backup error:", error);
+        return res.status(500).json({
+            success: false,
+            message: error.message || "Unable to create database backup.",
+        });
+    }
+};
 
 exports.deleteDuplicateMember = async (req, res) => {
     try {

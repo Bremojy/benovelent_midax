@@ -4904,3 +4904,47 @@ display:none;
 .modern-card:hover{transform:translateY(-8px);box-shadow:0 26px 60px rgba(20,20,20,.10);border-color:rgba(255,122,0,.16)}
 @keyframes publicCardReveal{to{opacity:1;transform:translateY(0)}}
 @media(prefers-reduced-motion:reduce){.modern-card-grid>.modern-card{opacity:1;transform:none;animation:none}.modern-card{transition:none}}
+
+/* =========================================================
+   DATA INTEGRITY — DATABASE OPERATIONS
+   ========================================================= */
+.integrity-database-panel {
+  background: linear-gradient(135deg, rgba(255,255,255,.98), rgba(249,250,251,.96));
+}
+
+.integrity-permission-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.integrity-permission {
+  padding: 14px;
+  border: 1px solid rgba(0,0,0,.07);
+  border-radius: 15px;
+  background: #fff;
+}
+
+.integrity-permission strong {
+  display: block;
+  margin-bottom: 5px;
+}
+
+.integrity-permission p {
+  margin: 0;
+  color: #667085;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+@media (max-width: 1000px) {
+  .integrity-permission-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 600px) {
+  .integrity-permission-grid {
+    grid-template-columns: 1fr;
+  }
+}

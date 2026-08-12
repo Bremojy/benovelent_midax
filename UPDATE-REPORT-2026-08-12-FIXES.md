@@ -23,3 +23,8 @@
 
 ## Environment limitation
 The supplied environment has an invalid global npm registry configuration and dependency installation could not complete reliably, so a full Vite production build could not be executed in this container. The source was still statically audited and backend syntax-checked.
+
+
+## SuperAdmin database governance update
+
+Added a live MongoDB-backed database governance workflow to the SuperAdmin Data Integrity page. The page now exposes protected database inspection, safe cleanup, carousel cleanup, individual duplicate-member handling, a downloadable JSON database snapshot with credential/token redaction, and a printer-friendly integrity report. The page also displays the live database connection state. Stale integrity actions now refresh the live report instead of leaving a failed 409 action looking like a broken button.
