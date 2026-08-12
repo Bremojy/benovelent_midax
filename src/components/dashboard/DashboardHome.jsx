@@ -84,7 +84,7 @@ function DashboardHome({
             KSh {totalContributions.toLocaleString()}
           </h2>
 
-          <span>Total Contributions</span>
+          <span>Scheme Contributions</span>
 
         </div>
 

@@ -10,6 +10,7 @@ import "./ContributionSummary.css";
 function ContributionSummary({
   statistics,
 }) {
+  const scheme = statistics?.scheme || {};
   return (
     <section className="wallet-summary">
 
@@ -17,11 +18,11 @@ function ContributionSummary({
 
         <Wallet size={34} />
 
-        <span>Total Contributions</span>
+        <span>Scheme Collected</span>
 
         <h2>
           KSh {Number(
-            statistics?.totalContribution || 0
+            scheme?.totalCollected || 0
           ).toLocaleString()}
         </h2>
 
@@ -31,11 +32,11 @@ function ContributionSummary({
 
         <TrendingUp size={30} />
 
-        <span>This Month</span>
+        <span>Standard Monthly Deduction</span>
 
         <h3>
           KSh {Number(
-            statistics?.monthlyContribution || 0
+            scheme?.standardMonthlyDeduction || 0
           ).toLocaleString()}
         </h3>
 
@@ -45,15 +46,11 @@ function ContributionSummary({
 
         <Calendar size={30} />
 
-        <span>Last Payment</span>
+        <span>Members Charged</span>
 
         <h3>
 
-          {statistics?.lastPaymentDate
-            ? new Date(
-                statistics.lastPaymentDate
-              ).toLocaleDateString()
-            : "No Payment"}
+          {Number(scheme?.membersChargedThisMonth || 0).toLocaleString()}
 
         </h3>
 
@@ -63,12 +60,11 @@ function ContributionSummary({
 
         <BadgeDollarSign size={30} />
 
-        <span>Status</span>
+        <span>Collection Status</span>
 
         <h3>
 
-          {statistics?.paymentStatus ||
-            "Up To Date"}
+          {scheme?.outstandingThisMonth ? "Collection in progress" : "Up to date"}
 
         </h3>
 

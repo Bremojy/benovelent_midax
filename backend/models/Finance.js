@@ -51,7 +51,8 @@ const financeSchema = new mongoose.Schema({
             "Cash",
             "M-PESA",
             "Bank",
-            "Cheque"
+            "Cheque",
+            "Payroll"
         ],
         default: "M-PESA"
     },

@@ -1141,9 +1141,6 @@ function MemberFormModal({
       member?.department || "",
     position:
       member?.position || "",
-    monthlyContribution:
-      member?.monthlyContribution ??
-      "",
     nationalId: member?.nationalId || "",
     gender: member?.gender || "",
     maritalStatus: member?.maritalStatus || "",
@@ -1195,10 +1192,6 @@ function MemberFormModal({
 
       await onSave({
         ...form,
-        monthlyContribution:
-          Number(
-            form.monthlyContribution
-          ) || 0,
       });
     } catch (error) {
       setFormError(
@@ -1362,20 +1355,6 @@ function MemberFormModal({
                 handleChange
               }
               placeholder="Position"
-            />
-
-            <FormField
-              label="Monthly Contribution"
-              name="monthlyContribution"
-              type="number"
-              min="0"
-              value={
-                form.monthlyContribution
-              }
-              onChange={
-                handleChange
-              }
-              placeholder="0"
             />
 
           </div>

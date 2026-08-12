@@ -15,6 +15,7 @@ const Message = require("../models/Message");
 const Notification = require("../models/Notification");
 const FeedbackCollection = require("../models/FeedbackCollection");
 const Carousel = require("../models/Carousel");
+const Contribution = require("../models/Contribution");
 const mongoose = require("mongoose");
 
 
@@ -869,7 +870,7 @@ exports.getPortalOverview = async (req, res) => {
       pendingFuneral, pendingMedical, pendingEducation, pendingGeneral,
       approvedClaims, bookBalance, news, conversations, messages, unreadNotifications,
       activeFeedback, carouselSlides,
-      feedbackResponseAgg,
+      feedbackResponseAgg, contributionPulse,
     ] = await Promise.all([
       Member.countDocuments({ role: "member", isDeleted: false }),
       Member.countDocuments({ role: "member", status: "active", isDeleted: false }),
@@ -890,6 +891,10 @@ exports.getPortalOverview = async (req, res) => {
       FeedbackCollection.countDocuments({ status: "active" }),
       Carousel.countDocuments({ isActive: true }),
       FeedbackCollection.aggregate([{ $unwind: "$responses" }, { $count: "count" }]),
+      Contribution.aggregate([
+        { $match: { year: new Date().getFullYear() } },
+        { $group: { _id: null, collected: { $sum: "$paidAmount" }, expected: { $sum: "$expectedAmount" }, members: { $addToSet: "$member" } } },
+      ]),
     ]);
 
     return res.json({
@@ -899,7 +904,12 @@ exports.getPortalOverview = async (req, res) => {
         members: { total: members, active: activeMembers, online: onlineMembers },
         leadership: { administrators: admins, activeAdministrators: activeAdmins, superadmins },
         support: { pending: Number(pendingFuneral) + Number(pendingMedical) + Number(pendingEducation) + Number(pendingGeneral), funeral: pendingFuneral, medical: pendingMedical, education: pendingEducation, general: pendingGeneral, approvedClaims },
-        finance: { bookBalance: Number(bookBalance?.[0]?.total || 0) },
+        finance: {
+          bookBalance: Number(bookBalance?.[0]?.total || 0),
+          contributionCollected: Number(contributionPulse?.[0]?.collected || 0),
+          contributionExpected: Number(contributionPulse?.[0]?.expected || 0),
+          contributionMembersCharged: contributionPulse?.[0]?.members?.length || 0,
+        },
         communication: { conversations, messages, unreadNotifications },
         content: { publishedNews: news, activeFeedbackCollections: activeFeedback, feedbackResponses: Number(feedbackResponseAgg?.[0]?.count || 0), activeCarouselSlides: carouselSlides },
         generatedAt: new Date().toISOString(),

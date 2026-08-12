@@ -8,15 +8,15 @@ import {
 import "../../styles/member.css";
 
 function MemberStats({
-  totalContributions = 24500,
+  standardMonthlyDeduction = 500,
+  schemeCollected = 0,
   activeClaims = 2,
-  nextContribution = "01 Aug 2026",
   unreadMessages = 4,
 }) {
   const cards = [
     {
-      title: "Total Contributions",
-      value: `KSh ${Number(totalContributions).toLocaleString()}`,
+      title: "Scheme Collected",
+      value: `KSh ${Number(schemeCollected).toLocaleString()}`,
       icon: Wallet,
     },
     {
@@ -25,8 +25,8 @@ function MemberStats({
       icon: HandHeart,
     },
     {
-      title: "Next Contribution",
-      value: nextContribution,
+      title: "Standard Deduction",
+      value: `KSh ${Number(standardMonthlyDeduction).toLocaleString()}`,
       icon: CalendarClock,
     },
     {

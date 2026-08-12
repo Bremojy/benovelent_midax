@@ -104,6 +104,136 @@ exports.createContribution = async (req, res) => {
   }
 };
 
+
+/* =====================================================
+   BULK PAYROLL CONTRIBUTION RUN
+   Records the same approved monthly deduction for all active members.
+===================================================== */
+exports.createBulkContributionRun = async (req, res) => {
+  try {
+    const month = Number(req.body?.month);
+    const year = Number(req.body?.year) || new Date().getFullYear();
+    const amount = Number(req.body?.amount);
+    const paymentDate = req.body?.paymentDate ? new Date(req.body.paymentDate) : new Date();
+    const recordAsCollected = req.body?.recordAsCollected !== false;
+    const paymentMethod = "Payroll";
+    const notes = String(req.body?.notes || "Monthly payroll deduction").trim();
+
+    if (!Number.isInteger(month) || month < 1 || month > 12) {
+      return res.status(400).json({ success: false, message: "A valid contribution month is required." });
+    }
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return res.status(400).json({ success: false, message: "A positive monthly contribution amount is required." });
+    }
+    if (Number.isNaN(paymentDate.getTime())) {
+      return res.status(400).json({ success: false, message: "A valid payment date is required." });
+    }
+
+    const members = await Member.find({ role: "member", status: "active", isDeleted: false })
+      .select("_id fullName memberNumber")
+      .lean();
+
+    if (!members.length) {
+      return res.status(400).json({ success: false, message: "No active members are available for the contribution run." });
+    }
+
+    let created = 0;
+    let updated = 0;
+    let collected = 0;
+    const failures = [];
+
+    for (const member of members) {
+      try {
+        const paidAmount = recordAsCollected ? amount : 0;
+        let contribution = await Contribution.findOne({ member: member._id, month, year });
+
+        if (!contribution) {
+          contribution = new Contribution({
+            member: member._id,
+            month,
+            year,
+            expectedAmount: amount,
+            paidAmount,
+            paymentMethod,
+            paymentDate: recordAsCollected ? paymentDate : undefined,
+            notes,
+            approvedBy: req.user._id,
+            approvedAt: new Date(),
+          });
+          await contribution.save();
+          created += 1;
+        } else {
+          contribution.expectedAmount = amount;
+          contribution.paymentMethod = paymentMethod;
+          contribution.notes = notes;
+          contribution.approvedBy = req.user._id;
+          contribution.approvedAt = new Date();
+          if (recordAsCollected) {
+            contribution.paidAmount = amount;
+            contribution.paymentDate = paymentDate;
+          } else if (Number(contribution.paidAmount || 0) === 0) {
+            contribution.paidAmount = 0;
+          }
+          await contribution.save();
+          updated += 1;
+        }
+
+        // Keep the financial ledger in sync with the contribution record.
+        if (recordAsCollected) {
+          let finance = contribution.finance
+            ? await Finance.findById(contribution.finance)
+            : await Finance.findOne({ member: member._id, type: "contribution", category: "Monthly Payroll Contribution", transactionDate: { $gte: new Date(year, month - 1, 1), $lt: new Date(year, month, 1) } }).sort({ createdAt: -1 });
+
+          if (!finance) {
+            finance = await Finance.create({
+              member: member._id,
+              transactionNumber: `PAYROLL-${year}${String(month).padStart(2, "0")}-${member.memberNumber}-${Date.now()}`,
+              type: "contribution",
+              category: "Monthly Payroll Contribution",
+              amount,
+              description: `Payroll contribution ${month}/${year}`,
+              paymentMethod,
+              transactionDate: paymentDate,
+              status: "approved",
+              approvedBy: req.user._id,
+              approvedAt: new Date(),
+              notes,
+            });
+          } else {
+            finance.amount = amount;
+            finance.paymentMethod = paymentMethod;
+            finance.transactionDate = paymentDate;
+            finance.description = `Payroll contribution ${month}/${year}`;
+            finance.notes = notes;
+            finance.status = "approved";
+            finance.approvedBy = req.user._id;
+            finance.approvedAt = new Date();
+            await finance.save();
+          }
+          contribution.finance = finance._id;
+          await contribution.save();
+          collected += 1;
+        }
+      } catch (memberError) {
+        failures.push({ memberNumber: member.memberNumber, name: member.fullName, message: memberError.message });
+      }
+    }
+
+    // Keep the shared member profile field aligned as a display fallback only.
+    await Member.updateMany({ role: "member", isDeleted: false }, { $set: { monthlyContribution: amount } });
+
+    return res.status(201).json({
+      success: true,
+      message: `Payroll contribution run completed for ${members.length} active members.`,
+      run: { month, year, amount, paymentMethod, recordAsCollected, totalMembers: members.length, created, updated, collected, failed: failures.length },
+      failures,
+    });
+  } catch (error) {
+    console.error("Bulk contribution run error:", error);
+    return res.status(500).json({ success: false, message: error.message || "Unable to complete bulk contribution run." });
+  }
+};
+
 /* =====================================================
    GET ALL CONTRIBUTIONS
 ===================================================== */
@@ -217,66 +347,46 @@ exports.getContributions = async (req,res)=>{
 ===================================================== */
 
 exports.getMemberContributions = async (req,res)=>{
-
     try{
-
-        const requestedMemberId = req.params.memberId || req.user._id;
-
-        if (req.user?.role === "member" && String(requestedMemberId) !== String(req.user._id)) {
-            return res.status(403).json({
-                success: false,
-                message: "You can only view your own contributions."
+        const isMemberRole = String(req.user?.role || '').toLowerCase() === 'member';
+        if (isMemberRole) {
+            const currentYear = Number(req.query.year) || new Date().getFullYear();
+            const rows = await Contribution.find({ year: currentYear }).lean();
+            const monthly = Array.from({ length: 12 }, (_, i) => {
+                const month = i + 1;
+                const monthRows = rows.filter((item) => Number(item.month) === month);
+                return {
+                    month,
+                    expected: monthRows.reduce((sum, item) => sum + Number(item.expectedAmount || 0), 0),
+                    collected: monthRows.reduce((sum, item) => sum + Number(item.paidAmount || 0), 0),
+                    membersCharged: new Set(monthRows.map((item) => String(item.member))).size,
+                };
+            });
+            return res.json({
+                success: true,
+                scope: 'scheme-wide',
+                year: currentYear,
+                count: rows.length,
+                monthly,
+                summary: {
+                    totalExpected: rows.reduce((sum, item) => sum + Number(item.expectedAmount || 0), 0),
+                    totalCollected: rows.reduce((sum, item) => sum + Number(item.paidAmount || 0), 0),
+                },
+                notice: 'Individual member contribution records are not displayed to members.'
             });
         }
 
-        const contributions=await Contribution.find({
-
-            member:requestedMemberId
-
-        })
-
-        .populate(
-
-            "finance"
-
-        )
-
-        .sort({
-
-            paymentDate: -1,
-            year: -1,
-            month: -1,
-            createdAt: -1
-
-        });
-
-        res.json({
-
-            success:true,
-
-            count:contributions.length,
-
-            contributions
-
-        });
-
-    }
-
-    catch(error){
-
+        const requestedMemberId = req.params.memberId || req.user._id;
+        const contributions=await Contribution.find({ member: requestedMemberId })
+            .populate('finance')
+            .sort({ paymentDate: -1, year: -1, month: -1, createdAt: -1 });
+        res.json({ success:true, count:contributions.length, contributions });
+    } catch(error){
         console.error(error);
-
-        res.status(500).json({
-
-            success:false,
-
-            message:error.message
-
-        });
-
+        res.status(500).json({ success:false, message:error.message });
     }
-
 };
+
 /* =====================================================
    UPDATE CONTRIBUTION
 ===================================================== */

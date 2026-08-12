@@ -1213,69 +1213,43 @@ exports.monthlyRegistrations = async (req, res) => {
 ===================================================== */
 
 exports.contributionSummary = async (req, res) => {
-
   try {
-
-    const summary = await Member.aggregate([
-
-      {
-        $match: {
-          isDeleted: false,
-        },
-      },
-
-      {
-        $group: {
-
-          _id: null,
-
-          totalContribution: {
-            $sum: "$monthlyContribution",
-          },
-
-          averageContribution: {
-            $avg: "$monthlyContribution",
-          },
-
-          highestContribution: {
-            $max: "$monthlyContribution",
-          },
-
-          lowestContribution: {
-            $min: "$monthlyContribution",
-          },
-
-        },
-
-      },
-
-    ]);
+    const Contribution = require("../models/Contribution");
+    const activeMembers = await Member.countDocuments({ role: "member", status: "active", isDeleted: false });
+    const currentYear = Number(req.query.year) || new Date().getFullYear();
+    const currentMonth = Number(req.query.month) || new Date().getMonth() + 1;
+    const rows = await Contribution.find({ year: currentYear }).lean();
+    const current = rows.filter((row) => Number(row.month) === currentMonth);
+    const totalExpected = rows.reduce((sum, row) => sum + Number(row.expectedAmount || 0), 0);
+    const totalCollected = rows.reduce((sum, row) => sum + Number(row.paidAmount || 0), 0);
+    const monthExpected = current.reduce((sum, row) => sum + Number(row.expectedAmount || 0), 0);
+    const monthCollected = current.reduce((sum, row) => sum + Number(row.paidAmount || 0), 0);
+    const deductionCounts = current.reduce((map, row) => { const value = Number(row.expectedAmount || 0); if (value > 0) map.set(value, (map.get(value) || 0) + 1); return map; }, new Map());
+    const standardMonthlyDeduction = [...deductionCounts.entries()].sort((a, b) => b[1] - a[1] || b[0] - a[0])[0]?.[0] || 500;
 
     res.json({
-
       success: true,
-
-      summary:
-        summary[0] || {},
-
+      summary: {
+        activeMembers,
+        totalContributions: totalCollected,
+        monthlyContributions: monthCollected,
+        expectedThisMonth: monthExpected,
+        collectedThisMonth: monthCollected,
+        outstandingThisYear: Math.max(0, totalExpected - totalCollected),
+        standardMonthlyDeduction,
+        membersChargedThisMonth: new Set(current.map((row) => String(row.member))).size,
+        contributionCount: rows.length,
+        totalExpected,
+        totalCollected,
+        currentYear,
+        currentMonth,
+      },
     });
-
   } catch (error) {
-
     console.error(error);
-
-    res.status(500).json({
-
-      success: false,
-
-      message: error.message,
-
-    });
-
+    res.status(500).json({ success: false, message: error.message });
   }
-
 };
-
 
 
 // ======================================================

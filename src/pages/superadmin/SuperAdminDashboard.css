@@ -2,3 +2,8 @@
 @media(max-width:1150px){.portal-metric-grid.six{grid-template-columns:repeat(3,minmax(0,1fr))}.control-tool-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:800px){.portal-metric-grid.six{grid-template-columns:repeat(2,minmax(0,1fr))}.control-tool-grid{grid-template-columns:1fr}.pwa-status-modern{grid-template-columns:1fr}.context-card-grid{grid-template-columns:1fr}}
 @media(max-width:560px){.portal-metric-grid.six{grid-template-columns:1fr}}
+
+.v8-super-metrics{grid-template-columns:repeat(4,minmax(0,1fr))}.v8-super-metrics .portal-metric{min-width:0}
+@media(max-width:1150px){.v8-super-metrics{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:800px){.v8-super-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:560px){.v8-super-metrics{grid-template-columns:1fr}}

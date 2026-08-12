@@ -27,6 +27,7 @@ const money = (value) =>
 export default function MemberDashboard() {
   const [d, setD] = useState(null);
   const [c, setC] = useState(null);
+  const [accounts, setAccounts] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
 
@@ -34,9 +35,10 @@ export default function MemberDashboard() {
     try {
       setLoading(true);
       setError("");
-      const [a, b] = await Promise.all([getMemberDashboard(), API.get("/member/community-stats")]);
+      const [a, b, accountResponse] = await Promise.all([getMemberDashboard(), API.get("/member/community-stats"), API.get(`/member/accounts?year=${new Date().getFullYear()}`)]);
       setD(a?.dashboard || {});
       setC(b.data?.stats || {});
+      setAccounts(accountResponse.data || null);
     } catch (x) {
       setError(x.response?.data?.message || x.message || "Unable to load your dashboard");
     } finally {
@@ -102,7 +104,7 @@ export default function MemberDashboard() {
           <article className="portal-panel member-personal-panel">
             <div className="panel-heading"><div><span className="panel-kicker">YOUR SPACE</span><h2>Your live activity</h2><p>Personal information only. Monthly income is not collected.</p></div></div>
             <div className="personal-signal-grid">{memberSignals.map(({label,value,icon:Icon}) => <div className="personal-signal" key={label}><div className="personal-icon"><Icon size={17} /></div><div><strong>{value}</strong><span>{label}</span></div></div>)}</div>
-            <div className="personal-total"><span>Total contributions</span><strong>{money(d?.statistics?.totalContributions)}</strong><small>Recorded contributions associated with your member account.</small></div>
+            <div className="personal-total"><span>Standard monthly payroll deduction</span><strong>{money(accounts?.standardMonthlyDeduction)}</strong><small>Scheme-wide amount currently scheduled for payroll deduction.</small></div>
           </article>
 
           <article className="portal-panel member-quick-panel">
@@ -110,7 +112,7 @@ export default function MemberDashboard() {
             <div className="member-quick-grid">
               <Quick to="/member/profile" title="Profile" text="Update your required information." icon={<UserRound />} />
               <Quick to="/member/dependents" title="Dependants" text="Manage your family records." icon={<Users />} />
-              <Quick to="/member/accounts" title="Accounts" text="See your contributions and ledger." icon={<WalletCards />} />
+              <Quick to="/member/accounts" title="Accounts" text="See the same scheme-wide accounts view shared by all members." icon={<WalletCards />} />
               <Quick to="/member/support" title="Support" text="Submit or follow a support request." icon={<HandHeart />} />
               <Quick to="/member/messages" title="Chat" text="Message members and leaders." icon={<MessageCircle />} />
               <Quick to="/member/notifications" title="Notifications" text="See your latest updates." icon={<Bell />} />

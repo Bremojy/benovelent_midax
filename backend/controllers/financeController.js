@@ -243,6 +243,11 @@ exports.updateTransaction = async (req, res) => {
 
         }
 
+        const linkedContribution = await Contribution.findOne({ finance: transaction._id });
+        if (linkedContribution && req.body.type && req.body.type !== "contribution") {
+            return res.status(400).json({ success: false, message: "Linked contribution transactions must remain type 'contribution'. Edit the amount/date/payment details instead." });
+        }
+
         const fields = [
             "type",
             "category",
@@ -275,6 +280,22 @@ exports.updateTransaction = async (req, res) => {
         }
 
         await transaction.save();
+
+        // A contribution finance transaction and its Contribution record are one accounting event.
+        if (transaction.type === "contribution") {
+            const linked = await Contribution.findOne({ finance: transaction._id });
+            if (linked) {
+                linked.member = transaction.member || linked.member;
+                linked.expectedAmount = Math.max(Number(linked.expectedAmount || 0), Number(transaction.amount || 0));
+                linked.paidAmount = Number(transaction.amount || 0);
+                linked.paymentMethod = transaction.paymentMethod;
+                linked.receiptNumber = transaction.receiptNumber || linked.receiptNumber;
+                linked.mpesaCode = transaction.referenceNumber || linked.mpesaCode;
+                linked.paymentDate = transaction.transactionDate;
+                linked.notes = transaction.notes || linked.notes;
+                await linked.save();
+            }
+        }
 
         res.json({
 
@@ -715,49 +736,103 @@ exports.getFinanceSummary = async (req, res) => {
 
 exports.getMemberAccounts = async (req, res) => {
   try {
-    const memberId = req.user._id;
     const year = Number(req.query.year) || new Date().getFullYear();
     const yearStart = new Date(`${year}-01-01T00:00:00.000Z`);
     const yearEnd = new Date(`${year + 1}-01-01T00:00:00.000Z`);
-    const [transactions, contributions, member, medical, funeral, education] = await Promise.all([
-      Finance.find({ member: memberId, transactionDate: { $gte: yearStart, $lt: yearEnd }, status: { $in: ["approved", "completed"] } }).sort({ transactionDate: -1, createdAt: -1 }).lean(),
-      Contribution.find({ member: memberId, year }).sort({ paymentDate: -1, year: -1, month: -1, createdAt: -1 }).lean(),
-      Member.findById(memberId).select("fullName memberNumber").lean(),
-      require("../models/MedicalSupport").find({ member: memberId }).select("status approvedAmount requestedAmount").lean(),
-      require("../models/FuneralSupport").find({ member: memberId }).select("status approvedAmount requestedAmount").lean(),
-      require("../models/EducationSupport").find({ member: memberId }).select("status approvedAmount requestedAmount").lean(),
+    const month = Number(req.query.month) || new Date().getMonth() + 1;
+
+    const [activeMembers, contributions, transactions, medical, funeral, education] = await Promise.all([
+      Member.countDocuments({ role: "member", status: "active", isDeleted: false }),
+      Contribution.find({ year }).sort({ year: -1, month: -1, paymentDate: -1, createdAt: -1 }).lean(),
+      Finance.find({ transactionDate: { $gte: yearStart, $lt: yearEnd }, status: { $in: ["approved", "completed"] } })
+        .sort({ transactionDate: -1, createdAt: -1 }).lean(),
+      require("../models/MedicalSupport").find({ isDeleted: { $ne: true } }).select("status approvedAmount requestedAmount").lean(),
+      require("../models/FuneralSupport").find({}).select("status approvedAmount requestedAmount").lean(),
+      require("../models/EducationSupport").find({}).select("status approvedAmount requestedAmount").lean(),
     ]);
-    const monthly = Array.from({length:12}, (_,i) => {
-      const month=i+1; const rows=contributions.filter(c=>Number(c.month)===month && Number(c.paidAmount||0)>0);
-      return {month, contributed:rows.reduce((a,c)=>a+Number(c.paidAmount||0),0), contributingMembers:rows.length > 0 ? 1 : 0};
+
+    const schemeContributions = contributions.filter((item) => Number(item.year) === year);
+    const totalExpected = schemeContributions.reduce((sum, item) => sum + Number(item.expectedAmount || 0), 0);
+    const totalCollected = schemeContributions.reduce((sum, item) => sum + Number(item.paidAmount || 0), 0);
+    const outstanding = schemeContributions.reduce((sum, item) => sum + Math.max(0, Number(item.expectedAmount || 0) - Number(item.paidAmount || 0)), 0);
+    const monthly = Array.from({ length: 12 }, (_, index) => {
+      const m = index + 1;
+      const rows = schemeContributions.filter((item) => Number(item.month) === m);
+      return {
+        month: m,
+        expected: rows.reduce((sum, item) => sum + Number(item.expectedAmount || 0), 0),
+        collected: rows.reduce((sum, item) => sum + Number(item.paidAmount || 0), 0),
+        outstanding: rows.reduce((sum, item) => sum + Math.max(0, Number(item.expectedAmount || 0) - Number(item.paidAmount || 0)), 0),
+        membersCharged: new Set(rows.map((item) => String(item.member))).size,
+      };
     });
-    const claims=[...medical,...funeral,...education];
-    const ledgerBalance=transactions.reduce((sum,t)=>sum + ((["contribution","income","refund"].includes(t.type))?Number(t.amount||0):-Number(t.amount||0)),0);
-    const supportCases = [
-      ...funeral.map((item) => ({
-        id: String(item._id),
-        supportType: "funeral",
-        status: item.status,
-        requestedAmount: Number(item.requestedAmount || 0),
-        approvedAmount: Number(item.approvedAmount || 0),
-      })),
-      ...medical.map((item) => ({
-        id: String(item._id),
-        supportType: "medical",
-        status: item.status,
-        requestedAmount: Number(item.requestedAmount || 0),
-        approvedAmount: Number(item.approvedAmount || 0),
-      })),
-      ...education.map((item) => ({
-        id: String(item._id),
-        supportType: "education",
-        status: item.status,
-        requestedAmount: Number(item.requestedAmount || 0),
-        approvedAmount: Number(item.approvedAmount || 0),
-      })),
-    ].sort((a, b) => String(b.id).localeCompare(String(a.id)));
-    const approvedSupportTotal = supportCases.reduce((sum, item) =>
-      sum + (["Approved","Paid","Disbursed","Completed","Closed"].includes(item.status) ? Number(item.approvedAmount || 0) : 0), 0);
-    res.json({success:true,member,year,transactions,monthly,supportCases,totals:{contributedThisYear:contributions.reduce((a,c)=>a+Number(c.paidAmount||0),0),ledgerBalance,totalCasesHelped:claims.filter(c=>["Approved","Paid","Disbursed","Completed","Closed"].includes(c.status)).length,pendingClaims:claims.filter(c=>["Pending","Under Review"].includes(c.status)).length,approvedSupportTotal}});
-  } catch(error){res.status(500).json({success:false,message:error.message});}
+
+    const currentMonthRows = schemeContributions.filter((item) => Number(item.month) === month);
+    const deductionCounts = currentMonthRows.reduce((map, item) => { const value = Number(item.expectedAmount || 0); if (value > 0) map.set(value, (map.get(value) || 0) + 1); return map; }, new Map());
+    const standardMonthlyDeduction = [...deductionCounts.entries()].sort((a, b) => b[1] - a[1] || b[0] - a[0])[0]?.[0] || 500;
+
+    const creditTypes = new Set(["contribution", "income", "refund"]);
+    let balance = 0;
+    const ledgerEntries = transactions.map((row) => {
+      const credit = creditTypes.has(row.type) ? Number(row.amount || 0) : 0;
+      const debit = credit ? 0 : Number(row.amount || 0);
+      balance += credit - debit;
+      return {
+        date: row.transactionDate || row.createdAt,
+        type: row.type,
+        category: row.category,
+        description: row.description,
+        amount: Number(row.amount || 0),
+        debit,
+        credit,
+        runningBalance: balance,
+      };
+    });
+
+    const supportRows = [...medical, ...funeral, ...education];
+    const approvedStatuses = new Set(["Approved", "Paid", "Disbursed", "Completed", "Closed"]);
+    const pendingStatuses = new Set(["Pending", "Under Review"]);
+    const approvedSupportTotal = supportRows.reduce((sum, item) => sum + (approvedStatuses.has(item.status) ? Number(item.approvedAmount || 0) : 0), 0);
+    const pendingSupportTotal = supportRows.filter((item) => pendingStatuses.has(item.status)).length;
+
+    return res.json({
+      success: true,
+      scope: "scheme-wide",
+      year,
+      month,
+      standardMonthlyDeduction,
+      activeMembers,
+      monthly,
+      totals: {
+        totalExpected,
+        totalCollected,
+        outstanding,
+        membersCharged: new Set(schemeContributions.map((item) => String(item.member))).size,
+        approvedSupportTotal,
+        pendingSupportCases: pendingSupportTotal,
+        ledgerBalance: balance,
+        ledgerCredits: ledgerEntries.reduce((sum, item) => sum + item.credit, 0),
+        ledgerDebits: ledgerEntries.reduce((sum, item) => sum + item.debit, 0),
+      },
+      ledger: {
+        entries: ledgerEntries.slice(0, 100),
+        totals: {
+          credit: ledgerEntries.reduce((sum, item) => sum + item.credit, 0),
+          debit: ledgerEntries.reduce((sum, item) => sum + item.debit, 0),
+          balance,
+        },
+      },
+      support: {
+        totalCases: supportRows.length,
+        approvedCases: supportRows.filter((item) => approvedStatuses.has(item.status)).length,
+        pendingCases: pendingSupportTotal,
+        approvedSupportTotal,
+      },
+      notice: "This member Accounts view is intentionally scheme-wide. Individual contribution amounts and personal finance records are not displayed to members.",
+    });
+  } catch (error) {
+    console.error("Scheme-wide member accounts error:", error);
+    res.status(500).json({ success: false, message: error.message || "Unable to load scheme accounts." });
+  }
 };
+

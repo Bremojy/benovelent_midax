@@ -14,7 +14,7 @@ export default function AdminSupport() {
   const [contactMessages, setContactMessages] = useState([]);
   const [supportRequests, setSupportRequests] = useState([]);
   const [form, setForm] = useState({ recipient: "", title: "", message: "" });
-  const [invite, setInvite] = useState({ memberNumber: "", fullName: "", username: "", phone: "", email: "", department: "", position: "", monthlyContribution: "" });
+  const [invite, setInvite] = useState({ memberNumber: "", fullName: "", username: "", phone: "", email: "", department: "", position: "",  });
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [inviting, setInviting] = useState(false);
@@ -147,7 +147,6 @@ export default function AdminSupport() {
         email: invite.email.trim(),
         department: invite.department.trim(),
         position: invite.position.trim(),
-        monthlyContribution: invite.monthlyContribution || 0,
       };
 
       const { data } = await createAdminMember(payload);
@@ -156,7 +155,7 @@ export default function AdminSupport() {
       const smsStatus = data?.delivery?.sms?.sent ? "sms sent" : data?.delivery?.sms?.reason ? `sms skipped (${data.delivery.sms.reason})` : "sms status unknown";
 
       setSuccess(`Member invited successfully. Temporary password: ${tempPassword}. Delivery: ${emailStatus}, ${smsStatus}.`);
-      setInvite({ memberNumber: "", fullName: "", username: "", phone: "", email: "", department: "", position: "", monthlyContribution: "" });
+      setInvite({ memberNumber: "", fullName: "", username: "", phone: "", email: "", department: "", position: "",  });
       await load();
     } catch (e) {
       setError(e.response?.data?.message || e.message || "Unable to create member invite.");
@@ -236,7 +235,6 @@ export default function AdminSupport() {
                 ["email", "Email"],
                 ["department", "Department"],
                 ["position", "Position"],
-                ["monthlyContribution", "Monthly Contribution"],
               ].map(([key, label]) => (
                 <div className="portal-field" key={key}>
                   <label>{label}</label>
@@ -244,7 +242,7 @@ export default function AdminSupport() {
                     value={invite[key]}
                     onChange={(e) => setInvite({ ...invite, [key]: e.target.value })}
                     placeholder={label}
-                    type={key === "email" ? "email" : key === "monthlyContribution" ? "number" : "text"}
+                    type={key === "email" ? "email" : "text"}
                   />
                 </div>
               ))}

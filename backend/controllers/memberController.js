@@ -78,31 +78,6 @@ exports.getDashboard = async (req, res) => {
         // CONTRIBUTIONS
         // ==========================================
 
-        const contributions =
-            await Contribution.find({
-
-                member:member._id
-
-            })
-            .sort({
-
-                year:-1,
-
-                month:-1
-
-            });
-
-        const totalContributions =
-            contributions.reduce(
-
-                (sum,item)=>
-
-                    sum + (item.paidAmount || 0),
-
-                0
-
-            );
-
         // ==========================================
         // DEPENDENTS
         // ==========================================
@@ -228,11 +203,6 @@ exports.getDashboard = async (req, res) => {
 
                 statistics:{
 
-                    totalContributions,
-
-                    monthlyContribution:
-                        member.monthlyContribution,
-
                     totalDependents,
 
                     verifiedDependents,
@@ -275,8 +245,6 @@ exports.getDashboard = async (req, res) => {
 
                 announcements,
 
-                recentContributions:
-                    contributions.slice(0,5)
 
             }
 
@@ -835,9 +803,6 @@ exports.getSummary = async (req, res) => {
 
                 phone:
                     member.phone,
-
-                contribution:
-                    member.monthlyContribution,
 
                 status:
                     member.status,

@@ -37,7 +37,7 @@ function ContributionCard({
 
                     <p>
 
-                        Your Benovelent Midax contributions
+                        Scheme-wide Benovelent MIDAX payroll contribution view
 
                     </p>
 
@@ -56,7 +56,7 @@ function ContributionCard({
 
                 <span>
 
-                    Monthly Contribution
+                    Standard Monthly Deduction
 
                 </span>
 
@@ -74,7 +74,7 @@ function ContributionCard({
 
                 <span>
 
-                    Total Contributions
+                    Scheme Contributions Collected
 
                 </span>
 

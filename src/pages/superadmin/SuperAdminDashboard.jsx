@@ -77,13 +77,14 @@ export default function SuperAdminDashboard() {
 
         {error && <div className="portal-alert"><ShieldAlert size={18} /> {error}</div>}
 
-        <section className="portal-metric-grid six">
+        <section className="portal-metric-grid v8-super-metrics">
           <Metric label="Members" value={overview?.members?.total ?? 0} caption={`${overview?.members?.online ?? 0} online`} icon={<Users />} />
           <Metric label="Support cases" value={overview?.support?.pending ?? 0} caption="pending" icon={<HandHeart />} tone="green" />
           <Metric label="Administrators" value={overview?.leadership?.administrators ?? statistics.total} caption={`${overview?.leadership?.activeAdministrators ?? statistics.active} active`} icon={<UserCog />} tone="violet" />
           <Metric label="Messages" value={overview?.communication?.messages ?? 0} caption={`${overview?.communication?.conversations ?? 0} conversations`} icon={<MessageCircle />} tone="blue" />
           <Metric label="Published news" value={overview?.content?.publishedNews ?? 0} caption="live content" icon={<Newspaper />} tone="rose" />
           <Metric label="Book balance" value={money(overview?.finance?.bookBalance)} caption="live finance snapshot" icon={<Wallet />} tone="amber" />
+          <Metric label="Contributions collected" value={money(overview?.finance?.contributionCollected)} caption={`${overview?.finance?.contributionMembersCharged ?? 0} members charged`} icon={<Wallet />} tone="green" />
         </section>
 
         <section className="portal-panel control-strip-v7">
@@ -92,7 +93,7 @@ export default function SuperAdminDashboard() {
             <Tool href="/superadmin/data-integrity" icon={<DatabaseZap />} title="Database integrity" text="Scan, review, clean and backup live data." />
             <Tool href="/superadmin/admins" icon={<UserCog />} title="Administrators" text="Manage roles, accounts and access." />
             <Tool href="/superadmin/members" icon={<Users />} title="Members" text="Inspect member identity and activity." />
-            <Tool href="/superadmin/accounts" icon={<Wallet />} title="Accounts & finance" text="View system-wide financial activity." />
+            <Tool href="/superadmin/accounts" icon={<Wallet />} title="Payroll & Accounts" text="Review the shared contribution run, scheme ledger and finance controls." />
             <Tool href="/superadmin/audit" icon={<ShieldCheck />} title="Audit logs" text="Trace important system actions." />
             <Tool href="/superadmin/settings" icon={<Gauge />} title="System settings" text="Control portal-wide configuration." />
           </div>

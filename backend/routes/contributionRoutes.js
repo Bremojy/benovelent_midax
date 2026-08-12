@@ -10,7 +10,8 @@ const {
     approveContribution,
     rejectContribution,
     getMemberContributions,
-    getContributionSummary
+    getContributionSummary,
+    createBulkContributionRun
 } = require("../controllers/contributionController");
 
 const { verifyToken: protect } = require("../middleware/authMiddleware");
@@ -26,6 +27,9 @@ router.post("/", protect, isAdminOrSuperAdmin, createContribution);
 // Get all contributions
 router.get("/", protect, isAdminOrSuperAdmin, getContributions);
 
+
+// Record the same monthly payroll deduction for all active members
+router.post("/bulk", protect, isAdminOrSuperAdmin, createBulkContributionRun);
 
 // Get all contributions for one member
 router.get("/member/:memberId", protect, getMemberContributions);
