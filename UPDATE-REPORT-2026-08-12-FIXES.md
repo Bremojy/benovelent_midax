@@ -1,31 +1,25 @@
-# Benovelent Midax – 2026-08-12 Fix & Audit Report
+# Benovelent Midax — Audit & Fixes — 12 Aug 2026
 
 ## Fixed
-- Fixed `SuperAdminDashboard.jsx` `ReferenceError: API is not defined` by importing the shared Axios API client.
-- Fixed PWA service-worker CacheStorage failures caused by HTTP `206 Partial Content` responses. Range/media requests now bypass caching, and only complete `200` responses are cached.
-- Prevented cache-write failures from becoming uncaught promise errors.
-- Kept the PWA custom installation prompt user-driven and cleared the prompt lifecycle after the user responds.
-- Consolidated chat page Socket.IO usage onto the existing resilient socket client instead of creating a second forced-WebSocket client.
-- Added a safe socket connection error handler so chat transport failures do not break normal HTTP dashboard functionality.
-- Added a SuperAdmin built-in website-experience feedback launcher with questions covering overall experience, requested features, exhausting/frustrating areas, and what is working well.
-- Built-in feedback can be submitted by authenticated users across member/admin/superadmin roles and prevents duplicate submissions per authenticated user.
-- Added mobile-only Back button to the feedback page.
-- Feedback cards use exactly two columns on desktop and one column on phone/tablet sizes.
-- Refined feedback header/actions for phone responsiveness.
-- Strengthened numeric form semantics for finance/support/monthly-income fields (`min`, `step`, `inputMode`) while keeping identifiers/reference fields as text because leading zeros/alphanumeric values are valid.
+- Admin member update no longer fails when optional `gender` / `maritalStatus` arrive as empty strings. The schema accepts an explicit blank state and the admin update path preserves the existing value when a blank value is submitted.
+- Removed personal member `monthlyIncome` collection from the member model and profile UI, removed the admin support display, and excluded the legacy field from member reads.
+- Added a SuperAdmin Data Integrity cleanup that unsets legacy `monthlyIncome` fields from existing Member documents without touching finance ledger `income` transactions.
+- News category handling now normalizes frontend values such as `event` / `announcement` to the schema's canonical values, preventing Mongoose enum 500 errors.
+- Feedback duplicate submission remains correctly protected with HTTP 409, but the member UI now presents a friendly already-submitted message.
+- Feedback admin/SuperAdmin responses were redesigned into modern response cards with respondent state, submission time, question labels, and readable answers instead of raw JSON blocks.
+- Feedback page now has visible Back and Home navigation controls.
+- Cookie consent was changed to a compact floating card instead of a wide page-spanning banner.
+- PWA install prompt was changed to a compact floating install card with a real install action and dismiss persistence.
+- Backend CORS was made explicit for the Benovelent Vercel frontend and local development origins.
+- Backend startup now binds the Render port before MongoDB connection completes and retries MongoDB connection, reducing Render 502/connection-closed behavior during cold starts or transient DB failures.
+- Education, funeral, and medical support document URLs now use the Cloudinary-aware stored-file resolver instead of hard-coded local `/uploads` paths.
+- Added `backend/.env.example` with the required CORS/Cloudinary/notification variables.
+- Existing live `.env` files from the supplied archive were excluded from the updated ZIP to avoid redistributing secrets.
 
-## API / backend validation
-- Backend JavaScript syntax check: PASS (`node --check` for all backend `.js` files outside `node_modules`).
-- Frontend files using `API` were scanned for missing imports: 31 JSX files use `API`, 0 missing imports after the fix.
-- Existing backend route families used by the frontend remain mounted in `backend/server.js`; no backend route files were removed.
+## Verification performed
+- Node syntax checks passed for all modified backend controllers/server.
+- Route inventory was compared against the frontend API service usage; the reported notification/news/feedback routes exist in the backend, with route-order conflicts checked for `public`/parameterized paths.
+- Cloudinary upload middleware and all identified support upload consumers were audited.
 
-## Build-note
-The uploaded dependency cache contains Vite/Rolldown packages without the Linux native optional binding required for the production build. Because reinstalling dependencies was not available in this execution environment, a full Vite production build could not be completed here. This is an environment/dependency-cache limitation, not a source-code build error observed from the uploaded code.
-
-Run locally before deployment:
-- `npm install`
-- `npm run build`
-- `cd backend && npm install`
-- `cd backend && npm start`
-
-The updated source ZIP excludes `node_modules`, `.git`, and the local `.env` file so secrets are not redistributed. `.env.example` is preserved.
+## Environment limitation
+The supplied environment has an invalid global npm registry configuration and dependency installation could not complete reliably, so a full Vite production build could not be executed in this container. The source was still statically audited and backend syntax-checked.

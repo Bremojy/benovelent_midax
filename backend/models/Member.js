@@ -158,7 +158,8 @@ sparse:true,
 
 gender: {
   type: String,
-  enum: ["Male", "Female", "Other"],
+  enum: ["", "Male", "Female", "Other"],
+  default: "",
 },
 
 dateOfBirth: {
@@ -167,7 +168,8 @@ dateOfBirth: {
 
 maritalStatus: {
   type: String,
-  enum: ["Single", "Married", "Divorced", "Widowed"],
+  enum: ["", "Single", "Married", "Divorced", "Widowed"],
+  default: "",
 },
 
 passportPhoto: {
@@ -236,10 +238,7 @@ employer: {
   trim: true,
 },
 
-monthlyIncome: {
-  type: Number,
-  default: 0,
-},
+// Monthly personal income is intentionally not collected or exposed.
 
 // =====================================
 // NEXT OF KIN

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, ExternalLink, MessageSquarePlus, Star, Trash2, Plus, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, ExternalLink, MessageSquarePlus, Star, Trash2, Plus, X, Home, UserRound, Clock3, MessageCircle } from "lucide-react";
 import { getFeedbackCollections, createFeedbackCollection, deleteFeedbackCollection, submitFeedback, getFeedbackResponses, createBuiltInFeedback } from "../services/feedbackService";
 import { useLocation, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
@@ -89,7 +89,7 @@ export default function Feedback() {
   const openResponses = async item => { try { const r = await getFeedbackResponses(item._id); setResponses(r.data.responses || []); setActive({ ...item, showResponses: true }); } catch { toast.error("Could not load responses"); } };
 
   return <div className="portal-page feedback-page">
-    <div className="feedback-mobile-back"><button type="button" className="feedback-back-button" onClick={() => navigate(-1)}><ChevronLeft size={18} /> Back</button></div>
+    <div className="feedback-mobile-back"><button type="button" className="feedback-back-button" onClick={() => navigate(-1)}><ChevronLeft size={18} /> Back</button><button type="button" className="feedback-home-button" onClick={() => navigate("/")}><Home size={17} /> Home</button></div>
     <div className="portal-module-header feedback-page-header"><div><span>COMMUNITY VOICE</span><h1>Feedback</h1><p>Share your experience, ideas and suggestions with the Benovelent Fund Scheme.</p></div>{isSuperAdmin && <button type="button" className="btn btn-primary" onClick={async () => { try { const r = await createBuiltInFeedback(); setItems(prev => prev.some(x => x._id === r.data.collection?._id) ? prev : [r.data.collection, ...prev]); toast.success(r.data.existing ? "Built-in feedback is already active." : "Built-in experience feedback launched for all users."); } catch (e) { toast.error(e.response?.data?.message || "Could not launch built-in feedback"); } }}><MessageSquarePlus size={16} /> Launch experience check-in</button>}</div>
     {canManage && <AdminComposer onCreated={c => setItems(prev => [c, ...prev])} />}
     {loading ? <div className="feedback-skeleton">Loading feedback…</div> : <div className="feedback-card-grid">{items.map(item => <article className="interactive-card feedback-card" key={item._id}>
@@ -107,6 +107,14 @@ export default function Feedback() {
       </div>
     </div>}
 
-    {active?.showResponses && <div className="feedback-modal-backdrop" onMouseDown={closeForm}><div className="feedback-modal" onMouseDown={e => e.stopPropagation()}><div className="portal-module-header"><h2>{active.title} responses</h2><button type="button" className="icon-btn" onClick={closeForm}><X /></button></div>{responses.length ? <div className="response-list">{responses.map(r => <pre key={r._id}>{JSON.stringify(r.answers, null, 2)}</pre>)}</div> : <p>No responses yet.</p>}</div></div>}
+    {active?.showResponses && <div className="feedback-modal-backdrop" onMouseDown={closeForm}>
+      <div className="feedback-modal feedback-responses-modal" onMouseDown={e => e.stopPropagation()}>
+        <div className="feedback-responses-head"><div><span>COLLECTED RESPONSES</span><h2>{active.title}</h2><p>{responses.length} response{responses.length === 1 ? "" : "s"} captured.</p></div><button type="button" className="icon-btn" onClick={closeForm}><X /></button></div>
+        {responses.length ? <div className="response-list">{responses.map((r, index) => { const answerEntries = Object.entries(r.answers || {}); return <article className="response-card" key={r._id || index}>
+          <div className="response-card-head"><div className="response-person"><span className="response-avatar"><UserRound size={17}/></span><div><strong>{r.anonymous ? "Anonymous response" : (r.member?.fullName || "Member response")}</strong><span>{r.member?.memberNumber || "Private member response"}</span></div></div><span className="response-time"><Clock3 size={14}/>{r.createdAt ? new Date(r.createdAt).toLocaleString() : "Submitted"}</span></div>
+          <div className="response-answer-list">{answerEntries.length ? answerEntries.map(([qid, value]) => { const question = (active.questions || []).find(q => q.id === qid); return <div className="response-answer" key={qid}><span className="response-question"><MessageCircle size={14}/>{question?.label || qid}</span><p>{Array.isArray(value) ? value.join(", ") : String(value ?? "—")}</p></div>; }) : <p className="response-empty">No answer data recorded.</p>}</div>
+        </article>; })}</div> : <div className="response-empty-state"><MessageCircle size={28}/><strong>No responses yet</strong><span>Member submissions will appear here in a clean, readable format.</span></div>}
+      </div>
+    </div>}
   </div>;
 }

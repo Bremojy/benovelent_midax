@@ -1,3 +1,4 @@
+const { resolveStoredFileUrl } = require("../utils/uploadUrl");
 // ======================================================
 // MEDICAL SUPPORT CONTROLLER
 // Benevolent Midax Management System
@@ -148,7 +149,7 @@ exports.createMedicalApplication = async (req, res) => {
 
         const uploadedDocuments = (req.files || []).map(file => ({
             fileName: file.originalname,
-            fileUrl: `/${req.uploadType === "documents" ? "documents" : "uploads/" + (req.uploadType || "support")}/${file.filename}`,
+            fileUrl: resolveStoredFileUrl(file, `/uploads/${req.uploadType || "support"}`),
             uploadedAt: new Date(),
         }));
 

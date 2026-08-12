@@ -51,7 +51,7 @@ exports.getDashboard = async (req, res) => {
 
         const member =
             await Member.findById(req.user._id)
-            .select("-password")
+            .select("-password -monthlyIncome")
             .lean();
 
         if (!member) {
@@ -297,7 +297,7 @@ exports.getProfile = async (req, res) => {
     try {
 
         const member = await Member.findById(req.user._id)
-            .select("-password")
+            .select("-password -monthlyIncome")
             .lean();
 
         if (!member) {
@@ -460,7 +460,6 @@ exports.updateProfile = async (req, res) => {
             "accountNumber",
             "occupation",
             "employer",
-            "monthlyIncome",
         ];
 
         const parseMaybeJson = (value) => {
@@ -498,8 +497,6 @@ exports.updateProfile = async (req, res) => {
                 field === "acceptedDeclaration"
             ) {
                 value = parseBoolean(value);
-            } else if (field === "monthlyIncome") {
-                value = value === "" ? 0 : Number(value) || 0;
             } else {
                 value = typeof value === "string" ? value.trim() : value;
                 if (field === "email" && !String(value || "").trim()) {
@@ -778,7 +775,7 @@ exports.getSummary = async (req, res) => {
 
         const member =
             await Member.findById(req.user._id)
-            .select("-password")
+            .select("-password -monthlyIncome")
             .lean();
 
         if (!member) {

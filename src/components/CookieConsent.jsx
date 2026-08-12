@@ -1,1 +1,18 @@
-import {useEffect,useState} from "react";import {Link} from "react-router-dom";export default function CookieConsent(){const[o,setO]=useState(false);useEffect(()=>setO(localStorage.getItem("benovelentPrivacyAccepted")!=="true"),[]);if(!o)return null;const accept=()=>{localStorage.setItem("benovelentPrivacyAccepted","true");setO(false)};return <div className="cookie-consent"><div><strong>Privacy & cookies</strong><p>We use essential browser storage to remember your privacy choice. Member information is protected and private access is restricted to authorised administrators.</p></div><div className="cookie-actions"><Link to="/privacy-policy">Read Privacy Policy</Link><button onClick={accept}>Accept</button></div></div>}
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import { Cookie, Check, X } from "lucide-react";
+
+export default function CookieConsent() {
+  const [open, setOpen] = useState(false);
+  useEffect(() => setOpen(localStorage.getItem("benovelentPrivacyAccepted") !== "true"), []);
+  if (!open) return null;
+  const dismiss = () => setOpen(false);
+  const accept = () => { localStorage.setItem("benovelentPrivacyAccepted", "true"); setOpen(false); };
+  return (
+    <aside className="cookie-consent" role="dialog" aria-label="Privacy and cookie notice">
+      <div className="cookie-icon"><Cookie size={17} /></div>
+      <div className="cookie-copy"><strong>Privacy & cookies</strong><span>Essential browser storage helps remember your privacy choice.</span><Link to="/privacy-policy">Privacy policy</Link></div>
+      <div className="cookie-actions"><button type="button" className="cookie-dismiss" onClick={dismiss} aria-label="Dismiss"><X size={16}/></button><button type="button" className="cookie-accept" onClick={accept}><Check size={15}/> Accept</button></div>
+    </aside>
+  );
+}

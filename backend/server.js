@@ -73,12 +73,24 @@ const dataIntegrityRoutes = require("./routes/dataIntegrityRoutes");
 
 app.disable("x-powered-by");
 
+const allowedOrigins = String(process.env.CORS_ORIGINS || "https://benovelent-midax.vercel.app,http://localhost:5173,http://127.0.0.1:5173")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
 app.use(
     cors({
-        origin: true,
+        origin(origin, callback) {
+            if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+            return callback(new Error("Origin not allowed by CORS."));
+        },
         credentials: true,
+        methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        allowedHeaders: ["Origin", "X-Requested-With", "Content-Type", "Accept", "Authorization"],
+        optionsSuccessStatus: 204,
     })
 );
+app.options(/.*/, cors());
 
 app.use(compression({ threshold: 1024 }));
 app.use(express.json({ limit: "10mb" }));
@@ -232,7 +244,7 @@ app.use(notFound);
 app.use(errorHandler);
 
 // ===============================================
-// DATABASE
+// DATABASE / SERVER STARTUP
 // ===============================================
 
 if (!process.env.MONGO_URI) {
@@ -240,36 +252,30 @@ if (!process.env.MONGO_URI) {
     process.exit(1);
 }
 
-mongoose
-    .connect(process.env.MONGO_URI, {
-        serverSelectionTimeoutMS: 15000,
-    })
-    .then(() => {
+const PORT = process.env.PORT || 5000;
 
-        console.log("======================================");
+server.listen(PORT, "0.0.0.0", () => {
+    console.log("======================================");
+    console.log(`🚀 Server Running on ${PORT}`);
+    console.log(`🔌 Socket.IO     : Enabled`);
+    console.log(`🛡 Environment   : ${process.env.NODE_ENV || "development"}`);
+    console.log("======================================");
+});
+
+let reconnectTimer;
+const connectDatabase = async () => {
+    try {
+        await mongoose.connect(process.env.MONGO_URI, { serverSelectionTimeoutMS: 15000 });
         console.log("✅ MongoDB Connected");
-        console.log("======================================");
+        if (reconnectTimer) { clearInterval(reconnectTimer); reconnectTimer = undefined; }
+    } catch (err) {
+        console.error("❌ MongoDB Connection Failed:", err.message);
+        if (!reconnectTimer) {
+            reconnectTimer = setInterval(() => {
+                connectDatabase().catch(() => {});
+            }, 15000);
+        }
+    }
+};
 
-        const PORT = process.env.PORT || 5000;
-
-        server.listen(PORT, "0.0.0.0", () => {
-
-            console.log("======================================");
-            console.log(`🚀 Server Running`);
-            console.log(`🌍 Port          : ${PORT}`);
-            console.log(`📁 Upload Folder : /uploads`);
-            console.log(`🔌 Socket.IO     : Enabled`);
-            console.log(`🛡 Environment   : ${process.env.NODE_ENV || "development"}`);
-            console.log("======================================");
-
-        });
-
-    })
-    .catch((err) => {
-
-        console.error("======================================");
-        console.error("❌ MongoDB Connection Failed");
-        console.error(err.message);
-        console.error("======================================");
-
-    });
+connectDatabase();

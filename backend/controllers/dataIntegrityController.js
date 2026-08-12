@@ -391,6 +391,16 @@ async function removeOrphans() {
     return { removedConversations, removedMessages };
 }
 
+async function removeLegacyMonthlyIncome() {
+    // Personal monthly income is no longer collected or exposed.
+    // Remove the legacy field from existing member documents without touching finance ledger income.
+    const result = await Member.updateMany(
+        { monthlyIncome: { $exists: true } },
+        { $unset: { monthlyIncome: 1 } }
+    );
+    return result.modifiedCount || 0;
+}
+
 async function removeDuplicateCarousels() {
     const slides = await Carousel.find({}).select("_id imageUrl title description createdAt updatedAt").lean();
     const groups = new Map();
@@ -541,6 +551,9 @@ exports.runSafeCleanup = async (req, res) => {
         }
         if (requested === "carousel" || requested === "safe" || requested === "all") {
             result.removedDuplicateCarousels = await removeDuplicateCarousels();
+        }
+        if (requested === "members" || requested === "safe" || requested === "all") {
+            result.removedLegacyMonthlyIncome = await removeLegacyMonthlyIncome();
         }
 
         const report = await buildReport();

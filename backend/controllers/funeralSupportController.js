@@ -1,3 +1,4 @@
+const { resolveStoredFileUrl } = require("../utils/uploadUrl");
 const FuneralSupport = require("../models/FuneralSupport");
 const Member = require("../models/Member");
 const Dependent = require("../models/Dependent");
@@ -75,7 +76,7 @@ exports.applyFuneralSupport = async (req, res) => {
         eligibility.member;
 
         const fileUrl = (file) =>
-            file ? `/${req.uploadType === "documents" ? "documents" : "uploads/" + (req.uploadType || "support")}/${file.filename}` : "";
+            resolveStoredFileUrl(file, `/uploads/${req.uploadType || "support"}`);
 
         const deathCertificateFile = req.files?.deathCertificate?.[0];
         const burialPermitFile = req.files?.burialPermit?.[0];

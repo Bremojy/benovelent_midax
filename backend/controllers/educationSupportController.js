@@ -1,3 +1,4 @@
+const { resolveStoredFileUrl } = require("../utils/uploadUrl");
 const EducationSupport = require("../models/EducationSupport");
 const Member = require("../models/Member");
 const Dependent = require("../models/Dependent");
@@ -144,11 +145,10 @@ exports.applyEducationSupport = async (req, res) => {
     }
 
     // =====================================
-    // LOCAL DOCUMENT UPLOADS
+    // PERSISTENT DOCUMENT UPLOADS
     // =====================================
 
-    const fileUrl = (file) =>
-      file ? `/${req.uploadType === "documents" ? "documents" : "uploads/" + (req.uploadType || "support")}/${file.filename}` : "";
+    const fileUrl = (file) => resolveStoredFileUrl(file, `/uploads/${req.uploadType || "support"}`);
 
     const feeStructureFile = req.files?.feeStructure?.[0];
     const admissionLetterFile = req.files?.admissionLetter?.[0];

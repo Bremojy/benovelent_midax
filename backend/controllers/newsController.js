@@ -3,6 +3,24 @@ const Member = require("../models/Member");
 const Notification = require("../models/Notification");
 const { notifyMembers } = require("../services/memberBroadcastService");
 
+const NEWS_CATEGORIES = new Map([
+    ["general", "General"],
+    ["announcement", "Announcement"],
+    ["finance", "Finance"],
+    ["contribution", "Contribution"],
+    ["meeting", "Meeting"],
+    ["event", "Event"],
+    ["emergency", "Emergency"],
+    ["election", "Election"],
+    ["poll", "Poll"],
+]);
+
+const normalizeNewsCategory = (value) => {
+    if (value === undefined || value === null || String(value).trim() === "") return "General";
+    const normalized = NEWS_CATEGORIES.get(String(value).trim().toLowerCase());
+    return normalized || String(value).trim();
+};
+
 /* =====================================================
    CREATE NEWS
 ===================================================== */
@@ -78,7 +96,7 @@ exports.createNews = async (req, res) => {
 
             content,
 
-            category,
+            category: normalizeNewsCategory(category),
 
             coverImage: fileUrl(coverFile) || coverImage || "",
 
@@ -203,7 +221,7 @@ exports.getAllNews = async (req, res) => {
 
         if (req.query.category) {
 
-            filter.category = req.query.category;
+            filter.category = normalizeNewsCategory(req.query.category);
 
         }
 
@@ -371,7 +389,7 @@ exports.updateNews = async (req, res) => {
             news.content = req.body.content;
 
         if (req.body.category !== undefined)
-            news.category = req.body.category;
+            news.category = normalizeNewsCategory(req.body.category);
 
         if (req.body.coverImage !== undefined)
             news.coverImage = req.body.coverImage;

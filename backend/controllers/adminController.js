@@ -114,7 +114,7 @@ exports.getMembers = async (req, res) => {
     const total = await Member.countDocuments(query);
 
     const members = await Member.find(query)
-      .select("-password")
+      .select("-password -monthlyIncome")
       .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
       .limit(limit)
@@ -147,7 +147,7 @@ exports.getMember = async (req, res) => {
     const member = await Member.findOne({
       _id: req.params.id,
       isDeleted: false,
-    }).select("-password");
+    }).select("-password -monthlyIncome");
 
     if (!member) {
       return res.status(404).json({
@@ -602,8 +602,10 @@ exports.updateMember = async (req, res) => {
     member.notes =
       req.body.notes ?? member.notes;
     member.nationalId = req.body.nationalId ?? member.nationalId;
-    member.gender = req.body.gender ?? member.gender;
-    member.maritalStatus = req.body.maritalStatus ?? member.maritalStatus;
+    const incomingGender = String(req.body.gender ?? "").trim();
+    if (incomingGender) member.gender = incomingGender;
+    const incomingMaritalStatus = String(req.body.maritalStatus ?? "").trim();
+    if (incomingMaritalStatus) member.maritalStatus = incomingMaritalStatus;
     member.dateOfBirth = req.body.dateOfBirth ?? member.dateOfBirth;
     member.physicalAddress = req.body.physicalAddress ?? member.physicalAddress;
 

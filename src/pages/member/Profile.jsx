@@ -20,7 +20,6 @@ const DEFAULT_MEMBER = {
   customSiteStation: "",
   occupation: "",
   employer: "",
-  monthlyIncome: "",
   mpesaNumber: "",
   bankName: "",
   bankBranch: "",
@@ -104,7 +103,6 @@ export default function Profile() {
         customSiteStation: member.customSiteStation || "",
         occupation: member.occupation || "",
         employer: member.employer || "",
-        monthlyIncome: member.monthlyIncome || "",
         mpesaNumber: member.mpesaNumber || "",
         bankName: member.bankName || "",
         bankBranch: member.bankBranch || "",
@@ -220,7 +218,6 @@ export default function Profile() {
               )}
               <Field label="Occupation" value={member.occupation} onChange={(v) => set("occupation", v)} />
               <Field label="Employer" value={member.employer} onChange={(v) => set("employer", v)} />
-              <Field label="Monthly income" type="number" inputMode="decimal" min="0" step="0.01" value={member.monthlyIncome} onChange={(v) => set("monthlyIncome", v)} />
               <Field label="M-Pesa number" value={member.mpesaNumber} onChange={(v) => set("mpesaNumber", v)} />
               <Field label="Bank name" value={member.bankName} onChange={(v) => set("bankName", v)} />
               <Field label="Bank branch" value={member.bankBranch} onChange={(v) => set("bankBranch", v)} />

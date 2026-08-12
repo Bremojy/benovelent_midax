@@ -1,62 +1,20 @@
 import { useEffect, useState } from "react";
 import { Download, X } from "lucide-react";
 
-/**
- * PWA installation helper.
- *
- * We intentionally do not cancel `beforeinstallprompt`. Cancelling the event
- * requires the page to later call event.prompt(); otherwise Chromium reports:
- * "Banner not shown: beforeinstallpromptevent.preventDefault() called."
- *
- * Leaving the event's default behavior intact allows the browser to manage its
- * native install UI. This component only shows a lightweight reminder when the
- * app is not already installed and the browser reports a PWA install state.
- */
 export default function InstallPWA() {
-  const [showHint, setShowHint] = useState(false);
-
+  const [show, setShow] = useState(false);
+  const [deferred, setDeferred] = useState(null);
   useEffect(() => {
-    const standalone = window.matchMedia?.("(display-mode: standalone)")?.matches;
-    const iosStandalone = window.navigator?.standalone === true;
-    if (standalone || iosStandalone) return undefined;
-
-    const handleInstalled = () => setShowHint(false);
-    const handleBeforeInstallPrompt = () => {
-      // Do not call preventDefault() or store the event for a delayed prompt.
-      // Chromium can therefore use its own native install UI without warnings.
-      setShowHint(true);
-    };
-
-    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
-    window.addEventListener("appinstalled", handleInstalled);
-
-    return () => {
-      window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
-      window.removeEventListener("appinstalled", handleInstalled);
-    };
+    const standalone = window.matchMedia?.("(display-mode: standalone)")?.matches || window.navigator?.standalone === true;
+    if (standalone || localStorage.getItem("benovelentPwaDismissed") === "true") return;
+    const onPrompt = (event) => { event.preventDefault(); setDeferred(event); setShow(true); };
+    const onInstalled = () => { setDeferred(null); setShow(false); };
+    window.addEventListener("beforeinstallprompt", onPrompt);
+    window.addEventListener("appinstalled", onInstalled);
+    return () => { window.removeEventListener("beforeinstallprompt", onPrompt); window.removeEventListener("appinstalled", onInstalled); };
   }, []);
-
-  if (!showHint) return null;
-
-  return (
-    <div className="pwa-install-banner" role="status" aria-live="polite">
-      <div>
-        <strong>Install Benevolent</strong>
-        <span>
-          Your browser can install Benevolent as an app. Use your browser's
-          install option when it appears in the address bar or menu.
-        </span>
-      </div>
-      <div className="pwa-install-actions">
-        <button
-          type="button"
-          className="icon-btn"
-          aria-label="Dismiss installation reminder"
-          onClick={() => setShowHint(false)}
-        >
-          <X size={16} />
-        </button>
-      </div>
-    </div>
-  );
+  if (!show) return null;
+  const install = async () => { if (!deferred) return; await deferred.prompt(); try { await deferred.userChoice; } catch {} setDeferred(null); setShow(false); };
+  const dismiss = () => { localStorage.setItem("benovelentPwaDismissed", "true"); setShow(false); };
+  return <aside className="pwa-install-banner" role="status" aria-live="polite"><div className="pwa-install-icon"><Download size={17}/></div><div className="pwa-install-copy"><strong>Install Benevolent</strong><span>Use the portal like an app.</span></div><div className="pwa-install-actions"><button type="button" className="pwa-install-now" onClick={install}>Install</button><button type="button" className="pwa-install-close" onClick={dismiss} aria-label="Dismiss"><X size={15}/></button></div></aside>;
 }
