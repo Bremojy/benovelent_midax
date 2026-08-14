@@ -138,6 +138,7 @@ function MessageCenterPage({
         callType: payload.callType === "video" ? "video" : "audio",
         callId: payload.callId || "",
         callerUserId: payload.callerUserId || "",
+        role: currentUser?.role || authUser?.role || "member",
       });
       const currentPeople = peopleRef.current || [];
       const currentConversation = selectedConversationRef.current;

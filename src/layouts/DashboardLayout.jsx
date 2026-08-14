@@ -20,7 +20,7 @@ function DashboardLayout({ children }) {
   }, [role, user?.role]);
 
   const isDashboardHome = location.pathname === basePath || location.pathname === `${basePath}/`;
-  const mobileSubpage = isMobile && !isDashboardHome;
+  const mobileSubpage = false;
 
   useEffect(() => {
     const resize = () => {
@@ -34,9 +34,9 @@ function DashboardLayout({ children }) {
   }, []);
 
   useEffect(() => {
-    if (!isMobile) return;
-    setSidebarOpen(isDashboardHome);
-  }, [isMobile, isDashboardHome]);
+    if (!isMobile) { setSidebarOpen(true); return; }
+    setSidebarOpen(true);
+  }, [isMobile]);
 
   const goHome = () => navigate(basePath);
 
@@ -46,7 +46,7 @@ function DashboardLayout({ children }) {
         role={role}
         sidebarOpen={sidebarOpen}
         setSidebarOpen={setSidebarOpen}
-        mobileHidden={mobileSubpage}
+        mobileHidden={false}
       />
       <div className={`dashboard-main ${mobileSubpage ? "mobile-fullscreen" : ""}`}>
         <DashboardTopbar
@@ -56,10 +56,10 @@ function DashboardLayout({ children }) {
           setSidebarOpen={setSidebarOpen}
           onLogout={logout}
           homePath={basePath}
-          showHomeBack={mobileSubpage}
+          showHomeBack={false}
           onHomeBack={goHome}
         />
-        <main className={`dashboard-content ${mobileSubpage ? "mobile-fullscreen" : ""}`}>
+        <main className="dashboard-content">
           <div className="dashboard-page">{children}</div>
         </main>
       </div>

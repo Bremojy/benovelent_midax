@@ -9,6 +9,7 @@ import {
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { HeartPulse } from "lucide-react";
+import { unlockCallAudio } from "./utils/callTone";
 
 import ScrollToTop from "./components/ScrollToTop";
 
@@ -256,7 +257,7 @@ function PageCutTransition() {
     }
 
     setActive(true);
-    const timer = window.setTimeout(() => setActive(false), 3200);
+    const timer = window.setTimeout(() => setActive(false), 2000);
     return () => window.clearTimeout(timer);
   }, [location.pathname, location.search]);
 
@@ -301,6 +302,7 @@ function PublicNavbar() {
 // =====================================================
 
 function AppContent() {
+  useEffect(() => { unlockCallAudio(); }, []);
   const location = useLocation();
 
   const dashboardRoute =

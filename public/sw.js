@@ -1,4 +1,4 @@
-const CACHE = "benovelent-shell-v14";
+const CACHE = "benovelent-shell-v15";
 const ASSETS = ["/", "/index.html", "/manifest.webmanifest", "/pwa-icon-192.png", "/pwa-icon-512.png", "/apple-touch-icon.png"];
 const DB_NAME = "benovelent-pwa";
 const DB_STORE = "calls";
@@ -66,6 +66,8 @@ self.addEventListener("push", (event) => {
 
   event.waitUntil((async () => {
     if (isIncomingCall) {
+      const openClients = await clients.matchAll({ type: "window", includeUncontrolled: true });
+      await Promise.all(openClients.map((client) => client.postMessage({ type: "BENOVELENT_INCOMING_CALL", payload })));
       const callId = String(payload?.data?.callId || `call-${Date.now()}`);
       const incomingPayload = payload?.data?.incomingPayload || {};
       const callData = {

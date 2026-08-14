@@ -129,17 +129,6 @@ html[data-appearance="dark"] .settings-field textarea{
 
 
 @media (max-width: 900px) {
-  .dashboard-main.mobile-fullscreen {
-    padding-bottom: 0;
-  }
-
-  .dashboard-content.mobile-fullscreen {
-    padding-bottom: 24px;
-  }
-
-  .dashboard-container.dashboard-mobile-subpage .dashboard-content {
-    padding-top: 12px;
-  }
 }
 
 

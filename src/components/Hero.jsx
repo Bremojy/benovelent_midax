@@ -10,15 +10,12 @@ import {
 } from "lucide-react";
 import api, { resolveUploadUrl } from "../services/api";
 
-const FALLBACK_SLIDE = {
-  _id: "welcome-fallback",
-  imageUrl: "/hero.jpg",
-  title: "Standing Together. Supporting One Another.",
-  description:
-    "A welcoming community built around compassion, dignity and practical support for members and their families.",
-  buttonText: "Discover More",
-  buttonLink: "/about",
-};
+const FALLBACK_SLIDES = [
+  { _id: "welcome-fallback", imageUrl: "/hero.jpg", title: "Standing Together. Supporting One Another.", description: "A welcoming community built around compassion, dignity and practical support for members and their families.", buttonText: "Discover More", buttonLink: "/about" },
+  { _id: "community-fallback", imageUrl: "/about-welcome.svg", title: "Community, Compassion & Support", description: "Stay connected to the people, services and leadership that keep Benevolent MIDAX moving together.", buttonText: "Explore Services", buttonLink: "/services" },
+  { _id: "news-fallback", imageUrl: "/news-placeholder.svg", title: "Stay Informed", description: "Follow announcements, polls and community updates from Benevolent MIDAX.", buttonText: "Read News", buttonLink: "/news" },
+  { _id: "gallery-fallback", imageUrl: "/gallery-placeholder.svg", title: "Our Community in Focus", description: "Discover the people and moments that make our community stronger.", buttonText: "View Gallery", buttonLink: "/gallery" },
+];
 
 function Hero() {
   const [slides, setSlides] = useState([]);
@@ -26,33 +23,39 @@ function Hero() {
   const [loading, setLoading] = useState(true);
   const [paused, setPaused] = useState(false);
   const [imageFailed, setImageFailed] = useState(false);
+  const [fetchAttempt, setFetchAttempt] = useState(0);
   const touchStart = useRef(null);
 
-  const fetchSlides = async () => {
-    try {
-      const response = await api.get("/carousel/active", {
-        params: { _ts: Date.now() },
-      });
-
-      const freshSlides = Array.isArray(response.data)
-        ? response.data.filter((slide) => slide?.imageUrl)
-        : [];
-
-      setSlides(freshSlides);
-      setCurrentSlide(0);
-    } catch (error) {
-      console.error("Failed to load carousel:", error);
-      setSlides([]);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   useEffect(() => {
-    fetchSlides();
+    let cancelled = false;
+    const run = async () => {
+      try {
+        setLoading(true);
+        const response = await api.get("/carousel/active", { params: { _ts: Date.now(), attempt: fetchAttempt } });
+        if (cancelled) return;
+        const freshSlides = Array.isArray(response.data) ? response.data.filter((slide) => slide?.imageUrl && slide?.isActive !== false) : [];
+        setSlides(freshSlides);
+        setCurrentSlide((index) => Math.min(index, Math.max(0, freshSlides.length - 1)));
+      } catch (error) {
+        if (!cancelled) {
+          console.error("Failed to load carousel:", error);
+          setSlides([]);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    run();
+    return () => { cancelled = true; };
+  }, [fetchAttempt]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setFetchAttempt((value) => value + 1), 2500);
+    return () => window.clearTimeout(timer);
   }, []);
 
-  const visibleSlides = slides.length ? slides : [FALLBACK_SLIDE];
+  const visibleSlides = slides.length ? slides : FALLBACK_SLIDES;
   const current = visibleSlides[currentSlide] || visibleSlides[0];
 
   useEffect(() => {
@@ -132,18 +135,18 @@ function Hero() {
 
           <p className="hero-label">COMMUNITY · COMPASSION · SUPPORT</p>
 
-          <h1>{current?.title || FALLBACK_SLIDE.title}</h1>
+          <h1>{current?.title || FALLBACK_SLIDES[0].title}</h1>
 
           <p className="hero-description">
-            {current?.description || FALLBACK_SLIDE.description}
+            {current?.description || FALLBACK_SLIDES[0].description}
           </p>
 
           <div className="hero-buttons">
             <Link
-              to={current?.buttonLink || "/about"}
+              to={current?.buttonLink || FALLBACK_SLIDES[0].buttonLink}
               className="primary-button modern-primary-button"
             >
-              {current?.buttonText || "Discover More"}
+              {current?.buttonText || FALLBACK_SLIDES[0].buttonText}
               <ArrowRight size={19} />
             </Link>
             <Link to="/contact" className="secondary-button modern-secondary-button">
