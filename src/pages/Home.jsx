@@ -1,6 +1,6 @@
 
 import { Link } from "react-router-dom";
-import { Heart, Stethoscope, MessageCircle, FileText, Users, Images, ArrowRight, ShieldCheck, Wallet, Bell, Sparkles } from "lucide-react";
+import { Heart, Stethoscope, MessageCircle, FileText, Users, Images, ArrowRight, ShieldCheck, Wallet, Bell, Sparkles, ClipboardCheck, Smartphone, Headphones, CheckCircle2 } from "lucide-react";
 import Hero from "../components/Hero";
 import "../styles/public-modern.css";
 
@@ -51,6 +51,20 @@ export default function Home() {
           </div>
         </section>
 
+        <section className="modern-section v3-experience-section">
+          <div className="modern-section-head">
+            <span className="eyebrow">DIGITAL EXPERIENCE</span>
+            <h2>Everything important, in one member space.</h2>
+            <p>Inspired by modern member-service portals, Benovelent MIDAX keeps key actions, updates and help close to the member without turning the site into a financial-banking clone.</p>
+          </div>
+          <div className="modern-card-grid four-v3">
+            <Card icon={ClipboardCheck} title="Track support" text="Follow submitted support requests from your authenticated portal." />
+            <Card icon={Smartphone} title="Mobile-ready" text="Install the portal as a PWA and keep important communication close at hand." />
+            <Card icon={Headphones} title="Guided help" text="Use the MIDAX Assistant for published website and portal guidance." />
+            <Card icon={CheckCircle2} title="Clear accountability" text="Use the Constitution and published updates as the source of truth for scheme procedures." />
+          </div>
+        </section>
+
         <section className="modern-section">
           <div className="modern-section-head">
             <span className="eyebrow">LEADERSHIP</span>
@@ -62,6 +76,21 @@ export default function Home() {
             <Card title="Secretary seat — coming soon" text="Open for all members" />
           </div>
           <Link className="modern-btn-secondary" to="/leaders">See all leaders</Link>
+        </section>
+
+        <section className="modern-section v3-portal-cta">
+          <div className="portal-cta-copy">
+            <span className="eyebrow">MEMBER PORTAL</span>
+            <h2>Need a faster way to your member tools?</h2>
+            <p>Sign in to chat privately, view contributions, manage dependants, follow support requests, receive updates and take part in polls.</p>
+            <Link className="modern-btn" to="/login"><ShieldCheck size={17} /> Open the portal <ArrowRight size={17} /></Link>
+          </div>
+          <div className="portal-cta-grid">
+            <div><MessageCircle size={21}/><strong>Chat</strong><span>Members & leaders</span></div>
+            <div><Bell size={21}/><strong>Notifications</strong><span>Stay up to date</span></div>
+            <div><Wallet size={21}/><strong>Accounts</strong><span>Contribution records</span></div>
+            <div><HelpIcon/><strong>Assistant</strong><span>Quick guidance</span></div>
+          </div>
         </section>
 
         <div className="quick-pop modern-quick-pop">
@@ -85,3 +114,5 @@ function Quick({ icon: Icon, title, text, to }) {
 function Chip({ icon: Icon, title, text }) {
   return <div className="trust-chip"><Icon size={19} /><strong>{title}</strong><span>{text}</span></div>;
 }
+
+function HelpIcon() { return <MessageCircle size={21} />; }

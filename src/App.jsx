@@ -8,7 +8,7 @@ import {
 
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Scissors } from "lucide-react";
+import { HeartPulse } from "lucide-react";
 
 import ScrollToTop from "./components/ScrollToTop";
 
@@ -21,6 +21,7 @@ import ThemeBootstrap from "./components/ThemeBootstrap";
 import CookieConsent from "./components/CookieConsent";
 import GlobalMotion from "./components/GlobalMotion";
 import InstallPWA from "./components/InstallPWA";
+import SmartAssistant from "./components/SmartAssistant";
 
 import "./App.css";
 import "./styles/interaction-system.css";
@@ -262,16 +263,16 @@ function PageCutTransition() {
   if (!active) return null;
 
   return (
-    <div className="page-cut-transition" aria-hidden="true">
-      <div className="page-cut-backdrop" />
-      <div className="page-cut-track page-cut-track-one" />
-      <div className="page-cut-track page-cut-track-two" />
-      <div className="page-cut-spark page-cut-spark-one" />
-      <div className="page-cut-spark page-cut-spark-two" />
-      <div className="page-cut-scissors">
-        <Scissors size={38} strokeWidth={2.2} />
+    <div className="page-pulse-transition" aria-hidden="true">
+      <div className="page-pulse-backdrop" />
+      <div className="page-pulse-ring page-pulse-ring-one" />
+      <div className="page-pulse-ring page-pulse-ring-two" />
+      <div className="page-pulse-spark page-pulse-spark-one" />
+      <div className="page-pulse-spark page-pulse-spark-two" />
+      <div className="page-pulse-core">
+        <HeartPulse size={34} strokeWidth={2.1} />
       </div>
-      <span className="page-cut-label">Cutting to the next page…</span>
+      <span className="page-pulse-label">Moving with the community…</span>
     </div>
   );
 }
@@ -321,6 +322,7 @@ function AppContent() {
       <PublicNavbar />
       <CookieConsent />
       <InstallPWA />
+      {!isLogin && <SmartAssistant />}
 
       <Suspense
         fallback={<LoadingScreen />}

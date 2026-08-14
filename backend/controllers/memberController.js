@@ -1323,7 +1323,7 @@ exports.getChatMembers = async (req, res) => {
         const actorPortalId = String(req.user?._id || req.auth?.id || "").trim();
         const actorChatId = String(req.auth?.chatId || req.user?.chatMemberId || currentUserId || "").trim();
         const actorEmail = String(req.user?.email || "").trim().toLowerCase();
-        const actorPhone = String(req.user?.phone || "").replace(/\D/g, "");
+        const actorPhone = String(req.user?.phone || req.user?.mobile || req.user?.telephone || "").replace(/\D/g, "");
         const actorExclusionIds = [currentUserId, actorChatId, actorPortalId].filter(Boolean);
 
         const memberFilter = {
@@ -1356,6 +1356,12 @@ exports.getChatMembers = async (req, res) => {
             status: { $ne: "deleted" },
             _id: { $nin: actorExclusionIds },
         };
+        if (elevated) {
+            if (department && department !== "all") adminFilter.department = department;
+            if (position && position !== "all") adminFilter.position = position;
+            if (status && status !== "all") adminFilter.status = status;
+            if (online === "true" || online === "false") adminFilter.online = online === "true";
+        }
 
         if (keyword) {
             memberFilter.$or = [
@@ -1373,6 +1379,17 @@ exports.getChatMembers = async (req, res) => {
                 { email: { $regex: keyword, $options: "i" } },
                 { phone: { $regex: keyword, $options: "i" } },
                 { position: { $regex: keyword, $options: "i" } },
+            ];
+        }
+
+        if (actorEmail || actorPhone) {
+            adminFilter.$and = [
+                { $nor: [
+                    ...(actorEmail ? [{ email: actorEmail }] : []),
+                    ...(actorPhone ? [{ phone: { $regex: actorPhone.slice(-9) + "$" } }] : []),
+                    ...(actorPortalId ? [{ portalOwnerId: actorPortalId }] : []),
+                ] },
+                ...(adminFilter.$and || []),
             ];
         }
 

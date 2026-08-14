@@ -458,13 +458,14 @@ function MessageCenterPage({
                     }}
                   >
                     <option value="">Select from dropdown</option>
-                    {normalizedConversations.map((conversation) => (
+                    {normalizedConversations.filter((conversation) => !isSameUser(buildActorProfile(conversation.partner), actor)).map((conversation) => (
                       <option key={conversation._id} value={conversation.partner?._id || conversation._id}>
                         {formatDisplayName(conversation.partner)}
                         {conversation.lastMessageText ? ` • ${truncateText(conversation.lastMessageText, 42)}` : ""}
                       </option>
                     ))}
                     {normalizedPeople
+                      .filter((person) => !isSameUser(buildActorProfile(person), actor))
                       .filter((person) => !normalizedConversations.some((conversation) => String(conversation.partner?._id) === String(person._id)))
                       .map((person) => (
                         <option key={person._id} value={person._id}>
