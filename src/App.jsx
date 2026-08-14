@@ -6,8 +6,9 @@ import {
   useLocation,
 } from "react-router-dom";
 
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { Scissors } from "lucide-react";
 
 import ScrollToTop from "./components/ScrollToTop";
 
@@ -232,6 +233,49 @@ function LoadingScreen() {
 // PUBLIC NAVBAR
 // =====================================================
 
+
+function PageCutTransition() {
+  const location = useLocation();
+  const firstRender = useRef(true);
+  const [active, setActive] = useState(false);
+
+  useEffect(() => {
+    if (firstRender.current) {
+      firstRender.current = false;
+      return undefined;
+    }
+
+    const reducedMotion =
+      typeof window !== "undefined" &&
+      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+
+    if (reducedMotion) {
+      setActive(false);
+      return undefined;
+    }
+
+    setActive(true);
+    const timer = window.setTimeout(() => setActive(false), 3200);
+    return () => window.clearTimeout(timer);
+  }, [location.pathname, location.search]);
+
+  if (!active) return null;
+
+  return (
+    <div className="page-cut-transition" aria-hidden="true">
+      <div className="page-cut-backdrop" />
+      <div className="page-cut-track page-cut-track-one" />
+      <div className="page-cut-track page-cut-track-two" />
+      <div className="page-cut-spark page-cut-spark-one" />
+      <div className="page-cut-spark page-cut-spark-two" />
+      <div className="page-cut-scissors">
+        <Scissors size={38} strokeWidth={2.2} />
+      </div>
+      <span className="page-cut-label">Cutting to the next page…</span>
+    </div>
+  );
+}
+
 function PublicNavbar() {
   const location = useLocation();
 
@@ -271,6 +315,7 @@ function AppContent() {
 
   return (
     <>
+      <PageCutTransition />
       <ThemeBootstrap />
       <GlobalMotion />
       <PublicNavbar />

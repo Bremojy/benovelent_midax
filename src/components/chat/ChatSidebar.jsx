@@ -235,7 +235,13 @@ function Avatar({ user, isOnline }) {
   );
 }
 
-function hasActiveFilters(filters = {}) {\n  return Object.values(filters).some((value) => value && value !== "all");\n}\n\nfunction isLeader(role) {
+function hasActiveFilters(filters = {}) {
+  return Object.values(filters).some(
+    (value) => value && value !== "all"
+  );
+}
+
+function isLeader(role) {
   return ["admin"].includes(String(role || "").toLowerCase());
 }
 
