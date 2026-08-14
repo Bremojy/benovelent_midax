@@ -81,6 +81,16 @@ const allowedOrigins = String(process.env.CORS_ORIGINS || "https://benovelent-mi
 const corsOptions = {
     origin(origin, callback) {
         if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+
+        // Permit Vercel preview deployments for this project while keeping
+        // arbitrary origins blocked.
+        try {
+            const hostname = new URL(origin).hostname;
+            if (/^benovelent-midax(?:-[a-z0-9-]+)?\.vercel\.app$/i.test(hostname)) {
+                return callback(null, true);
+            }
+        } catch (_) {}
+
         return callback(new Error("Origin not allowed by CORS."));
     },
     credentials: true,
@@ -174,12 +184,14 @@ app.get("/api/health", (req, res) => {
                     ? "disconnecting"
                     : "disconnected";
 
-    res.status(200).json({
-        success: true,
+    const healthy = readyState === 1;
+    res.status(healthy ? 200 : 503).json({
+        success: healthy,
         application: "Benevolent Midax API",
-        status: "Running",
+        status: healthy ? "healthy" : "degraded",
         database,
         environment: process.env.NODE_ENV || "development",
+        version: process.env.APP_VERSION || "updated1",
         timestamp: new Date().toISOString(),
     });
 });

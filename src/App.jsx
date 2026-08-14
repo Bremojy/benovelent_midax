@@ -8,7 +8,7 @@ import {
 
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { HeartPulse } from "lucide-react";
+import { Scissors } from "lucide-react";
 import { unlockCallAudio } from "./utils/callTone";
 
 import ScrollToTop from "./components/ScrollToTop";
@@ -26,6 +26,7 @@ import SmartAssistant from "./components/SmartAssistant";
 
 import "./App.css";
 import "./styles/interaction-system.css";
+import "./styles/updated1.css";
 
 // =====================================================
 // PUBLIC PAGES
@@ -257,7 +258,7 @@ function PageCutTransition() {
     }
 
     setActive(true);
-    const timer = window.setTimeout(() => setActive(false), 2000);
+    const timer = window.setTimeout(() => setActive(false), 3000);
     return () => window.clearTimeout(timer);
   }, [location.pathname, location.search]);
 
@@ -271,9 +272,9 @@ function PageCutTransition() {
       <div className="page-pulse-spark page-pulse-spark-one" />
       <div className="page-pulse-spark page-pulse-spark-two" />
       <div className="page-pulse-core">
-        <HeartPulse size={34} strokeWidth={2.1} />
+        <Scissors size={34} strokeWidth={2.1} />
       </div>
-      <span className="page-pulse-label">Moving with the community…</span>
+      <span className="page-pulse-label">Cutting to the next page…</span>
     </div>
   );
 }
