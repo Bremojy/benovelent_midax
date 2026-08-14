@@ -17,6 +17,10 @@ function ChatSidebar({
   emptyMembersLabel = "No people found",
   memberSectionLabel = "All people",
   conversationSectionLabel = "Recent chats",
+  showMemberFilters = false,
+  filterOptions = {},
+  filters = {},
+  setFilters,
 }) {
   const filteredMembers = useMemo(() => {
     const keyword = String(search || "").trim().toLowerCase();
@@ -74,6 +78,33 @@ function ChatSidebar({
           />
         </div>
       </div>
+
+
+      {showMemberFilters && (
+        <div className="chat-filters" aria-label="Member filters">
+          <select value={filters.siteStation || "all"} onChange={(e) => setFilters?.((p) => ({ ...p, siteStation: e.target.value }))}>
+            <option value="all">All site stations</option>
+            {(filterOptions.siteStation || []).map((value) => <option key={`station-${value}`} value={value}>{value}</option>)}
+          </select>
+          <select value={filters.department || "all"} onChange={(e) => setFilters?.((p) => ({ ...p, department: e.target.value }))}>
+            <option value="all">All departments</option>
+            {(filterOptions.department || []).map((value) => <option key={`dept-${value}`} value={value}>{value}</option>)}
+          </select>
+          <select value={filters.position || "all"} onChange={(e) => setFilters?.((p) => ({ ...p, position: e.target.value }))}>
+            <option value="all">All positions</option>
+            {(filterOptions.position || []).map((value) => <option key={`pos-${value}`} value={value}>{value}</option>)}
+          </select>
+          <select value={filters.status || "all"} onChange={(e) => setFilters?.((p) => ({ ...p, status: e.target.value }))}>
+            <option value="all">All statuses</option>
+            {(filterOptions.status || []).map((value) => <option key={`status-${value}`} value={value}>{value}</option>)}
+          </select>
+          <select value={filters.online || "all"} onChange={(e) => setFilters?.((p) => ({ ...p, online: e.target.value }))}>
+            <option value="all">Any presence</option>
+            <option value="true">Online now</option>
+            <option value="false">Offline</option>
+          </select>
+        </div>
+      )}
 
       <div className="chat-directory-summary">
         <div><strong>{leaders.length}</strong><span>Leaders</span></div>

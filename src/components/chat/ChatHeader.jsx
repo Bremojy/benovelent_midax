@@ -35,13 +35,14 @@ function ChatHeader({ conversation, partner, typingUser, onAudioCall, onVideoCal
           {user.online && <span className="online-indicator" />}
         </div>
 
-        <div className="chat-user-info">
+        <div className="chat-user-info" title={`${user.fullName || "Member"}${user.email ? ` • ${user.email}` : ""}`}>
           <div className="chat-name-row">
             <h3>{user.fullName || "Member"}</h3>
             {user.verified ? <BadgeCheck size={16} className="verified-dot" /> : null}
             {role ? <span className="role-chip">{role}</span> : null}
           </div>
           {typingUser ? <p className="typing-status">Typing...</p> : <p>{user.online ? "Online now" : user.lastSeen ? `Last seen ${formatLastSeen(user.lastSeen)}` : "Offline"}</p>}
+          {user.siteStation ? <span className="chat-profile-meta">{user.siteStation}{user.department ? ` • ${user.department}` : ""}</span> : null}
         </div>
       </div>
 

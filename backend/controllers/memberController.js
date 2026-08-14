@@ -1308,12 +1308,28 @@ exports.getChatMembers = async (req, res) => {
     try {
         const currentUserId = String(req.auth?.chatId || req.user?.chatMemberId || req.user?._id || req.user?.id || "").trim();
         const keyword = String(req.query.search || "").trim().toLowerCase();
-        const limit = Number(req.query.limit || 500);
+        const limit = Math.min(Math.max(Number(req.query.limit || 500), 1), 1000);
+        const elevated = ["admin", "superadmin"].includes(String(req.user?.role || req.auth?.role || "").toLowerCase());
+        const siteStation = String(req.query.siteStation || "").trim();
+        const department = String(req.query.department || "").trim();
+        const position = String(req.query.position || "").trim();
+        const status = String(req.query.status || "").trim();
+        const online = req.query.online === undefined || !elevated ? "" : String(req.query.online).trim();
+        const verified = req.query.verified === undefined || !elevated ? "" : String(req.query.verified).trim();
 
         const memberFilter = {
             isDeleted: { $ne: true },
             _id: { $ne: currentUserId },
         };
+
+        if (elevated) {
+            if (siteStation && siteStation !== "all") memberFilter.siteStation = siteStation;
+            if (department && department !== "all") memberFilter.department = department;
+            if (position && position !== "all") memberFilter.position = position;
+            if (status && status !== "all") memberFilter.status = status;
+            if (online === "true" || online === "false") memberFilter.online = online === "true";
+            if (verified === "true" || verified === "false") memberFilter.verified = verified === "true";
+        }
 
         const adminFilter = {
             status: { $ne: "deleted" },
@@ -1328,6 +1344,7 @@ exports.getChatMembers = async (req, res) => {
                 { memberNumber: { $regex: keyword, $options: "i" } },
                 { department: { $regex: keyword, $options: "i" } },
                 { position: { $regex: keyword, $options: "i" } },
+                { siteStation: { $regex: keyword, $options: "i" } },
             ];
             adminFilter.$or = [
                 { fullName: { $regex: keyword, $options: "i" } },
@@ -1340,7 +1357,7 @@ exports.getChatMembers = async (req, res) => {
 
         const [members, adminRecords, conversations] = await Promise.all([
             Member.find({ ...memberFilter, role: "member" })
-                .select("fullName username profileImage online lastSeen status memberNumber department position phone email role")
+                .select("fullName username profileImage online lastSeen status memberNumber department position siteStation customSiteStation phone email role verified")
                 .sort({ role: 1, fullName: 1 })
                 .limit(limit)
                 .lean(),
@@ -1493,16 +1510,37 @@ exports.getChatMembers = async (req, res) => {
             }
         });
 
-        return res.json({
-            success: true,
-            count: unique.size,
-            members: Array.from(unique.values()).sort((a, b) => {
+        const responseMembers = Array.from(unique.values()).sort((a, b) => {
                 const order = { superadmin: 0, admin: 1, member: 2 };
                 const aRank = order[String(a.role || "member").toLowerCase()] ?? 2;
                 const bRank = order[String(b.role || "member").toLowerCase()] ?? 2;
                 if (aRank !== bRank) return aRank - bRank;
                 return String(a.fullName || "").localeCompare(String(b.fullName || ""));
-            }),
+            });
+
+        let filterOptions = {};
+        if (elevated) {
+            const optionsBase = { role: "member", isDeleted: { $ne: true } };
+            const [stations, departments, positions, statuses] = await Promise.all([
+                Member.distinct("siteStation", optionsBase),
+                Member.distinct("department", optionsBase),
+                Member.distinct("position", optionsBase),
+                Member.distinct("status", optionsBase),
+            ]);
+            filterOptions = {
+                siteStation: stations.filter(Boolean).sort(),
+                department: departments.filter(Boolean).sort(),
+                position: positions.filter(Boolean).sort(),
+                status: statuses.filter(Boolean).sort(),
+            };
+        }
+
+        return res.json({
+            success: true,
+            count: responseMembers.length,
+            members: responseMembers,
+            filterOptions,
+            appliedFilters: { siteStation, department, position, status, online, verified },
         });
     } catch (error) {
         console.error("Get Chat Members Error:", error);

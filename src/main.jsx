@@ -39,4 +39,27 @@ createRoot(
   </StrictMode>
 
 );
-if ("serviceWorker" in navigator) { window.addEventListener("load", () => navigator.serviceWorker.register("/sw.js").catch(() => {})); }
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", async () => {
+    try {
+      const registration = await navigator.serviceWorker.register("/sw.js");
+      if ("Notification" in window && "PushManager" in window && Notification.permission === "granted") {
+        // The settings page remains responsible for first-time permission prompts.
+        // Once permission exists, refresh the subscription automatically after each login/app load.
+        const { default: API } = await import("./services/api");
+        const { data } = await API.get("/notifications/push/vapid-public-key");
+        if (data?.configured && data?.publicKey) {
+          const key = data.publicKey;
+          const padding = "=".repeat((4 - (key.length % 4)) % 4);
+          const raw = window.atob((key + padding).replace(/-/g, "+").replace(/_/g, "/"));
+          const appServerKey = Uint8Array.from([...raw].map((c) => c.charCodeAt(0)));
+          let subscription = await registration.pushManager.getSubscription();
+          if (!subscription) subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: appServerKey });
+          if (subscription) await API.post("/notifications/push/subscribe", { subscription: subscription.toJSON() });
+        }
+      }
+    } catch (error) {
+      console.debug("Service worker/push bootstrap skipped:", error?.message || error);
+    }
+  });
+}

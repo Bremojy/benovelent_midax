@@ -93,15 +93,15 @@ async function sendEmail({ to, subject, text, html }) {
     const client = getResendClient();
     if (!config || !client) return { sent: false, reason: "resend-not-configured" };
 
-    await client.emails.send({
+    const result = await client.emails.send({
       from: config.from,
       to,
       subject,
       text,
       html,
     });
-
-    return { sent: true, provider: "resend" };
+    if (result?.error) throw new Error(result.error.message || "Resend rejected the email.");
+    return { sent: true, provider: "resend", id: result?.data?.id || null };
   }
 
   if (provider === "smtp") {
@@ -176,36 +176,44 @@ async function sendBulkEmailToMembers({ subject, text, html, members }) {
   return { sent: 0, skipped: "email-not-configured" };
 }
 
-async function sendTalkBeeSms({ to, message }) {
-  const url = String(process.env.TALKBEE_API_URL || "").trim();
-  const token = String(process.env.TALKBEE_API_TOKEN || "").trim();
-  const senderId = String(process.env.TALKBEE_SENDER_ID || "").trim();
-  if (!url || !token || !to || !message) return { sent: false, reason: "talkbee-not-configured" };
+function normalizeSmsRecipient(value) {
+  const raw = String(value || "").trim().replace(/[\s().-]/g, "");
+  if (!raw) return "";
+  if (/^\+\d{10,15}$/.test(raw)) return raw;
+  if (/^254\d{9}$/.test(raw)) return `+${raw}`;
+  if (/^0\d{9}$/.test(raw)) return `+254${raw.slice(1)}`;
+  if (/^7\d{8}$/.test(raw)) return `+254${raw}`;
+  return raw;
+}
 
-  // TalkBee exposes messaging through its API. The concrete API endpoint is
-  // account/channel-specific, so the URL and token stay configurable in the
-  // Render environment rather than being hard-coded in the application.
-  const payload = {
-    to: String(to),
+async function sendTextBeeSms({ to, message }) {
+  const baseUrl = String(process.env.TEXTBEE_API_URL || "https://api.textbee.dev/api/v1/gateway/devices").trim().replace(/\/$/, "");
+  const deviceId = String(process.env.TEXTBEE_DEVICE_ID || "").trim();
+  const apiKey = String(process.env.TEXTBEE_API_KEY || "").trim();
+  const recipient = normalizeSmsRecipient(to);
+  if (!baseUrl || !deviceId || !apiKey || !recipient || !message) {
+    return { sent: false, reason: "textbee-not-configured" };
+  }
+
+  const url = `${baseUrl}/${encodeURIComponent(deviceId)}/send-sms`;
+  const response = await axios.post(url, {
+    recipients: [recipient],
     message: String(message),
-    ...(senderId ? { senderId } : {}),
-  };
-
-  const response = await axios.post(url, payload, {
+  }, {
     headers: {
-      Authorization: `Bearer ${token}`,
+      "x-api-key": apiKey,
       "Content-Type": "application/json",
     },
-    timeout: 15000,
+    timeout: 30000,
   });
 
-  return { sent: true, provider: "talkbee", response: response.data };
+  return { sent: true, provider: "textbee", response: response.data };
 }
 
 async function sendSmsNotification({ to, message }) {
   const provider = String(process.env.SMS_PROVIDER || "").toLowerCase();
-  if (provider === "talkbee" || process.env.TALKBEE_API_URL) {
-    return sendTalkBeeSms({ to, message });
+  if (provider === "textbee" || process.env.TEXTBEE_API_KEY || process.env.TEXTBEE_DEVICE_ID) {
+    return sendTextBeeSms({ to, message });
   }
 
   const url = process.env.SMS_API_URL;
@@ -218,7 +226,7 @@ async function sendSmsNotification({ to, message }) {
 
   await axios.post(url, { to, message, senderId }, {
     headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : {},
-    timeout: 15000,
+    timeout: 30000,
   });
 
   return { sent: true, provider: "generic" };
@@ -257,7 +265,7 @@ module.exports = {
   sendEmail,
   sendBulkEmailToMembers,
   sendSmsNotification,
-  sendTalkBeeSms,
+  sendTextBeeSms,
   notifyMembers,
   escapeHtml,
 };

@@ -46,6 +46,8 @@ if (!adminController.includes('code: "DUPLICATE_MEMBER_FIELD"')) failures.push("
 
 const messageSocket = fs.readFileSync(path.join(root, "sockets/messageSocket.js"), "utf8");
 for (const needle of ["call-started", "missed-call", "sendPushToRecipient", "lastSeen", "portalOwnerId"]) if (!messageSocket.includes(needle)) failures.push(`Realtime call/presence check missing: ${needle}`);
+const broadcastService = fs.readFileSync(path.join(root, "services/memberBroadcastService.js"), "utf8");
+for (const needle of ["sendTextBeeSms", "TEXTBEE_API_KEY", "x-api-key", "api.textbee.dev"]) if (!broadcastService.includes(needle)) failures.push(`SMS integration check missing: ${needle}`);
 
 const sw = fs.readFileSync(path.join(frontend, "public/sw.js"), "utf8");
 for (const needle of ["incoming_call", "missed_call", "requireInteraction", "showNotification", "incomingPayload", "savePendingCall"]) if (!sw.includes(needle)) failures.push(`PWA push check missing: ${needle}`);

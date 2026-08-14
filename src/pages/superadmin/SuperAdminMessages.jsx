@@ -12,9 +12,12 @@ export default function SuperAdminMessages() {
       emptyMembersLabel="No contacts found."
       emptyConversationsLabel="No conversations yet."
       onRefreshHint="Superadmin conversations refreshed."
-      loadContacts={async () => {
+      showMemberFilters
+      loadContacts={async ({ filters = {} } = {}) => {
+        const params = { limit: 1000 };
+        Object.entries(filters || {}).forEach(([key, value]) => { if (value && value !== "all") params[key] = value; });
         const [membersRes, convRes] = await Promise.allSettled([
-          API.get("/member/chat-members", { params: { limit: 500 } }),
+          API.get("/member/chat-members", { params }),
           API.get("/conversations"),
         ]);
 
@@ -25,7 +28,11 @@ export default function SuperAdminMessages() {
           ? (convRes.value?.data?.conversations || [])
           : [];
 
-        return { members, conversations };
+        return {
+          members,
+          conversations,
+          filterOptions: membersRes.status === "fulfilled" ? (membersRes.value?.data?.filterOptions || {}) : {},
+        };
       }}
     />
   );

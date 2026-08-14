@@ -1,4 +1,4 @@
-const CACHE = "benovelent-shell-v11";
+const CACHE = "benovelent-shell-v12";
 const ASSETS = ["/", "/index.html", "/manifest.webmanifest", "/pwa-icon-192.png", "/pwa-icon-512.png", "/apple-touch-icon.png"];
 const DB_NAME = "benovelent-pwa";
 const DB_STORE = "calls";
@@ -60,6 +60,7 @@ self.addEventListener("push", (event) => {
       { action: "answer", title: "Answer" },
       { action: "decline", title: "Decline" },
     ] : [],
+    silent: false,
     data: payload.data || { link: "/" },
   };
 
@@ -75,7 +76,8 @@ self.addEventListener("push", (event) => {
         role: payload?.data?.role || incomingPayload?.role || "member",
       };
       await savePendingCall(callId, { ...payload, data: callData });
-      options.data = { ...callData, link: `/member/messages?incomingPushCall=${encodeURIComponent(callId)}` };
+      const base = callData.role === "admin" ? "/admin/messages" : callData.role === "superadmin" ? "/superadmin/messages" : "/member/messages";
+      options.data = { ...callData, link: `${base}?incomingPushCall=${encodeURIComponent(callId)}` };
     }
     await self.registration.showNotification(title, options);
   })());

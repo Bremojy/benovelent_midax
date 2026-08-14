@@ -22,6 +22,7 @@ function MessageCenterPage({
   loadContacts,
   onRefreshHint,
   initialConversationId = "",
+  showMemberFilters = false,
 }) {
   const { user: authUser } = useAuth();
   const location = useLocation();
@@ -36,6 +37,8 @@ function MessageCenterPage({
   const [mobileChatOpen, setMobileChatOpen] = useState(false);
   const [call, setCall] = useState(null);
   const [search, setSearch] = useState("");
+  const [filters, setFilters] = useState({ siteStation: "all", department: "all", position: "all", status: "all", online: "all" });
+  const [filterOptions, setFilterOptions] = useState({ siteStation: [], department: [], position: [], status: [] });
   const [isMobile, setIsMobile] = useState(() => (typeof window !== "undefined" ? window.innerWidth < 900 : false));
 
   const loadContactsRef = useRef(loadContacts);
@@ -196,7 +199,7 @@ function MessageCenterPage({
   const loadChatData = async () => {
     try {
       setLoadingSidebar(true);
-      const result = await loadContactsRef.current({ currentUser: currentUser || authUser });
+      const result = await loadContactsRef.current({ currentUser: currentUser || authUser, filters });
       const peopleList = Array.isArray(result?.members)
         ? result.members
         : Array.isArray(result?.data?.members)
@@ -210,6 +213,7 @@ function MessageCenterPage({
 
       setPeople(peopleList);
       setConversations(conversationList);
+      if (result?.filterOptions) setFilterOptions(result.filterOptions);
     } catch (error) {
       console.error("Load chat data error:", error);
       setPeople([]);
@@ -223,7 +227,7 @@ function MessageCenterPage({
     if (!actorId) return;
     loadChatData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [actorId, currentUser?._id, authUser?._id]);
+  }, [actorId, currentUser?._id, authUser?._id, filters.siteStation, filters.department, filters.position, filters.status, filters.online]);
 
   const normalizedPeople = useMemo(() => normalizeMembers(people, actor), [people, actor]);
   const normalizedConversations = useMemo(() => normalizeConversations(conversations, actor), [conversations, actor]);
@@ -407,6 +411,10 @@ function MessageCenterPage({
                 emptyMembersLabel={emptyMembersLabel}
                 memberSectionLabel={memberSectionLabel}
                 conversationSectionLabel="Recent chats"
+                showMemberFilters={showMemberFilters}
+                filterOptions={filterOptions}
+                filters={filters}
+                setFilters={setFilters}
               />
             </aside>
 
