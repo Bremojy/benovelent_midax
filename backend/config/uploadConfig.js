@@ -14,7 +14,7 @@ const useCloudinary = Boolean(
 
 
 if (process.env.NODE_ENV === "production" && !useCloudinary) {
-  console.warn("Cloudinary environment variables are missing. Production uploads will fail until CLOUDINARY_URL or CLOUDINARY_CLOUD_NAME/API_KEY/API_SECRET are configured.");
+  console.warn("Cloudinary environment variables are missing. Production uploads will use the configured persistent disk only when the host provides one; configure Cloudinary for durable media persistence.");
 }
 
 if (useCloudinary) {

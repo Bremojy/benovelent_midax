@@ -7,7 +7,6 @@ import {
 } from "react-dom/client";
 
 import App from "./App.jsx";
-import AppErrorBoundary from "./components/AppErrorBoundary.jsx";
 
 import {
   SocketProvider,
@@ -19,6 +18,7 @@ import {
 
 import "./index.css";
 import "./styles/feedback-pwa.css";
+import "./App.css";
 
 createRoot(
   document.getElementById("root")
@@ -30,9 +30,7 @@ createRoot(
 
       <SocketProvider>
 
-        <AppErrorBoundary>
-          <App />
-        </AppErrorBoundary>
+        <App />
 
       </SocketProvider>
 

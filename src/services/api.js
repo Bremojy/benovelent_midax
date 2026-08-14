@@ -44,9 +44,10 @@ export const resolveApiUrl = (path = "") => {
 
 const API = axios.create({
   baseURL: `${BASE_URL}/api`,
-  timeout: Number(import.meta.env.VITE_API_TIMEOUT || 20000),
+  timeout: 15000,
+
   headers: {
-    Accept: "application/json",
+    "Content-Type": "application/json",
   },
 });
 
@@ -99,20 +100,6 @@ API.interceptors.request.use(
 
       config.headers.Authorization =
         `Bearer ${token}`;
-    }
-
-    // Axios/browser must generate the multipart boundary for FormData.
-    // Leaving an explicit application/json content type here breaks some uploads.
-    if (typeof FormData !== "undefined" && config.data instanceof FormData) {
-      if (config.headers && typeof config.headers.delete === "function") {
-        config.headers.delete("Content-Type");
-      } else if (config.headers) {
-        delete config.headers["Content-Type"];
-      }
-    } else if (config.data && typeof config.data === "object" && !(config.data instanceof Blob)) {
-      if (config.headers && !config.headers["Content-Type"]) {
-        config.headers["Content-Type"] = "application/json";
-      }
     }
 
     return config;

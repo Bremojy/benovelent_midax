@@ -8,7 +8,7 @@ import {
 
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Scissors } from "lucide-react";
+import { HeartPulse } from "lucide-react";
 import { unlockCallAudio } from "./utils/callTone";
 
 import ScrollToTop from "./components/ScrollToTop";
@@ -26,7 +26,6 @@ import SmartAssistant from "./components/SmartAssistant";
 
 import "./App.css";
 import "./styles/interaction-system.css";
-import "./styles/updated1.css";
 
 // =====================================================
 // PUBLIC PAGES
@@ -77,7 +76,11 @@ const PortalSettings = lazy(
 
 const Polls = lazy(() => import("./pages/Polls"));
 const Feedback = lazy(() => import("./pages/Feedback"));
+const Resources = lazy(() => import("./pages/Resources"));
+const PublicEvents = lazy(() => import("./pages/PublicEvents"));
 const PortalGuide = lazy(() => import("./pages/member/PortalGuide"));
+const PlatformCenter = lazy(() => import("./pages/PlatformCenter"));
+const VerifyMembership = lazy(() => import("./pages/VerifyMembership"));
 
 
 // =====================================================
@@ -258,7 +261,7 @@ function PageCutTransition() {
     }
 
     setActive(true);
-    const timer = window.setTimeout(() => setActive(false), 3000);
+    const timer = window.setTimeout(() => setActive(false), 2000);
     return () => window.clearTimeout(timer);
   }, [location.pathname, location.search]);
 
@@ -272,9 +275,9 @@ function PageCutTransition() {
       <div className="page-pulse-spark page-pulse-spark-one" />
       <div className="page-pulse-spark page-pulse-spark-two" />
       <div className="page-pulse-core">
-        <Scissors size={34} strokeWidth={2.1} />
+        <HeartPulse size={34} strokeWidth={2.1} />
       </div>
-      <span className="page-pulse-label">Cutting to the next page…</span>
+      <span className="page-pulse-label">Moving with the community…</span>
     </div>
   );
 }
@@ -380,6 +383,9 @@ function AppContent() {
             element={<News />}
           />
 
+          <Route path="/resources" element={<Resources />} />
+          <Route path="/events" element={<PublicEvents />} />
+
           <Route
             path="/contact"
             element={<Contact />}
@@ -417,6 +423,8 @@ function AppContent() {
             }
           />
 
+          <Route path="/verify-membership" element={<VerifyMembership />} />
+
 
           {/* =================================================
               ADMIN PORTAL
@@ -449,6 +457,7 @@ function AppContent() {
             }
           />
 
+          <Route path="/admin/platform" element={<ProtectedRoute allowedRoles={["admin","superadmin"]}><PlatformCenter role="admin" /></ProtectedRoute>} />
           <Route path="/admin/accounts" element={<ProtectedRoute allowedRoles={["admin"]}><AdminFinance /></ProtectedRoute>} />
           <Route path="/admin/finance" element={<Navigate to="/admin/accounts" replace />} />
           <Route path="/admin/claims" element={<ProtectedRoute allowedRoles={["admin", "superadmin"]}><AdminClaims /></ProtectedRoute>} />
@@ -489,6 +498,8 @@ function AppContent() {
               </ProtectedRoute>
             }
           />
+
+          <Route path="/member/platform" element={<ProtectedRoute allowedRoles={["member"]}><PlatformCenter role="member" /></ProtectedRoute>} />
 
           <Route path="/member/accounts" element={<ProtectedRoute allowedRoles={["member"]}><Contributions /></ProtectedRoute>} />
 
@@ -636,6 +647,7 @@ function AppContent() {
             }
           />
 
+          <Route path="/superadmin/platform" element={<ProtectedRoute allowedRoles={["superadmin"]}><PlatformCenter role="superadmin" /></ProtectedRoute>} />
           <Route path="/superadmin/members" element={<ProtectedRoute allowedRoles={["superadmin"]}><AdminMembers /></ProtectedRoute>} />
           <Route path="/superadmin/accounts" element={<ProtectedRoute allowedRoles={["superadmin"]}><AdminFinance /></ProtectedRoute>} />
           <Route path="/superadmin/finance" element={<Navigate to="/superadmin/accounts" replace />} />

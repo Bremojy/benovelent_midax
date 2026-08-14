@@ -66,12 +66,14 @@ const supportRequestRoutes = require("./routes/supportRequestRoutes");
 
 const auditLogRoutes = require("./routes/auditLogRoutes");
 const dataIntegrityRoutes = require("./routes/dataIntegrityRoutes");
+const platformRoutes = require("./routes/platformRoutes");
 
 // ===============================================
 // MIDDLEWARE
 // ===============================================
 
 app.disable("x-powered-by");
+try { app.use(require("helmet")({ contentSecurityPolicy: false, crossOriginEmbedderPolicy: false })); } catch (_) { /* helmet optional during constrained builds */ }
 
 const allowedOrigins = String(process.env.CORS_ORIGINS || "https://benovelent-midax.vercel.app,http://localhost:5173,http://127.0.0.1:5173")
     .split(",")
@@ -81,16 +83,6 @@ const allowedOrigins = String(process.env.CORS_ORIGINS || "https://benovelent-mi
 const corsOptions = {
     origin(origin, callback) {
         if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
-
-        // Permit Vercel preview deployments for this project while keeping
-        // arbitrary origins blocked.
-        try {
-            const hostname = new URL(origin).hostname;
-            if (/^benovelent-midax(?:-[a-z0-9-]+)?\.vercel\.app$/i.test(hostname)) {
-                return callback(null, true);
-            }
-        } catch (_) {}
-
         return callback(new Error("Origin not allowed by CORS."));
     },
     credentials: true,
@@ -184,14 +176,12 @@ app.get("/api/health", (req, res) => {
                     ? "disconnecting"
                     : "disconnected";
 
-    const healthy = readyState === 1;
-    res.status(healthy ? 200 : 503).json({
-        success: healthy,
+    res.status(200).json({
+        success: true,
         application: "Benevolent Midax API",
-        status: healthy ? "healthy" : "degraded",
+        status: "Running",
         database,
         environment: process.env.NODE_ENV || "development",
-        version: process.env.APP_VERSION || "updated1",
         timestamp: new Date().toISOString(),
     });
 });
@@ -250,6 +240,7 @@ app.use("/api/superadmin", superadminRoutes);
 
 app.use("/api/audit-logs", auditLogRoutes);
 app.use("/api/superadmin/data-integrity", dataIntegrityRoutes);
+app.use("/api/platform", platformRoutes);
 
 // ===============================================
 // NOT FOUND

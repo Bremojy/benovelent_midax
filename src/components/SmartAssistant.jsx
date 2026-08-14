@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Bot, ChevronDown, HelpCircle, MessageCircle, Send, X } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import API from "../services/api";
 import "../styles/smart-assistant.css";
 
 const BASE_FAQ = [
@@ -60,11 +61,19 @@ export default function SmartAssistant() {
   }, []);
   const suggested = useMemo(() => (role ? ["How do I submit support?", "How do I use chat?", "What can I filter?"] : ["What does the scheme support?", "How do I read the Constitution?", "How do I access the portal?"]), [role]);
 
-  const ask = (question = input) => {
+  const ask = async (question = input) => {
     const clean = String(question || "").trim();
     if (!clean) return;
-    setMessages((items) => [...items, { from: "user", text: clean }, { from: "bot", text: answerFor(clean, String(role || "").toLowerCase()) }]);
+    setMessages((items) => [...items, { from: "user", text: clean }, { from: "bot", text: "Checking the current Benovelent MIDAX information…" }]);
     setInput("");
+    try {
+      const endpoint = role ? "/platform/assistant" : "/platform/public/assistant";
+      const { data } = await API.post(endpoint, { question: clean });
+      const answer = data?.answer || answerFor(clean, String(role || "").toLowerCase());
+      setMessages((items) => { const next = [...items]; const index = next.map((m,i)=>[m,i]).reverse().find(([,i])=>next[i]?.from === "bot")?.[1]; if (index !== undefined && next[index].text.includes("Checking the current")) next[index] = { from:"bot", text: answer }; return next; });
+    } catch (_) {
+      setMessages((items) => [...items, { from: "bot", text: answerFor(clean, String(role || "").toLowerCase()) }]);
+    }
   };
 
   return (

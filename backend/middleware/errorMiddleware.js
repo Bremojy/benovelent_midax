@@ -30,26 +30,6 @@ const errorHandler = (err, req, res, next) => {
   console.error("====================================\n");
 
   // -------------------------------
-  // Request parsing / payload errors
-  // -------------------------------
-
-  if (err instanceof SyntaxError && err.status === 400 && "body" in err) {
-    return Response.error(
-      res,
-      "The request body contains invalid JSON.",
-      400
-    );
-  }
-
-  if (err.type === "entity.too.large") {
-    return Response.error(
-      res,
-      "The uploaded request is too large.",
-      413
-    );
-  }
-
-  // -------------------------------
   // Multer Errors
   // -------------------------------
 
