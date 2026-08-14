@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Search, MessageCircle, Users, Crown, BadgeCheck } from "lucide-react";
+import { Search, MessageCircle, Users, Crown, BadgeCheck, SlidersHorizontal, X } from "lucide-react";
 import "./ChatSidebar.css";
 
 function ChatSidebar({
@@ -21,6 +21,8 @@ function ChatSidebar({
   filterOptions = {},
   filters = {},
   setFilters,
+  filtersOpen = false,
+  setFiltersOpen,
 }) {
   const filteredMembers = useMemo(() => {
     const keyword = String(search || "").trim().toLowerCase();
@@ -81,28 +83,56 @@ function ChatSidebar({
 
 
       {showMemberFilters && (
-        <div className="chat-filters" aria-label="Member filters">
-          <select value={filters.siteStation || "all"} onChange={(e) => setFilters?.((p) => ({ ...p, siteStation: e.target.value }))}>
-            <option value="all">All site stations</option>
-            {(filterOptions.siteStation || []).map((value) => <option key={`station-${value}`} value={value}>{value}</option>)}
-          </select>
-          <select value={filters.department || "all"} onChange={(e) => setFilters?.((p) => ({ ...p, department: e.target.value }))}>
-            <option value="all">All departments</option>
-            {(filterOptions.department || []).map((value) => <option key={`dept-${value}`} value={value}>{value}</option>)}
-          </select>
-          <select value={filters.position || "all"} onChange={(e) => setFilters?.((p) => ({ ...p, position: e.target.value }))}>
-            <option value="all">All positions</option>
-            {(filterOptions.position || []).map((value) => <option key={`pos-${value}`} value={value}>{value}</option>)}
-          </select>
-          <select value={filters.status || "all"} onChange={(e) => setFilters?.((p) => ({ ...p, status: e.target.value }))}>
-            <option value="all">All statuses</option>
-            {(filterOptions.status || []).map((value) => <option key={`status-${value}`} value={value}>{value}</option>)}
-          </select>
-          <select value={filters.online || "all"} onChange={(e) => setFilters?.((p) => ({ ...p, online: e.target.value }))}>
-            <option value="all">Any presence</option>
-            <option value="true">Online now</option>
-            <option value="false">Offline</option>
-          </select>
+        <div className="chat-filter-panel" aria-label="Member filters">
+          <div className="chat-filter-toolbar">
+            <button type="button" className="chat-filter-toggle" onClick={() => setFiltersOpen?.((open) => !open)} aria-expanded={filtersOpen}>
+              <SlidersHorizontal size={16} />
+              <span>Filter members</span>
+              {hasActiveFilters(filters) ? <span className="chat-filter-count">Active</span> : null}
+            </button>
+            {hasActiveFilters(filters) ? (
+              <button
+                type="button"
+                className="chat-filter-clear"
+                title="Clear filters"
+                aria-label="Clear filters"
+                onClick={() => setFilters?.({ siteStation: "all", department: "all", position: "all", status: "all", online: "all", verified: "all" })}
+              >
+                <X size={15} />
+                <span>Clear</span>
+              </button>
+            ) : null}
+          </div>
+          {filtersOpen ? (
+            <div className="chat-filters">
+              <select value={filters.siteStation || "all"} onChange={(e) => setFilters?.((p) => ({ ...p, siteStation: e.target.value }))}>
+                <option value="all">All site stations</option>
+                {(filterOptions.siteStation || []).map((value) => <option key={`station-${value}`} value={value}>{value}</option>)}
+              </select>
+              <select value={filters.department || "all"} onChange={(e) => setFilters?.((p) => ({ ...p, department: e.target.value }))}>
+                <option value="all">All departments</option>
+                {(filterOptions.department || []).map((value) => <option key={`dept-${value}`} value={value}>{value}</option>)}
+              </select>
+              <select value={filters.position || "all"} onChange={(e) => setFilters?.((p) => ({ ...p, position: e.target.value }))}>
+                <option value="all">All positions</option>
+                {(filterOptions.position || []).map((value) => <option key={`pos-${value}`} value={value}>{value}</option>)}
+              </select>
+              <select value={filters.status || "all"} onChange={(e) => setFilters?.((p) => ({ ...p, status: e.target.value }))}>
+                <option value="all">All statuses</option>
+                {(filterOptions.status || []).map((value) => <option key={`status-${value}`} value={value}>{value}</option>)}
+              </select>
+              <select value={filters.online || "all"} onChange={(e) => setFilters?.((p) => ({ ...p, online: e.target.value }))}>
+                <option value="all">Any presence</option>
+                <option value="true">Online now</option>
+                <option value="false">Offline</option>
+              </select>
+              <select value={filters.verified || "all"} onChange={(e) => setFilters?.((p) => ({ ...p, verified: e.target.value }))}>
+                <option value="all">Any verification</option>
+                <option value="true">Verified only</option>
+                <option value="false">Unverified</option>
+              </select>
+            </div>
+          ) : null}
         </div>
       )}
 
@@ -205,7 +235,7 @@ function Avatar({ user, isOnline }) {
   );
 }
 
-function isLeader(role) {
+function hasActiveFilters(filters = {}) {\n  return Object.values(filters).some((value) => value && value !== "all");\n}\n\nfunction isLeader(role) {
   return ["admin"].includes(String(role || "").toLowerCase());
 }
 

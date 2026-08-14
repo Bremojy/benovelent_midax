@@ -4948,3 +4948,4 @@ display:none;
     grid-template-columns: 1fr;
   }
 }
+\n/* V2: always-available public website home */\n.portal-website-home-btn{display:inline-flex;align-items:center;gap:7px;border:1px solid rgba(148,163,184,.22);background:rgba(255,255,255,.72);color:inherit;border-radius:10px;padding:8px 10px;font-weight:700;cursor:pointer;white-space:nowrap}\n.portal-website-home-btn:hover{transform:translateY(-1px)}\n@media(max-width:700px){.portal-website-home-btn span{display:none}.portal-website-home-btn{padding:9px}.dashboard-topbar .search-box{display:none}}\n

@@ -157,7 +157,7 @@ app.get("/", (req, res) => {
     res.status(200).json({
         success: true,
         application: "Benevolent Midax API",
-        version: "1.0.0",
+        version: "2.0.0",
         status: "Running",
         timestamp: new Date().toISOString(),
     });

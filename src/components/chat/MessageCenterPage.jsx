@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
-import { ArrowLeft, RefreshCw } from "lucide-react";
+import { ArrowLeft, RefreshCw, SlidersHorizontal, X } from "lucide-react";
 import socketClient from "../../sockets/socket";
 import DashboardLayout from "../../layouts/DashboardLayout";
 import ChatSidebar from "./ChatSidebar";
@@ -8,6 +8,7 @@ import ChatWindow from "./ChatWindow";
 import CallOverlay from "./CallOverlay";
 import API from "../../services/api";
 import { getPendingCall, removePendingCall } from "../../utils/pushCallStore";
+import { startNativeIncomingCall } from "../../utils/nativeCallBridge";
 import { useAuth } from "../../context/AuthContext";
 import "../../pages/member/messages.css";
 
@@ -38,7 +39,8 @@ function MessageCenterPage({
   const [call, setCall] = useState(null);
   const [search, setSearch] = useState("");
   const [filters, setFilters] = useState({ siteStation: "all", department: "all", position: "all", status: "all", online: "all" });
-  const [filterOptions, setFilterOptions] = useState({ siteStation: [], department: [], position: [], status: [] });
+  const [filterOptions, setFilterOptions] = useState({ siteStation: [], department: [], position: [], status: [], verified: [] });
+  const [filtersOpen, setFiltersOpen] = useState(Boolean(showMemberFilters));
   const [isMobile, setIsMobile] = useState(() => (typeof window !== "undefined" ? window.innerWidth < 900 : false));
 
   const loadContactsRef = useRef(loadContacts);
@@ -131,6 +133,12 @@ function MessageCenterPage({
 
     const handleIncomingCall = (payload) => {
       if (!payload?.offer || !payload?.from) return;
+      startNativeIncomingCall({
+        callerName: payload.callerName || "Member",
+        callType: payload.callType === "video" ? "video" : "audio",
+        callId: payload.callId || "",
+        callerUserId: payload.callerUserId || "",
+      });
       const currentPeople = peopleRef.current || [];
       const currentConversation = selectedConversationRef.current;
       setCall({
@@ -227,7 +235,7 @@ function MessageCenterPage({
     if (!actorId) return;
     loadChatData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [actorId, currentUser?._id, authUser?._id, filters.siteStation, filters.department, filters.position, filters.status, filters.online]);
+  }, [actorId, currentUser?._id, authUser?._id, filters.siteStation, filters.department, filters.position, filters.status, filters.online, filters.verified]);
 
   const normalizedPeople = useMemo(() => normalizeMembers(people, actor), [people, actor]);
   const normalizedConversations = useMemo(() => normalizeConversations(conversations, actor), [conversations, actor]);
@@ -415,6 +423,8 @@ function MessageCenterPage({
                 filterOptions={filterOptions}
                 filters={filters}
                 setFilters={setFilters}
+                filtersOpen={filtersOpen}
+                setFiltersOpen={setFiltersOpen}
               />
             </aside>
 
@@ -465,6 +475,42 @@ function MessageCenterPage({
                       ))}
                   </select>
                 </div>
+                {showMemberFilters ? (
+                  <div className="mobile-chat-filter-box">
+                    <div className="mobile-chat-filter-header">
+                      <strong>Filter members</strong>
+                      <button type="button" onClick={() => setFiltersOpen?.((open) => !open)}>
+                        <SlidersHorizontal size={15} />
+                        {filtersOpen ? "Hide" : "Show"}
+                      </button>
+                    </div>
+                    {filtersOpen ? (
+                      <div className="mobile-chat-filter-grid">
+                        <select value={filters.siteStation || "all"} onChange={(e) => setFilters((p) => ({ ...p, siteStation: e.target.value }))}>
+                          <option value="all">All site stations</option>
+                          {(filterOptions.siteStation || []).map((value) => <option key={value} value={value}>{value}</option>)}
+                        </select>
+                        <select value={filters.department || "all"} onChange={(e) => setFilters((p) => ({ ...p, department: e.target.value }))}>
+                          <option value="all">All departments</option>
+                          {(filterOptions.department || []).map((value) => <option key={value} value={value}>{value}</option>)}
+                        </select>
+                        <select value={filters.position || "all"} onChange={(e) => setFilters((p) => ({ ...p, position: e.target.value }))}>
+                          <option value="all">All positions</option>
+                          {(filterOptions.position || []).map((value) => <option key={value} value={value}>{value}</option>)}
+                        </select>
+                        <select value={filters.status || "all"} onChange={(e) => setFilters((p) => ({ ...p, status: e.target.value }))}>
+                          <option value="all">All statuses</option>
+                          {(filterOptions.status || []).map((value) => <option key={value} value={value}>{value}</option>)}
+                        </select>
+                        <select value={filters.online || "all"} onChange={(e) => setFilters((p) => ({ ...p, online: e.target.value }))}>
+                          <option value="all">Any presence</option>
+                          <option value="true">Online now</option>
+                          <option value="false">Offline</option>
+                        </select>
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
 
                 <div className="mobile-chat-list">
                   {loadingSidebar ? (

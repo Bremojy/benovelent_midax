@@ -7,6 +7,7 @@ import {
   Settings,
   LogOut,
   Download as DownloadIcon,
+  House,
 } from "lucide-react";
 
 import { useEffect, useState } from "react";
@@ -148,6 +149,17 @@ function DashboardTopbar({
             <Menu size={23} />
           </button>
         )}
+
+        <button
+          type="button"
+          className="portal-website-home-btn"
+          onClick={() => navigate("/")}
+          aria-label="Open public website home"
+          title="Public website home"
+        >
+          <House size={18} />
+          <span>Website</span>
+        </button>
 
         <div className="search-box">
 

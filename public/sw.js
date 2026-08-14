@@ -1,4 +1,4 @@
-const CACHE = "benovelent-shell-v12";
+const CACHE = "benovelent-shell-v14";
 const ASSETS = ["/", "/index.html", "/manifest.webmanifest", "/pwa-icon-192.png", "/pwa-icon-512.png", "/apple-touch-icon.png"];
 const DB_NAME = "benovelent-pwa";
 const DB_STORE = "calls";

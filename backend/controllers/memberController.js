@@ -1317,9 +1317,18 @@ exports.getChatMembers = async (req, res) => {
         const online = req.query.online === undefined || !elevated ? "" : String(req.query.online).trim();
         const verified = req.query.verified === undefined || !elevated ? "" : String(req.query.verified).trim();
 
+        // Resolve every identity associated with the logged-in portal account.
+        // Admin/SuperAdmin accounts have a mirrored Member chat profile, so both
+        // the portal-account ID and chat-profile ID must be excluded.
+        const actorPortalId = String(req.user?._id || req.auth?.id || "").trim();
+        const actorChatId = String(req.auth?.chatId || req.user?.chatMemberId || currentUserId || "").trim();
+        const actorEmail = String(req.user?.email || "").trim().toLowerCase();
+        const actorPhone = String(req.user?.phone || "").replace(/\D/g, "");
+        const actorExclusionIds = [currentUserId, actorChatId, actorPortalId].filter(Boolean);
+
         const memberFilter = {
             isDeleted: { $ne: true },
-            _id: { $ne: currentUserId },
+            _id: { $nin: actorExclusionIds },
         };
 
         if (elevated) {
@@ -1330,10 +1339,22 @@ exports.getChatMembers = async (req, res) => {
             if (online === "true" || online === "false") memberFilter.online = online === "true";
             if (verified === "true" || verified === "false") memberFilter.verified = verified === "true";
         }
+        if (actorEmail || actorPhone) {
+            memberFilter.$and = [
+                ...(memberFilter.$and || []),
+                {
+                    $nor: [
+                        ...(actorEmail ? [{ email: actorEmail }] : []),
+                        ...(actorPhone ? [{ phone: { $regex: actorPhone.slice(-9) + "$" } }] : []),
+                        ...(actorPortalId ? [{ portalOwnerId: actorPortalId }] : []),
+                    ],
+                },
+            ];
+        }
 
         const adminFilter = {
             status: { $ne: "deleted" },
-            _id: { $ne: currentUserId },
+            _id: { $nin: actorExclusionIds },
         };
 
         if (keyword) {
@@ -1463,11 +1484,20 @@ exports.getChatMembers = async (req, res) => {
         const contacts = [
             ...members.map((member) => normalizeContact(member, "member")),
             ...adminProfiles.map((admin) => normalizeContact(admin, "admin")),
-        ].filter((item) =>
-            String(item._id) !== currentUserId &&
-            String(item.role || "").toLowerCase() !== "superadmin" &&
-            String(item.status || "").toLowerCase() !== "deleted"
-        );
+        ].filter((item) => {
+            const itemId = String(item._id || "");
+            const ownerId = String(item.portalOwnerId || item.sourceAdminId || "");
+            const email = String(item.email || "").trim().toLowerCase();
+            const phone = String(item.phone || "").replace(/\D/g, "");
+            const sameId = actorExclusionIds.includes(itemId) || actorExclusionIds.includes(ownerId);
+            const sameEmail = Boolean(actorEmail && email && actorEmail === email);
+            const samePhone = Boolean(actorPhone && phone && phone.slice(-9) === actorPhone.slice(-9));
+            return !sameId &&
+                !sameEmail &&
+                !samePhone &&
+                String(item.role || "").toLowerCase() !== "superadmin" &&
+                String(item.status || "").toLowerCase() !== "deleted";
+        });
 
         // Identity-aware dedupe. Prefer an active administrator/leader when
         // both collections contain the same real person, otherwise keep the
@@ -1532,6 +1562,7 @@ exports.getChatMembers = async (req, res) => {
                 department: departments.filter(Boolean).sort(),
                 position: positions.filter(Boolean).sort(),
                 status: statuses.filter(Boolean).sort(),
+                verified: ["true", "false"],
             };
         }
 
