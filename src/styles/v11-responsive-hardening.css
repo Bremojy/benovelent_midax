@@ -1,0 +1,66 @@
+/* V11 responsive hardening: preserves existing portal functions while improving layout on phones, tablets and laptops. */
+.dashboard-container,
+.dashboard-container *{box-sizing:border-box}
+.dashboard-container{--portal-page-gutter:clamp(8px,2vw,28px);--portal-radius:clamp(16px,1.4vw,24px);min-width:0}
+.dashboard-main{width:min(100%,calc(100vw - 270px));min-width:0}
+.dashboard-content{min-width:0;overflow-x:clip;padding-inline:var(--portal-page-gutter)}
+.dashboard-page{width:100%;min-width:0}
+.dashboard-drawer-backdrop{position:fixed;inset:0;z-index:1190;border:0;background:rgba(2,6,23,.46);backdrop-filter:blur(2px);cursor:pointer}
+.dashboard-topbar,.dashboard-sidebar{-webkit-backdrop-filter:blur(18px)}
+.dashboard-topbar{min-width:0}
+.dashboard-topbar .topbar-left,.dashboard-topbar .topbar-right{min-width:0}
+.dashboard-topbar .topbar-left{flex:1 1 auto}
+.dashboard-topbar .topbar-right{flex:0 0 auto}
+.dashboard-topbar .search-box{min-width:0;flex:1 1 min(420px,40vw)}
+.dashboard-topbar .user-box,.dashboard-topbar .user-info{min-width:0}
+.dashboard-topbar .user-info h4,.dashboard-topbar .user-info p{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.portal-module,.member-dashboard,.admin-dashboard,.superadmin-dashboard,.admin-members-page,.admin-finance-page,.admin-support-page,.admin-claims-page{width:100%;min-width:0;max-width:100%}
+.portal-panel,.settings-panel,.admin-stat-card,.admin-overview-card,.superadmin-panel,.profile-completion-card,.v7-completion,.v7-unlocked{min-width:0}
+.portal-stat-grid,.portal-form-grid,.portal-grid,.community-metrics,.quick-action-grid,.control-tool-grid{width:100%}
+.portal-actions,.settings-tabs,.admin-page-header,.panel-heading,.claim-feed-top{min-width:0}
+.portal-actions>*,
+.settings-tabs>*{max-width:100%}
+.portal-table-wrap,.portal-table-wrapper,.table-responsive,.admin-members-table-wrapper{width:100%;min-width:0;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain}
+.portal-table,.admin-members-table{width:max(100%,680px);min-width:680px}
+.admin-members-table{width:max-content}
+.portal-field input,.portal-field select,.portal-field textarea,.settings-field input,.settings-field select,.settings-field textarea,input,select,textarea,button{max-width:100%}
+.dashboard-container input,.dashboard-container select,.dashboard-container textarea{font-size:16px}
+.dashboard-container button,.dashboard-container a{-webkit-tap-highlight-color:transparent}
+@media(max-width:1200px){.dashboard-main{width:min(100%,calc(100vw - 250px))}.dashboard-page{max-width:100%}}
+@media(max-width:900px){
+ .dashboard-main{width:100%;max-width:100%;margin-left:0}
+ .dashboard-content{padding-inline:clamp(10px,3vw,18px);padding-bottom:max(24px,env(safe-area-inset-bottom))}
+ .dashboard-drawer-backdrop{z-index:1190}
+ .dashboard-sidebar{z-index:1200}
+ .dashboard-topbar{z-index:1100}
+ .portal-module-header h1{font-size:clamp(24px,5vw,32px);line-height:1.1}
+ .portal-panel,.settings-panel{border-radius:var(--portal-radius)}
+}
+@media(max-width:700px){
+ .dashboard-topbar{padding-inline:10px;gap:6px}
+ .dashboard-topbar .topbar-left,.dashboard-topbar .topbar-right{gap:5px}
+ .dashboard-topbar .icon-btn,.dashboard-topbar .menu-btn,.dashboard-topbar .home-btn{width:40px;min-width:40px;height:40px;flex:0 0 40px}
+ .dashboard-topbar .install-topbar-btn{width:40px;min-width:40px;padding:0}
+ .dashboard-topbar .portal-website-home-btn{display:none}
+ .dashboard-content{padding-inline:10px}
+ .dashboard-page{overflow-wrap:anywhere}
+ .portal-stat-grid,.community-metrics,.v8-super-metrics,.control-tool-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .portal-form-grid,.portal-grid{grid-template-columns:1fr}
+ .portal-actions>button,.portal-actions>a,.settings-tabs>button{min-height:44px}
+ .claim-feed-card{grid-template-columns:1fr}
+ .claim-feed-side{flex-direction:row;flex-wrap:wrap}
+}
+@media(max-width:520px){
+ .dashboard-content{padding-inline:8px}
+ .dashboard-topbar .avatar{width:38px;height:38px}
+ .dashboard-topbar .icon-btn,.dashboard-topbar .menu-btn{width:38px;min-width:38px;height:38px}
+ .dashboard-topbar .topbar-right{gap:3px}
+ .portal-stat-grid,.community-metrics,.v8-super-metrics,.control-tool-grid,.personal-signal-grid,.member-quick-grid,.pwa-status-modern,.context-card-grid{grid-template-columns:1fr}
+ .portal-panel,.settings-panel,.admin-stat-card,.admin-overview-card,.superadmin-panel{padding:14px!important}
+ .portal-table,.admin-members-table{min-width:620px}
+ .portal-btn,.primary-btn,.secondary-btn,.danger-btn{min-height:44px}
+ .dashboard-sidebar.mobile-drawer{width:min(88vw,330px)}
+}
+@media(prefers-reduced-motion:reduce){
+ .dashboard-container *,.dashboard-container *::before,.dashboard-container *::after{animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important;transition-duration:.01ms!important}
+}

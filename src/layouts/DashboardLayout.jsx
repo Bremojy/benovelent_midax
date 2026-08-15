@@ -35,14 +35,41 @@ function DashboardLayout({ children }) {
   }, []);
 
   useEffect(() => {
-    if (!isMobile) { setSidebarOpen(true); return; }
-    setSidebarOpen(!isMobile);
+    if (!isMobile) {
+      setSidebarOpen(true);
+      return;
+    }
+    setSidebarOpen(false);
   }, [isMobile]);
+
+  useEffect(() => {
+    if (!isMobile || !sidebarOpen) return undefined;
+
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") setSidebarOpen(false);
+    };
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", onKeyDown);
+
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [isMobile, sidebarOpen]);
 
   const goHome = () => navigate(basePath);
 
   return (
     <div className={`dashboard-container portal-role-${String((role || user?.role || "member").toLowerCase())} ${mobileSubpage ? "dashboard-mobile-subpage" : ""} ${mobileBottomNav ? "dashboard-home-shell" : ""}`}>
+      {isMobile && !mobileBottomNav && sidebarOpen && (
+        <button
+          type="button"
+          className="dashboard-drawer-backdrop"
+          aria-label="Close dashboard navigation"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
       <DashboardSidebar
         role={role}
         sidebarOpen={sidebarOpen}

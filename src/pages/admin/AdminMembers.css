@@ -492,7 +492,7 @@
 .admin-members-table {
   width: 100%;
 
-  min-width: 1050px;
+  min-width: 680px;
 
   border-collapse: separate;
   border-spacing: 0;
@@ -2378,3 +2378,5 @@ input[type="number"]::-webkit-outer-spin-button {
 .admin-member-temp-password-generate{border:0;border-radius:12px;padding:0 16px;background:#ef7d00;color:#fff;font-weight:700;cursor:pointer}
 .admin-member-temp-password-generate:hover{filter:brightness(.96)}
 @media(max-width:600px){.admin-member-temp-password-row{flex-direction:column}.admin-member-temp-password-generate{min-height:44px}}
+
+.admin-members-table-wrapper{width:100%;min-width:0;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain}

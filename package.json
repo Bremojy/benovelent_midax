@@ -9,7 +9,9 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "test:integrity": "node backend/scripts/staticIntegrityTest.js",
-    "test:routes": "node backend/scripts/routeContractTest.js"
+    "test:routes": "node backend/scripts/routeContractTest.js",
+    "test:quality": "node backend/scripts/sourceQualityTest.js",
+    "test": "npm run test:quality && npm run test:integrity && npm run test:routes"
   },
   "dependencies": {
     "axios": "^1.18.1",

@@ -38,7 +38,7 @@ export default function useSettings() {
         setSettings(res.settings);
       }
     } catch (err) {
-      console.log(err);
+      console.debug("Unable to load settings:", err?.message || err);
     } finally {
       setLoading(false);
     }
