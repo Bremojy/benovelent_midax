@@ -12,6 +12,15 @@ async function createAccounts() {
       process.env.MONGO_URI
     );
 
+    const adminInitialPassword = String(process.env.ADMIN_INITIAL_PASSWORD || "").trim();
+    const superAdminInitialPassword = String(process.env.SUPERADMIN_INITIAL_PASSWORD || "").trim();
+
+    if (!adminInitialPassword || !superAdminInitialPassword) {
+      throw new Error(
+        "ADMIN_INITIAL_PASSWORD and SUPERADMIN_INITIAL_PASSWORD must be set before creating accounts."
+      );
+    }
+
     console.log(
       "✅ Connected to MongoDB"
     );
@@ -44,7 +53,7 @@ async function createAccounts() {
           "0712345679",
 
         password:
-          "Admin123!",
+          adminInitialPassword,
 
         role:
           "admin",
@@ -87,7 +96,7 @@ async function createAccounts() {
             "superadmin@example.com",
 
           password:
-            "SuperAdmin123!",
+            superAdminInitialPassword,
 
           role:
             "superadmin",
@@ -107,46 +116,16 @@ async function createAccounts() {
     }
 
     // =====================================
-    // CREDENTIALS
+    // ACCOUNT SUMMARY
     // =====================================
 
     console.log("");
-    console.log(
-      "========================================"
-    );
-    console.log(
-      "Benevolent Midax Test Accounts"
-    );
-    console.log(
-      "========================================"
-    );
-
-    console.log("");
-    console.log(
-      "ADMIN"
-    );
-    console.log(
-      "Email: admin@example.com"
-    );
-    console.log(
-      "Password: Admin123!"
-    );
-
-    console.log("");
-    console.log(
-      "SUPERADMIN"
-    );
-    console.log(
-      "Email: superadmin@example.com"
-    );
-    console.log(
-      "Password: SuperAdmin123!"
-    );
-
-    console.log("");
-    console.log(
-      "========================================"
-    );
+    console.log("========================================");
+    console.log("Benevolent Midax account setup complete");
+    console.log("========================================");
+    console.log("Admin: admin@example.com");
+    console.log("SuperAdmin: superadmin@example.com");
+    console.log("Passwords are supplied only through environment variables.");
 
     await mongoose.disconnect();
 

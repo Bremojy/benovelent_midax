@@ -43,7 +43,7 @@ createRoot(
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
-      const registration = await navigator.serviceWorker.register("/sw.js");
+      const registration = await navigator.serviceWorker.register("/sw.js", { updateViaCache: "none" });
       if ("Notification" in window && "PushManager" in window && Notification.permission === "granted") {
         // The settings page remains responsible for first-time permission prompts.
         // Once permission exists, refresh the subscription automatically after each login/app load.

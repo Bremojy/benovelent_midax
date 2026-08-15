@@ -125,9 +125,11 @@ async function sendEmail({ to, subject, text, html }) {
 
 async function sendBulkEmailToMembers({ subject, text, html, members }) {
   const targets = Array.isArray(members) ? members : await getActiveMembers({ includeEmails: true });
-  const recipients = targets
-    .map((member) => member?.email)
-    .filter(Boolean);
+  const recipients = [...new Set(
+    targets
+      .map((member) => String(member?.email || "").trim().toLowerCase())
+      .filter(Boolean)
+  )];
 
   if (!recipients.length) {
     return { sent: 0, skipped: "no-email-recipients" };
@@ -140,19 +142,26 @@ async function sendBulkEmailToMembers({ subject, text, html, members }) {
     const client = getResendClient();
     if (!config || !client) return { sent: 0, skipped: "resend-not-configured" };
 
+    const BATCH_SIZE = 8;
     let sent = 0;
-    for (const recipient of recipients) {
-      await client.emails.send({
-        from: config.from,
-        to: recipient,
-        subject,
-        text,
-        html,
-      });
-      sent += 1;
+
+    for (let index = 0; index < recipients.length; index += BATCH_SIZE) {
+      const batch = recipients.slice(index, index + BATCH_SIZE);
+      const results = await Promise.allSettled(
+        batch.map((recipient) =>
+          client.emails.send({
+            from: config.from,
+            to: recipient,
+            subject,
+            text,
+            html,
+          })
+        )
+      );
+      sent += results.filter((result) => result.status === "fulfilled").length;
     }
 
-    return { sent, provider: "resend" };
+    return { sent, provider: "resend", attempted: recipients.length };
   }
 
   if (provider === "smtp") {
@@ -160,17 +169,26 @@ async function sendBulkEmailToMembers({ subject, text, html, members }) {
     const transport = await getTransport();
     if (!config || !transport) return { sent: 0, skipped: "smtp-not-configured" };
 
-    for (const recipient of recipients) {
-      await transport.sendMail({
-        from: config.from,
-        to: recipient,
-        subject,
-        text,
-        html,
-      });
+    const BATCH_SIZE = 8;
+    let sent = 0;
+
+    for (let index = 0; index < recipients.length; index += BATCH_SIZE) {
+      const batch = recipients.slice(index, index + BATCH_SIZE);
+      const results = await Promise.allSettled(
+        batch.map((recipient) =>
+          transport.sendMail({
+            from: config.from,
+            to: recipient,
+            subject,
+            text,
+            html,
+          })
+        )
+      );
+      sent += results.filter((result) => result.status === "fulfilled").length;
     }
 
-    return { sent: recipients.length, provider: "smtp" };
+    return { sent, provider: "smtp", attempted: recipients.length };
   }
 
   return { sent: 0, skipped: "email-not-configured" };

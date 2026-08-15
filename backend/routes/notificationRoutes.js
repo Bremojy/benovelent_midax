@@ -36,7 +36,7 @@ router.delete("/push/subscribe", protect, removePushSubscription);
 router.get("/:id", protect, getNotification);
 
 // Create notification (Admin/Super Admin/System)
-router.post("/", protect, createNotification);
+router.post("/", protect, isAdminOrSuperAdmin, createNotification);
 router.post("/broadcast", protect, isAdminOrSuperAdmin, broadcastToMembers);
 
 // Mark one notification as read

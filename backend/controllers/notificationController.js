@@ -18,15 +18,27 @@ GET MY NOTIFICATIONS
 
 exports.getNotifications = async (req, res) => {
   try {
-    const notifications = await Notification.find({
-      recipient: req.user._id,
-    })
-      .populate("sender", "fullName profileImage")
-      .sort({ createdAt: -1 });
+    const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(100, Math.max(1, Number.parseInt(req.query.limit, 10) || 50));
+    const skip = (page - 1) * limit;
+    const filter = { recipient: req.user._id };
+
+    const [total, notifications] = await Promise.all([
+      Notification.countDocuments(filter),
+      Notification.find(filter)
+        .populate("sender", "fullName profileImage")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+    ]);
 
     return res.json({
       success: true,
       count: notifications.length,
+      total,
+      page,
+      pages: Math.max(1, Math.ceil(total / limit)),
       notifications,
     });
   } catch (error) {
@@ -66,7 +78,10 @@ MARK AS READ
 
 exports.markRead = async (req, res) => {
   try {
-    const notification = await Notification.findById(req.params.id);
+    const notification = await Notification.findOne({
+      _id: req.params.id,
+      recipient: req.user._id,
+    });
     if (!notification) {
       return res.status(404).json({
         success: false,
@@ -148,7 +163,10 @@ DELETE NOTIFICATION
 
 exports.deleteNotification = async (req, res) => {
   try {
-    const notification = await Notification.findById(req.params.id);
+    const notification = await Notification.findOne({
+      _id: req.params.id,
+      recipient: req.user._id,
+    });
     if (!notification) {
       return res.status(404).json({
         success: false,
@@ -198,8 +216,10 @@ GET SINGLE NOTIFICATION
 
 exports.getNotification = async (req, res) => {
   try {
-    const notification = await Notification.findById(req.params.id)
-      .populate("sender", "fullName profileImage");
+    const notification = await Notification.findOne({
+      _id: req.params.id,
+      recipient: req.user._id,
+    }).populate("sender", "fullName profileImage");
 
     if (!notification) {
       return res.status(404).json({

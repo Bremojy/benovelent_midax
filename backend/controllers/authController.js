@@ -145,6 +145,25 @@ exports.login = async (req, res) => {
     );
 
     if (!passwordMatch) {
+      const failedAttempts = Number(user.failedLoginAttempts || 0) + 1;
+      const MAX_FAILED_ATTEMPTS = 5;
+      const LOCK_MINUTES = 15;
+
+      user.failedLoginAttempts = failedAttempts;
+
+      if (failedAttempts >= MAX_FAILED_ATTEMPTS) {
+        user.accountLockedUntil = new Date(Date.now() + LOCK_MINUTES * 60 * 1000);
+        await user.save();
+        return res.status(403).json({
+          success: false,
+          message: `Too many failed login attempts. Try again in ${LOCK_MINUTES} minutes.`,
+          code: "ACCOUNT_LOCKED",
+          lockedUntil: user.accountLockedUntil,
+        });
+      }
+
+      await user.save();
+
       return res.status(401).json({
         success: false,
         message: "Invalid email or password.",
