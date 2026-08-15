@@ -8,7 +8,8 @@
     "build": "vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "test:integrity": "node backend/scripts/staticIntegrityTest.js"
+    "test:integrity": "node backend/scripts/staticIntegrityTest.js",
+    "test:routes": "node backend/scripts/routeContractTest.js"
   },
   "dependencies": {
     "axios": "^1.18.1",

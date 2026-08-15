@@ -44,7 +44,8 @@ export const resolveApiUrl = (path = "") => {
 
 const API = axios.create({
   baseURL: `${BASE_URL}/api`,
-  timeout: 15000,
+  // Keep ordinary portal calls responsive while still allowing Render cold-starts.
+  timeout: Number(import.meta.env.VITE_API_TIMEOUT || 20000),
 
   headers: {
     "Content-Type": "application/json",

@@ -18,7 +18,7 @@ function getPortalPath(role) {
   }
 }
 
-const loginVideoSources = ["/videos/benevolent-login-loop.mp4"];
+const loginVideoSources = [import.meta.env.VITE_LOGIN_VIDEO_URL || "/videos/benevolent-login-loop.mp4"];
 
 export default function Login() {
   const navigate = useNavigate();

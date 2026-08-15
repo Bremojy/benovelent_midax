@@ -28,6 +28,7 @@ import "./App.css";
 import "./styles/interaction-system.css";
 import "./styles/v8-responsive.css";
 import "./styles/final-v1-complete.css";
+import "./styles/modern-responsive-overrides.css";
 
 // =====================================================
 // PUBLIC PAGES
