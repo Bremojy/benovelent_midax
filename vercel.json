@@ -33,6 +33,10 @@
       "handle": "filesystem"
     },
     {
+      "src": "/assets/.*\\.(?:js|mjs|css|map|woff2?|png|jpe?g|gif|svg|webp)$",
+      "status": 404
+    },
+    {
       "src": "/(.*)",
       "dest": "/index.html"
     }

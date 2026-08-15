@@ -28,186 +28,200 @@ import "./App.css";
 import "./styles/interaction-system.css";
 import "./styles/v8-responsive.css";
 
+const lazyWithRecovery = (loader, key) => lazy(async () => {
+  try {
+    return await loader();
+  } catch (error) {
+    const recoveryKey = `midax:chunk-recovery:${key}`;
+    if (sessionStorage.getItem(recoveryKey) !== "1") {
+      sessionStorage.setItem(recoveryKey, "1");
+      window.location.reload();
+      await new Promise(() => {});
+    }
+    throw error;
+  }
+});
+
 // =====================================================
 // PUBLIC PAGES
 // =====================================================
 
-const Home = lazy(
+const Home = lazyWithRecovery(
   () => import("./pages/Home")
-);
+, "Home");
 
-const About = lazy(
+const About = lazyWithRecovery(
   () => import("./pages/About")
-);
+, "About");
 
-const Services = lazy(
+const Services = lazyWithRecovery(
   () => import("./pages/Services")
-);
+, "Services");
 
-const Leaders = lazy(
+const Leaders = lazyWithRecovery(
   () => import("./pages/Leaders")
-);
+, "Leaders");
 
-const Constitution = lazy(
+const Constitution = lazyWithRecovery(
   () => import("./pages/Constitution")
-);
+, "Constitution");
 
-const Gallery = lazy(
+const Gallery = lazyWithRecovery(
   () => import("./pages/Gallery")
-);
+, "Gallery");
 
-const News = lazy(
+const News = lazyWithRecovery(
   () => import("./pages/News")
-);
+, "News");
 
-const Contact = lazy(
+const Contact = lazyWithRecovery(
   () => import("./pages/Contact")
-);
+, "Contact");
 
-const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
-const TermsConditions = lazy(() => import("./pages/TermsConditions"));
+const PrivacyPolicy = lazyWithRecovery(() => import("./pages/PrivacyPolicy"), "PrivacyPolicy");
+const TermsConditions = lazyWithRecovery(() => import("./pages/TermsConditions"), "TermsConditions");
 
-const Login = lazy(
+const Login = lazyWithRecovery(
   () => import("./pages/Login")
-);
+, "Login");
 
-const PortalSettings = lazy(
+const PortalSettings = lazyWithRecovery(
   () => import("./pages/PortalSettings")
-);
+, "PortalSettings");
 
-const Polls = lazy(() => import("./pages/Polls"));
-const Feedback = lazy(() => import("./pages/Feedback"));
-const PortalGuide = lazy(() => import("./pages/member/PortalGuide"));
-const PlatformCenter = lazy(() => import("./pages/PlatformCenter"));
-const VerifyMembership = lazy(() => import("./pages/VerifyMembership"));
+const Polls = lazyWithRecovery(() => import("./pages/Polls"), "Polls");
+const Feedback = lazyWithRecovery(() => import("./pages/Feedback"), "Feedback");
+const PortalGuide = lazyWithRecovery(() => import("./pages/member/PortalGuide"), "PortalGuide");
+const PlatformCenter = lazyWithRecovery(() => import("./pages/PlatformCenter"), "PlatformCenter");
+const VerifyMembership = lazyWithRecovery(() => import("./pages/VerifyMembership"), "VerifyMembership");
 
 
 // =====================================================
 // ADMIN PAGES
 // =====================================================
 
-const AdminDashboard = lazy(
+const AdminDashboard = lazyWithRecovery(
   () =>
     import(
       "./pages/admin/AdminDashboard"
     )
-);
+, "AdminDashboard");
 
-const AdminMembers = lazy(
+const AdminMembers = lazyWithRecovery(
   () =>
     import(
       "./pages/admin/AdminMembers"
     )
-);
+, "AdminMembers");
 
-const AdminFinance = lazy(() => import("./pages/admin/AdminFinance"));
-const AdminClaims = lazy(() => import("./pages/admin/AdminClaims"));
-const AdminSupport = lazy(() => import("./pages/admin/AdminSupport"));
-const AdminMessages = lazy(() => import("./pages/admin/AdminMessages"));
-const AdminNotifications = lazy(() => import("./pages/admin/AdminNotifications"));
+const AdminFinance = lazyWithRecovery(() => import("./pages/admin/AdminFinance"), "AdminFinance");
+const AdminClaims = lazyWithRecovery(() => import("./pages/admin/AdminClaims"), "AdminClaims");
+const AdminSupport = lazyWithRecovery(() => import("./pages/admin/AdminSupport"), "AdminSupport");
+const AdminMessages = lazyWithRecovery(() => import("./pages/admin/AdminMessages"), "AdminMessages");
+const AdminNotifications = lazyWithRecovery(() => import("./pages/admin/AdminNotifications"), "AdminNotifications");
 
 
 // =====================================================
 // MEMBER PAGES
 // =====================================================
 
-const MemberDashboard = lazy(
+const MemberDashboard = lazyWithRecovery(
   () =>
     import(
       "./pages/member/MemberDashboard"
     )
-);
+, "MemberDashboard");
 
-const Notifications = lazy(
+const Notifications = lazyWithRecovery(
   () =>
     import(
       "./pages/member/Notifications"
     )
-);
+, "Notifications");
 
-const Messages = lazy(
+const Messages = lazyWithRecovery(
   () =>
     import(
       "./pages/member/Messages"
     )
-);
+, "Messages");
 
-const Profile = lazy(
+const Profile = lazyWithRecovery(
   () =>
     import(
       "./pages/member/Profile"
     )
-);
+, "Profile");
 
-const Contributions = lazy(
+const Contributions = lazyWithRecovery(
   () =>
     import(
       "./pages/member/Contributions"
     )
-);
+, "Contributions");
 
-const Claims = lazy(
+const Claims = lazyWithRecovery(
   () =>
     import(
       "./pages/member/Claims"
     )
-);
+, "Claims");
 
-const Announcements = lazy(
+const Announcements = lazyWithRecovery(
   () =>
     import(
       "./pages/member/Announcements"
     )
-);
+, "Announcements");
 
-const Support = lazy(
+const Support = lazyWithRecovery(
   () =>
     import(
       "./pages/member/Support"
     )
-);
+, "Support");
 
-const Benefits = lazy(
+const Benefits = lazyWithRecovery(
   () =>
     import(
       "./pages/member/Benefits"
     )
-);
-const Dependents = lazy(() => import("./pages/member/Dependents"));
+, "Benefits");
+const Dependents = lazyWithRecovery(() => import("./pages/member/Dependents"), "Dependents");
 
-const Settings = lazy(
+const Settings = lazyWithRecovery(
   () =>
     import(
       "./pages/member/Settings"
     )
-);
+, "Settings");
 
 
 // =====================================================
 // SUPERADMIN PAGES
 // =====================================================
 
-const SuperAdminDashboard = lazy(
+const SuperAdminDashboard = lazyWithRecovery(
   () =>
     import(
       "./pages/superadmin/SuperAdminDashboard"
     )
-);
+, "SuperAdminDashboard");
 
-const SuperAdminAdmins = lazy(
+const SuperAdminAdmins = lazyWithRecovery(
   () =>
     import(
       "./pages/superadmin/SuperAdminAdmins"
     )
-);
-const SuperAdminAudit = lazy(() => import("./pages/superadmin/SuperAdminAudit"));
-const SuperAdminSettings = lazy(() => import("./pages/superadmin/SuperAdminSettings"));
-const SuperAdminSystem = lazy(() => import("./pages/superadmin/SuperAdminSystem"));
-const SuperAdminDataIntegrity = lazy(() => import("./pages/superadmin/SuperAdminDataIntegrity"));
-const SuperAdminConstitution = lazy(() => import("./pages/superadmin/SuperAdminConstitution"));
-const SuperAdminNotifications = lazy(() => import("./pages/superadmin/SuperAdminNotifications"));
-const SuperAdminMessages = lazy(() => import("./pages/superadmin/SuperAdminMessages"));
-const SuperAdminNews = lazy(() => import("./pages/superadmin/SuperAdminNews"));
+, "SuperAdminAdmins");
+const SuperAdminAudit = lazyWithRecovery(() => import("./pages/superadmin/SuperAdminAudit"), "SuperAdminAudit");
+const SuperAdminSettings = lazyWithRecovery(() => import("./pages/superadmin/SuperAdminSettings"), "SuperAdminSettings");
+const SuperAdminSystem = lazyWithRecovery(() => import("./pages/superadmin/SuperAdminSystem"), "SuperAdminSystem");
+const SuperAdminDataIntegrity = lazyWithRecovery(() => import("./pages/superadmin/SuperAdminDataIntegrity"), "SuperAdminDataIntegrity");
+const SuperAdminConstitution = lazyWithRecovery(() => import("./pages/superadmin/SuperAdminConstitution"), "SuperAdminConstitution");
+const SuperAdminNotifications = lazyWithRecovery(() => import("./pages/superadmin/SuperAdminNotifications"), "SuperAdminNotifications");
+const SuperAdminMessages = lazyWithRecovery(() => import("./pages/superadmin/SuperAdminMessages"), "SuperAdminMessages");
+const SuperAdminNews = lazyWithRecovery(() => import("./pages/superadmin/SuperAdminNews"), "SuperAdminNews");
 
 
 // =====================================================

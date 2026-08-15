@@ -218,3 +218,73 @@
 
 /* V9 mobile navigation modes */
 @media (max-width:900px){.dashboard-sidebar.mobile-bottom-nav{top:auto;bottom:0;left:50%;transform:translateX(-50%);width:min(100%,720px);height:70px;display:flex!important}.dashboard-sidebar.mobile-bottom-nav:not(.open){transform:translateX(-50%)}.dashboard-sidebar.mobile-bottom-nav .sidebar-menu{display:flex}.dashboard-sidebar.mobile-bottom-nav .sidebar-footer{display:flex}.dashboard-sidebar.mobile-drawer{top:0;bottom:auto;left:0;right:auto;width:min(320px,88vw);height:100dvh;max-height:100dvh;display:flex!important;transform:translateX(-105%);border-radius:0 24px 24px 0;border-right:1px solid rgba(255,255,255,.08);border-top:0}.dashboard-sidebar.mobile-drawer.open{transform:translateX(0)}.dashboard-sidebar.mobile-drawer .sidebar-header{display:flex}.dashboard-sidebar.mobile-drawer .sidebar-menu{flex-direction:column;align-items:stretch;gap:7px;padding:18px 14px;overflow-y:auto;overflow-x:hidden}.dashboard-sidebar.mobile-drawer .sidebar-link{width:100%;height:50px;min-width:0;padding:0 14px;justify-content:flex-start;flex-direction:row;font-size:14px;gap:12px}.dashboard-sidebar.mobile-drawer .sidebar-link span{display:inline}.dashboard-sidebar.mobile-drawer .sidebar-footer{padding:0 0 18px;display:block}.dashboard-sidebar.mobile-drawer .logout-btn{width:calc(100% - 28px);height:48px;margin:0 14px;font-size:14px}.dashboard-sidebar.mobile-drawer .logout-btn span{display:inline}}
+
+
+/* V10: mobile dashboard navigation always fits the viewport. */
+@media (max-width:900px){
+  .dashboard-sidebar.mobile-bottom-nav{
+    height:calc(68px + env(safe-area-inset-bottom));
+    width:100%;
+    max-width:none;
+    padding:0 8px env(safe-area-inset-bottom);
+    border-radius:18px 18px 0 0;
+  }
+  .dashboard-sidebar.mobile-bottom-nav .sidebar-menu{
+    flex:1 1 auto;
+    min-width:0;
+    display:grid;
+    grid-template-columns:repeat(4,minmax(0,1fr));
+    gap:4px;
+    padding:6px 0;
+    overflow:hidden;
+  }
+  .dashboard-sidebar.mobile-bottom-nav .sidebar-link{
+    min-width:0; width:auto; height:54px;
+    justify-self:stretch;
+    border-radius:15px;
+  }
+  .dashboard-sidebar.mobile-bottom-nav .sidebar-footer{
+    flex:0 0 58px;
+    display:flex;
+    align-items:center;
+    gap:4px;
+    padding:0;
+  }
+  .dashboard-sidebar.mobile-bottom-nav .logout-btn,
+  .dashboard-sidebar.mobile-bottom-nav .mobile-more-btn{
+    width:50px; height:50px; margin:0; border-radius:15px;
+    display:grid; place-items:center; padding:0;
+  }
+  .dashboard-sidebar.mobile-bottom-nav .mobile-more-btn{
+    border:1px solid rgba(255,255,255,.08);
+    background:#1f1f28; color:#fff; cursor:pointer;
+  }
+  .dashboard-sidebar.mobile-bottom-nav .mobile-more-btn span{display:none}
+  .dashboard-sidebar.mobile-bottom-nav .logout-btn{display:none}
+  .mobile-more-backdrop{
+    position:fixed; inset:0; z-index:3000;
+    background:rgba(3,7,12,.45); backdrop-filter:blur(8px);
+    display:flex; align-items:flex-end; justify-content:center;
+  }
+  .mobile-more-drawer{
+    width:min(680px,100%); max-height:min(78dvh,680px); overflow:auto;
+    background:#fff; color:#111827; border-radius:24px 24px 0 0;
+    padding:18px; box-shadow:0 -28px 70px rgba(0,0,0,.24);
+  }
+  .mobile-more-header{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
+  .mobile-more-header strong{font-size:1.1rem}
+  .mobile-more-header button{width:38px;height:38px;border:0;border-radius:12px;background:#f2f4f7;color:#344054;display:grid;place-items:center}
+  .mobile-more-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .mobile-more-link{min-height:64px;display:flex;align-items:center;gap:10px;padding:12px 13px;border:1px solid #eaecf0;border-radius:15px;background:#fff;color:#344054;text-decoration:none;font-weight:700}
+  .mobile-more-link.active{border-color:#ff7a00;background:#fff5ec;color:#d85f00}
+  .mobile-more-link.danger{cursor:pointer}
+}
+@media (max-width:390px){
+  .dashboard-sidebar.mobile-bottom-nav{padding-left:4px;padding-right:4px}
+  .dashboard-sidebar.mobile-bottom-nav .sidebar-link{height:52px}
+  .dashboard-sidebar.mobile-bottom-nav .sidebar-link svg{width:21px;height:21px}
+  .dashboard-sidebar.mobile-bottom-nav .sidebar-footer{flex-basis:54px}
+  .dashboard-sidebar.mobile-bottom-nav .logout-btn,.dashboard-sidebar.mobile-bottom-nav .mobile-more-btn{width:46px;height:46px}
+}
+
+@media(max-width:900px){.dashboard-sidebar.mobile-bottom-nav:not(.open){transform:translateX(-50%) !important;}}

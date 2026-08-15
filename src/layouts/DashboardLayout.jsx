@@ -35,9 +35,15 @@ function DashboardLayout({ children }) {
   }, []);
 
   useEffect(() => {
-    if (!isMobile) { setSidebarOpen(true); return; }
-    setSidebarOpen(!isMobile);
-  }, [isMobile]);
+    // Desktop keeps the sidebar available. On mobile, the dashboard home
+    // keeps its compact bottom navigation visible, while subpages open with
+    // the sidebar drawer closed so the page itself gets the full viewport.
+    if (!isMobile) {
+      setSidebarOpen(true);
+      return;
+    }
+    setSidebarOpen(Boolean(isDashboardHome));
+  }, [isMobile, isDashboardHome]);
 
   const goHome = () => navigate(basePath);
 
@@ -58,7 +64,7 @@ function DashboardLayout({ children }) {
           setSidebarOpen={setSidebarOpen}
           onLogout={logout}
           homePath={basePath}
-          showHomeBack={false}
+          showHomeBack={mobileSubpage}
           onHomeBack={goHome}
         />
         <main className="dashboard-content">

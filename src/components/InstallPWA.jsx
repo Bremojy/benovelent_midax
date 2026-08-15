@@ -1,143 +1,94 @@
-import { useEffect, useState } from "react";
-import { Download, X, Smartphone, Share2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Download, X } from "lucide-react";
 import "../styles/feedback-pwa.css";
 
-const standalone = () => Boolean(
+const isStandalone = () => Boolean(
   window.matchMedia?.("(display-mode: standalone)")?.matches ||
   window.navigator?.standalone === true
 );
-const ios = () => /iphone|ipad|ipod/i.test(window.navigator?.userAgent || "");
-const android = () => /android/i.test(window.navigator?.userAgent || "");
+const isIOS = () => /iphone|ipad|ipod/i.test(window.navigator?.userAgent || "");
 
 export default function InstallPWA() {
-  const [deferred, setDeferred] = useState(null);
-  const [open, setOpen] = useState(false);
-  const [statusMessage, setStatusMessage] = useState("");
+  const deferredPromptRef = useRef(null);
   const [installed, setInstalled] = useState(false);
-  const [iosDevice, setIosDevice] = useState(false);
-  const [androidDevice, setAndroidDevice] = useState(false);
-  const [pendingInstallIntent, setPendingInstallIntent] = useState(false);
+  const [notice, setNotice] = useState(null);
 
   useEffect(() => {
-    if (standalone()) {
+    if (isStandalone()) {
       setInstalled(true);
       return undefined;
     }
-    setIosDevice(ios());
-    setAndroidDevice(android());
 
-    const onPrompt = async (event) => {
+    const onBeforeInstallPrompt = (event) => {
       event.preventDefault();
-      setDeferred(event);
+      deferredPromptRef.current = event;
       window.__benovelentPwaPrompt = event;
-      if (pendingInstallIntent) {
-        try {
-          await event.prompt();
-          await event.userChoice;
-        } catch (_) {
-          // Browser may reject/consume the one-time prompt.
-        } finally {
-          setPendingInstallIntent(false);
-          setDeferred(null);
-          window.__benovelentPwaPrompt = null;
-        }
-      }
     };
+
     const onInstalled = () => {
+      deferredPromptRef.current = null;
+      window.__benovelentPwaPrompt = null;
       setInstalled(true);
-      setDeferred(null);
-      setOpen(false);
+      setNotice(null);
     };
+
     const onDirectInstall = async () => {
-      if (standalone()) return;
-      const prompt = window.__benovelentPwaPrompt || deferred;
+      if (isStandalone()) return;
+      const prompt = deferredPromptRef.current || window.__benovelentPwaPrompt;
       if (prompt) {
         try {
           await prompt.prompt();
           await prompt.userChoice;
-        } catch (_) {
-          // Browser may reject/consume the one-time prompt.
+        } catch (error) {
+          console.debug("PWA install prompt was dismissed or unavailable.", error);
         } finally {
-          setDeferred(null);
+          deferredPromptRef.current = null;
           window.__benovelentPwaPrompt = null;
         }
-        setPendingInstallIntent(false);
         return;
       }
-      setPendingInstallIntent(true);
-      if (ios()) {
-        setPendingInstallIntent(false);
-        setStatusMessage("On iPhone/iPad: tap Share, then Add to Home Screen.");
+
+      if (isIOS()) {
+        setNotice({
+          title: "Add MIDAX to your Home Screen",
+          body: <>Tap <b>Share</b> in Safari, then choose <b>Add to Home Screen</b>.</>,
+        });
       } else {
-        setPendingInstallIntent(true);
-        setStatusMessage("Your browser controls installation. Open its menu and choose Install app when available.");
+        // Chromium only emits beforeinstallprompt when the browser decides the
+        // install criteria are met. Do not cover the dashboard with instructions.
+        setNotice({
+          title: "Install isn’t ready yet",
+          body: <>Your browser has not exposed the direct install prompt. Try again from this Install button after the app has finished loading.</>,
+        });
       }
-      setOpen(true);
     };
 
-    window.addEventListener("beforeinstallprompt", onPrompt);
+    window.addEventListener("beforeinstallprompt", onBeforeInstallPrompt);
     window.addEventListener("appinstalled", onInstalled);
     window.addEventListener("benovelent:install-now", onDirectInstall);
-    if (window.__benovelentPwaPrompt) setDeferred(window.__benovelentPwaPrompt);
-
     return () => {
-      window.removeEventListener("beforeinstallprompt", onPrompt);
+      window.removeEventListener("beforeinstallprompt", onBeforeInstallPrompt);
       window.removeEventListener("appinstalled", onInstalled);
       window.removeEventListener("benovelent:install-now", onDirectInstall);
     };
-  }, [pendingInstallIntent]);
+  }, []);
 
-  const closeFallback = () => {
-    setOpen(false);
-    setPendingInstallIntent(false);
-  };
+  useEffect(() => {
+    if (!notice) return undefined;
+    const timer = window.setTimeout(() => setNotice(null), 6500);
+    return () => window.clearTimeout(timer);
+  }, [notice]);
 
-  const install = async () => {
-    if (!deferred) return;
-    try {
-      await deferred.prompt();
-      await deferred.userChoice;
-    } catch (_) {
-      // The browser can reject/consume the prompt; the app remains usable.
-    } finally {
-      setDeferred(null);
-      setOpen(false);
-    }
-  };
-
-  if (installed || !open) return null;
-
-  const directInstall = Boolean(deferred);
-  const iosMode = !directInstall && iosDevice;
+  if (installed || !notice) return null;
 
   return (
-    <div className="pwa-install-sheet" role="dialog" aria-modal="true" aria-label="Install Benovelent MIDAX">
-      <button type="button" className="pwa-install-sheet-close" onClick={closeFallback} aria-label="Close installation dialog">
-        <X size={18} />
-      </button>
-      <div className="pwa-install-sheet-icon"><Download size={22} /></div>
-      <div className="pwa-install-sheet-copy">
-        <span>BENOVELENT MIDAX</span>
-        <h2>{directInstall ? "Install Benovelent MIDAX" : iosMode ? "Add to Home Screen" : "Installation notice"}</h2>
-        {directInstall ? (
-          <p>Install the portal for a faster, app-like experience and easier access on your device.</p>
-        ) : iosMode ? (
-          <p><Share2 size={14} /> In Safari, tap <b>Share</b> → <b>Add to Home Screen</b> → <b>Add</b>.</p>
-        ) : statusMessage ? (
-          <p>{statusMessage}</p>
-        ) : androidDevice ? (
-          <p>Open the browser menu and choose <b>Install app</b> when available.</p>
-        ) : (
-          <p>Open your browser menu and choose <b>Install app</b> when available.</p>
-        )}
+    <div className="pwa-install-toast" role="status" aria-live="polite">
+      <div className="pwa-install-toast-icon"><Download size={18} /></div>
+      <div className="pwa-install-toast-copy">
+        <strong>{notice.title}</strong>
+        <span>{notice.body}</span>
       </div>
-      <div className="pwa-install-sheet-actions">
-        {directInstall ? (
-          <button type="button" className="pwa-install-now" onClick={install}><Smartphone size={16} /> Install</button>
-        ) : (
-          <button type="button" className="pwa-help-secondary" onClick={closeFallback}>Close</button>
-        )}
-      </div>
+      <button type="button" className="pwa-install-toast-close" onClick={() => setNotice(null)} aria-label="Close install message"><X size={17} /></button>
     </div>
   );
 }
