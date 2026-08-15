@@ -159,6 +159,11 @@ lastDevice: {
     // ACTIVITY
     // =====================================
 
+    sessionVersion: {
+      type: Number,
+      default: 0,
+    },
+
     lastLogin: {
       type: Date,
       default: null,

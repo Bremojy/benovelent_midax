@@ -52,6 +52,16 @@ for (const needle of ["sendTextBeeSms", "TEXTBEE_API_KEY", "x-api-key", "api.tex
 const sw = fs.readFileSync(path.join(frontend, "public/sw.js"), "utf8");
 for (const needle of ["incoming_call", "missed_call", "requireInteraction", "showNotification", "incomingPayload", "savePendingCall"]) if (!sw.includes(needle)) failures.push(`PWA push check missing: ${needle}`);
 
+
+const authMiddleware = fs.readFileSync(path.join(root, "middleware/authMiddleware.js"), "utf8");
+if (!authMiddleware.includes('SESSION_REPLACED')) failures.push("Authentication middleware is missing server-side session replacement enforcement.");
+const socket = fs.readFileSync(path.join(root, "sockets/socket.js"), "utf8");
+for (const needle of ["sessionVersion", "session:", "jsonwebtoken"]) if (!socket.includes(needle)) failures.push(`Socket authentication/session check missing: ${needle}`);
+for (const rel of ["models/Member.js", "models/Admin.js", "models/SuperAdmin.js"]) {
+  const text = fs.readFileSync(path.join(root, rel), "utf8");
+  if (!text.includes("sessionVersion:")) failures.push(`${rel} is missing sessionVersion.`);
+}
+
 const server = fs.readFileSync(path.join(root, "server.js"), "utf8");
 if (!server.includes('require("./utils/runMigrations")')) failures.push("Server is not wired to run database migrations.");
 

@@ -125,6 +125,11 @@ sparse:true,
       default: Date.now,
     },
 
+    sessionVersion: {
+      type: Number,
+      default: 0,
+    },
+
     lastLogin: {
       type: Date,
     },

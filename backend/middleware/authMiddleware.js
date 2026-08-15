@@ -110,6 +110,17 @@ const verifyToken = async (req, res, next) => {
     // NORMALIZE ROLE
     // --------------------------------------
 
+    const tokenSessionVersion = Number(decoded.sessionVersion ?? 0);
+    const currentSessionVersion = Number(user.sessionVersion ?? 0);
+
+    if (tokenSessionVersion !== currentSessionVersion) {
+      return res.status(401).json({
+        success: false,
+        message: "Your account was signed in on another device. This session has been logged out.",
+        code: "SESSION_REPLACED",
+      });
+    }
+
     const role = user.role || userType;
 
     // --------------------------------------

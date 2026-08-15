@@ -83,3 +83,25 @@ button, input, select, textarea { max-width:100%; }
   .dashboard-content { width:100%; min-width:0; }
   .portal-panel, .portal-module, .admin-members-page { max-width:100%; min-width:0; }
 }
+
+
+/* V10–V15 responsive foundation */
+html, body, #root { max-width: 100%; min-width: 0; }
+body { overflow-x: hidden; }
+img, video, canvas, svg { max-width: 100%; }
+button, input, select, textarea { font: inherit; }
+button, [role="button"] { min-height: 40px; }
+:focus-visible { outline: 3px solid rgba(255,122,0,.35); outline-offset: 3px; }
+@media (max-width: 900px) {
+  .dashboard-content, .dashboard-page, .portal-module, .portal-panel, .admin-page, .superadmin-page { min-width: 0; }
+  .dashboard-page { width: 100%; }
+}
+@media (max-width: 560px) {
+  h1 { font-size: clamp(1.55rem, 8vw, 2.15rem); }
+  h2 { font-size: clamp(1.25rem, 6vw, 1.75rem); }
+  .dashboard-content { padding-left: 10px; padding-right: 10px; }
+  .portal-btn, .primary-btn, .secondary-btn, .danger-btn { min-height: 44px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
+}

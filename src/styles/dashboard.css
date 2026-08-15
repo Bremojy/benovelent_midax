@@ -187,3 +187,14 @@ html[data-appearance="dark"] .settings-field textarea{
 
 /* V9: mobile portal navigation exists only on portal home. Other portal pages use an overlay drawer. */
 @media (max-width:900px){.dashboard-home-shell .dashboard-main{padding-bottom:84px}.dashboard-mobile-subpage .dashboard-main{padding-bottom:0}.dashboard-home-shell .dashboard-content{padding-bottom:96px}.dashboard-mobile-subpage .dashboard-content{padding-bottom:24px}}
+
+
+@media (max-width: 900px) {
+  .dashboard-main { width: 100%; min-width: 0; }
+  .dashboard-content { width: 100%; overflow-x: clip; }
+  .dashboard-page { overflow-wrap: anywhere; }
+}
+@media (max-width: 640px) {
+  .dashboard-container .portal-panel, .dashboard-container .settings-panel, .dashboard-container .admin-stat-card, .dashboard-container .admin-overview-card, .dashboard-container .superadmin-panel { padding: 14px !important; }
+  .dashboard-container .portal-table-wrapper, .dashboard-container .table-responsive { max-width: 100%; }
+}

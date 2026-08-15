@@ -399,3 +399,15 @@
 .chat-filter-toggle,.chat-filter-clear{display:inline-flex;align-items:center;gap:7px;border:1px solid rgba(148,163,184,.24);border-radius:10px;background:rgba(255,255,255,.78);color:inherit;padding:8px 10px;font-size:.78rem;font-weight:800;cursor:pointer}
 .chat-filter-toggle{flex:1;justify-content:flex-start}.chat-filter-clear{font-weight:700}
 .chat-filter-count{margin-left:auto;font-size:.68rem;border-radius:999px;padding:2px 7px;background:currentColor;color:#fff;mix-blend-mode:multiply}
+
+
+/* V10 mobile hardening */
+@media (max-width: 899px) {
+  .chat-sidebar, .chat-window, .chat-content, .message-input-container, .call-overlay { min-width: 0; max-width: 100%; }
+  .chat-window, .chat-sidebar { width: 100%; }
+  .message-input-container textarea { min-width: 0; font-size: 16px; }
+}
+@media (max-width: 520px) {
+  .message-input-container { padding-left: 8px; padding-right: 8px; }
+  .message-input-container button { min-width: 40px; }
+}

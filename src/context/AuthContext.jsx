@@ -481,6 +481,28 @@ export function AuthProvider({
     );
 
   // ======================================
+  // SERVER-SIDE SESSION REPLACEMENT
+  // ======================================
+
+  useEffect(() => {
+    const handleSessionEnded = (event) => {
+      const message = event.detail?.message || "Your session has ended.";
+      clearSession();
+      setAuthError(message);
+    };
+    window.addEventListener("benevolent:session-ended", handleSessionEnded);
+    return () => window.removeEventListener("benevolent:session-ended", handleSessionEnded);
+  }, [clearSession]);
+
+  // Verify the JWT periodically so a dashboard that is not using chat still
+  // notices when the account signs in on another device.
+  useEffect(() => {
+    if (!user) return undefined;
+    const timer = window.setInterval(() => { loadCurrentUser(); }, 60000);
+    return () => window.clearInterval(timer);
+  }, [user, loadCurrentUser]);
+
+  // ======================================
   // INITIAL AUTH CHECK
   // ======================================
 

@@ -244,6 +244,8 @@ exports.login = async (req, res) => {
 
         lastSeen:
           user.lastSeen,
+        sessionVersion:
+          Number(user.sessionVersion || 0),
       },
     });
 
@@ -355,6 +357,7 @@ exports.logout = async (req, res) => {
   try {
     if (req.user) {
       req.user.lastSeen = new Date();
+      req.user.sessionVersion = Number(req.user.sessionVersion || 0) + 1;
 
       if ("online" in req.user) {
         req.user.online = false;

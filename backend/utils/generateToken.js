@@ -17,6 +17,7 @@ const generateToken = (user, extra = {}) => {
     issuer: 'benevolent-midax',
     audience: 'benevolent-midax-users',
     subject: user._id.toString(),
+    sessionVersion: Number(user.sessionVersion || 0),
   });
 };
 
