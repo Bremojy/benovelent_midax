@@ -127,17 +127,25 @@ function DashboardTopbar({
       <div className="topbar-left">
 
         {showHomeBack ? (
-          <>
-            <button type="button" className="home-btn" onClick={onHomeBack || (() => navigate(homePath))} aria-label="Go to dashboard home" title="Dashboard home">
-              <ArrowLeft size={20} />
-              <span>Home</span>
-            </button>
-            <button type="button" className="menu-btn subpage-menu-btn" onClick={() => setSidebarOpen(!sidebarOpen)} aria-label="Open portal navigation">
-              <Menu size={23} />
-            </button>
-          </>
+          <button
+            type="button"
+            className="home-btn"
+            onClick={onHomeBack || (() => navigate(homePath))}
+            aria-label="Go back home"
+            title="Go back home"
+          >
+            <ArrowLeft size={20} />
+            <span>Home</span>
+          </button>
         ) : (
-          <button type="button" className="menu-btn" onClick={() => setSidebarOpen(!sidebarOpen)} aria-label="Toggle portal navigation">
+          <button
+            type="button"
+            className="menu-btn"
+            onClick={() =>
+              setSidebarOpen(!sidebarOpen)
+            }
+            aria-label="Toggle sidebar"
+          >
             <Menu size={23} />
           </button>
         )}
@@ -172,7 +180,7 @@ function DashboardTopbar({
 
         {/* MESSAGES */}
 
-        <button
+        {normalizedRole !== "superadmin" && <button
           type="button"
           className="icon-btn"
           onClick={goToMessages}
@@ -188,7 +196,7 @@ function DashboardTopbar({
                 : unreadMessages}
             </span>
           )}
-        </button>
+        </button>}
 
         {/* NOTIFICATIONS */}
 

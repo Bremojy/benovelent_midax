@@ -357,24 +357,3 @@ transform:translateY(-2px);
 /* V9 install action */
 .install-topbar-btn{width:auto;min-width:86px;padding:0 12px;gap:6px;font-weight:800}
 @media(max-width:560px){.dashboard-topbar{padding:0 10px;gap:6px}.topbar-left,.topbar-right{gap:6px;min-width:0}.portal-website-home-btn{display:none!important}.icon-btn.install-topbar-btn{width:40px;min-width:40px;padding:0;border-radius:12px}.icon-btn.install-topbar-btn span{display:none}.topbar-right{margin-left:auto}.user-box{max-width:40px}}
-
-
-@media (max-width:900px){
-  .dashboard-topbar{position:sticky;top:0;z-index:1400}
-  .dashboard-topbar .search-box{min-width:0;flex:1;max-width:none}
-  .dashboard-topbar .portal-website-home-btn span,.dashboard-topbar .user-info{display:none}
-  .dashboard-topbar .portal-website-home-btn{width:44px}
-  .dashboard-topbar .user-box{padding:0}
-  .dashboard-topbar .install-topbar-btn span{display:inline;font-size:12px}
-  .dashboard-topbar .icon-btn.install-topbar-btn{padding:0 12px;min-width:84px}
-}
-@media(max-width:560px){
-  .dashboard-topbar{padding:8px 10px;gap:6px}
-  .dashboard-topbar .search-box{display:none}
-  .dashboard-topbar .portal-website-home-btn{display:none}
-  .dashboard-topbar .topbar-right{gap:5px}
-  .dashboard-topbar .icon-btn{min-width:42px;width:42px;height:42px}
-  .dashboard-topbar .icon-btn.install-topbar-btn{width:auto;min-width:76px;padding:0 9px}
-  .dashboard-topbar .install-topbar-btn span{display:inline;font-size:11px}
-  .subpage-menu-btn{order:-1}
-}

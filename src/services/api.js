@@ -192,19 +192,6 @@ export const UPLOAD_URL = BASE_URL;
 export const resolveUploadUrl = (value = "") => {
   const raw = String(value || "").trim();
   if (!raw) return "";
-  if (/^https?:\/\//i.test(raw)) {
-    try {
-      const url = new URL(raw);
-      if (/^benovelent-midax\.onrender\.com$/i.test(url.hostname) && /^\/(?:about-welcome|news-placeholder|gallery-placeholder|hero)(?:\.[a-z0-9]+)?$/i.test(url.pathname)) {
-        return `${url.pathname}${url.search}`;
-      }
-    } catch (_) { /* keep original URL below */ }
-    return raw;
-  }
-  if (/^(data:|blob:)/i.test(raw)) return raw;
-  // Public assets bundled by Vite belong to the frontend origin. Uploaded
-  // media and backend documents remain on the Render API origin.
-  if (/^\/(?:about-welcome|news-placeholder|gallery-placeholder|hero)(?:\.[a-z0-9]+)?(?:\?.*)?$/i.test(raw)) return raw;
-  if (/^\/(?:favicon|apple-touch-icon|pwa-icon-192|pwa-icon-512|icons)(?:\.[a-z0-9]+)?(?:\?.*)?$/i.test(raw)) return raw;
+  if (/^(https?:\/\/|data:|blob:)/i.test(raw)) return raw;
   return `${BASE_URL}${raw.startsWith("/") ? "" : "/"}${raw}`;
 };

@@ -28,26 +28,16 @@ export default function PlatformCenter({ role = "member" }) {
   const load = async () => {
     setLoading(true);
     try {
-      const results = await Promise.allSettled([
+      const [a, d, e, docs, c] = await Promise.all([
         API.get("/platform/activity"),
         API.get("/platform/directory", { params: station ? { station } : {} }),
         API.get("/platform/events"),
         API.get("/platform/documents"),
         API.get("/platform/membership-card"),
-        ...(["admin", "superadmin"].includes(role) ? [API.get("/platform/analytics")] : []),
       ]);
-      const value = (index) => results[index]?.status === "fulfilled" ? results[index].value.data : null;
-      const activityData = value(0);
-      const directoryData = value(1);
-      const eventsData = value(2);
-      const docsData = value(3);
-      const cardData = value(4);
-      setActivity(activityData?.data || null);
-      setDirectory({ members: directoryData?.members || [], stations: directoryData?.stations || [] });
-      setEvents(eventsData?.events || []);
-      setDocuments(docsData?.documents || []);
-      setCard(cardData?.card || null);
-      if (["admin", "superadmin"].includes(role)) setAnalytics(value(5)?.data || null);
+      setActivity(a.data?.data || null); setDirectory({ members: d.data?.members || [], stations: d.data?.stations || [] });
+      setEvents(e.data?.events || []); setDocuments(docs.data?.documents || []); setCard(c.data?.card || null);
+      if (["admin", "superadmin"].includes(role)) { const r = await API.get("/platform/analytics"); setAnalytics(r.data?.data || null); }
     } finally { setLoading(false); }
   };
 

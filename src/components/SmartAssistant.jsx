@@ -52,13 +52,13 @@ export default function SmartAssistant() {
     if (open) { setShowLauncher(true); setShowTeaser(false); return undefined; }
     setShowLauncher(true);
     setShowTeaser(true);
-    const hideTeaser = window.setTimeout(() => setShowTeaser(false), 4200);
-    const hideLauncher = window.setTimeout(() => setShowLauncher(false), 6500);
+    const hideTeaser = window.setTimeout(() => setShowTeaser(false), 5200);
+    const hideLauncher = window.setTimeout(() => setShowLauncher(false), 9000);
     const repeat = window.setInterval(() => {
       setShowLauncher(true);
       setShowTeaser(true);
-      window.setTimeout(() => setShowTeaser(false), 4200);
-      window.setTimeout(() => setShowLauncher(false), 6500);
+      window.setTimeout(() => setShowTeaser(false), 5200);
+      window.setTimeout(() => setShowLauncher(false), 9000);
     }, 42000);
     return () => { window.clearTimeout(hideTeaser); window.clearTimeout(hideLauncher); window.clearInterval(repeat); };
   }, [open, path]);

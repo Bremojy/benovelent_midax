@@ -1,4 +1,4 @@
-const CACHE = "benovelent-shell-v20";
+const CACHE = "benovelent-shell-v17";
 const ASSETS = ["/", "/index.html", "/manifest.webmanifest", "/pwa-icon-192.png", "/pwa-icon-512.png", "/apple-touch-icon.png"];
 const DB_NAME = "benovelent-pwa";
 const DB_STORE = "calls";
@@ -123,25 +123,10 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
+  // Static assets are fast on repeat visits; HTML falls back to the network so
+  // deployments can roll forward without users being trapped on an old shell.
   const isDocument = request.mode === "navigate" || request.destination === "document";
-  const isCodeAsset = /\.(?:js|mjs|css)$/.test(url.pathname);
   event.respondWith((async () => {
-    // Network-first for code assets prevents stale hashed modules after a deploy.
-    if (isCodeAsset) {
-      try {
-        const response = await fetch(request, { cache: "no-store" });
-        if (response.ok && response.status === 200 && response.type !== "opaque") {
-          const cache = await caches.open(CACHE);
-          await cache.put(request, response.clone());
-        }
-        return response;
-      } catch (error) {
-        const cached = await caches.match(request);
-        if (cached) return cached;
-        return new Response("Asset unavailable", { status: 503, statusText: "Asset unavailable" });
-      }
-    }
-
     if (!isDocument) {
       const cached = await caches.match(request);
       if (cached) return cached;

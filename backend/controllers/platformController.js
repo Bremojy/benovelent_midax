@@ -95,7 +95,7 @@ exports.search = async (req, res) => {
 exports.events = async (req, res) => {
   const role = req.userRole;
   const now = new Date();
-  const events = await Event.find({ published: true, audience: { $in: [role, "all"] }, startAt: { $gte: new Date(now.getTime() - 86400000 * 14) } }).sort({ startAt: 1 }).limit(50).lean();
+  const events = await Event.find({ published: true, audience: role, startAt: { $gte: new Date(now.getTime() - 86400000 * 14) } }).sort({ startAt: 1 }).limit(50).lean();
   res.json({ success: true, events });
 };
 
@@ -214,11 +214,12 @@ exports.assistant = async (req, res) => {
 
 exports.assistantContext = async (req, res) => {
   const role = req.userRole || "public";
-  const [news, events] = await Promise.all([
+  const [website, news, events] = await Promise.all([
     News.find({ published: true, status: "published" }).sort({ publishDate: -1 }).limit(8).select("title summary category publishDate").lean(),
-    Event.find({ published: true, audience: { $in: [role === "public" ? "member" : role, "all"] }, startAt: { $gte: new Date(Date.now() - 86400000) } }).sort({ startAt: 1 }).limit(8).select("title description type startAt location").lean().catch(() => []),
+    Event.find({ published: true, audience: role === "public" ? "member" : role, startAt: { $gte: new Date(Date.now() - 86400000) } }).sort({ startAt: 1 }).limit(8).select("title description type startAt location").lean().catch(() => []),
+    Promise.resolve([]),
   ]);
-  res.json({ success: true, context: { role, service: "Benevolent Midax", news, events } });
+  res.json({ success: true, context: { role, service: "Benevolent Midax", news: website, events } });
 };
 
 
