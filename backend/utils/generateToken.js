@@ -10,6 +10,7 @@ const generateToken = (user, extra = {}) => {
     role: user.role,
     email: user.email,
     ...extra,
+    sessionVersion: Number(user.sessionVersion || 0),
   };
 
   return jwt.sign(payload, process.env.JWT_SECRET, {
@@ -17,7 +18,6 @@ const generateToken = (user, extra = {}) => {
     issuer: 'benevolent-midax',
     audience: 'benevolent-midax-users',
     subject: user._id.toString(),
-    sessionVersion: Number(user.sessionVersion || 0),
   });
 };
 
