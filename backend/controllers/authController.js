@@ -18,6 +18,7 @@ const {
 const auditService = require("../services/auditService");
 
 const notificationService = require("../services/notificationService");
+const { getIO } = require("../sockets/socket");
 
 // ==========================================
 // LOGIN
@@ -155,10 +156,23 @@ exports.login = async (req, res) => {
     // SUCCESSFUL LOGIN
     // --------------------------------------
 
+    // A successful login replaces any previous device session. Notify existing
+    // sockets before incrementing the server-side session version so the old
+    // browser/phone can log out immediately instead of waiting for a request.
+    try {
+      getIO()?.to(`session:${String(user._id)}`).emit("session-replaced", {
+        reason: "new-login",
+        message: "Your account was signed in on another device. This session has been logged out for security.",
+      });
+    } catch (socketError) {
+      console.debug("Session replacement notification skipped:", socketError?.message || socketError);
+    }
+
     user.failedLoginAttempts = 0;
     user.accountLockedUntil = null;
     user.lastLogin = new Date();
     user.lastSeen = new Date();
+    user.sessionVersion = Number(user.sessionVersion || 0) + 1;
 
     await user.save();
 

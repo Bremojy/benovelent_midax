@@ -164,6 +164,7 @@ API.interceptors.response.use(
         "TOKEN_MISSING",
         "USER_NOT_FOUND",
         "AUTH_FAILED",
+      "SESSION_REPLACED",
       ].includes(code)
     ) {
       clearAuthSession();

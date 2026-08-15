@@ -700,6 +700,23 @@ export function AuthProvider({
   ]);
 
   // ======================================
+  // SERVER-SIDE SESSION REPLACEMENT
+  // ======================================
+
+  useEffect(() => {
+    const handleSessionReplaced = () => {
+      clearSession();
+      setAuthError("Your account was signed in on another device. You have been logged out for security.");
+      try {
+        localStorage.setItem(SESSION_EVENT_KEY, JSON.stringify({ type: "logout", reason: "session-replaced", timestamp: Date.now() }));
+      } catch {}
+      try { window.dispatchEvent(new CustomEvent("benovelent:session-replaced-ui")); } catch {}
+    };
+    window.addEventListener("benovelent:session-replaced", handleSessionReplaced);
+    return () => window.removeEventListener("benovelent:session-replaced", handleSessionReplaced);
+  }, [clearSession]);
+
+  // ======================================
   // CROSS-TAB SESSION SYNC
   // ======================================
 

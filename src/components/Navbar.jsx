@@ -20,6 +20,7 @@ export default function Navbar() {
 
   return (
     <>
+      <a className="skip-link" href="#main-content">Skip to content</a>
       <div className="public-utility-bar">
         <div className="public-utility-inner">
           <span><Phone size={13} /> Member support: use the Contact page or your portal</span>

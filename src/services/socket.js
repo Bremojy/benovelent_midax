@@ -5,6 +5,7 @@ const SOCKET_URL = String(import.meta.env.VITE_API_URL || "https://benovelent-mi
 const socket = io(SOCKET_URL, {
   transports: ["websocket", "polling"],
   autoConnect: false,
+  auth: {},
   reconnection: true,
   reconnectionAttempts: Infinity,
   reconnectionDelay: 800,
@@ -13,3 +14,10 @@ const socket = io(SOCKET_URL, {
 });
 
 export default socket;
+
+export const setSocketToken = (token) => {
+  socket.auth = { token: token || "" };
+  if (socket.io?.opts) socket.io.opts.query = token ? { token } : {};
+};
+
+export const clearSocketAuth = () => setSocketToken("");

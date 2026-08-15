@@ -33,6 +33,15 @@ const socket = io(SOCKET_URL, {
 socket.on("connect_error", (error) => {
   // HTTP APIs remain usable when Render is waking or a WebSocket upgrade is unavailable.
   console.debug("Socket.IO connection unavailable:", error?.message || error);
+  if (String(error?.message || "").includes("SESSION_REPLACED")) {
+    try { window.dispatchEvent(new CustomEvent("benovelent:session-replaced")); } catch {}
+  }
+});
+
+// The server can invalidate this device immediately when the same account logs in
+// elsewhere. Portal auth listens for this event and clears local credentials.
+socket.on("session-replaced", () => {
+  try { window.dispatchEvent(new CustomEvent("benovelent:session-replaced")); } catch {}
 });
 
 export default socket;

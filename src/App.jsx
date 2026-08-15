@@ -27,6 +27,7 @@ import SmartAssistant from "./components/SmartAssistant";
 import "./App.css";
 import "./styles/interaction-system.css";
 import "./styles/v8-responsive.css";
+import "./styles/final-v1-complete.css";
 
 // =====================================================
 // PUBLIC PAGES
@@ -80,6 +81,7 @@ const Feedback = lazy(() => import("./pages/Feedback"));
 const PortalGuide = lazy(() => import("./pages/member/PortalGuide"));
 const PlatformCenter = lazy(() => import("./pages/PlatformCenter"));
 const VerifyMembership = lazy(() => import("./pages/VerifyMembership"));
+const NotFound = lazy(() => import("./pages/NotFound"));
 
 
 // =====================================================
@@ -335,6 +337,7 @@ function AppContent() {
 
         <AnimatePresence mode="wait" initial={false}>
           <motion.div
+            id="main-content"
             key={location.pathname}
             className="page-transition-shell"
             initial={{ opacity: 0, y: 10 }}
@@ -670,15 +673,7 @@ function AppContent() {
               UNKNOWN ROUTES
           ================================================= */}
 
-          <Route
-            path="*"
-            element={
-              <Navigate
-                to="/"
-                replace
-              />
-            }
-          />
+          <Route path="*" element={<NotFound />} />
 
             </Routes>
           </motion.div>

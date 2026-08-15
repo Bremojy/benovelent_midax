@@ -26,6 +26,8 @@ function normalize(value) {
 function answerFor(question, role) {
   const text = normalize(question);
   if (!text) return "Ask me about the Constitution, support, contributions, chat, polls, notifications, the public website, or portal navigation.";
+  if (text.includes("another phone") || text.includes("other phone") || text.includes("logged out") || text.includes("security")) return role ? "For security, signing in to the same account on another device replaces the older session. The older device is logged out automatically." : "Members and portal users are protected by server-side session controls. Signing in on another device replaces the older session.";
+  if (text.includes("notification")) return "Use the notification centre for new messages, announcements, polls and missed-call alerts. Browser push is used only when permission is granted.";
   if (text.includes("who are you") || text.includes("what can you do")) return "I am the Benovelent MIDAX website assistant. I answer from the public website knowledge in this application and can guide signed-in users around their portal.";
   if (text.includes("constituency")) return "I can explain Benovelent MIDAX website and Constitution information, but I do not invent constituency rules or official government information. Ask about a specific section and I will stay within the information published by this site.";
   const hit = BASE_FAQ.find(item => item.keys.some(key => text.includes(key)));
@@ -63,7 +65,7 @@ export default function SmartAssistant() {
     return () => { window.clearTimeout(hideTeaser); window.clearTimeout(hideLauncher); window.clearInterval(repeat); };
   }, [open, path]);
 
-  const suggested = useMemo(() => (role ? ["How do I submit support?", "How do I use chat?", "What can I filter?"] : ["What does the scheme support?", "How do I read the Constitution?", "How do I access the portal?"]), [role]);
+  const suggested = useMemo(() => (role ? ["How do I submit support?", "How do I use chat?", "How do I stay secure on another phone?", "How do I use notifications?"] : ["What does the scheme support?", "How do I read the Constitution?", "How do I access the portal?", "How do I contact Benevolent?"]), [role]);
 
   const ask = async (question = input) => {
     const clean = String(question || "").trim();

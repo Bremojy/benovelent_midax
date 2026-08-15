@@ -25,6 +25,30 @@ const initSocket = (server) => {
 
     });
 
+    // Authenticate every Socket.IO connection with the same JWT/session rules
+    // used by the HTTP API. This prevents anonymous sockets from joining rooms
+    // or emitting message/call events.
+    io.use(async (socket, next) => {
+        try {
+            const token = socket.handshake.auth?.token || socket.handshake.query?.token;
+            if (!token) return next(new Error("AUTH_REQUIRED"));
+            const decoded = jwt.verify(token, process.env.JWT_SECRET);
+            const userType = String(decoded.role || decoded.userType || "").toLowerCase();
+            const UserModel = userType === "superadmin" ? SuperAdmin : userType === "admin" ? Admin : Member;
+            const user = await UserModel.findById(decoded.id || decoded.userId || decoded._id).select("_id role status sessionVersion fullName").lean();
+            if (!user || (user.status && user.status !== "active")) return next(new Error("AUTH_INVALID"));
+            if (Number(decoded.sessionVersion ?? 0) !== Number(user.sessionVersion ?? 0)) return next(new Error("SESSION_REPLACED"));
+            socket.user = user;
+            socket.userRole = userType;
+            socket.sessionVersion = Number(user.sessionVersion || 0);
+            socket.join(`user:${String(user._id)}`);
+            socket.join(`session:${String(user._id)}`);
+            next();
+        } catch (error) {
+            next(new Error(error?.name === "TokenExpiredError" ? "TOKEN_EXPIRED" : "AUTH_INVALID"));
+        }
+    });
+
     io.on("connection", (socket) => {
 
         console.log("User Connected:", socket.id);
