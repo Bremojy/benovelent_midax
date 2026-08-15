@@ -1,47 +1,55 @@
 import { io } from "socket.io-client";
 
-const SOCKET_URL =
+const SOCKET_URL = String(
   import.meta.env.VITE_SOCKET_URL ||
   import.meta.env.VITE_API_URL ||
-  "https://benovelent-midax.onrender.com";
-
-// Start with HTTP long-polling and let Socket.IO upgrade to WebSocket.
-// This is more reliable with Render cold starts/proxies than forcing
-// WebSocket as the only transport.
-const getRoleToken = () => {
-  try {
-    const user = JSON.parse(localStorage.getItem("user") || "null");
-    const role = String(user?.role || "").toLowerCase();
-    const key = role === "superadmin" ? "superAdminToken" : role === "admin" ? "adminToken" : "memberToken";
-    return key ? localStorage.getItem(key) : null;
-  } catch {
-    return null;
-  }
-};
+  "https://benovelent-midax.onrender.com"
+).replace(/\/+$/, "");
 
 const socket = io(SOCKET_URL, {
   autoConnect: false,
   transports: ["polling", "websocket"],
-  auth: { get token() { return getRoleToken(); } },
+  auth: { token: "" },
   upgrade: true,
   reconnection: true,
-  reconnectionAttempts: 5,
-  reconnectionDelay: 1500,
+  reconnectionAttempts: 10,
+  reconnectionDelay: 1000,
+  reconnectionDelayMax: 5000,
   timeout: 10000,
 });
 
+export const setSocketToken = (token) => {
+  socket.auth = { token: token || "" };
+  if (socket.io?.opts) socket.io.opts.query = token ? { token } : {};
+};
+
+export const clearSocketAuth = () => setSocketToken("");
+
 socket.on("connect_error", (error) => {
-  // HTTP APIs remain usable when Render is waking or a WebSocket upgrade is unavailable.
-  console.debug("Socket.IO connection unavailable:", error?.message || error);
-  if (String(error?.message || "").includes("SESSION_REPLACED")) {
-    try { window.dispatchEvent(new CustomEvent("benovelent:session-replaced")); } catch {}
+  const message = String(error?.message || error || "");
+  console.debug("Socket.IO connection unavailable:", message);
+  if (
+    message.includes("SESSION_REPLACED") ||
+    message.includes("Authentication required")
+  ) {
+    try {
+      window.dispatchEvent(
+        new CustomEvent("benovelent:session-replaced")
+      );
+    } catch {
+      // Ignore browser event failures.
+    }
   }
 });
 
-// The server can invalidate this device immediately when the same account logs in
-// elsewhere. Portal auth listens for this event and clears local credentials.
 socket.on("session-replaced", () => {
-  try { window.dispatchEvent(new CustomEvent("benovelent:session-replaced")); } catch {}
+  try {
+    window.dispatchEvent(
+      new CustomEvent("benovelent:session-replaced")
+    );
+  } catch {
+    // Ignore browser event failures.
+  }
 });
 
 export default socket;
