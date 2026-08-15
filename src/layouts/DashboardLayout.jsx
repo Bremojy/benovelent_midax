@@ -6,7 +6,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import "../styles/dashboard.css";
 
 function DashboardLayout({ children }) {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(() => (typeof window !== "undefined" ? window.innerWidth > 900 : true));
   const [isMobile, setIsMobile] = useState(() => (typeof window !== "undefined" ? window.innerWidth <= 900 : false));
   const { user, role, logout } = useAuth();
   const location = useLocation();
@@ -35,7 +35,7 @@ function DashboardLayout({ children }) {
 
   useEffect(() => {
     if (!isMobile) { setSidebarOpen(true); return; }
-    setSidebarOpen(true);
+    setSidebarOpen(!isMobile);
   }, [isMobile]);
 
   const goHome = () => navigate(basePath);

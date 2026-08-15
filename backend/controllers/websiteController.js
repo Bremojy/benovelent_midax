@@ -3,9 +3,13 @@ const path = require("path");
 const WebsiteContent = require("../models/WebsiteContent");
 const { resolveStoredFileUrl } = require("../utils/uploadUrl");
 
-const DEFAULT_SECTIONS = ["home", "about", "services", "contact", "footer", "settings", "gallery", "constitution", "privacy-policy", "terms-conditions"];
+const DEFAULT_SECTIONS = ["home", "about", "services", "contact", "footer", "settings", "gallery", "constitution", "privacy-policy", "terms-conditions", "news", "events", "resources", "chatbot"];
 
 const SECTION_DEFAULTS = {
+    "news": { title: "Newsroom", subtitle: "News, events and community updates", description: "Public information centre for Benevolent MIDAX.", content: { tabs: ["news", "events", "resources"] } },
+    "events": { title: "Upcoming activities", subtitle: "Community calendar", description: "Published events appear inside the public Newsroom.", content: {} },
+    "resources": { title: "Resources", subtitle: "Forms, guides and official documents", description: "Published documents appear inside the public Newsroom.", content: {} },
+    "chatbot": { title: "MIDAX Assistant", subtitle: "Approved assistant guidance", description: "Controls the assistant public positioning and approved knowledge scope.", content: { enabled: true, mode: "grounded" } },
     "privacy-policy": {
         title: "Privacy Policy",
         subtitle: "How we protect member data",

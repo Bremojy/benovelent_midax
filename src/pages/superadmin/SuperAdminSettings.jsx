@@ -23,6 +23,10 @@ const SECTION_FIELDS = [
   { key: "home", label: "Home" },
   { key: "about", label: "About" },
   { key: "services", label: "Services" },
+  { key: "news", label: "Newsroom" },
+  { key: "events", label: "Events" },
+  { key: "resources", label: "Resources" },
+  { key: "chatbot", label: "Chatbot" },
   { key: "contact", label: "Contact" },
   { key: "footer", label: "Footer" },
   { key: "gallery", label: "Gallery" },
@@ -454,7 +458,7 @@ export default function SuperAdminSettings() {
           <div className="portal-form-grid">
             <div className="portal-field" style={{ gridColumn: "1 / -1" }}>
               <p style={{ margin: 0, color: "#666", lineHeight: 1.6 }}>
-                The public site can be edited through the Website content tab. Carousel slides are what show on the home hero. Leaders are shown on the public leadership page. Gallery images are reflected on the public gallery page.
+                The public site can be edited through the Website content tab. V8 also gives SuperAdmin dedicated controls for the Newsroom, event/resource presentation and the assistant guidance scope. Carousel slides are what show on the home hero. Leaders are shown on the public leadership page. Gallery images are reflected on the public gallery page.
               </p>
             </div>
           </div>

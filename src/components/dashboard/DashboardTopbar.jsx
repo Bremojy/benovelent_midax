@@ -218,7 +218,7 @@ function DashboardTopbar({
           )}
         </button>
 
-        <button type="button" className="icon-btn install-topbar-btn" onClick={openInstall} aria-label="Install Benovelent MIDAX" title="Install Benovelent MIDAX"><DownloadIcon size={20}/></button>
+        <button type="button" className="icon-btn install-topbar-btn" onClick={openInstall} aria-label="Install Benovelent MIDAX" title="Install Benovelent MIDAX"><DownloadIcon size={19}/><span>Install</span></button>
 
         {/* SETTINGS */}
 

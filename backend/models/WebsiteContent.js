@@ -17,7 +17,11 @@ const websiteContentSchema = new mongoose.Schema(
         "constitution",
         "privacy-policy",
         "terms-conditions",
-        "disclaimer"
+        "disclaimer",
+        "news",
+        "events",
+        "resources",
+        "chatbot"
       ]
     },
 

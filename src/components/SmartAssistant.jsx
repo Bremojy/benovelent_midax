@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { Bot, ChevronDown, HelpCircle, MessageCircle, Send, X } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import API from "../services/api";
@@ -38,27 +38,8 @@ export default function SmartAssistant() {
   const { role } = useAuth();
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
-  const [compact, setCompact] = useState(false);
-  const idleTimer = useRef(null);
   const [messages, setMessages] = useState([{ from: "bot", text: "Hi — I’m the Benovelent MIDAX assistant. What would you like to know?" }]);
 
-  useEffect(() => {
-    const schedule = () => {
-      window.clearTimeout(idleTimer.current);
-      idleTimer.current = window.setTimeout(() => setCompact(true), 5000);
-    };
-    schedule();
-    const wake = () => { setCompact(false); schedule(); };
-    window.addEventListener("scroll", wake, { passive: true });
-    window.addEventListener("pointermove", wake, { passive: true });
-    window.addEventListener("keydown", wake);
-    return () => {
-      window.clearTimeout(idleTimer.current);
-      window.removeEventListener("scroll", wake);
-      window.removeEventListener("pointermove", wake);
-      window.removeEventListener("keydown", wake);
-    };
-  }, []);
   const suggested = useMemo(() => (role ? ["How do I submit support?", "How do I use chat?", "What can I filter?"] : ["What does the scheme support?", "How do I read the Constitution?", "How do I access the portal?"]), [role]);
 
   const ask = async (question = input) => {
@@ -77,7 +58,7 @@ export default function SmartAssistant() {
   };
 
   return (
-    <div className={`smart-assistant ${open ? "is-open" : ""} ${compact && !open ? "is-compact" : ""}`}>
+    <div className={`smart-assistant ${open ? "is-open" : ""}`}>
       {open && (
         <section className="smart-assistant-panel" aria-label="Benovelent MIDAX assistant">
           <header className="smart-assistant-header">
@@ -95,7 +76,7 @@ export default function SmartAssistant() {
           <p className="assistant-note"><HelpCircle size={13} /> Answers are based on Benovelent MIDAX information published in this application.</p>
         </section>
       )}
-      <button className="smart-assistant-trigger" type="button" onClick={() => { setOpen((value) => !value); setCompact(false); }} onMouseEnter={() => setCompact(false)} aria-expanded={open} aria-label={open ? "Close MIDAX Assistant" : "Open MIDAX Assistant"}>
+      <button className="smart-assistant-trigger" type="button" onClick={() => setOpen((value) => !value)} aria-expanded={open} aria-label={open ? "Close MIDAX Assistant" : "Open MIDAX Assistant"}>
         {open ? <MessageCircle size={20} /> : <Bot size={20} />}
         <span>Ask MIDAX</span>
         <ChevronDown className="assistant-chevron" size={15} />

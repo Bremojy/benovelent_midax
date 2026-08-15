@@ -184,11 +184,13 @@ exports.assistant = async (req, res) => {
   const question = String(req.body?.question || "").trim();
   if (!question) return res.status(400).json({ success: false, message: "Question is required." });
   const role = req.userRole || "public";
-  const [news, events] = await Promise.all([
-    News.find({ published: true, status: "published" }).sort({ publishDate: -1 }).limit(10).select("title summary category content publishDate").lean(),
-    Event.find({ published: true, startAt: { $gte: new Date(Date.now() - 86400000 * 7) }, ...(role !== "public" ? { audience: role } : {}) }).sort({ startAt: 1 }).limit(10).select("title description type startAt location").lean(),
+  const [news, events, website, resources] = await Promise.all([
+    News.find({ published: true, status: "published" }).sort({ publishDate: -1 }).limit(12).select("title summary category content publishDate").lean(),
+    Event.find({ published: true, startAt: { $gte: new Date(Date.now() - 86400000 * 7) }, ...(role !== "public" ? { audience: role } : {}) }).sort({ startAt: 1 }).limit(12).select("title description type startAt location audience").lean(),
+    WebsiteContent.find({ published: true, section: { $in: ["home", "about", "services", "contact", "footer", "constitution", "news", "events", "resources", "chatbot"] } }).select("section title subtitle description content").lean(),
+    (async () => { const publicRoot = path.join(__dirname, "..", "..", "public", "documents"); try { return fs.readdirSync(publicRoot).filter((name) => /\.(pdf|docx?|xlsx?|pptx?)$/i.test(name)).slice(0, 30); } catch (_) { return []; } })(),
   ]);
-  const context = JSON.stringify({ service: "Benevolent MIDAX", role, news, events });
+  const context = JSON.stringify({ service: "Benevolent MIDAX", role, approvedWebsiteContent: website, news, events, resources });
   const aiUrl = String(process.env.AI_API_URL || "").trim();
   const aiKey = String(process.env.AI_API_KEY || "").trim();
   const aiModel = String(process.env.AI_MODEL || "").trim();
@@ -201,7 +203,7 @@ exports.assistant = async (req, res) => {
   const normalized = question.toLowerCase();
   const matches = news.filter(n => `${n.title} ${n.summary} ${n.category}`.toLowerCase().includes(normalized.split(/\s+/).find(w => w.length > 3) || "___"));
   const eventMatches = events.filter(e => `${e.title} ${e.description} ${e.location}`.toLowerCase().includes(normalized.split(/\s+/).find(w => w.length > 3) || "___"));
-  let answer = "I can help with Benevolent MIDAX information, but I could not find a published answer in the current application knowledge. Try asking about the Constitution, support, contributions, news, events, resources or portal navigation.";
+  let answer = "I can help with Benevolent MIDAX information, but I could not find a published answer in the current application knowledge. Try asking about the Constitution, support, contributions, news, upcoming events, resources or portal navigation.";
   if (matches.length) answer = `Here is a relevant published update: ${matches[0].title}. ${matches[0].summary || "Open the News page for the full update."}`;
   else if (eventMatches.length) answer = `A matching upcoming event is ${eventMatches[0].title}${eventMatches[0].location ? ` at ${eventMatches[0].location}` : ""}. It starts ${new Date(eventMatches[0].startAt).toLocaleString()}.`;
   else if (normalized.includes("constitution")) answer = "The Constitution is available from the public Constitution page and the Resource Centre. It is the authoritative source for governance and benefit rules.";

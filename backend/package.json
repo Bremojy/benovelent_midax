@@ -1,6 +1,6 @@
 {
   "name": "benevolent-midax-backend",
-  "version": "7.0.0",
+  "version": "8.0.0",
   "description": "Benevolent Midax Backend API",
   "main": "server.js",
   "type": "commonjs",

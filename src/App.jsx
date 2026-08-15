@@ -26,6 +26,7 @@ import SmartAssistant from "./components/SmartAssistant";
 
 import "./App.css";
 import "./styles/interaction-system.css";
+import "./styles/v8-responsive.css";
 
 // =====================================================
 // PUBLIC PAGES
@@ -76,8 +77,6 @@ const PortalSettings = lazy(
 
 const Polls = lazy(() => import("./pages/Polls"));
 const Feedback = lazy(() => import("./pages/Feedback"));
-const Resources = lazy(() => import("./pages/Resources"));
-const PublicEvents = lazy(() => import("./pages/PublicEvents"));
 const PortalGuide = lazy(() => import("./pages/member/PortalGuide"));
 const PlatformCenter = lazy(() => import("./pages/PlatformCenter"));
 const VerifyMembership = lazy(() => import("./pages/VerifyMembership"));
@@ -383,8 +382,9 @@ function AppContent() {
             element={<News />}
           />
 
-          <Route path="/resources" element={<Resources />} />
-          <Route path="/events" element={<PublicEvents />} />
+          {/* V8: Events and Resources are now content types inside News. Keep old URLs as redirects for bookmarks. */}
+          <Route path="/resources" element={<Navigate to="/news?tab=resources" replace />} />
+          <Route path="/events" element={<Navigate to="/news?tab=events" replace />} />
 
           <Route
             path="/contact"
