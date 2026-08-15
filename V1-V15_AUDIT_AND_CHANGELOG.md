@@ -30,3 +30,13 @@ A coordinated stabilization and modernization pass covering routing/API integrit
 
 ## Verification caveat
 The ZIP was inspected and patched directly. Full end-to-end browser clicking against production credentials requires an interactive browser environment, so those actions are not claimed as completed here. The package includes static integrity checks and the modernization changes are designed to be validated on the next local/deployed run.
+
+## V12 — Dashboard geometry, persistent mobile navigation, portal themes & chat self-filtering
+- Constrained desktop portal content to the viewport remaining after the fixed sidebar.
+- Kept the dashboard bottom navigation persistent across all mobile portal pages.
+- Added a mobile Dashboard-home path on subpages.
+- Added green Member, orange Admin, and purple SuperAdmin visual identities.
+- Prevented the signed-in user from appearing in chat people/conversation pickers.
+- Passed current-user identity into the shared chat directory and retained the existing start-conversation self guard.
+- Reduced realtime chat scroll work while preserving smooth scroll after explicit sends.
+- Added V12 UI contract testing.

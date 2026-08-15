@@ -407,6 +407,7 @@ function MessageCenterPage({
             <aside className="messages-sidebar-container desktop-chat-sidebar">
               <ChatSidebar
                 title="Chats"
+                currentUser={currentUser || authUser}
                 searchPlaceholder={searchPlaceholder}
                 members={normalizedPeople}
                 conversations={normalizedConversations}

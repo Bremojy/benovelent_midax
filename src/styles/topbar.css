@@ -357,3 +357,25 @@ transform:translateY(-2px);
 /* V9 install action */
 .install-topbar-btn{width:auto;min-width:86px;padding:0 12px;gap:6px;font-weight:800}
 @media(max-width:560px){.dashboard-topbar{padding:0 10px;gap:6px}.topbar-left,.topbar-right{gap:6px;min-width:0}.portal-website-home-btn{display:none!important}.icon-btn.install-topbar-btn{width:40px;min-width:40px;padding:0;border-radius:12px}.icon-btn.install-topbar-btn span{display:none}.topbar-right{margin-left:auto}.user-box{max-width:40px}}
+
+/* V12 portal identity and compact laptop behavior. */
+.dashboard-container .dashboard-topbar{
+  box-shadow:0 8px 26px var(--portal-soft,rgba(15,23,42,.06));
+}
+
+.dashboard-container .portal-website-home-btn:hover,
+.dashboard-container .menu-btn:hover,
+.dashboard-container .icon-btn:hover{
+  color:var(--portal-accent,#ff7a00);
+  border-color:color-mix(in srgb, var(--portal-accent,#ff7a00) 45%, transparent);
+  background:var(--portal-soft,rgba(255,122,0,.10));
+}
+
+@media(max-width:1200px) and (min-width:901px){
+  .dashboard-topbar{padding:0 18px}
+  .topbar-left{gap:9px}
+  .topbar-right{gap:7px}
+  .search-box{max-width:300px}
+  .user-info{max-width:145px}
+  .user-info h4,.user-info p{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+}

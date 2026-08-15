@@ -23,11 +23,15 @@ function ChatSidebar({
   setFilters,
   filtersOpen = false,
   setFiltersOpen,
+  currentUser,
 }) {
+  const actor = useMemo(() => buildActorIdentity(currentUser), [currentUser]);
+
   const filteredMembers = useMemo(() => {
     const keyword = String(search || "").trim().toLowerCase();
     const sorted = [...members]
       .filter((member) => String(member?.role || "").toLowerCase() !== "superadmin")
+      .filter((member) => !isSameIdentity(member, actor))
       .sort((a, b) => {
         const roleRank = rankRole(a.role) - rankRole(b.role);
         if (roleRank !== 0) return roleRank;
@@ -43,13 +47,14 @@ function ChatSidebar({
         .toLowerCase();
       return haystack.includes(keyword);
     });
-  }, [members, search]);
+  }, [members, search, actor]);
 
   const filteredConversations = useMemo(() => {
     const keyword = String(search || "").trim().toLowerCase();
-    if (!keyword) return conversations;
+    const withoutSelf = conversations.filter((conversation) => !isSameIdentity(conversation.partner || {}, actor));
+    if (!keyword) return withoutSelf;
 
-    return conversations.filter((conversation) => {
+    return withoutSelf.filter((conversation) => {
       const partner = conversation.partner || {};
       const haystack = [partner.fullName, partner.username, sanitizePreviewText(conversation.lastMessageText)]
         .filter(Boolean)
@@ -57,7 +62,7 @@ function ChatSidebar({
         .toLowerCase();
       return haystack.includes(keyword);
     });
-  }, [conversations, search]);
+  }, [conversations, search, actor]);
 
   const leaders = filteredMembers.filter((member) => isLeader(member.role));
   const regularMembers = filteredMembers.filter((member) => !isLeader(member.role));
@@ -282,6 +287,37 @@ function safeDisplayName(value, fallbackSource = {}) {
   const looksLikeFilePath = raw.includes("/") && /\b(upload|avatar|photo|image|video|document|file)\b/i.test(raw);
   if (looksLikeUrl || looksLikeFilePath) return fallback || "Member";
   return raw;
+}
+
+function buildActorIdentity(user) {
+  return {
+    id: String(user?._id || user?.id || user?.chatId || user?.memberId || "").trim(),
+    email: String(user?.email || "").trim().toLowerCase(),
+    username: String(user?.username || "").trim().toLowerCase(),
+    memberNumber: String(user?.memberNumber || "").trim().toLowerCase(),
+    phone: normalizePhone(user?.phone || user?.mobile || user?.telephone || ""),
+  };
+}
+
+function isSameIdentity(candidate, actor) {
+  if (!candidate || !actor) return false;
+  const candidateId = String(candidate?._id || candidate?.id || candidate?.chatId || candidate?.memberId || "").trim();
+  const candidateEmail = String(candidate?.email || "").trim().toLowerCase();
+  const candidateUsername = String(candidate?.username || "").trim().toLowerCase();
+  const candidateMemberNumber = String(candidate?.memberNumber || "").trim().toLowerCase();
+  const candidatePhone = normalizePhone(candidate?.phone || candidate?.mobile || candidate?.telephone || "");
+
+  return Boolean(
+    (actor.id && candidateId && actor.id === candidateId) ||
+    (actor.email && candidateEmail && actor.email === candidateEmail) ||
+    (actor.username && candidateUsername && actor.username === candidateUsername) ||
+    (actor.memberNumber && candidateMemberNumber && actor.memberNumber === candidateMemberNumber) ||
+    (actor.phone && candidatePhone && actor.phone === candidatePhone)
+  );
+}
+
+function normalizePhone(value) {
+  return String(value || "").replace(/[^\d+]/g, "").trim();
 }
 
 export default ChatSidebar;

@@ -198,3 +198,4 @@ html[data-appearance="dark"] .settings-field textarea{
   .dashboard-container .portal-panel, .dashboard-container .settings-panel, .dashboard-container .admin-stat-card, .dashboard-container .admin-overview-card, .dashboard-container .superadmin-panel { padding: 14px !important; }
   .dashboard-container .portal-table-wrapper, .dashboard-container .table-responsive { max-width: 100%; }
 }
+

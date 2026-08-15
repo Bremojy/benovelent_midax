@@ -62,7 +62,7 @@ function ChatWindow({ conversation, socket, currentUser, onBack, onAudioCall, on
   }, [conversation?._id]);
 
   useEffect(() => {
-    scrollToBottom();
+    messagesEndRef.current?.scrollIntoView({ behavior: "auto", block: "end" });
   }, [messages, typingUserId]);
 
   useEffect(() => {
@@ -154,7 +154,7 @@ function ChatWindow({ conversation, socket, currentUser, onBack, onAudioCall, on
   }
 
   function scrollToBottom() {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }
 
   if (!conversation) {

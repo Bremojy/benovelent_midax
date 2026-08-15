@@ -411,3 +411,25 @@
   .message-input-container { padding-left: 8px; padding-right: 8px; }
   .message-input-container button { min-width: 40px; }
 }
+
+/* V12: chat follows the active portal identity instead of a single global purple. */
+.modern-chat-sidebar .chat-sidebar-eyebrow{
+  background:var(--portal-soft,rgba(255,122,0,.12)) !important;
+  color:var(--portal-accent,#ff7a00) !important;
+}
+.modern-chat-sidebar .conversation:hover,
+.modern-chat-sidebar .member-row:hover{
+  border-color:color-mix(in srgb,var(--portal-accent,#ff7a00) 35%, transparent) !important;
+}
+.modern-chat-sidebar .conversation.active{
+  background:linear-gradient(135deg,var(--portal-soft,rgba(255,122,0,.12)),rgba(17,17,20,.98)) !important;
+  border-color:color-mix(in srgb,var(--portal-accent,#ff7a00) 48%, transparent) !important;
+}
+.modern-chat-sidebar .role-chip,
+.modern-chat-sidebar .member-chat-tag{
+  background:var(--portal-soft,rgba(255,122,0,.12)) !important;
+  color:var(--portal-accent,#ff7a00) !important;
+}
+.modern-chat-sidebar .badge{
+  background:var(--portal-accent,#ff7a00) !important;
+}

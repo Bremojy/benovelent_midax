@@ -4,6 +4,7 @@ import DashboardTopbar from "../components/dashboard/DashboardTopbar";
 import { useAuth } from "../context/AuthContext";
 import { useLocation, useNavigate } from "react-router-dom";
 import "../styles/dashboard.css";
+import "../styles/v12-dashboard-mobile.css";
 
 function DashboardLayout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(() => (typeof window !== "undefined" ? window.innerWidth > 900 : true));
@@ -21,7 +22,9 @@ function DashboardLayout({ children }) {
 
   const isDashboardHome = location.pathname === basePath || location.pathname === `${basePath}/`;
   const mobileSubpage = !isDashboardHome;
-  const mobileBottomNav = isDashboardHome;
+  // Keep the portal navigation persistent on every mobile portal page so users
+  // can always move back to Dashboard or choose another portal section.
+  const mobileBottomNav = isMobile;
 
   useEffect(() => {
     const resize = () => {
@@ -85,7 +88,7 @@ function DashboardLayout({ children }) {
           setSidebarOpen={setSidebarOpen}
           onLogout={logout}
           homePath={basePath}
-          showHomeBack={false}
+          showHomeBack={isMobile && mobileSubpage}
           onHomeBack={goHome}
         />
         <main className="dashboard-content">
