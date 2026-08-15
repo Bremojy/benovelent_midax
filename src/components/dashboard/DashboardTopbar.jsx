@@ -99,7 +99,7 @@ function DashboardTopbar({
     else navigate("/superadmin/notifications");
   };
 
-  const openInstall = () => window.dispatchEvent(new Event("benovelent:open-install"));
+  const openInstall = () => window.dispatchEvent(new Event("benovelent:install-now"));
 
   const goToSettings = () => {
     if (normalizedRole === "member") navigate("/member/settings");

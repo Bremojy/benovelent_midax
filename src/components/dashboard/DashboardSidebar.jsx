@@ -4,7 +4,7 @@ import { useAuth } from "../../context/AuthContext";
 import { dashboardMenus } from "../../config/dashboardMenu";
 import "../../styles/sidebar.css";
 
-function DashboardSidebar({ role, sidebarOpen, setSidebarOpen, mobileHidden = false }) {
+function DashboardSidebar({ role, sidebarOpen, setSidebarOpen, mobileHidden = false, mobileBottomNav = false }) {
   const currentRole = role || "member";
   const menu = dashboardMenus[currentRole] || dashboardMenus.member;
   const { logout: authLogout } = useAuth();
@@ -14,7 +14,7 @@ function DashboardSidebar({ role, sidebarOpen, setSidebarOpen, mobileHidden = fa
   const roleLabel = currentRole === "superadmin" ? "Super Admin" : currentRole === "admin" ? "Administrator" : "Member";
 
   return (
-    <aside className={`${sidebarOpen ? "dashboard-sidebar open" : "dashboard-sidebar"} ${mobileHidden ? "mobile-hidden" : ""}`} aria-label="Dashboard navigation">
+    <aside className={`${sidebarOpen ? "dashboard-sidebar open" : "dashboard-sidebar"} ${mobileHidden ? "mobile-hidden" : ""} ${mobileBottomNav ? "mobile-bottom-nav" : "mobile-drawer"}`} aria-label="Dashboard navigation">
       <div className="sidebar-header">
         <div className="sidebar-brand"><h2>Benovelent Midax</h2><span className="sidebar-role">{roleLabel}</span></div>
         <button type="button" className="close-sidebar" onClick={() => setSidebarOpen?.(false)} aria-label="Close sidebar"><X size={22} /></button>

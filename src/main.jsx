@@ -18,6 +18,7 @@ import {
 
 import "./index.css";
 import "./styles/feedback-pwa.css";
+import "./styles/v9-modern-forms.css";
 import "./App.css";
 
 createRoot(

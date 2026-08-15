@@ -352,3 +352,8 @@ transform:translateY(-2px);
 .search-box input{padding:0;font-size:13px}.topbar-right{gap:10px}.icon-btn{width:44px;height:44px;border-radius:13px}.avatar{width:45px;height:45px;box-shadow:0 10px 20px rgba(15,23,42,.12)}
 .dashboard-container.portal-role-superadmin .icon-btn:hover,.dashboard-container.portal-role-superadmin .menu-btn:hover{background:#f2eaff;color:#6d28d9}.dashboard-container.portal-role-member .icon-btn:hover,.dashboard-container.portal-role-member .menu-btn:hover{background:#eaf9f0;color:#159447}
 @media(max-width:900px){.dashboard-topbar{height:70px;padding:0 14px}.topbar-left{gap:8px}.icon-btn{width:40px;height:40px}.user-box{max-width:44px}.avatar{width:40px;height:40px}}
+
+
+/* V9 install action */
+.install-topbar-btn{width:auto;min-width:86px;padding:0 12px;gap:6px;font-weight:800}
+@media(max-width:560px){.dashboard-topbar{padding:0 10px;gap:6px}.topbar-left,.topbar-right{gap:6px;min-width:0}.portal-website-home-btn{display:none!important}.icon-btn.install-topbar-btn{width:40px;min-width:40px;padding:0;border-radius:12px}.icon-btn.install-topbar-btn span{display:none}.topbar-right{margin-left:auto}.user-box{max-width:40px}}

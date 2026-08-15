@@ -1,6 +1,7 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Bot, ChevronDown, HelpCircle, MessageCircle, Send, X } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import { useLocation } from "react-router-dom";
 import API from "../services/api";
 import "../styles/smart-assistant.css";
 
@@ -36,9 +37,31 @@ function answerFor(question, role) {
 
 export default function SmartAssistant() {
   const { role } = useAuth();
+  const location = useLocation();
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
+  const [showTeaser, setShowTeaser] = useState(true);
+  const [showLauncher, setShowLauncher] = useState(true);
   const [messages, setMessages] = useState([{ from: "bot", text: "Hi — I’m the Benovelent MIDAX assistant. What would you like to know?" }]);
+
+  const path = location.pathname;
+  const isPortal = /^\/(member|admin|superadmin)(?:\/|$)/.test(path);
+  const isPortalDashboard = /^\/(member|admin|superadmin)\/?$/.test(path);
+
+  useEffect(() => {
+    if (open) { setShowLauncher(true); setShowTeaser(false); return undefined; }
+    setShowLauncher(true);
+    setShowTeaser(true);
+    const hideTeaser = window.setTimeout(() => setShowTeaser(false), 5200);
+    const hideLauncher = window.setTimeout(() => setShowLauncher(false), 9000);
+    const repeat = window.setInterval(() => {
+      setShowLauncher(true);
+      setShowTeaser(true);
+      window.setTimeout(() => setShowTeaser(false), 5200);
+      window.setTimeout(() => setShowLauncher(false), 9000);
+    }, 42000);
+    return () => { window.clearTimeout(hideTeaser); window.clearTimeout(hideLauncher); window.clearInterval(repeat); };
+  }, [open, path]);
 
   const suggested = useMemo(() => (role ? ["How do I submit support?", "How do I use chat?", "What can I filter?"] : ["What does the scheme support?", "How do I read the Constitution?", "How do I access the portal?"]), [role]);
 
@@ -57,8 +80,17 @@ export default function SmartAssistant() {
     }
   };
 
+  const openAssistant = () => { setOpen(true); setShowTeaser(false); };
+
   return (
-    <div className={`smart-assistant ${open ? "is-open" : ""}`}>
+    <div className={`smart-assistant ${open ? "is-open" : ""} ${isPortal ? "is-portal" : ""} ${isPortalDashboard ? "is-portal-dashboard" : ""}`}>
+      {showTeaser && !open && (
+        <button type="button" className="smart-assistant-teaser" onClick={openAssistant} aria-label="Open MIDAX help">
+          <span className="teaser-dot" />
+          <span>Hi — Benovelent MIDAX is available. Tap for help.</span>
+          <span className="teaser-close" onClick={(event) => { event.stopPropagation(); setShowTeaser(false); }} aria-hidden="true">×</span>
+        </button>
+      )}
       {open && (
         <section className="smart-assistant-panel" aria-label="Benovelent MIDAX assistant">
           <header className="smart-assistant-header">
@@ -76,11 +108,13 @@ export default function SmartAssistant() {
           <p className="assistant-note"><HelpCircle size={13} /> Answers are based on Benovelent MIDAX information published in this application.</p>
         </section>
       )}
-      <button className="smart-assistant-trigger" type="button" onClick={() => setOpen((value) => !value)} aria-expanded={open} aria-label={open ? "Close MIDAX Assistant" : "Open MIDAX Assistant"}>
-        {open ? <MessageCircle size={20} /> : <Bot size={20} />}
-        <span>Ask MIDAX</span>
-        <ChevronDown className="assistant-chevron" size={15} />
-      </button>
+      {(showLauncher || open) && (
+        <button className="smart-assistant-trigger" type="button" onClick={() => { setOpen((value) => !value); setShowTeaser(false); setShowLauncher(true); }} aria-expanded={open} aria-label={open ? "Close MIDAX Assistant" : "Open MIDAX Assistant"}>
+          {open ? <MessageCircle size={20} /> : <Bot size={20} />}
+          <span>Ask MIDAX</span>
+          <ChevronDown className="assistant-chevron" size={15} />
+        </button>
+      )}
     </div>
   );
 }

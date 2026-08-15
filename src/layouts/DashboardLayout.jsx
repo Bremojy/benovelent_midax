@@ -20,7 +20,8 @@ function DashboardLayout({ children }) {
   }, [role, user?.role]);
 
   const isDashboardHome = location.pathname === basePath || location.pathname === `${basePath}/`;
-  const mobileSubpage = false;
+  const mobileSubpage = !isDashboardHome;
+  const mobileBottomNav = isDashboardHome;
 
   useEffect(() => {
     const resize = () => {
@@ -41,12 +42,13 @@ function DashboardLayout({ children }) {
   const goHome = () => navigate(basePath);
 
   return (
-    <div className={`dashboard-container portal-role-${String((role || user?.role || "member").toLowerCase())} ${mobileSubpage ? "dashboard-mobile-subpage" : ""}`}>
+    <div className={`dashboard-container portal-role-${String((role || user?.role || "member").toLowerCase())} ${mobileSubpage ? "dashboard-mobile-subpage" : ""} ${mobileBottomNav ? "dashboard-home-shell" : ""}`}>
       <DashboardSidebar
         role={role}
         sidebarOpen={sidebarOpen}
         setSidebarOpen={setSidebarOpen}
         mobileHidden={false}
+        mobileBottomNav={mobileBottomNav}
       />
       <div className={`dashboard-main ${mobileSubpage ? "mobile-fullscreen" : ""}`}>
         <DashboardTopbar
