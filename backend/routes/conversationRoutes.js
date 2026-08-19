@@ -9,7 +9,8 @@ const {
     getConversation,
     deleteConversation,
     addMember,
-    removeMember
+    removeMember,
+    markConversationRead
 } = conversationController;
 
 const { verifyToken: protect } = require("../middleware/authMiddleware");
@@ -27,6 +28,7 @@ const safeHandler = (handler, label) => {
 router.post("/", protect, safeHandler(createConversation, "Conversation creation"));
 router.get("/", protect, safeHandler(getMyConversations, "Conversation loading"));
 router.get("/:id", protect, safeHandler(getConversation, "Conversation loading"));
+router.put("/:id/read", protect, safeHandler(markConversationRead, "Conversation read status"));
 router.delete("/:id", protect, safeHandler(deleteConversation, "Conversation removal"));
 router.put("/:id/add-member", protect, safeHandler(addMember, "Add member"));
 router.put("/:id/remove-member", protect, safeHandler(removeMember, "Remove member"));

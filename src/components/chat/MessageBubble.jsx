@@ -44,7 +44,7 @@ function MessageBubble({
 
         {isAudio && attachment && <audio controls src={attachment} style={{maxWidth:"100%"}} />}
         {isVideo && attachment && <video controls src={attachment} style={{maxWidth:"100%",borderRadius:12}} />}
-        {body && <p>{body}</p>}
+        {message?.deletedForEveryone ? <p className="message-deleted">This message was deleted</p> : body && <p>{body}</p>}
 
         {attachment && !isImage && (
           <a className="message-file-link" href={attachment} target="_blank" rel="noreferrer">
@@ -56,9 +56,11 @@ function MessageBubble({
           <span>{formatTime(message?.createdAt)}</span>
           {own && (
             <span className="status">
-              {message?.status === "read" ? (
+              {message?.status === "sending" ? (
+                <Check size={15} />
+              ) : (message?.seenAt || (Array.isArray(message?.seenBy) && message.seenBy.length > 0)) ? (
                 <CheckCheck size={15} color="#0ea5e9" />
-              ) : message?.status === "delivered" ? (
+              ) : message?.delivered || message?.status === "delivered" ? (
                 <CheckCheck size={15} />
               ) : (
                 <Check size={15} />

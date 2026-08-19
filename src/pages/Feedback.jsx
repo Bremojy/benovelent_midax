@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, ExternalLink, MessageSquarePlus, Star, Trash2, Plus, X, Home, UserRound, Clock3, MessageCircle } from "lucide-react";
-import { getFeedbackCollections, createFeedbackCollection, deleteFeedbackCollection, submitFeedback, getFeedbackResponses, createBuiltInFeedback } from "../services/feedbackService";
+import { getFeedbackCollections, createFeedbackCollection, deleteFeedbackCollection, submitFeedback, getFeedbackResponses, createBuiltInFeedback, autoGenerateFeedback } from "../services/feedbackService";
 import { useLocation, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 
 const questionTypes = ["short_text", "long_text", "email", "number", "rating", "single_choice", "multiple_choice"];
 
 function AdminComposer({ onCreated }) {
-  const [form, setForm] = useState({ title: "", description: "", kind: "native", googleFormUrl: "", anonymous: false, preventDuplicate: true, questions: [] });
+  const [form, setForm] = useState({ title: "", description: "", kind: "native", googleFormUrl: "", anonymous: false, preventDuplicate: true, promptOnLogin: false, requireOnLogin: false, promptFrequencyDays: 7, questions: [] });
   const addQuestion = () => setForm((f) => ({ ...f, questions: [...f.questions, { id: crypto.randomUUID(), type: "short_text", label: "", required: false, options: [] }] }));
+  const generate = async () => { try { const topic = form.title || "member website experience"; const r = await autoGenerateFeedback(topic); setForm((f) => ({ ...f, kind: "native", questions: r.data.questions || [] })); toast.success("Questions generated. Review them before publishing."); } catch (e) { toast.error(e.response?.data?.message || "Could not generate questions"); } };
   const updateQ = (id, key, value) => setForm((f) => ({ ...f, questions: f.questions.map((q) => q.id === id ? { ...q, [key]: value } : q) }));
   const save = async (e) => {
     e.preventDefault();
@@ -18,7 +19,7 @@ function AdminComposer({ onCreated }) {
       const r = await createFeedbackCollection(normalized);
       toast.success("Feedback collection created");
       onCreated(r.data.collection);
-      setForm({ title: "", description: "", kind: "native", googleFormUrl: "", anonymous: false, preventDuplicate: true, questions: [] });
+      setForm({ title: "", description: "", kind: "native", googleFormUrl: "", anonymous: false, preventDuplicate: true, promptOnLogin: false, requireOnLogin: false, promptFrequencyDays: 7, questions: [] });
     } catch (e) { toast.error(e.response?.data?.message || "Could not create feedback"); }
   };
   return <form className="portal-module feedback-composer" onSubmit={save}>
@@ -29,7 +30,7 @@ function AdminComposer({ onCreated }) {
     </div>
     <label>Description<textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} /></label>
     {form.kind === "google_form" ? <label>Google Forms URL<input type="url" required value={form.googleFormUrl} onChange={e => setForm({ ...form, googleFormUrl: e.target.value })} /></label> : <>
-      <div className="feedback-question-toolbar"><strong>Questions</strong><button type="button" className="btn btn-secondary" onClick={addQuestion}><Plus size={16} /> Add question</button></div>
+      <div className="feedback-question-toolbar"><strong>Questions</strong><div style={{display:"flex",gap:8,flexWrap:"wrap"}}><button type="button" className="btn btn-secondary" onClick={generate}>Auto-generate questions</button><button type="button" className="btn btn-secondary" onClick={addQuestion}><Plus size={16} /> Add question</button></div></div>
       {form.questions.map((q, i) => <div className="feedback-question" key={q.id}>
         <div className="feedback-question-head"><span>Question {i + 1}</span><button type="button" className="icon-btn" onClick={() => setForm(f => ({ ...f, questions: f.questions.filter(x => x.id !== q.id) }))}><X size={16} /></button></div>
         <input type="text" placeholder="Question text" required value={q.label} onChange={e => updateQ(q.id, "label", e.target.value)} />
@@ -41,6 +42,9 @@ function AdminComposer({ onCreated }) {
       </div>)}
     </>}
     <div className="feedback-grid">
+      <label className="inline-check"><input type="checkbox" checked={form.promptOnLogin} onChange={e => setForm({ ...form, promptOnLogin: e.target.checked, requireOnLogin: e.target.checked ? form.requireOnLogin : false })} /> Show once after member login</label>
+      <label className="inline-check"><input type="checkbox" checked={form.requireOnLogin} disabled={!form.promptOnLogin || form.kind !== "native"} onChange={e => setForm({ ...form, requireOnLogin: e.target.checked })} /> Require completion before portal access</label>
+      <label>Prompt frequency (days)<input type="number" min="0" max="3650" value={form.promptFrequencyDays} onChange={e => setForm({ ...form, promptFrequencyDays: Number(e.target.value) })} /></label>
       <label className="inline-check"><input type="checkbox" checked={form.anonymous} onChange={e => setForm({ ...form, anonymous: e.target.checked })} /> Allow anonymous answers</label>
       <label className="inline-check"><input type="checkbox" checked={form.preventDuplicate} onChange={e => setForm({ ...form, preventDuplicate: e.target.checked })} /> Prevent duplicate member responses</label>
     </div>

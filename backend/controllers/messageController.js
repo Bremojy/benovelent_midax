@@ -8,6 +8,14 @@ const Admin = require("../models/Admin");
 const SuperAdmin = require("../models/SuperAdmin");
 const { resolveStoredFileUrl } = require("../utils/uploadUrl");
 
+async function getAuthorizedMessage(req) {
+    const actorId = getChatActorId(req);
+    const message = await Message.findById(req.params.id);
+    if (!message) return { actorId, message: null, conversation: null };
+    const conversation = await Conversation.findOne({ _id: message.conversation, participants: actorId });
+    return { actorId, message, conversation };
+}
+
 /* =====================================================
 SEND MESSAGE
 ===================================================== */
@@ -135,6 +143,14 @@ exports.sendMessage = async (req, res) => {
             await Promise.all(notificationTargets.filter((target) => target.recipientModel === "Member").map((target) => Member.findByIdAndUpdate(target.recipient, { $inc: { unreadMessages: 1, unreadNotifications: 1 } }).catch(() => null)));
         }
 
+        // Maintain per-user unread counts on the conversation for fast sidebar badges.
+        conversation.unreadCounts = conversation.unreadCounts || new Map();
+        for (const recipientId of recipients) {
+            const key = String(recipientId);
+            conversation.unreadCounts.set(key, Number(conversation.unreadCounts.get(key) || 0) + 1);
+        }
+        await conversation.save();
+
         return res.status(201).json({
             success: true,
             message: newMessage,
@@ -157,6 +173,8 @@ exports.getConversationMessages = async (req, res) => {
 try{
 
 const actorId = getChatActorId(req);
+const conversation = await Conversation.findOne({ _id: req.params.conversationId, participants: actorId }).select("_id").lean();
+if (!conversation) return res.status(404).json({ success:false, message:"Conversation not found." });
 
 const messages=
 await Message.find({
@@ -223,318 +241,91 @@ EDIT MESSAGE
 ===================================================== */
 
 exports.editMessage=async(req,res)=>{
-
-try{
-
-const actorId = getChatActorId(req);
-
-const msg=
-await Message.findById(req.params.id);
-
-if(!msg){
-
-return res.status(404).json({
-
-success:false,
-
-message:"Message not found."
-
-});
-
-}
-
-if(msg.sender.toString()!=String(actorId)){
-
-return res.status(403).json({
-
-success:false,
-
-message:"Unauthorized."
-
-});
-
-}
-
-msg.message=req.body.message;
-
-msg.edited=true;
-
-msg.editedAt=new Date();
-
-await msg.save();
-
-res.json({
-
-success:true,
-
-message:msg
-
-});
-
-}
-
-catch(error){
-
-res.status(500).json({
-
-success:false,
-
-message:error.message
-
-});
-
-}
-
+    try{
+        const { actorId, message: msg, conversation } = await getAuthorizedMessage(req);
+        if(!msg || !conversation) return res.status(404).json({success:false,message:"Message not found."});
+        if(String(msg.sender)!==String(actorId)) return res.status(403).json({success:false,message:"Unauthorized."});
+        msg.message=String(req.body.message || "").trim().slice(0,5000);
+        msg.edited=true; msg.editedAt=new Date(); await msg.save();
+        getIO()?.to(String(msg.conversation)).emit("message-edited", msg);
+        return res.json({success:true,message:msg});
+    } catch(error){ return res.status(500).json({success:false,message:error.message}); }
 };
 
 
 /* =====================================================
+DELETE FOR ME/* =====================================================
 DELETE FOR ME
 ===================================================== */
 
 exports.deleteMessage = async (req, res) => {
-
-try{
-
-const actorId = getChatActorId(req);
-
-const msg=
-await Message.findById(req.params.id);
-
-if(!msg){
-
-return res.status(404).json({
-
-success:false,
-
-message:"Message not found."
-
-});
-
-}
-
-if(!msg.deletedFor.includes(actorId)){
-
-msg.deletedFor.push(actorId);
-
-}
-
-await msg.save();
-
-res.json({
-
-success:true,
-
-message:"Deleted for you."
-
-});
-
-}
-
-catch(error){
-
-res.status(500).json({
-
-success:false,
-
-message:error.message
-
-});
-
-}
-
+    try{
+        const { actorId, message: msg, conversation } = await getAuthorizedMessage(req);
+        if(!msg || !conversation) return res.status(404).json({success:false,message:"Message not found."});
+        if(!msg.deletedFor.includes(actorId)) msg.deletedFor.push(actorId);
+        await msg.save();
+        getIO()?.to(String(msg.conversation)).emit("message-deleted-for-me", {messageId:String(msg._id), userId:String(actorId)});
+        return res.json({success:true,message:"Deleted for you."});
+    } catch(error){ return res.status(500).json({success:false,message:error.message}); }
 };
 
 
 /* =====================================================
+DELETE FOR EVERYONE/* =====================================================
 DELETE FOR EVERYONE
 ===================================================== */
 
 exports.deleteForEveryone=async(req,res)=>{
-
-try{
-
-const actorId = getChatActorId(req);
-
-const msg=
-await Message.findById(req.params.id);
-
-if(!msg){
-
-return res.status(404).json({
-
-success:false,
-
-message:"Message not found."
-
-});
-
-}
-
-if(msg.sender.toString()!=String(actorId)){
-
-return res.status(403).json({
-
-success:false,
-
-message:"Unauthorized."
-
-});
-
-}
-
-msg.deletedForEveryone=true;
-
-await msg.save();
-
-res.json({
-
-success:true,
-
-message:"Deleted."
-
-});
-
-}
-
-catch(error){
-
-res.status(500).json({
-
-success:false,
-
-message:error.message
-
-});
-
-}
-
+    try{
+        const { actorId, message: msg, conversation } = await getAuthorizedMessage(req);
+        if(!msg || !conversation) return res.status(404).json({success:false,message:"Message not found."});
+        if(String(msg.sender)!==String(actorId)) return res.status(403).json({success:false,message:"Unauthorized."});
+        msg.deletedForEveryone=true; msg.message=""; msg.attachment=""; await msg.save();
+        getIO()?.to(String(msg.conversation)).emit("message-deleted", {messageId:String(msg._id)});
+        return res.json({success:true,message:"Deleted for everyone."});
+    } catch(error){ return res.status(500).json({success:false,message:error.message}); }
 };
 
 
 /* =====================================================
+MARK AS SEEN/* =====================================================
 MARK AS SEEN
 ===================================================== */
 exports.markAsRead = async (req, res) => {
-
-try{
-
-const actorId = getChatActorId(req);
-
-const msg=
-await Message.findById(req.params.id);
-
-if(!msg){
-
-return res.status(404).json({
-
-success:false,
-
-message:"Message not found."
-
-});
-
-}
-
-if(!msg.seenBy.includes(actorId)){
-
-msg.seenBy.push(actorId);
-
-msg.seenAt=new Date();
-
-}
-
-await msg.save();
-
-res.json({
-
-success:true
-
-});
-
-}
-
-catch(error){
-
-res.status(500).json({
-
-success:false,
-
-message:error.message
-
-});
-
-}
-
+    try{
+        const { actorId, message: msg, conversation } = await getAuthorizedMessage(req);
+        if(!msg || !conversation) return res.status(404).json({success:false,message:"Message not found."});
+        if(!msg.seenBy.includes(actorId)) msg.seenBy.push(actorId);
+        msg.seenAt=new Date(); msg.delivered=true; msg.deliveredAt=msg.deliveredAt || new Date(); await msg.save();
+        conversation.unreadCounts = conversation.unreadCounts || new Map(); conversation.unreadCounts.set(String(actorId),0); await conversation.save();
+        getIO()?.to(String(msg.conversation)).emit("message-seen", {messageId:String(msg._id), userId:String(actorId), seenAt:msg.seenAt});
+        return res.json({success:true,message:msg});
+    } catch(error){ return res.status(500).json({success:false,message:error.message}); }
 };
 
 
 /* =====================================================
+REACT TO MESSAGE/* =====================================================
 REACT TO MESSAGE
 ===================================================== */
 
 exports.reactToMessage = async (req, res) => {
-
-try{
-
-const actorId = getChatActorId(req);
-
-const {
-
-emoji
-
-}=req.body;
-
-const msg=
-await Message.findById(req.params.id);
-
-if(!msg){
-
-return res.status(404).json({
-
-success:false,
-
-message:"Message not found."
-
-});
-
-}
-
-msg.reactions.push({
-
-member:actorId,
-
-emoji
-
-});
-
-await msg.save();
-
-res.json({
-
-success:true,
-
-message:msg
-
-});
-
-}
-
-catch(error){
-
-res.status(500).json({
-
-success:false,
-
-message:error.message
-
-});
-
-}
-
+    try{
+        const { actorId, message: msg, conversation } = await getAuthorizedMessage(req);
+        const emoji=String(req.body?.emoji || "").trim();
+        if(!msg || !conversation) return res.status(404).json({success:false,message:"Message not found."});
+        if(!emoji || emoji.length>20) return res.status(400).json({success:false,message:"Invalid reaction."});
+        msg.reactions=(msg.reactions||[]).filter((reaction)=>String(reaction.member)!==String(actorId));
+        msg.reactions.push({member:actorId,emoji});
+        await msg.save();
+        getIO()?.to(String(msg.conversation)).emit("message-reaction", msg);
+        return res.json({success:true,message:msg});
+    } catch(error){ return res.status(500).json({success:false,message:error.message}); }
 };
 
+
 /* =====================================================
+GET SINGLE MESSAGE/* =====================================================
 GET SINGLE MESSAGE
 ===================================================== */
 
@@ -542,9 +333,10 @@ exports.getMessage = async (req, res) => {
 
     try {
 
-        const message = await Message.findById(req.params.id)
-            .populate("sender", "fullName profileImage")
-            .populate("replyTo");
+        const { message, conversation } = await getAuthorizedMessage(req);
+        if (!message || !conversation) return res.status(404).json({ success:false, message:"Message not found." });
+        await message.populate("sender", "fullName profileImage");
+        await message.populate("replyTo");
 
         if (!message) {
 

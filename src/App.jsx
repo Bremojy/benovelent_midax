@@ -23,6 +23,7 @@ import CookieConsent from "./components/CookieConsent";
 import GlobalMotion from "./components/GlobalMotion";
 import InstallPWA from "./components/InstallPWA";
 import SmartAssistant from "./components/SmartAssistant";
+import LoginFeedbackPrompt from "./components/feedback/LoginFeedbackPrompt";
 
 import "./App.css";
 import "./styles/interaction-system.css";
@@ -330,6 +331,7 @@ function AppContent() {
       <CookieConsent />
       <InstallPWA />
       {!isLogin && <SmartAssistant />}
+      {dashboardRoute && location.pathname.startsWith("/member") && <LoginFeedbackPrompt />}
 
       <Suspense
         fallback={<LoadingScreen />}

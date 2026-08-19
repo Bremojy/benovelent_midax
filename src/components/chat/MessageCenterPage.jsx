@@ -280,11 +280,6 @@ function MessageCenterPage({
         setBanner("You cannot chat with yourself.");
         return;
       }
-      if (String(person?.role || "").toLowerCase() === "superadmin") {
-        setBanner("No one can communicate with SuperAdmin.");
-        return;
-      }
-
       const existingConversation =
         normalizedConversations.find((conversation) => String(conversation.partner?._id) === String(person._id)) ||
         normalizedConversations.find((conversation) =>
@@ -640,6 +635,7 @@ function normalizeConversation(conversation, currentUserId) {
         conversation.lastMessage?.text ||
         ""
     ),
+    unreadCount: Number(conversation.unreadCount ?? conversation.unreadCounts?.[String(currentUserId)] ?? conversation.unreadCounts?.get?.(String(currentUserId)) ?? 0),
   };
 }
 
@@ -650,7 +646,6 @@ function normalizeConversations(items, actor) {
     .map((conversation) => normalizeConversation(conversation, actor.id))
     .filter((conversation) => {
       if (!conversation) return false;
-      if (String(conversation.partner?.role || "").toLowerCase() === "superadmin") return false;
       if (!conversation.partner?._id) return false;
       return !isSameUser(normalizeContact(conversation.partner, conversation.partner?.role || "member"), actor);
     })

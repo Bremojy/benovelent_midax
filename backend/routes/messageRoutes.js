@@ -9,7 +9,8 @@ const {
     editMessage,
     deleteMessage,
     reactToMessage,
-    markAsRead
+    markAsRead,
+    deleteForEveryone
 } = require("../controllers/messageController");
 
 const { verifyToken: protect } = require("../middleware/authMiddleware");
@@ -37,6 +38,7 @@ router.put("/:id", protect, editMessage);
 
 // Delete a message
 router.delete("/:id", protect, deleteMessage);
+router.delete("/:id/everyone", protect, deleteForEveryone);
 
 // React to a message
 router.put("/:id/react", protect, reactToMessage);

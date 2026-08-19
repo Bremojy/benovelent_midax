@@ -59,26 +59,12 @@ exports.createConversation = async (req, res) => {
             });
         }
 
-        if (currentRole === "superadmin") {
-            return res.status(403).json({
-                success: false,
-                message: "SuperAdmin conversations are disabled."
-            });
-        }
-
         const targetRole = await resolveChatRoleById(participantId);
 
         if (!targetRole) {
             return res.status(404).json({
                 success: false,
                 message: "Selected user could not be found."
-            });
-        }
-
-        if (targetRole === "superadmin") {
-            return res.status(403).json({
-                success: false,
-                message: "No one can communicate with SuperAdmin."
             });
         }
 
@@ -156,14 +142,9 @@ updatedAt:-1
 
 });
 
-const partnerIds = conversations.flatMap((conversation) => getConversationPartnerIds(conversation, currentUserId));
-const restrictedIds = new Set(
-    (await SuperAdmin.find({ _id: { $in: partnerIds } }).select("_id").lean()).map((user) => String(user._id))
-);
-
 const visibleConversations = conversations.filter((conversation) => {
     const partnerId = getConversationPartnerIds(conversation, currentUserId)[0];
-    return partnerId && !restrictedIds.has(partnerId);
+    return Boolean(partnerId);
 });
 
 res.json({
@@ -208,41 +189,20 @@ req.params.id
 
 )
 
-.populate(
+const currentUserId = req.auth?.chatId || req.user._id;
+if (!conversation || !(conversation.participants || []).some((participant) => String(participant) === String(currentUserId))) {
+    return res.status(404).json({ success:false, message:"Conversation not found." });
+}
+
+await conversation.populate(
 
 "participants",
 
 "fullName profileImage online lastSeen"
 
-)
-
-.populate(
-
-"lastMessage"
-
 );
 
-if(!conversation){
-
-return res.status(404).json({
-
-success:false,
-
-message:"Conversation not found."
-
-});
-
-}
-
-const currentUserId = req.auth?.chatId || req.user._id;
-const partnerIds = getConversationPartnerIds(conversation, currentUserId);
-const restricted = await SuperAdmin.find({ _id: { $in: partnerIds } }).select("_id").lean();
-if (restricted.length) {
-    return res.status(403).json({
-        success: false,
-        message: "No one can communicate with SuperAdmin."
-    });
-}
+await conversation.populate("lastMessage");
 
 res.json({
 
@@ -269,6 +229,25 @@ message:error.message
 };
 
 
+
+/* =====================================================
+MARK CONVERSATION READ
+===================================================== */
+exports.markConversationRead = async (req, res) => {
+    try {
+        const actorId = req.auth?.chatId || req.user._id;
+        const conversation = await Conversation.findOne({ _id: req.params.id, participants: actorId });
+        if (!conversation) return res.status(404).json({ success:false, message:"Conversation not found." });
+        conversation.unreadCounts = conversation.unreadCounts || new Map();
+        conversation.unreadCounts.set(String(actorId), 0);
+        await conversation.save();
+        const Message = require("../models/Message");
+        await Message.updateMany({ conversation: conversation._id, sender: { $ne: actorId }, seenBy: { $ne: actorId }, deletedForEveryone: false }, { $addToSet: { seenBy: actorId }, $set: { seenAt: new Date(), delivered: true, deliveredAt: new Date() } });
+        return res.json({ success:true });
+    } catch (error) {
+        return res.status(500).json({ success:false, message:error.message });
+    }
+};
 
 /* =====================================================
 DELETE CONVERSATION FOR ME

@@ -151,20 +151,16 @@ async function markMissedCall(callId, reason = "missed") {
 }
 
 module.exports = (io, socket) => {
-  socket.on("user-online", async (payload) => {
-    const userId = typeof payload === "string" ? payload : payload?.userId;
-    const hintedRole = typeof payload === "string" ? "member" : payload?.role;
-    if (!userId) return;
+  socket.on("user-online", async () => {
     try {
-      const actor = await resolveActor(userId, hintedRole);
+      const role = socket.userRole || "member";
+      const actor = await resolveActor(socket.user?._id, role);
       if (!actor) return;
       socket.data.userId = String(actor.user._id);
       socket.data.chatId = String(actor.chatId);
       socket.data.role = actor.role;
       addUser(actor.chatId, socket.id, actor.role);
       socket.join(String(actor.chatId));
-      // Join the real portal-account room as well as the chat-profile room.
-      // Admin/SuperAdmin notifications are stored against their portal account.
       if (String(actor.user._id) !== String(actor.chatId)) socket.join(String(actor.user._id));
       await savePresence(actor, true, socket.id);
       broadcastPresence(io);
@@ -173,11 +169,7 @@ module.exports = (io, socket) => {
 
   socket.on("join-conversation", (conversationId) => { if (conversationId) socket.join(String(conversationId)); });
 
-  socket.on("send-message", async (data) => {
-    const { conversationId, sender, text, image, file, replyTo, messageType, messageId } = data || {};
-    if (!conversationId) return;
-    io.to(String(conversationId)).emit("new-message", { _id: messageId, conversation: conversationId, sender, message: text || "", attachment: image || file || "", messageType: messageType || (image || file ? "image" : "text"), replyTo, createdAt: new Date() });
-  });
+
 
   socket.on("call-user", async ({ to, conversationId, callType, offer, callerUserId, callerName, callerRole }) => {
     if (!to || !offer) return;
