@@ -144,7 +144,7 @@ async function markMissedCall(callId, reason = "missed") {
     });
     const io = call.io;
     io?.to(String(call.recipientChatId)).emit("missed-call", { notification, callId, callType: call.callType, callerUserId: String(call.caller.chatId), callerName: call.caller.user.fullName || call.caller.user.name || "Member" });
-    io?.to(String(call.recipientChatId)).emit("new-notification", notification);
+    io?.to(`user:${String(call.recipientChatId)}`).emit("new-notification", notification);
   } catch (error) {
     console.warn("Could not create missed call notification:", error.message);
   }
@@ -209,7 +209,7 @@ module.exports = (io, socket) => {
       const notification = await deliverCallNotification({ recipient, caller, callType: normalizedType, title, message, callId, incomingPayload, missed: false });
       io.to(String(caller.chatId)).emit("call-started", { callId, recipientUserId: String(recipient.chatId), callType: normalizedType });
       io.to(String(to)).emit("incoming-call", incomingPayload);
-      io.to(String(to)).emit("new-call-notification", { title, message, callType: normalizedType, callId, callerUserId: String(caller.chatId), callerName: incomingPayload.callerName, notification });
+      io.to(`user:${String(to)}`).emit("new-call-notification", { title, message, callType: normalizedType, callId, callerUserId: String(caller.chatId), callerName: incomingPayload.callerName, notification });
     } catch (error) { console.warn("Could not save/deliver call notification:", error.message); }
   });
 

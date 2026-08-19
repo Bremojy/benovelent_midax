@@ -130,7 +130,7 @@ exports.sendMessage = async (req, res) => {
             );
 
             notifications.forEach((notification) => {
-                io?.to(notification.recipient.toString()).emit("new-notification", notification);
+                io?.to(`user:${notification.recipient.toString()}`).emit("new-notification", notification);
             });
             await Promise.all(notificationTargets.filter((target) => target.recipientModel === "Member").map((target) => Member.findByIdAndUpdate(target.recipient, { $inc: { unreadMessages: 1, unreadNotifications: 1 } }).catch(() => null)));
         }

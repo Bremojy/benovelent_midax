@@ -199,3 +199,12 @@ html[data-appearance="dark"] .settings-field textarea{
   .dashboard-container .portal-table-wrapper, .dashboard-container .table-responsive { max-width: 100%; }
 }
 
+
+/* Cross-device shell guard: page content never sits beneath the persistent sidebar/topbar/mobile dock. */
+.dashboard-container{--dashboard-nav-space:270px;min-width:0;overflow-x:hidden}
+.dashboard-main{min-width:0;width:calc(100% - var(--dashboard-nav-space));max-width:calc(100vw - var(--dashboard-nav-space))}
+.dashboard-content{min-width:0;overflow-x:hidden;scrollbar-gutter:stable;padding-bottom:clamp(32px,4vw,56px)}
+.dashboard-page{min-width:0;max-width:1450px;box-sizing:border-box}
+@media (max-width:1200px){.dashboard-main{width:calc(100% - 250px);max-width:calc(100vw - 250px)}}
+@media (max-width:900px){.dashboard-container{--mobile-dock-space:92px}.dashboard-main{width:100%;max-width:100%;margin-left:0;padding-bottom:var(--mobile-dock-space)}.dashboard-content{padding-bottom:calc(var(--mobile-dock-space) + env(safe-area-inset-bottom))}.dashboard-page{width:100%;max-width:none}}
+@media (max-width:560px){.dashboard-content{padding-left:10px!important;padding-right:10px!important;padding-bottom:calc(96px + env(safe-area-inset-bottom))}}

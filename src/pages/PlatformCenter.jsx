@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
-import { CalendarDays, FileText, MapPinned, QrCode, Search, ShieldCheck, Activity, Users, BarChart3, WifiOff, RefreshCw } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { CalendarDays, FileText, QrCode, Search, ShieldCheck, Activity, Users, BarChart3, WifiOff, RefreshCw, Home } from "lucide-react";
 import API, { resolveApiUrl, resolveUploadUrl } from "../services/api";
 import "./PlatformCenter.css";
 
 const formatDate = (value) => value ? new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)) : "—";
 
 export default function PlatformCenter({ role = "member" }) {
+  const navigate = useNavigate();
   const [tab, setTab] = useState("activity");
   const [activity, setActivity] = useState(null);
   const [directory, setDirectory] = useState({ members: [], stations: [] });
@@ -28,16 +30,23 @@ export default function PlatformCenter({ role = "member" }) {
   const load = async () => {
     setLoading(true);
     try {
-      const [a, d, e, docs, c] = await Promise.all([
+      const requests = [
         API.get("/platform/activity"),
         API.get("/platform/directory", { params: station ? { station } : {} }),
         API.get("/platform/events"),
         API.get("/platform/documents"),
-        API.get("/platform/membership-card"),
-      ]);
-      setActivity(a.data?.data || null); setDirectory({ members: d.data?.members || [], stations: d.data?.stations || [] });
-      setEvents(e.data?.events || []); setDocuments(docs.data?.documents || []); setCard(c.data?.card || null);
-      if (["admin", "superadmin"].includes(role)) { const r = await API.get("/platform/analytics"); setAnalytics(r.data?.data || null); }
+      ];
+      if (role === "member") requests.push(API.get("/platform/membership-card"));
+      if (["admin", "superadmin"].includes(role)) requests.push(API.get("/platform/analytics"));
+      const results = await Promise.allSettled(requests);
+      const [a, d, e, docs, optionalOne, optionalTwo] = results;
+      if (a.status === "fulfilled") setActivity(a.value.data?.data || null);
+      if (d.status === "fulfilled") setDirectory({ members: d.value.data?.members || [], stations: d.value.data?.stations || [] });
+      if (e.status === "fulfilled") setEvents(e.value.data?.events || []);
+      if (docs.status === "fulfilled") setDocuments(docs.value.data?.documents || []);
+      if (role === "member" && optionalOne?.status === "fulfilled") setCard(optionalOne.value.data?.card || null);
+      if (["admin", "superadmin"].includes(role) && optionalOne?.status === "fulfilled") setAnalytics(optionalOne.value.data?.data || null);
+      else if (["admin", "superadmin"].includes(role)) setAnalytics(null);
     } finally { setLoading(false); }
   };
 
@@ -80,7 +89,10 @@ export default function PlatformCenter({ role = "member" }) {
         <h1>One place for your community tools.</h1>
         <p>Activity, people, events, resources, verification and insights in a mobile-first workspace.</p>
       </div>
-      <button className="platform-refresh" onClick={() => load()} disabled={loading}><RefreshCw size={18} className={loading ? "spin" : ""}/> Refresh</button>
+      <div className="platform-hero-actions">
+        <button type="button" className="platform-home" onClick={() => navigate(`/${role}`)}><Home size={18}/> Home</button>
+        <button className="platform-refresh" onClick={() => load()} disabled={loading}><RefreshCw size={18} className={loading ? "spin" : ""}/> Refresh</button>
+      </div>
     </div>
     {offline && <div className="platform-offline"><WifiOff size={17}/> Offline mode: the app shell remains available and live data will refresh when connection returns.</div>}
     <div className="platform-tabs">{tabs.map(([key,label,Icon]) => <button key={key} className={tab===key?"active":""} onClick={()=>changeTab(key)}><Icon size={17}/><span>{label}</span></button>)}</div>

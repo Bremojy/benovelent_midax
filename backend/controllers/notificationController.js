@@ -4,6 +4,7 @@ const { getActiveMembers, notifyMembers } = require("../services/memberBroadcast
 const PushSubscription = require("../models/PushSubscription");
 const { getPublicKey } = require("../services/pushService");
 const { getIO } = require("../sockets/socket");
+const { sendPushForNotification } = require("../services/pushService");
 
 function senderModelFromUser(user = {}) {
   const role = String(user.role || "").toLowerCase();
@@ -143,7 +144,8 @@ CREATE NOTIFICATION
 exports.createNotification = async (req, res) => {
   try {
     const notification = await Notification.create(req.body);
-    getIO()?.to(String(notification.recipient)).emit("new-notification", notification);
+    getIO()?.to(`user:${String(notification.recipient)}`).emit("new-notification", notification);
+    sendPushForNotification(notification).catch((error) => console.warn("Push notification failed:", error.message));
 
     return res.status(201).json({
       success: true,

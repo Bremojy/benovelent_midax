@@ -71,25 +71,8 @@ module.exports = (io, socket) => {
                 referenceModel
             });
 
-            const receiverSocket = getSocket(recipient);
-
-            if (receiverSocket) {
-
-                io.to(receiverSocket).emit(
-
-                    "new-notification",
-
-                    notification
-
-                );
-
-            }
-
-            io.to(recipient).emit(
-
-                "notification-count"
-
-            );
+            io.to(`user:${String(recipient)}`).emit("new-notification", notification);
+            io.to(`user:${String(recipient)}`).emit("notification-count");
 
         }
 
