@@ -80,7 +80,6 @@ const PortalSettings = lazy(
 const Polls = lazy(() => import("./pages/Polls"));
 const Feedback = lazy(() => import("./pages/Feedback"));
 const PortalGuide = lazy(() => import("./pages/member/PortalGuide"));
-const PlatformCenter = lazy(() => import("./pages/PlatformCenter"));
 const VerifyMembership = lazy(() => import("./pages/VerifyMembership"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
@@ -461,7 +460,7 @@ function AppContent() {
             }
           />
 
-          <Route path="/admin/platform" element={<ProtectedRoute allowedRoles={["admin","superadmin"]}><PlatformCenter role="admin" /></ProtectedRoute>} />
+          <Route path="/admin/platform" element={<ProtectedRoute allowedRoles={["admin","superadmin"]}><Navigate to="/admin" replace /></ProtectedRoute>} />
           <Route path="/admin/accounts" element={<ProtectedRoute allowedRoles={["admin"]}><AdminFinance /></ProtectedRoute>} />
           <Route path="/admin/finance" element={<Navigate to="/admin/accounts" replace />} />
           <Route path="/admin/claims" element={<ProtectedRoute allowedRoles={["admin", "superadmin"]}><AdminClaims /></ProtectedRoute>} />
@@ -503,7 +502,7 @@ function AppContent() {
             }
           />
 
-          <Route path="/member/platform" element={<ProtectedRoute allowedRoles={["member"]}><PlatformCenter role="member" /></ProtectedRoute>} />
+          <Route path="/member/platform" element={<ProtectedRoute allowedRoles={["member"]}><Navigate to="/member" replace /></ProtectedRoute>} />
 
           <Route path="/member/accounts" element={<ProtectedRoute allowedRoles={["member"]}><Contributions /></ProtectedRoute>} />
 
@@ -651,7 +650,7 @@ function AppContent() {
             }
           />
 
-          <Route path="/superadmin/platform" element={<ProtectedRoute allowedRoles={["superadmin"]}><PlatformCenter role="superadmin" /></ProtectedRoute>} />
+          <Route path="/superadmin/platform" element={<ProtectedRoute allowedRoles={["superadmin"]}><Navigate to="/superadmin" replace /></ProtectedRoute>} />
           <Route path="/superadmin/members" element={<ProtectedRoute allowedRoles={["superadmin"]}><AdminMembers /></ProtectedRoute>} />
           <Route path="/superadmin/accounts" element={<ProtectedRoute allowedRoles={["superadmin"]}><AdminFinance /></ProtectedRoute>} />
           <Route path="/superadmin/finance" element={<Navigate to="/superadmin/accounts" replace />} />

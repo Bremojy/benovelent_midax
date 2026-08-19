@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, Wallet, HandHeart, MessageCircle, UserRound, UserPlus, ShieldCheck, ClipboardList, Headphones, Vote, MessageSquarePlus, Newspaper, Activity } from "lucide-react";
+import { LayoutDashboard, Users, Wallet, HandHeart, MessageCircle, UserRound, UserPlus, ShieldCheck, ClipboardList, Headphones, Vote, MessageSquarePlus, Newspaper } from "lucide-react";
 
 export const dashboardMenus = {
   member: [
@@ -9,7 +9,6 @@ export const dashboardMenus = {
     { title: "Support", icon: Headphones, path: "/member/support" },
     { title: "Claim", icon: HandHeart, path: "/member/claims" },
     { title: "Chat", icon: MessageCircle, path: "/member/messages" },
-    { title: "Platform Center", icon: Activity, path: "/member/platform" },
     { title: "Polls", icon: Vote, path: "/member/polls" },
     { title: "Feedback", icon: MessageSquarePlus, path: "/member/feedback" },
   ],
@@ -20,7 +19,6 @@ export const dashboardMenus = {
     { title: "Claims", icon: HandHeart, path: "/admin/claims" },
     { title: "Support", icon: Headphones, path: "/admin/support" },
     { title: "Chat", icon: MessageCircle, path: "/admin/messages" },
-    { title: "Platform Center", icon: Activity, path: "/admin/platform" },
     { title: "Polls", icon: Vote, path: "/admin/polls" },
     { title: "Feedback", icon: MessageSquarePlus, path: "/admin/feedback" },
   ],
@@ -28,7 +26,6 @@ export const dashboardMenus = {
     { title: "Dashboard", icon: LayoutDashboard, path: "/superadmin" },
     { title: "Administrators", icon: UserPlus, path: "/superadmin/admins" },
     { title: "Members", icon: Users, path: "/superadmin/members" },
-    { title: "Platform Center", icon: Activity, path: "/superadmin/platform" },
     { title: "Accounts", icon: Wallet, path: "/superadmin/accounts" },
     { title: "Audit", icon: ClipboardList, path: "/superadmin/audit" },
     { title: "Data Integrity", icon: ShieldCheck, path: "/superadmin/data-integrity" },
