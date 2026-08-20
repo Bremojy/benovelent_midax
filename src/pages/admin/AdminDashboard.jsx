@@ -21,7 +21,6 @@ import { Link } from "react-router-dom";
 import DashboardLayout from "../../layouts/DashboardLayout";
 import {
   getAdminDashboard,
-  getMemberStatistics,
   getRecentMembers,
   getContributionSummary,
 } from "../../services/adminService";
@@ -46,14 +45,17 @@ export default function AdminDashboard() {
     try {
       setLoading(true);
       setError("");
-      const [, s, r, c] = await Promise.all([
+      const [dashboardResponse, r, c] = await Promise.all([
         getAdminDashboard(),
-        getMemberStatistics(),
         getRecentMembers(),
         getContributionSummary(),
       ]);
-      setStats(s?.statistics || s || {});
-      setRecent(r?.members || r?.recentMembers || []);
+      const liveDashboard = dashboardResponse?.dashboard || {};
+      setStats(liveDashboard);
+      setRecent((r?.members || r?.recentMembers || []).map((member) => ({
+        ...member,
+        profileCompletion: member.profileCompletion ?? 0,
+      })));
       setContrib(c?.summary || c || {});
     } catch (e) {
       setError(e.response?.data?.message || e.message || "Unable to load administrator dashboard.");

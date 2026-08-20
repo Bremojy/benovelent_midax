@@ -4,6 +4,7 @@ const SuperAdmin = require("../models/SuperAdmin");
 const Admin = require("../models/Admin");
 const Member = require("../models/Member");
 const Response = require("../utils/response");
+const { ensureChatProfile } = require("../utils/chatProfile");
 
 const ROLES = require("../constants/roles");
 
@@ -172,10 +173,26 @@ const verifyToken = async (req, res, next) => {
     }
 
     // --------------------------------------
+    // CANONICAL CHAT IDENTITY
+    // --------------------------------------
+    // Conversations are stored against Member chat-profile IDs. Older tokens
+    // may not contain chatId, so resolve the portal account to its canonical
+    // chat profile once here rather than allowing mixed Admin/Member IDs.
+    if (!req.auth.chatId && (role === "admin" || role === "superadmin")) {
+      try {
+        const chatProfile = await ensureChatProfile(user);
+        if (chatProfile?._id) req.auth.chatId = chatProfile._id.toString();
+      } catch (chatError) {
+        console.warn("Chat identity sync skipped:", chatError?.message || chatError);
+      }
+    }
+
+    // --------------------------------------
     // ATTACH USER TO REQUEST
     // --------------------------------------
 
     req.user = user;
+    req.user.chatMemberId = req.auth.chatId || user._id.toString();
 
     req.userRole = role;
 

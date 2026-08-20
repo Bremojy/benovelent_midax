@@ -23,14 +23,7 @@ const generateTemporaryPassword = require("../utils/generateTemporaryPassword");
 exports.getDashboard = async (req, res) => {
   try {
     const [
-      totalMembers,
-      activeMembers,
-      inactiveMembers,
-      suspendedMembers,
-      onlineMembers,
-      verifiedMembers,
-      completedProfiles,
-      incompleteProfiles,
+      members,
       totalLeaders,
       bookBalance,
       approvedClaims,
@@ -43,15 +36,11 @@ exports.getDashboard = async (req, res) => {
       feedbackCollections,
       feedbackResponses,
     ] = await Promise.all([
-      Member.countDocuments({ role: "member", isDeleted: false }),
-      Member.countDocuments({ role: "member", status: "active", isDeleted: false }),
-      Member.countDocuments({ role: "member", status: "inactive", isDeleted: false }),
-      Member.countDocuments({ role: "member", status: "suspended", isDeleted: false }),
-      Member.countDocuments({ role: "member", online: true, isDeleted: false }),
-      Member.countDocuments({ role: "member", verified: true, isDeleted: false }),
-      Member.countDocuments({ role: "member", profileCompleted: true, isDeleted: false }),
-      Member.countDocuments({ role: "member", profileCompleted: { $ne: true }, isDeleted: false }),
-      require("../models/Admin").countDocuments({ status: { $ne: "deleted" } }),
+      Member.find({ role: "member", isDeleted: false })
+        .select("fullName memberNumber email status online verified profileCompletion profileCompleted profileImage passportPhoto documents nationalId gender maritalStatus dateOfBirth physicalAddress siteStation customSiteStation acceptedConstitution acceptedPrivacyPolicy acceptedDeclaration emergencyContact nextOfKin phone createdAt")
+        .sort({ createdAt: -1 })
+        .lean(),
+      Admin.countDocuments({ status: { $ne: "deleted" } }),
       Finance.aggregate([{ $match: { status: { $in: ["approved", "completed"] } } }, { $group: { _id: null, total: { $sum: { $cond: [{ $in: ["$type", ["contribution", "income"]] }, "$amount", { $multiply: ["$amount", -1] }] } } } }]),
       Finance.countDocuments({ type: "claim", status: { $in: ["approved", "completed"] } }),
       FuneralSupport.countDocuments({ status: { $in: ["Pending", "Under Review"] } }),
@@ -64,7 +53,20 @@ exports.getDashboard = async (req, res) => {
       FeedbackCollection.aggregate([{ $unwind: "$responses" }, { $count: "count" }]),
     ]);
 
-    const incompleteMembers = (await Member.find({ role: "member", isDeleted: false, profileCompleted: { $ne: true } }).select("fullName memberNumber profileCompletion").sort({ profileCompletion: 1, createdAt: -1 }).limit(20).lean()).map((m) => ({ ...m, missingFields: calculateProfileCompletion(m).missingFields }));
+    const hydratedMembers = members.map((member) => {
+      const completion = calculateProfileCompletion(member);
+      return { ...member, profileCompletion: completion.percentage, profileCompleted: completion.percentage === 100, missingFields: completion.missingFields };
+    });
+
+    const totalMembers = hydratedMembers.length;
+    const activeMembers = hydratedMembers.filter((m) => m.status === "active").length;
+    const inactiveMembers = hydratedMembers.filter((m) => m.status === "inactive").length;
+    const suspendedMembers = hydratedMembers.filter((m) => m.status === "suspended").length;
+    const onlineMembers = hydratedMembers.filter((m) => m.online === true).length;
+    const verifiedMembers = hydratedMembers.filter((m) => m.verified === true).length;
+    const completedProfiles = hydratedMembers.filter((m) => m.profileCompleted).length;
+    const incompleteProfiles = totalMembers - completedProfiles;
+    const incompleteMembers = hydratedMembers.filter((m) => !m.profileCompleted).slice(0, 20);
 
     res.json({
       success: true,
@@ -998,10 +1000,20 @@ exports.getRecentMembers = async (req, res) => {
       .limit(10)
       .lean();
 
+    const liveMembers = members.map((member) => {
+      const completion = calculateProfileCompletion(member);
+      return {
+        ...member,
+        profileCompletion: completion.percentage,
+        profileCompleted: completion.percentage === 100,
+        missingFields: completion.missingFields,
+      };
+    });
+
     res.json({
       success: true,
-      count: members.length,
-      members,
+      count: liveMembers.length,
+      members: liveMembers,
     });
 
   } catch (error) {

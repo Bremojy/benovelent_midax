@@ -2,21 +2,29 @@ const Conversation = require("../models/Conversation");
 const Member = require("../models/Member");
 const Admin = require("../models/Admin");
 const SuperAdmin = require("../models/SuperAdmin");
+const { ensureChatProfile } = require("../utils/chatProfile");
 
-const resolveChatRoleById = async (id) => {
+const resolveChatActor = async (id) => {
     const chatId = String(id || "").trim();
-
     if (!chatId) return null;
 
-    const [member, admin, superAdmin] = await Promise.all([
-        Member.findById(chatId).select("_id role").lean(),
-        Admin.findById(chatId).select("_id role").lean(),
-        SuperAdmin.findById(chatId).select("_id role").lean(),
-    ]);
+    const member = await Member.findById(chatId).lean();
+    if (member) {
+        return { id: String(member._id), role: String(member.role || "member").toLowerCase(), user: member };
+    }
 
-    if (superAdmin) return "superadmin";
-    if (admin) return "admin";
-    if (member) return "member";
+    const admin = await Admin.findById(chatId).lean();
+    if (admin) {
+        const profile = await ensureChatProfile(admin);
+        return profile ? { id: String(profile._id), role: "admin", user: profile, portalUser: admin } : null;
+    }
+
+    const superAdmin = await SuperAdmin.findById(chatId).lean();
+    if (superAdmin) {
+        const profile = await ensureChatProfile(superAdmin);
+        return profile ? { id: String(profile._id), role: "superadmin", user: profile, portalUser: superAdmin } : null;
+    }
+
     return null;
 };
 
@@ -35,8 +43,7 @@ CREATE CONVERSATION
 exports.createConversation = async (req, res) => {
     try {
         const { participantId } = req.body;
-        const me = req.auth?.chatId || req.user?._id;
-        const currentRole = String(req.user?.role || req.userRole || "").toLowerCase();
+        const me = req.auth?.chatId || req.user?.chatMemberId || req.user?._id;
 
         if (!participantId) {
             return res.status(400).json({
@@ -52,24 +59,28 @@ exports.createConversation = async (req, res) => {
             });
         }
 
-        if (String(me).toLowerCase() === String(participantId).toLowerCase()) {
+        const currentActor = await resolveChatActor(me);
+        const targetActor = await resolveChatActor(participantId);
+
+        if (!currentActor || !targetActor) {
+            return res.status(404).json({
+                success: false,
+                message: "Selected chat participant could not be resolved."
+            });
+        }
+
+        const canonicalMe = String(currentActor.id);
+        const canonicalTarget = String(targetActor.id);
+
+        if (canonicalMe === canonicalTarget) {
             return res.status(400).json({
                 success: false,
                 message: "Cannot create conversation with yourself."
             });
         }
 
-        const targetRole = await resolveChatRoleById(participantId);
-
-        if (!targetRole) {
-            return res.status(404).json({
-                success: false,
-                message: "Selected user could not be found."
-            });
-        }
-
         let conversation = await Conversation.findOne({
-            participants: { $all: [me, participantId] },
+            participants: { $all: [canonicalMe, canonicalTarget] },
             isGroup: false
         });
 
@@ -81,7 +92,7 @@ exports.createConversation = async (req, res) => {
         }
 
         conversation = await Conversation.create({
-            participants: [me, participantId]
+            participants: [canonicalMe, canonicalTarget]
         });
 
         await conversation.populate(

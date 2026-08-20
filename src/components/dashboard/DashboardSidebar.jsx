@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { ChevronUp, LogOut, MoreHorizontal, X } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";

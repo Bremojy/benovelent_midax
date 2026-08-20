@@ -22,3 +22,12 @@ Passed:
 - REGRESSION AUDIT
 
 A full Vite production build was not claimed because dependency installation in the sandbox was blocked by the execution environment; the delivered project does not include a partial `node_modules` directory.
+
+## Final portal stabilization update — 20 Aug 2026
+- Fixed `DashboardSidebar.jsx` missing `useState` import that caused the production `ReferenceError` during portal rendering.
+- Applied the same import correction to the duplicated mobile/dashboard source copy under `backend/src`.
+- Admin dashboard now uses the authoritative `/admin/dashboard` payload instead of mixing inconsistent statistics endpoint shapes.
+- Admin dashboard profile-completion counts and incomplete-member records are calculated from the live profile fields rather than trusting stale `profileCompleted/profileCompletion` flags.
+- Recent member records now include live profile completion percentage and missing fields.
+- Canonicalized admin/superadmin chat identities through their linked Member chat profiles, preventing self-conversations and mixed Admin/Member participant IDs.
+- Added legacy-token chat identity recovery in authentication middleware.
