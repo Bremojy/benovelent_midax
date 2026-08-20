@@ -29,23 +29,9 @@ img,video{height:auto}
  .nav-links.mobile-open,.nav-links.open,.navbar.mobile-open .nav-links{display:flex}.nav-links a{padding:12px 14px;border-radius:12px}.nav-links a:hover{background:#fff3e8}
 }
 
-/* portal shell */
-.dashboard-container{min-height:100vh;background:#f5f7f9}.dashboard-main{min-width:0}.dashboard-content{min-width:0}
-.dashboard-page{max-width:1400px;margin:0 auto;width:100%}
-.dashboard-sidebar{will-change:transform}
+/* Portal shell sizing is defined by dashboard.css, dashboard-mobile.css and sidebar.css. */
 .dashboard-mobile-overlay{display:none}
-@media(max-width:900px){
- .dashboard-sidebar.mobile-drawer{position:fixed;inset:0 auto 0 0;width:min(88vw,320px);z-index:1200;transform:translateX(-105%);transition:transform .22s ease;box-shadow:20px 0 60px rgba(0,0,0,.18)}
- .dashboard-sidebar.mobile-drawer.open{transform:translateX(0)}
- .dashboard-container:has(.dashboard-sidebar.open)::after{content:"";position:fixed;inset:0;background:rgba(10,12,15,.42);z-index:1100}
- .dashboard-sidebar.mobile-bottom-nav{position:fixed;left:10px;right:10px;bottom:max(8px,env(safe-area-inset-bottom));height:auto;z-index:1100;border-radius:20px;box-shadow:0 15px 50px rgba(0,0,0,.18);overflow-x:auto}
- .dashboard-sidebar.mobile-bottom-nav .sidebar-header,.dashboard-sidebar.mobile-bottom-nav .sidebar-footer{display:none}
- .dashboard-sidebar.mobile-bottom-nav .sidebar-menu{display:flex;justify-content:space-around;overflow-x:auto;padding:7px}
- .dashboard-sidebar.mobile-bottom-nav .sidebar-link{flex:1 0 66px;min-width:60px;justify-content:center;flex-direction:column;gap:3px;padding:7px 5px;font-size:10px}
- .dashboard-sidebar.mobile-bottom-nav .sidebar-link span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:70px}
- .dashboard-home-shell .dashboard-content{padding-bottom:92px}
- .dashboard-topbar{position:sticky;top:0;z-index:1000}
-}
+.dashboard-sidebar{will-change:transform}
 
 /* cards / grids collapse cleanly */
 .dashboard-stats,.quick-grid,.activity-grid,.modern-card-grid,.modern-trust-band,.four-v3{min-width:0}

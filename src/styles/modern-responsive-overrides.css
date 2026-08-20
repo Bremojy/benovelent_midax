@@ -326,7 +326,6 @@ button:disabled{opacity:.62;}
 
   .dashboard-content{padding:16px;}
   .dashboard-topbar{min-height:64px;}
-  .dashboard-home-shell .dashboard-content{padding-bottom:96px;}
 
   .form-grid,.portal-form-grid{grid-template-columns:1fr;}
   .form-grid .full,.portal-form-grid .full{grid-column:auto;}

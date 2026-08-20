@@ -13,14 +13,24 @@ const layout = read("src/layouts/DashboardLayout.jsx");
 const sidebar = read("src/components/dashboard/DashboardSidebar.jsx");
 const chatSidebar = read("src/components/chat/ChatSidebar.jsx");
 const messageCenter = read("src/components/chat/MessageCenterPage.jsx");
-const dashboardCss = read("src/styles/dashboard-mobile.css");
+const dashboardCss = read("src/styles/dashboard.css");
+const mobileCss = read("src/styles/dashboard-mobile.css");
+const sidebarCss = read("src/styles/sidebar.css");
 const packageJson = JSON.parse(read("package.json"));
 
 if (packageJson.version === "12.0.0") failures.push("package.json: legacy release version marker is still present.");
-if (!layout.includes("const mobileBottomNav = isMobile;")) failures.push("DashboardLayout: the mobile bottom navigation is not persistent across portal pages.");
-if (!layout.includes("showHomeBack={isMobile && mobileSubpage}")) failures.push("DashboardLayout: mobile portal subpages do not expose dashboard-home navigation.");
+if (!layout.includes("const mobileBottomNav = isMobile;")) failures.push("DashboardLayout: mobile bottom navigation is not persistent across portal pages.");
+if (!layout.includes("showHomeBack={isMobile && !isDashboardHome}")) failures.push("DashboardLayout: mobile portal subpages do not expose dashboard-home navigation.");
+if (!layout.includes("dashboard-mobile-shell")) failures.push("DashboardLayout: mobile shell class is missing.");
+if (!dashboardCss.includes("--dashboard-sidebar-width: 270px;")) failures.push("Dashboard CSS: sidebar width contract is missing.");
 if (!dashboardCss.includes("width: calc(100% - var(--dashboard-sidebar-width));")) failures.push("Dashboard CSS: desktop content width is not constrained to the sidebar.");
-if (!dashboardCss.includes("--dashboard-sidebar-width: 270px;")) failures.push("Dashboard CSS: sidebar width contract missing.");
+if (dashboardCss.includes("max-height: calc(100dvh - 72px)")) failures.push("Dashboard CSS: legacy fixed content height is still present.");
+if (!dashboardCss.includes("padding-bottom: calc(var(--dashboard-bottom-nav-height) + env(safe-area-inset-bottom) + 24px)")) failures.push("Dashboard mobile spacing must account for the fixed bottom dock and safe-area inset.");
+if (!sidebarCss.includes("position: fixed;")) failures.push("Sidebar CSS: fixed positioning is missing.");
+if (!sidebarCss.includes("bottom: 0;")) failures.push("Sidebar CSS: mobile dock is not fixed to the bottom edge.");
+if (!sidebarCss.includes("height: 58px;")) failures.push("Sidebar CSS: mobile actions are not thumb-friendly.");
+if (sidebar.includes("className=\"dashboard-sidebar mobile-drawer\"")) failures.push("Sidebar component: the desktop persistent sidebar must remain independent of mobile drawer styling.");
+
 if (!chatSidebar.includes("currentUser,")) failures.push("ChatSidebar: current user identity is not supplied for self-filtering.");
 if (!chatSidebar.includes("isSameIdentity(member, actor)")) failures.push("ChatSidebar: member directory self-filter is missing.");
 if (!chatSidebar.includes("isSameIdentity(partner, actor)")) failures.push("ChatSidebar: conversation self-filter is missing.");
@@ -35,4 +45,4 @@ if (failures.length) {
 }
 
 console.log("PORTAL UI CONTRACT TEST PASSED");
-console.log("Verified persistent mobile portal navigation, dashboard/sidebar width constraints, portal navigation to home, and chat self-filter contracts without a visible release-version dependency.");
+console.log("Verified persistent mobile navigation, fixed desktop sidebar, thumb-friendly mobile actions, scroll-safe shell spacing, portal navigation to home, and chat self-filter contracts.");

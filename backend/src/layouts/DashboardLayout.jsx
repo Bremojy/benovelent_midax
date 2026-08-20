@@ -7,8 +7,12 @@ import "../styles/dashboard.css";
 import "../styles/dashboard-mobile.css";
 
 function DashboardLayout({ children }) {
-  const [sidebarOpen, setSidebarOpen] = useState(() => (typeof window !== "undefined" ? window.innerWidth > 900 : true));
-  const [isMobile, setIsMobile] = useState(() => (typeof window !== "undefined" ? window.innerWidth <= 900 : false));
+  const [sidebarOpen, setSidebarOpen] = useState(() => (
+    typeof window !== "undefined" ? window.innerWidth > 900 : true
+  ));
+  const [isMobile, setIsMobile] = useState(() => (
+    typeof window !== "undefined" ? window.innerWidth <= 900 : false
+  ));
   const { user, role, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
@@ -21,9 +25,6 @@ function DashboardLayout({ children }) {
   }, [role, user?.role]);
 
   const isDashboardHome = location.pathname === basePath || location.pathname === `${basePath}/`;
-  const mobileSubpage = !isDashboardHome;
-  // Keep the dashboard dock visible on every authenticated mobile portal page.
-  // The hamburger opens a separate full navigation drawer when needed.
   const mobileBottomNav = isMobile;
 
   useEffect(() => {
@@ -32,8 +33,9 @@ function DashboardLayout({ children }) {
       setIsMobile(mobile);
       if (!mobile) setSidebarOpen(true);
     };
+
     resize();
-    window.addEventListener("resize", resize);
+    window.addEventListener("resize", resize, { passive: true });
     return () => window.removeEventListener("resize", resize);
   }, []);
 
@@ -45,26 +47,34 @@ function DashboardLayout({ children }) {
     setSidebarOpen(false);
   }, [isMobile]);
 
+  // Only lock the document while the mobile drawer is actually open. The
+  // persistent bottom navigation and all portal pages remain naturally scrollable.
   useEffect(() => {
     if (!isMobile || !sidebarOpen) return undefined;
 
     const onKeyDown = (event) => {
       if (event.key === "Escape") setSidebarOpen(false);
     };
-    const originalOverflow = document.body.style.overflow;
+
+    const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     window.addEventListener("keydown", onKeyDown);
 
     return () => {
-      document.body.style.overflow = originalOverflow;
+      document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", onKeyDown);
     };
   }, [isMobile, sidebarOpen]);
 
   const goHome = () => navigate(basePath);
+  const portalRole = String(role || user?.role || "member").toLowerCase();
 
   return (
-    <div className={`dashboard-container portal-role-${String((role || user?.role || "member").toLowerCase())} ${mobileSubpage ? "dashboard-mobile-subpage" : ""} ${mobileBottomNav ? "dashboard-home-shell" : ""}`}>
+    <div
+      className={`dashboard-container portal-role-${portalRole} ${
+        isMobile ? "dashboard-mobile-shell" : "dashboard-desktop-shell"
+      } ${isDashboardHome ? "dashboard-is-home" : "dashboard-is-subpage"}`}
+    >
       {isMobile && sidebarOpen && (
         <button
           type="button"
@@ -73,6 +83,7 @@ function DashboardLayout({ children }) {
           onClick={() => setSidebarOpen(false)}
         />
       )}
+
       <DashboardSidebar
         role={role}
         sidebarOpen={sidebarOpen}
@@ -80,7 +91,8 @@ function DashboardLayout({ children }) {
         mobileHidden={false}
         mobileBottomNav={mobileBottomNav}
       />
-      <div className={`dashboard-main ${mobileSubpage ? "mobile-fullscreen" : ""}`}>
+
+      <div className="dashboard-main">
         <DashboardTopbar
           role={role}
           user={user}
@@ -88,12 +100,14 @@ function DashboardLayout({ children }) {
           setSidebarOpen={setSidebarOpen}
           onLogout={logout}
           homePath={basePath}
-          showHomeBack={isMobile && mobileSubpage}
+          showHomeBack={isMobile && !isDashboardHome}
           onHomeBack={goHome}
         />
+
         <main className="dashboard-content">
           <div className="dashboard-page">{children}</div>
         </main>
+
         <footer className="dashboard-portal-footer" aria-label="Portal footer">
           <span>Benevolent MIDAX</span>
           <span>Secure member portal</span>
