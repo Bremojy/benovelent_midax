@@ -5,7 +5,7 @@ import { useLocation } from "react-router-dom";
 import API from "../services/api";
 import "../styles/smart-assistant.css";
 
-const STORAGE_KEY = "benovelentMidaxAssistantHistory";
+const STORAGE_KEY_PREFIX = "benovelentMidaxAssistantHistory";
 const MAX_MESSAGES = 30;
 
 const FAQ = [
@@ -35,9 +35,16 @@ function fallbackAnswer(question, role) {
   if (role === "admin" || role === "superadmin") return "I could not match that to a published admin topic. Try Members, Support, Claims, Chat, Notifications, Polls, News or the Constitution.";
   return "I could not match that to a published website topic. Try Membership, Support, the Constitution, News or Contact information.";
 }
-function loadHistory(role) {
+function getHistoryKey(role, path) {
+  const portal = String(role || "public").toLowerCase();
+  const sectionMatch = String(path || "").match(/^\/(member|admin|superadmin)(?:\/([^/]+))?/);
+  const section = sectionMatch ? (sectionMatch[2] || "home") : "public";
+  return `${STORAGE_KEY_PREFIX}:${portal}:${section}`;
+}
+
+function loadHistory(role, path) {
   try {
-    const parsed = JSON.parse(sessionStorage.getItem(STORAGE_KEY) || "null");
+    const parsed = JSON.parse(sessionStorage.getItem(getHistoryKey(role, path)) || "null");
     if (Array.isArray(parsed) && parsed.length) return parsed.slice(-MAX_MESSAGES);
   } catch (_) {}
   return [makeMessage("bot", `Hello! I’m MIDAX Assistant. ${role ? "How can I help with your portal today?" : "How can I help you today?"}`)];
@@ -52,13 +59,20 @@ export default function SmartAssistant() {
   const [typing, setTyping] = useState(false);
   const [showTeaser, setShowTeaser] = useState(true);
   const [showLauncher, setShowLauncher] = useState(true);
-  const [messages, setMessages] = useState(() => loadHistory(roleName));
+  const [messages, setMessages] = useState(() => loadHistory(roleName, location.pathname));
   const endRef = useRef(null);
   const inputRef = useRef(null);
   const path = location.pathname;
   const isPortal = /^\/(member|admin|superadmin)(?:\/|$)/.test(path);
 
-  useEffect(() => { try { sessionStorage.setItem(STORAGE_KEY, JSON.stringify(messages.slice(-MAX_MESSAGES))); } catch (_) {} }, [messages]);
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(
+        getHistoryKey(roleName, path),
+        JSON.stringify(messages.slice(-MAX_MESSAGES))
+      );
+    } catch (_) {}
+  }, [messages, roleName, path]);
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }); }, [messages, typing]);
   useEffect(() => {
     if (open) { setShowLauncher(true); setShowTeaser(false); window.setTimeout(() => inputRef.current?.focus(), 120); return undefined; }

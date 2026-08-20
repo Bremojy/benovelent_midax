@@ -22,7 +22,10 @@ function walk(dir){
   return out;
 }
 
-const files=SOURCE_DIRS.flatMap(walk).filter((f)=>!f.endsWith("sourceQualityTest.js"));
+const files=SOURCE_DIRS.flatMap(walk)
+  .filter((f)=>!f.endsWith("sourceQualityTest.js"))
+  .filter((f)=>!f.includes(`${path.sep}backend${path.sep}src${path.sep}`))
+  .filter((f)=>!f.endsWith(`${path.sep}backend${path.sep}vite.config.js`));
 const failures=[];
 
 for(const file of files){

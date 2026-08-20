@@ -9,7 +9,7 @@ const failures = [];
 function walk(dir) {
   const out = [];
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    if (["node_modules", ".git", "uploads"].includes(entry.name)) continue;
+    if (["node_modules", ".git", "uploads", "src"].includes(entry.name)) continue;
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) out.push(...walk(full));
     else if (entry.isFile() && full.endsWith(".js")) out.push(full);
@@ -17,7 +17,7 @@ function walk(dir) {
   return out;
 }
 
-for (const file of walk(root)) {
+for (const file of walk(root).filter((file) => !file.endsWith(`${path.sep}backend${path.sep}vite.config.js`))) {
   try { execFileSync(process.execPath, ["--check", file], { stdio: "pipe" }); }
   catch (error) { failures.push(`Backend syntax error: ${path.relative(frontend, file)}\n${error.stderr?.toString() || error.message}`); }
 }

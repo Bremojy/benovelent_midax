@@ -12,6 +12,7 @@ const News = require("../models/News");
 const Contribution = require("../models/Contribution");
 const AuditLog = require("../models/AuditLog");
 const Event = require("../models/Event");
+const WebsiteContent = require("../models/WebsiteContent");
 const { documentRoot } = require("../config/uploadConfig");
 const { logActivity } = require("../services/auditService");
 

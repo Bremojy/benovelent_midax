@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { MessageCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
-import { API_BASE_URL } from "../../services/api";
+import API from "../../services/api";
 import "./ChatPreview.css";
 
 function ChatPreview() {
@@ -16,23 +16,17 @@ function ChatPreview() {
 
   async function loadConversations() {
     try {
-      const token = localStorage.getItem("memberToken");
-
-      const response = await fetch(`${API_BASE_URL}/api/conversations`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      const data = await response.json();
-
-      if (Array.isArray(data)) {
-        setConversations(data);
-      } else {
-        setConversations(data.conversations || []);
-      }
+      const { data } = await API.get("/conversations");
+      const next = Array.isArray(data)
+        ? data
+        : data?.conversations || data?.data?.conversations || [];
+      setConversations(Array.isArray(next) ? next : []);
     } catch (error) {
-      console.error(error);
+      console.warn(
+        "Chat preview unavailable:",
+        error?.response?.data?.message || error?.message || error
+      );
+      setConversations([]);
     } finally {
       setLoading(false);
     }
