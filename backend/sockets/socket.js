@@ -15,14 +15,39 @@ let io;
 
 const initSocket = (server) => {
 
-    io = new Server(server, {
+    const allowedOrigins = String(
+        process.env.CORS_ORIGINS ||
+        "https://benovelent-midax.vercel.app,http://localhost:5173,http://127.0.0.1:5173"
+    )
+        .split(",")
+        .map((value) => value.trim())
+        .filter(Boolean);
 
+    const allowVercelPreviews = String(process.env.ALLOW_VERCEL_PREVIEWS || "false").toLowerCase() === "true";
+
+    const isAllowedOrigin = (origin) => {
+        if (!origin) return true;
+        if (allowedOrigins.includes(origin)) return true;
+        if (allowVercelPreviews) {
+            try {
+                const url = new URL(origin);
+                return url.protocol === "https:" && url.hostname.endsWith(".vercel.app");
+            } catch {
+                return false;
+            }
+        }
+        return false;
+    };
+
+    io = new Server(server, {
         cors: {
-            origin: String(process.env.CORS_ORIGINS || "https://benovelent-midax.vercel.app,http://localhost:5173,http://127.0.0.1:5173").split(",").map((value) => value.trim()).filter(Boolean),
+            origin(origin, callback) {
+                if (isAllowedOrigin(origin)) return callback(null, true);
+                return callback(new Error("Origin not allowed by Socket.IO CORS."));
+            },
             methods: ["GET", "POST"],
             credentials: true,
         }
-
     });
 
     // Authenticate every Socket.IO connection with the same JWT/session rules

@@ -14,7 +14,8 @@
     "test:ui": "node backend/scripts/v12UiContractTest.js",
     "test": "npm run test:quality && npm run test:integrity && npm run test:routes && npm run test:ui && npm run test:shell && npm run test:regression",
     "test:shell": "node backend/scripts/v13PortalShellTest.js",
-    "test:regression": "node backend/scripts/regressionAuditTest.js"
+    "test:regression": "node backend/scripts/regressionAuditTest.js",
+    "vercel-build": "vite build && node scripts/copy-vite-output.mjs"
   },
   "dependencies": {
     "axios": "^1.18.1",

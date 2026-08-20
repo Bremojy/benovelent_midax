@@ -16,6 +16,14 @@ export const SocketProvider = ({ children }) => {
       } catch { return null; }
     })();
     setSocketToken(token);
+
+    // The socket is authenticated and should only be connected after a valid
+    // portal token exists. Connecting anonymously creates noisy connect errors
+    // on public/login pages and can leave stale transports during logout.
+    if (!token) {
+      socket.disconnect();
+    }
+
     const handleSessionReplaced = () => {
       socket.disconnect();
       clearSession?.();
@@ -25,7 +33,7 @@ export const SocketProvider = ({ children }) => {
 
     // Socket.IO is intentionally non-blocking. If Render is sleeping,
     // the rest of the dashboard must continue working over HTTP.
-    if (!socket.connected) {
+    if (token && !socket.connected) {
       socket.connect();
     }
 

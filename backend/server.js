@@ -79,10 +79,24 @@ const allowedOrigins = String(process.env.CORS_ORIGINS || "https://benovelent-mi
     .split(",")
     .map((origin) => origin.trim())
     .filter(Boolean);
+const allowVercelPreviews = String(process.env.ALLOW_VERCEL_PREVIEWS || "false").toLowerCase() === "true";
+
+const isAllowedCorsOrigin = (origin) => {
+    if (!origin || allowedOrigins.includes(origin)) return true;
+    if (allowVercelPreviews) {
+        try {
+            const url = new URL(origin);
+            return url.protocol === "https:" && url.hostname.endsWith(".vercel.app");
+        } catch {
+            return false;
+        }
+    }
+    return false;
+};
 
 const corsOptions = {
     origin(origin, callback) {
-        if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+        if (isAllowedCorsOrigin(origin)) return callback(null, true);
         return callback(new Error("Origin not allowed by CORS."));
     },
     credentials: true,

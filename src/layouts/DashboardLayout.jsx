@@ -22,9 +22,10 @@ function DashboardLayout({ children }) {
 
   const isDashboardHome = location.pathname === basePath || location.pathname === `${basePath}/`;
   const mobileSubpage = !isDashboardHome;
-  // Keep the portal navigation persistent on every mobile portal page so users
-  // can always move back to Dashboard or choose another portal section.
-  const mobileBottomNav = isMobile;
+  // The mobile bottom dashboard dock belongs to the portal dashboard home only.
+  // Portal subpages use the topbar menu + drawer instead of placing dashboard
+  // navigation below their page content.
+  const mobileBottomNav = isMobile && isDashboardHome;
 
   useEffect(() => {
     const resize = () => {

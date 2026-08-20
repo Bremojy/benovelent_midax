@@ -17,7 +17,7 @@ const dashboardCss = read("src/styles/v12-dashboard-mobile.css");
 const packageJson = JSON.parse(read("package.json"));
 
 if (packageJson.version !== "12.0.0") failures.push(`package.json: expected V12 version 12.0.0, found ${packageJson.version}`);
-if (!layout.includes("const mobileBottomNav = isMobile;")) failures.push("DashboardLayout: mobile bottom navigation is not persistent across portal pages.");
+if (!layout.includes("const mobileBottomNav = isMobile && isDashboardHome;")) failures.push("DashboardLayout: mobile bottom navigation is not limited to the portal dashboard home.");
 if (!layout.includes("showHomeBack={isMobile && mobileSubpage}")) failures.push("DashboardLayout: mobile portal subpages do not expose dashboard-home navigation.");
 if (!dashboardCss.includes("width: calc(100% - var(--dashboard-sidebar-width));")) failures.push("Dashboard CSS: desktop content width is not constrained to the sidebar.");
 if (!dashboardCss.includes("--dashboard-sidebar-width: 270px;")) failures.push("Dashboard CSS: sidebar width contract missing.");
@@ -34,4 +34,4 @@ if (failures.length) {
 }
 
 console.log("V12 UI CONTRACT TEST PASSED");
-console.log("Verified persistent mobile portal navigation, dashboard/sidebar width constraints, portal navigation to home, and chat self-filter contracts.");
+console.log("Verified dashboard-home mobile navigation, dashboard/sidebar width constraints, portal navigation to home, and chat self-filter contracts.");

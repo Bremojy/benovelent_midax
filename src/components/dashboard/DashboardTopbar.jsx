@@ -56,7 +56,6 @@ function DashboardTopbar({
     loadUnread();
     const interval = window.setInterval(loadUnread, 30000);
     const onNotification = () => { if (mounted) { setUnreadNotifications((v) => Number(v) + 1); loadUnread(); } };
-    if (!socket.connected) socket.connect();
     socket.on("new-notification", onNotification);
     socket.on("new-call-notification", onNotification);
     return () => { mounted = false; window.clearInterval(interval); socket.off("new-notification", onNotification); socket.off("new-call-notification", onNotification); };

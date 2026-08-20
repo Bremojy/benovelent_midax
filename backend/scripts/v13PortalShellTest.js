@@ -28,8 +28,11 @@ if (!shell.includes("flex: 0 0 auto;")) failures.push("Dashboard main is not loc
 if (!shell.includes("width: calc(100vw - var(--dashboard-sidebar-width));")) {
   failures.push("Desktop dashboard width is not calculated from the fixed sidebar.");
 }
-if (!shell.includes("padding-bottom: calc(var(--dashboard-bottom-nav-height) + env(safe-area-inset-bottom) + 24px)")) {
-  failures.push("Mobile page content does not reserve space for the fixed bottom navigation.");
+if (!shell.includes("dashboard-home-shell .dashboard-content")) {
+  failures.push("Mobile dashboard shell is missing dedicated bottom-navigation spacing.");
+}
+if (!shell.includes("dashboard-mobile-subpage .dashboard-content") || !shell.includes("padding-bottom: 24px !important")) {
+  failures.push("Mobile portal subpages do not use content spacing independent of the dashboard dock.");
 }
 if (!sidebar.includes("min-height: 0;")) failures.push("Sidebar scroll area is missing min-height: 0.");
 if (!sidebar.includes("margin-top: auto;")) failures.push("Sidebar footer is not anchored below the scrollable menu.");
@@ -43,4 +46,4 @@ if (failures.length) {
 }
 
 console.log("V13 PORTAL SHELL TEST PASSED");
-console.log("Verified fixed desktop sidebar, non-overlapping scroll/footer layout, mobile bottom-dock spacing, and role-specific portal navigation without Platform Center.");
+console.log("Verified fixed desktop sidebar, non-overlapping scroll/footer layout, dashboard-home mobile dock spacing, and role-specific portal navigation without Platform Center.");

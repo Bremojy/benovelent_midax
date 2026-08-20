@@ -6,11 +6,16 @@ const SOCKET_URL = String(
   "https://benovelent-midax.onrender.com"
 ).replace(/\/+$/, "");
 
+const socketUpgrade = String(import.meta.env.VITE_SOCKET_UPGRADE || "false").toLowerCase() === "true";
+
 const socket = io(SOCKET_URL, {
   autoConnect: false,
   transports: ["polling", "websocket"],
   auth: { token: "" },
-  upgrade: true,
+  // Render deployments can accept Socket.IO polling while a WebSocket upgrade
+  // is intermittently closed by the proxy. Keep polling as the stable default;
+  // production can opt into websocket upgrades with VITE_SOCKET_UPGRADE=true.
+  upgrade: socketUpgrade,
   reconnection: true,
   reconnectionAttempts: 10,
   reconnectionDelay: 1000,
