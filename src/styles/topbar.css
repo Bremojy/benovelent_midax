@@ -358,7 +358,7 @@ transform:translateY(-2px);
 .install-topbar-btn{width:auto;min-width:86px;padding:0 12px;gap:6px;font-weight:800}
 @media(max-width:560px){.dashboard-topbar{padding:0 10px;gap:6px}.topbar-left,.topbar-right{gap:6px;min-width:0}.portal-website-home-btn{display:none!important}.icon-btn.install-topbar-btn{width:40px;min-width:40px;padding:0;border-radius:12px}.icon-btn.install-topbar-btn span{display:none}.topbar-right{margin-left:auto}.user-box{max-width:40px}}
 
-/* V12 portal identity and compact laptop behavior. */
+/* Portal portal identity and compact laptop behavior. */
 .dashboard-container .dashboard-topbar{
   box-shadow:0 8px 26px var(--portal-soft,rgba(15,23,42,.06));
 }

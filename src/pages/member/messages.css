@@ -496,7 +496,7 @@
 .mobile-chat-filter-header{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}.mobile-chat-filter-header button{display:inline-flex;align-items:center;gap:5px;border:1px solid rgba(148,163,184,.25);border-radius:8px;background:white;padding:6px 9px;font-weight:700}.mobile-chat-filter-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px}.mobile-chat-filter-grid select{min-width:0;width:100%;padding:8px;border:1px solid rgba(148,163,184,.25);border-radius:9px;background:white}
 @media(max-width:480px){.mobile-chat-filter-grid{grid-template-columns:1fr}}
 
-/* V12: fast, stable chat canvas. The center pane never forces the portal page wider. */
+/* Portal: fast, stable chat canvas. The center pane never forces the portal page wider. */
 .message-center-shell,
 .messages-chat-container,
 .messages-page,

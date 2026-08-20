@@ -4,7 +4,7 @@ import DashboardTopbar from "../components/dashboard/DashboardTopbar";
 import { useAuth } from "../context/AuthContext";
 import { useLocation, useNavigate } from "react-router-dom";
 import "../styles/dashboard.css";
-import "../styles/v12-dashboard-mobile.css";
+import "../styles/dashboard-mobile.css";
 
 function DashboardLayout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(() => (typeof window !== "undefined" ? window.innerWidth > 900 : true));
@@ -98,7 +98,6 @@ function DashboardLayout({ children }) {
         <footer className="dashboard-portal-footer" aria-label="Portal footer">
           <span>Benevolent MIDAX</span>
           <span>Secure member portal</span>
-          <span>v{import.meta.env.VITE_APP_VERSION || "12.0.0"}</span>
         </footer>
       </div>
     </div>

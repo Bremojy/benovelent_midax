@@ -33,152 +33,101 @@ const TOKEN_KEYS = {
 // 30 minutes of inactivity
 const INACTIVITY_TIMEOUT = 30 * 60 * 1000;
 
-// Key used to synchronize logout
-// between multiple browser tabs/windows.
-const SESSION_EVENT_KEY =
-  "benovelentMidaxSessionEvent";
 
 // ========================================
-// CLEAR STORED SESSION
+// SESSION-ONLY AUTH STORAGE
 // ========================================
 
-const clearStoredSession = () => {
-  Object.values(TOKEN_KEYS).forEach((key) => {
-    localStorage.removeItem(key);
-  });
+// Authentication belongs to the current browser tab only. This prevents two
+// accounts opened on the same computer from sharing credentials through
+// localStorage and lets member/admin tabs stay independently signed in.
+const LEGACY_TOKEN_KEYS = [
+  "memberToken",
+  "adminToken",
+  "superAdminToken",
+  "user",
+  "benovelentMidaxLastActivity",
+];
 
-  localStorage.removeItem("user");
-
-  // Also remove inactivity timestamp.
-  localStorage.removeItem(
-    "benovelentMidaxLastActivity"
-  );
+const SESSION_KEYS = {
+  member: "memberToken",
+  admin: "adminToken",
+  superadmin: "superAdminToken",
 };
 
-// ========================================
-// GET STORED USER
-// ========================================
+const migrateLegacySession = () => {
+  try {
+    const existingUser = sessionStorage.getItem("user");
+    const hasSessionAuth = Object.values(SESSION_KEYS).some((key) => Boolean(sessionStorage.getItem(key)));
+    if (!existingUser && !hasSessionAuth) {
+      const legacyUser = localStorage.getItem("user");
+      let legacyRole = "";
+      try { legacyRole = String(JSON.parse(legacyUser || "null")?.role || "").toLowerCase(); } catch {}
+      const legacyKey = SESSION_KEYS[legacyRole];
+      const legacyToken = legacyKey ? localStorage.getItem(legacyKey) : null;
+      if (legacyUser && legacyToken) {
+        sessionStorage.setItem("user", legacyUser);
+        sessionStorage.setItem(legacyKey, legacyToken);
+        const legacyActivity = localStorage.getItem("benovelentMidaxLastActivity");
+        if (legacyActivity) sessionStorage.setItem("benovelentMidaxLastActivity", legacyActivity);
+      }
+    }
+    LEGACY_TOKEN_KEYS.forEach((key) => localStorage.removeItem(key));
+  } catch (_) {
+    // Private browsing/storage-disabled environments are handled by callers.
+  }
+};
+
+migrateLegacySession();
+
+const clearStoredSession = () => {
+  Object.values(SESSION_KEYS).forEach((key) => {
+    try { sessionStorage.removeItem(key); } catch {}
+  });
+  try { sessionStorage.removeItem("user"); } catch {}
+  try { sessionStorage.removeItem("benovelentMidaxLastActivity"); } catch {}
+};
 
 const getStoredUser = () => {
   try {
-    return JSON.parse(
-      localStorage.getItem("user") || "null"
-    );
+    return JSON.parse(sessionStorage.getItem("user") || "null");
   } catch (error) {
-    console.error(
-      "Invalid stored user:",
-      error
-    );
-
+    console.error("Invalid stored user:", error);
     return null;
   }
 };
-
-// ========================================
-// GET TOKEN FOR ROLE
-// ========================================
 
 const getTokenForRole = (role) => {
-  const normalizedRole =
-    (role || "").toLowerCase();
-
-  const tokenKey =
-    TOKEN_KEYS[normalizedRole];
-
-  if (!tokenKey) {
-    return null;
-  }
-
-  return localStorage.getItem(tokenKey);
+  const normalizedRole = String(role || "").toLowerCase();
+  const tokenKey = SESSION_KEYS[normalizedRole];
+  if (!tokenKey) return null;
+  try { return sessionStorage.getItem(tokenKey); } catch { return null; }
 };
-
-// ========================================
-// GET STORED TOKEN
-// ========================================
 
 const getStoredToken = () => {
   const storedUser = getStoredUser();
-
-  // ----------------------------------------
-  // Prefer token matching stored role
-  // ----------------------------------------
-
   if (storedUser?.role) {
-    const roleToken =
-      getTokenForRole(
-        storedUser.role
-      );
-
-    if (roleToken) {
-      return roleToken;
-    }
+    const roleToken = getTokenForRole(storedUser.role);
+    if (roleToken) return roleToken;
   }
-
-  // ----------------------------------------
-  // Fallback
-  // ----------------------------------------
-
-  for (const key of Object.values(
-    TOKEN_KEYS
-  )) {
-    const token =
-      localStorage.getItem(key);
-
-    if (token) {
-      return token;
-    }
+  for (const key of Object.values(SESSION_KEYS)) {
+    try {
+      const token = sessionStorage.getItem(key);
+      if (token) return token;
+    } catch {}
   }
-
   return null;
 };
 
-// ========================================
-// SAVE SESSION
-// ========================================
-
-const saveSession = (
-  token,
-  user
-) => {
+const saveSession = (token, user) => {
   clearStoredSession();
-
-  const role = (
-    user?.role || ""
-  ).toLowerCase();
-
-  if (!token || !role) {
-    throw new Error(
-      "Invalid authentication response."
-    );
-  }
-
-  const tokenKey =
-    TOKEN_KEYS[role];
-
-  if (!tokenKey) {
-    throw new Error(
-      "Unknown account role."
-    );
-  }
-
-  localStorage.setItem(
-    tokenKey,
-    token
-  );
-
-  localStorage.setItem(
-    "user",
-    JSON.stringify({
-      ...user,
-      role,
-    })
-  );
-
-  // Start a fresh inactivity period.
-  localStorage.setItem(
-    "benovelentMidaxLastActivity",
-    String(Date.now())
-  );
+  const role = String(user?.role || "").toLowerCase();
+  if (!token || !role) throw new Error("Invalid authentication response.");
+  const tokenKey = SESSION_KEYS[role];
+  if (!tokenKey) throw new Error("Unknown account role.");
+  sessionStorage.setItem(tokenKey, token);
+  sessionStorage.setItem("user", JSON.stringify({ ...user, role }));
+  sessionStorage.setItem("benovelentMidaxLastActivity", String(Date.now()));
 };
 
 // ========================================
@@ -242,41 +191,15 @@ export function AuthProvider({
     ]);
 
   // ======================================
-  // BROADCAST LOGOUT
-  // ======================================
-
-  const broadcastSessionLogout =
-    useCallback(() => {
-      localStorage.setItem(
-        SESSION_EVENT_KEY,
-        JSON.stringify({
-          type: "logout",
-          timestamp: Date.now(),
-        })
-      );
-    }, []);
-
-  // ======================================
   // AUTOMATIC INACTIVITY LOGOUT
   // ======================================
 
   const handleInactivityLogout =
     useCallback(() => {
-      console.warn(
-        "Session expired because of inactivity."
-      );
-
+      console.warn("Session expired because of inactivity.");
       clearSession();
-
-      setAuthError(
-        "You have been logged out due to inactivity."
-      );
-
-      broadcastSessionLogout();
-    }, [
-      clearSession,
-      broadcastSessionLogout,
-    ]);
+      setAuthError("You have been logged out due to inactivity.");
+    }, [clearSession]);
 
   // ======================================
   // RESET INACTIVITY TIMER
@@ -296,7 +219,7 @@ export function AuthProvider({
 
       const now = Date.now();
 
-      localStorage.setItem(
+      sessionStorage.setItem(
         "benovelentMidaxLastActivity",
         String(now)
       );
@@ -341,7 +264,7 @@ export function AuthProvider({
 
           const lastActivity =
             Number(
-              localStorage.getItem(
+              sessionStorage.getItem(
                 "benovelentMidaxLastActivity"
               )
             );
@@ -441,7 +364,7 @@ export function AuthProvider({
           // Store normalized user
           // --------------------------------
 
-          localStorage.setItem(
+          sessionStorage.setItem(
             "user",
             JSON.stringify(
               currentUser
@@ -451,7 +374,7 @@ export function AuthProvider({
           // If there was no previous
           // activity timestamp, create one.
           if (!lastActivity) {
-            localStorage.setItem(
+            sessionStorage.setItem(
               "benovelentMidaxLastActivity",
               String(Date.now())
             );
@@ -644,12 +567,10 @@ export function AuthProvider({
         } finally {
           clearSession();
 
-          broadcastSessionLogout();
-        }
+            }
       },
       [
         clearSession,
-        broadcastSessionLogout,
       ]
     );
 
@@ -677,7 +598,7 @@ export function AuthProvider({
     const handleActivity = () => {
       const now = Date.now();
 
-      // Prevent excessive localStorage writes
+      // Prevent excessive sessionStorage writes
       // when mousemove fires continuously.
       if (
         now - lastActivityHandled <
@@ -732,61 +653,12 @@ export function AuthProvider({
     const handleSessionReplaced = () => {
       clearSession();
       setAuthError("Your account was signed in on another device. You have been logged out for security.");
-      try {
-        localStorage.setItem(SESSION_EVENT_KEY, JSON.stringify({ type: "logout", reason: "session-replaced", timestamp: Date.now() }));
-      } catch {}
       try { window.dispatchEvent(new CustomEvent("benovelent:session-replaced-ui")); } catch {}
     };
     window.addEventListener("benovelent:session-replaced", handleSessionReplaced);
     return () => window.removeEventListener("benovelent:session-replaced", handleSessionReplaced);
   }, [clearSession]);
 
-  // ======================================
-  // CROSS-TAB SESSION SYNC
-  // ======================================
-
-  useEffect(() => {
-    const handleStorageChange =
-      (event) => {
-        if (
-          event.key !==
-          SESSION_EVENT_KEY
-        ) {
-          return;
-        }
-
-        try {
-          const eventData =
-            JSON.parse(
-              event.newValue || "{}"
-            );
-
-          if (
-            eventData.type ===
-            "logout"
-          ) {
-            clearSession();
-          }
-        } catch (error) {
-          console.error(
-            "Session sync error:",
-            error
-          );
-        }
-      };
-
-    window.addEventListener(
-      "storage",
-      handleStorageChange
-    );
-
-    return () => {
-      window.removeEventListener(
-        "storage",
-        handleStorageChange
-      );
-    };
-  }, [clearSession]);
 
   // ======================================
   // PORTAL THEME

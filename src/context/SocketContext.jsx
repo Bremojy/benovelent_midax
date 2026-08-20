@@ -10,9 +10,9 @@ export const SocketProvider = ({ children }) => {
   useEffect(() => {
     const token = (() => {
       try {
-        const stored = JSON.parse(localStorage.getItem("user") || "null");
+        const stored = JSON.parse(sessionStorage.getItem("user") || "null");
         const map = { member: "memberToken", admin: "adminToken", superadmin: "superAdminToken" };
-        return stored?.role ? localStorage.getItem(map[String(stored.role).toLowerCase()]) : null;
+        return stored?.role ? sessionStorage.getItem(map[String(stored.role).toLowerCase()]) : null;
       } catch { return null; }
     })();
     setSocketToken(token);

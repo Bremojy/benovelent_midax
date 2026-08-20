@@ -181,37 +181,105 @@ exports.verifyMembership = async (req, res) => {
 };
 
 
+const ASSISTANT_KNOWLEDGE = [
+  ["greeting", /^(hi|hello|hey|good morning|good afternoon|good evening)\b/i, "Hello! Welcome to Benevolent MIDAX. I can guide you through the website and the secure portals."],
+  ["identity", /\b(who are you|what can you do|help)\b/i, "I’m the Benevolent Assistant. I explain published website information and guide you to the right portal section without exposing private member records."],
+  ["contribution", /\b(contribution|monthly contribution|pay|deduction|500)\b/i, "The website currently describes the member contribution as Ksh 500. Use Accounts for your current records; the Constitution remains the source of truth for scheme rules."],
+  ["funeral", /\b(funeral|death|burial)\b/i, "The public Services page describes Ksh 100,000 for an eligible funeral claim and Ksh 30,000 for qualifying sibling funeral expenses, subject to the Constitution and claim conditions."],
+  ["medical", /\b(medical|hospital|inpatient)\b/i, "Medical support is available subject to the Constitution’s inpatient bands, family eligibility and claim conditions. Members can use Support or Claims after signing in."],
+  ["education", /\b(education|school|school fees|children)\b/i, "Education support is described as coming soon. The website does not invent an amount; use official scheme updates when the benefit becomes active."],
+  ["constitution", /\b(constitution|governance|rules|policy)\b/i, "Open Constitution to read, view, download or print the official scheme rules. The Constitution is the authoritative source for governance and benefit procedures."],
+  ["about", /\b(about|history|midax company|why benevolent)\b/i, "The About page explains Midax Petroleum Marketing, the Benevolent scheme’s purpose, member voice, accountability, representatives and communication."],
+  ["services", /\b(services|benefits|support services)\b/i, "Services covers Funeral Support, Medical Support, Education Support coming soon, accountability and Constitution-led decisions."],
+  ["news", /\b(news|announcement|announcements|update|newsroom)\b/i, "Open News for published updates, upcoming activities, resources and community polls. Signed-in users also receive portal notifications."],
+  ["resources", /\b(resource|resources|document|documents|forms|guides)\b/i, "Open Resource Centre or the Resources section of News for published forms, guides and official documents."],
+  ["contact", /\b(contact|phone|email|whatsapp|location|nairobi)\b/i, "Open Contact for the official enquiry form and current scheme contact information. The public page lists Nairobi, Kenya as the location."],
+  ["login", /\b(login|log in|sign in|access portal|password)\b/i, "Use Login to enter the secure portal. Member, admin and superadmin accounts see role-specific tools. Keep credentials private."],
+  ["member", /\b(member portal|member dashboard|member account)\b/i, "The member portal includes Profile, Dependants, Accounts, Support, Claims, Messages, Notifications, News/Announcements, Polls and Settings."],
+  ["admin", /\b(admin portal|administrator|admin dashboard)\b/i, "The admin portal provides authorised operational tools for members, accounts, support and claims, messages, notifications and other administrator functions."],
+  ["superadmin", /\b(superadmin|super admin|super administrator)\b/i, "The superadmin portal provides higher-level administration, system, audit and data-integrity controls plus member/admin management, messages, notifications, news and settings."],
+  ["profile", /\b(profile|profile photo|photo|account details|bio)\b/i, "Open Profile to review or update your account details and profile photo. Complete required fields to unlock the full portal experience."],
+  ["dependants", /\b(dependant|dependants|dependent|family|spouse|parent)\b/i, "Open Dependants to manage eligible family records used by support and claims processes."],
+  ["accounts", /\b(accounts|ledger|contribution history|balance)\b/i, "Open Accounts for contribution records and scheme account information available to your role. Figures are server-provided system records."],
+  ["support", /\b(support request|support|claim|assistance|submit support)\b/i, "Open Support or Claims, choose the relevant request type, provide the required details and supporting documents, then track the request from the portal."],
+  ["chat", /\b(chat|message|messages|messaging|conversation)\b/i, "Open Messages to search members, start private conversations, send messages and use audio/video calling where supported."],
+  ["call", /\b(audio call|voice call|video call|calling|call someone)\b/i, "Messages supports browser audio and video calls using WebRTC. Both users need a live connection and browser permission for the required microphone/camera."],
+  ["ringtone", /\b(ringtone|incoming call sound|call sound)\b/i, "Incoming calls use the Benevolent call ringtone shipped with the website. Browser/device notification and sound permissions must be allowed for the most reliable alerts."],
+  ["notification", /\b(notification|notifications|bell|alert)\b/i, "Use Notifications and the bell icon for portal updates. Browser push notifications require permission and can also alert you to incoming calls."],
+  ["poll", /\b(poll|vote|voting)\b/i, "Open Polls to view active community questions and vote when eligible. Published poll results can appear on News."],
+  ["install", /\b(install|android|iphone|pwa|home screen|app)\b/i, "The site is installable as a PWA on supported browsers. Use the Install action or your browser’s Install App/Add to Home Screen option."],
+  ["privacy", /\b(privacy|private|security|personal data)\b/i, "Open Privacy Policy for privacy guidance. Member information, support requests, dependants and portal activity are intended for authorised access only."],
+  ["terms", /\b(terms|conditions|rules for using)\b/i, "Open Terms & Conditions for the rules governing responsible use of the website and portals and the requirement to protect login credentials."],
+  ["logout", /\b(logout|log out|sign out)\b/i, "Use the account menu and choose Logout. Portal credentials are kept only for the current browser tab, not as a persistent browser login."],
+  ["same computer", /\b(another phone|other phone|new device|same laptop|same computer|two accounts)\b/i, "Each browser tab keeps its own portal session, so different authorised accounts can be used on the same computer without sharing login credentials."],
+];
+
+const tokenise = (value) => String(value || "").toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter((word) => word.length > 2);
+const bestKnowledgeAnswer = (question) => {
+  const normalized = String(question || "").trim();
+  if (!normalized) return null;
+  const exact = ASSISTANT_KNOWLEDGE.find(([, pattern]) => pattern.test(normalized));
+  return exact?.[2] || null;
+};
+
 exports.assistant = async (req, res) => {
   const question = String(req.body?.question || "").trim();
   if (!question) return res.status(400).json({ success: false, message: "Question is required." });
   const role = req.userRole || "public";
+
   const [news, events, website, resources] = await Promise.all([
-    News.find({ published: true, status: "published" }).sort({ publishDate: -1 }).limit(12).select("title summary category content publishDate").lean(),
-    Event.find({ published: true, startAt: { $gte: new Date(Date.now() - 86400000 * 7) }, ...(role !== "public" ? { audience: role } : {}) }).sort({ startAt: 1 }).limit(12).select("title description type startAt location audience").lean(),
-    WebsiteContent.find({ published: true, section: { $in: ["home", "about", "services", "contact", "footer", "constitution", "news", "events", "resources", "chatbot"] } }).select("section title subtitle description content").lean(),
-    (async () => { const publicRoot = path.join(__dirname, "..", "..", "public", "documents"); try { return fs.readdirSync(publicRoot).filter((name) => /\.(pdf|docx?|xlsx?|pptx?)$/i.test(name)).slice(0, 30); } catch (_) { return []; } })(),
+    News.find({ published: true, status: "published" }).sort({ publishDate: -1 }).limit(20).select("title summary category content publishDate").lean(),
+    Event.find({ published: true, startAt: { $gte: new Date(Date.now() - 86400000 * 30) }, ...(role !== "public" ? { audience: role } : {}) }).sort({ startAt: 1 }).limit(20).select("title description type startAt location audience").lean(),
+    WebsiteContent.find({ published: true, section: { $in: ["home", "about", "services", "contact", "footer", "settings", "gallery", "constitution", "privacy-policy", "terms-conditions", "news", "events", "resources", "chatbot"] } }).select("section title subtitle description content").lean(),
+    (async () => {
+      const publicRoot = path.join(__dirname, "..", "..", "public", "documents");
+      try { return fs.readdirSync(publicRoot).filter((name) => /\.(pdf|docx?|xlsx?|pptx?)$/i.test(name)).slice(0, 50); } catch (_) { return []; }
+    })(),
   ]);
-  const context = JSON.stringify({ service: "Benevolent MIDAX", role, approvedWebsiteContent: website, news, events, resources });
-  const aiUrl = String(process.env.AI_API_URL || "").trim();
-  const aiKey = String(process.env.AI_API_KEY || "").trim();
-  const aiModel = String(process.env.AI_MODEL || "").trim();
-  if (aiUrl && aiKey && aiModel && typeof fetch === "function") {
-    try {
-      const response = await fetch(aiUrl, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${aiKey}` }, body: JSON.stringify({ model: aiModel, messages: [{ role: "system", content: `You are the Benevolent MIDAX assistant. Answer only from the supplied application context. Respect the user's portal role; never reveal private member data to a public user. If the context does not contain the answer, say so and direct the user to the appropriate website/portal section. Context: ${context}` }, { role: "user", content: question }], temperature: 0.2 }) });
-      if (response.ok) { const data = await response.json(); const answer = data?.choices?.[0]?.message?.content || data?.output?.[0]?.content?.[0]?.text; if (answer) return res.json({ success: true, answer: String(answer).trim(), source: "ai" }); }
-    } catch (error) { console.warn("Optional AI provider unavailable:", error.message); }
-  }
+
   const normalized = question.toLowerCase();
-  const matches = news.filter(n => `${n.title} ${n.summary} ${n.category}`.toLowerCase().includes(normalized.split(/\s+/).find(w => w.length > 3) || "___"));
-  const eventMatches = events.filter(e => `${e.title} ${e.description} ${e.location}`.toLowerCase().includes(normalized.split(/\s+/).find(w => w.length > 3) || "___"));
-  let answer = "I can help with Benevolent MIDAX information, but I could not find a published answer in the current application knowledge. Try asking about the Constitution, support, contributions, news, upcoming events, resources or portal navigation.";
-  if (matches.length) answer = `Here is a relevant published update: ${matches[0].title}. ${matches[0].summary || "Open the News page for the full update."}`;
-  else if (eventMatches.length) answer = `A matching upcoming event is ${eventMatches[0].title}${eventMatches[0].location ? ` at ${eventMatches[0].location}` : ""}. It starts ${new Date(eventMatches[0].startAt).toLocaleString()}.`;
-  else if (normalized.includes("constitution")) answer = "The Constitution is available from the public Constitution page and the Resource Centre. It is the authoritative source for governance and benefit rules.";
-  else if (normalized.includes("support") || normalized.includes("claim")) answer = role === "public" ? "The public site explains the scheme's support services. Members can submit and track requests from the Support area after signing in." : "Open Support in your portal to submit or track a support request.";
-  else if (normalized.includes("document") || normalized.includes("resource")) answer = "Open the Resource Centre for published Constitution files, forms, guides and other documents.";
+  const tokens = tokenise(question);
+  const publishedMatches = news.filter((item) => tokens.some((token) => `${item.title || ""} ${item.summary || ""} ${item.category || ""} ${item.content || ""}`.toLowerCase().includes(token)));
+  const eventMatches = events.filter((item) => tokens.some((token) => `${item.title || ""} ${item.description || ""} ${item.location || ""}`.toLowerCase().includes(token)));
+
+  const knowledgeAnswer = bestKnowledgeAnswer(question);
+  let answer = knowledgeAnswer;
+  if (!answer && publishedMatches.length) answer = `A published update that matches your question is “${publishedMatches[0].title}”. ${publishedMatches[0].summary || "Open News for the full update."}`;
+  else if (!answer && eventMatches.length) answer = `A matching activity is “${eventMatches[0].title}”${eventMatches[0].location ? ` at ${eventMatches[0].location}` : ""}. It starts ${new Date(eventMatches[0].startAt).toLocaleString()}.`;
+  else if (!answer && (normalized.includes("resource") || normalized.includes("document"))) answer = `The Resource Centre currently lists ${resources.length} published document${resources.length === 1 ? "" : "s"}. Open Resources to view them.`;
+  else if (!answer) answer = role === "public"
+    ? "I can help with the published Benevolent MIDAX website and current public updates. Try asking about the Constitution, services, contributions, funeral or medical support, news, events, resources, contact details, login or the public website."
+    : "I can help with the published Benevolent MIDAX website and your authorised portal navigation. Try asking about Profile, Dependants, Accounts, Support, Claims, Messages, Notifications, Calls, Polls, News, Resources or the Constitution.";
+
+  // Optional server-side language provider remains grounded by the same knowledge
+  // and is never exposed as a user-facing feature name.
+  const providerUrl = String(process.env.ASSISTANT_PROVIDER_URL || process.env.AI_API_URL || "").trim();
+  const providerKey = String(process.env.ASSISTANT_PROVIDER_KEY || process.env.AI_API_KEY || "").trim();
+  const providerModel = String(process.env.ASSISTANT_MODEL || process.env.AI_MODEL || "").trim();
+  if (providerUrl && providerKey && providerModel && typeof fetch === "function") {
+    try {
+      const context = JSON.stringify({ service: "Benevolent MIDAX", role, website, news, events, resources, applicationGuidance: ASSISTANT_KNOWLEDGE.map(([name, , text]) => ({ name, text })) });
+      const response = await fetch(providerUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${providerKey}` },
+        body: JSON.stringify({ model: providerModel, messages: [
+          { role: "system", content: `You are the Benevolent MIDAX website assistant. Answer only from the supplied application context. Respect the portal role. Never reveal private member data. If the answer is not in context, say so and direct the user to the appropriate page. Context: ${context}` },
+          { role: "user", content: question },
+        ], temperature: 0.1 }),
+      });
+      if (response.ok) {
+        const data = await response.json();
+        const generated = data?.choices?.[0]?.message?.content || data?.output?.[0]?.content?.[0]?.text;
+        if (generated) answer = String(generated).trim();
+      }
+    } catch (error) {
+      console.warn("Assistant provider unavailable:", error.message);
+    }
+  }
+
   res.json({ success: true, answer, source: "application" });
 };
+
 
 exports.assistantContext = async (req, res) => {
   const role = req.userRole || "public";

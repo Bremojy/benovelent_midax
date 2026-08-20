@@ -111,14 +111,14 @@ export default function InstallPWA() {
   const iosMode = !directInstall && iosDevice;
 
   return (
-    <div className="pwa-install-sheet" role="dialog" aria-modal="true" aria-label="Install Benovelent MIDAX">
+    <div className="pwa-install-sheet" role="dialog" aria-modal="true" aria-label="Install Benevolent MIDAX">
       <button type="button" className="pwa-install-sheet-close" onClick={closeFallback} aria-label="Close installation dialog">
         <X size={18} />
       </button>
       <div className="pwa-install-sheet-icon"><Download size={22} /></div>
       <div className="pwa-install-sheet-copy">
         <span>BENOVELENT MIDAX</span>
-        <h2>{directInstall ? "Install Benovelent MIDAX" : iosMode ? "Add to Home Screen" : "Installation notice"}</h2>
+        <h2>{directInstall ? "Install Benevolent MIDAX" : iosMode ? "Add to Home Screen" : "Installation notice"}</h2>
         {directInstall ? (
           <p>Install the portal for a faster, app-like experience and easier access on your device.</p>
         ) : iosMode ? (

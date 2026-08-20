@@ -59,7 +59,7 @@ const API = axios.create({
 const getToken = () => {
   let user = null;
   try {
-    user = JSON.parse(localStorage.getItem("user") || "null");
+    user = JSON.parse(sessionStorage.getItem("user") || "null");
   } catch (_) {
     user = null;
   }
@@ -75,15 +75,15 @@ const getToken = () => {
   // portal's token; that can produce confusing 401/403 responses.
   const roleKey = tokenByRole[role];
   if (roleKey) {
-    return localStorage.getItem(roleKey);
+    return sessionStorage.getItem(roleKey);
   }
 
   // Only use pathname as a recovery path when the role has not yet been
   // restored, never as a way to switch credentials between portals.
   const pathname = typeof window !== "undefined" ? window.location.pathname : "";
-  if (pathname.startsWith("/superadmin")) return localStorage.getItem("superAdminToken");
-  if (pathname.startsWith("/admin")) return localStorage.getItem("adminToken");
-  if (pathname.startsWith("/member")) return localStorage.getItem("memberToken");
+  if (pathname.startsWith("/superadmin")) return sessionStorage.getItem("superAdminToken");
+  if (pathname.startsWith("/admin")) return sessionStorage.getItem("adminToken");
+  if (pathname.startsWith("/member")) return sessionStorage.getItem("memberToken");
   return null;
 };
 
@@ -115,19 +115,19 @@ API.interceptors.request.use(
 // ========================================
 
 export const clearAuthSession = () => {
-  localStorage.removeItem(
+  sessionStorage.removeItem(
     "memberToken"
   );
 
-  localStorage.removeItem(
+  sessionStorage.removeItem(
     "adminToken"
   );
 
-  localStorage.removeItem(
+  sessionStorage.removeItem(
     "superAdminToken"
   );
 
-  localStorage.removeItem(
+  sessionStorage.removeItem(
     "user"
   );
 };

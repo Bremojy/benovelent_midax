@@ -219,7 +219,7 @@
 /* V9 mobile navigation modes */
 @media (max-width:900px){.dashboard-sidebar.mobile-bottom-nav{top:auto;bottom:0;left:50%;transform:translateX(-50%);width:min(100%,720px);height:70px;display:flex!important}.dashboard-sidebar.mobile-bottom-nav:not(.open){transform:translateX(-50%)}.dashboard-sidebar.mobile-bottom-nav .sidebar-menu{display:flex}.dashboard-sidebar.mobile-bottom-nav .sidebar-footer{display:flex}.dashboard-sidebar.mobile-drawer{top:0;bottom:auto;left:0;right:auto;width:min(320px,88vw);height:100dvh;max-height:100dvh;display:flex!important;transform:translateX(-105%);border-radius:0 24px 24px 0;border-right:1px solid rgba(255,255,255,.08);border-top:0}.dashboard-sidebar.mobile-drawer.open{transform:translateX(0)}.dashboard-sidebar.mobile-drawer .sidebar-header{display:flex}.dashboard-sidebar.mobile-drawer .sidebar-menu{flex-direction:column;align-items:stretch;gap:7px;padding:18px 14px;overflow-y:auto;overflow-x:hidden}.dashboard-sidebar.mobile-drawer .sidebar-link{width:100%;height:50px;min-width:0;padding:0 14px;justify-content:flex-start;flex-direction:row;font-size:14px;gap:12px}.dashboard-sidebar.mobile-drawer .sidebar-link span{display:inline}.dashboard-sidebar.mobile-drawer .sidebar-footer{padding:0 0 18px;display:block}.dashboard-sidebar.mobile-drawer .logout-btn{width:calc(100% - 28px);height:48px;margin:0 14px;font-size:14px}.dashboard-sidebar.mobile-drawer .logout-btn span{display:inline}}
 
-/* V12 portal-specific navigation identity. */
+/* Portal portal-specific navigation identity. */
 .dashboard-container .sidebar-brand h2::after{
   content:"";
   display:block;
@@ -252,7 +252,7 @@
 }
 
 
-/* V13 — sidebar never collapses into page content */
+/* Portal — sidebar never collapses into page content */
 .dashboard-sidebar {
   position: fixed;
   inset: 0 auto 0 0;
@@ -325,7 +325,7 @@
 }
 
 
-/* V14 — guaranteed viewport-anchored mobile dock. */
+/* Portal — guaranteed viewport-anchored mobile dock. */
 @media (max-width: 900px) {
   .dashboard-sidebar.mobile-bottom-nav {
     display: flex !important;
@@ -453,5 +453,30 @@
   .mobile-more-link.logout-more {
     cursor:pointer;
     font:inherit;
+  }
+}
+
+
+/* Final portal navigation polish: desktop uses the permanent sidebar; mobile uses
+   a floating dock with breathing room so it stays clearly visible above the edge. */
+@media (min-width: 901px) {
+  .dashboard-topbar .menu-btn { display: none; }
+}
+@media (max-width: 900px) {
+  .dashboard-sidebar.mobile-bottom-nav {
+    left: 10px !important;
+    right: 10px !important;
+    bottom: max(14px, env(safe-area-inset-bottom)) !important;
+    width: auto !important;
+    max-width: none !important;
+    min-height: 74px !important;
+    border-radius: 24px !important;
+    padding: 8px 10px !important;
+  }
+  .dashboard-sidebar.mobile-bottom-nav .sidebar-menu {
+    justify-content: space-evenly !important;
+  }
+  .dashboard-container.dashboard-home-shell .dashboard-content {
+    padding-bottom: calc(var(--dashboard-bottom-nav-height,96px) + 100px + env(safe-area-inset-bottom)) !important;
   }
 }

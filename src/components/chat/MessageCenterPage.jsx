@@ -375,6 +375,14 @@ function MessageCenterPage({
     setMobileChatOpen(false);
   };
 
+  const ensureCallNotifications = async () => {
+    try {
+      if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "default") {
+        await Notification.requestPermission();
+      }
+    } catch (_) {}
+  };
+
   const startCall = async (type) => {
     if (!selectedConversation?.partner?._id) {
       setBanner("Select a member before starting a call.");
@@ -383,6 +391,7 @@ function MessageCenterPage({
 
     const activeSocket = socket || contextSocket || socketClient;
     try {
+      await ensureCallNotifications();
       if (!activeSocket.connected) {
         setBanner("Connecting to secure calling…");
         if (activeSocket.connect) activeSocket.connect();
@@ -642,9 +651,9 @@ function waitForSocketConnection(activeSocket, timeout = 9000) {
 
 function getToken(role) {
   const normalized = String(role || "").toLowerCase();
-  if (normalized === "superadmin") return localStorage.getItem("superAdminToken");
-  if (normalized === "admin") return localStorage.getItem("adminToken");
-  return localStorage.getItem("memberToken");
+  if (normalized === "superadmin") return sessionStorage.getItem("superAdminToken");
+  if (normalized === "admin") return sessionStorage.getItem("adminToken");
+  return sessionStorage.getItem("memberToken");
 }
 
 function buildActorProfile(user) {

@@ -60,7 +60,7 @@ export default function Home() {
           <div className="modern-card-grid four-v3">
             <Card icon={ClipboardCheck} title="Track support" text="Follow submitted support requests from your authenticated portal." />
             <Card icon={Smartphone} title="Mobile-ready" text="Install the portal as a PWA and keep important communication close at hand." />
-            <Card icon={Headphones} title="Guided help" text="Use the MIDAX Assistant for published website and portal guidance." />
+            <Card icon={Headphones} title="Guided help" text="Use the Benevolent Assistant for published website and portal guidance." />
             <Card icon={CheckCircle2} title="Clear accountability" text="Use the Constitution and published updates as the source of truth for scheme procedures." />
           </div>
         </section>

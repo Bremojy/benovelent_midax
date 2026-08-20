@@ -245,8 +245,9 @@ html[data-appearance="dark"] .dashboard-portal-footer span:first-child{color:#e5
 @media (max-width:1200px){.dashboard-portal-footer{left:250px}}
 @media (max-width:900px){
   .dashboard-portal-footer{
-    left:0;
-    bottom:calc(var(--dashboard-bottom-nav-height,96px) + env(safe-area-inset-bottom));
+    left:10px;
+    right:10px;
+    bottom:calc(var(--dashboard-bottom-nav-height,96px) + 12px + env(safe-area-inset-bottom));
     min-height:30px;
     padding:6px 10px;
     gap:10px;

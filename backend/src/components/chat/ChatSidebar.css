@@ -412,7 +412,7 @@
   .message-input-container button { min-width: 40px; }
 }
 
-/* V12: chat follows the active portal identity instead of a single global purple. */
+/* Portal: chat follows the active portal identity instead of a single global purple. */
 .modern-chat-sidebar .chat-sidebar-eyebrow{
   background:var(--portal-soft,rgba(255,122,0,.12)) !important;
   color:var(--portal-accent,#ff7a00) !important;
