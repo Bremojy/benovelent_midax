@@ -30,11 +30,9 @@ export const SocketProvider = ({ children }) => {
     }
 
     return () => {
-      // Do not force-close a connection that is still handshaking.
-      // Socket.IO can reconnect on the next mount/navigation.
       socket.off("session-replaced", handleSessionReplaced);
-      if (socket.connected) { socket.disconnect(); }
-      clearSocketAuth();
+      // Keep the application-wide socket alive across portal navigation.
+      // Chat/call pages subscribe/unsubscribe to their own events.
     };
   }, [user, clearSession, logout]);
 

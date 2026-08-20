@@ -11,3 +11,7 @@
 @media(max-width:900px){.smart-assistant.is-portal{bottom:calc(var(--dashboard-bottom-nav-height,96px) + env(safe-area-inset-bottom) + 10px)}}
 @media(max-width:640px){.smart-assistant{right:10px;bottom:18px}.smart-assistant.is-portal{bottom:calc(var(--dashboard-bottom-nav-height,96px) + env(safe-area-inset-bottom) + 10px)}.smart-assistant-teaser{min-width:0;width:min(320px,calc(100vw - 20px));max-width:calc(100vw - 20px)}.smart-assistant-panel{width:min(410px,calc(100vw - 20px));height:min(680px,calc(100vh - 150px));border-radius:22px}}
 @media(prefers-reduced-motion:reduce){.smart-assistant-trigger,.smart-assistant-panel,.smart-assistant-teaser,.typing-bubble span{animation:none!important;transition:none!important}}
+
+/* The teaser bubble is the only closed-state launcher. */
+.smart-assistant-trigger { display:none !important; }
+.smart-assistant-teaser { cursor:pointer; box-shadow:0 14px 36px rgba(15,23,42,.18); }

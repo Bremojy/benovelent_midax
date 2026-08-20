@@ -10,6 +10,7 @@ import API from "../../services/api";
 import { getPendingCall, removePendingCall } from "../../utils/pushCallStore";
 import { startNativeIncomingCall } from "../../utils/nativeCallBridge";
 import { useAuth } from "../../context/AuthContext";
+import { useSocket } from "../../context/SocketContext";
 import "../../pages/member/messages.css";
 
 function MessageCenterPage({
@@ -26,10 +27,11 @@ function MessageCenterPage({
   showMemberFilters = false,
 }) {
   const { user: authUser } = useAuth();
+  const contextSocket = useSocket();
   const location = useLocation();
 
   const [currentUser, setCurrentUser] = useState(authUser || null);
-  const [socket, setSocket] = useState(null);
+  const [socket, setSocket] = useState(contextSocket || socketClient);
   const [selectedConversation, setSelectedConversation] = useState(null);
   const [people, setPeople] = useState([]);
   const [conversations, setConversations] = useState([]);
@@ -100,22 +102,29 @@ function MessageCenterPage({
   }, [authUser]);
 
   useEffect(() => {
-    if (!actorId) return;
+    if (!actorId) return undefined;
 
+    const activeSocket = contextSocket || socketClient;
     const token = getToken(currentUser?.role || authUser?.role);
-    const newSocket = socketClient;
-    newSocket.auth = { token };
-    newSocket.io.opts.query = { token };
-    if (!newSocket.connected) newSocket.connect();
+    activeSocket.auth = { token };
+    if (activeSocket.io?.opts) activeSocket.io.opts.query = { token };
 
-    newSocket.on("connect", () => {
-      newSocket.emit("user-online", { userId: actorId, role: currentUser?.role || authUser?.role || "member" });
-    });
+    const handleConnectError = (error) => {
+      console.warn("Chat socket connection error:", error?.message || error);
+      setBanner("Chat is reconnecting. Messaging stays available; calls will work once the secure call connection is ready.");
+    };
 
-    newSocket.on("connect_error", (error) => {
-      console.error("Chat socket connection error:", error);
-      setBanner("Chat connection failed. Calls require the live Socket.IO server to be reachable.");
-    });
+    const handleConnect = () => {
+      activeSocket.emit("user-online", {
+        userId: actorId,
+        role: currentUser?.role || authUser?.role || "member",
+      });
+      setBanner((current) =>
+        current === "Chat is reconnecting. Messaging stays available; calls will work once the secure call connection is ready."
+          ? ""
+          : current
+      );
+    };
 
     const handleCallNotification = (payload) => {
       const title = payload?.title || "Incoming call";
@@ -125,6 +134,7 @@ function MessageCenterPage({
         try { new Notification(title, { body, tag: `call-${payload?.callerUserId || Date.now()}` }); } catch {}
       }
     };
+
     const handlePresence = (payload) => {
       const onlineIds = new Set((payload?.users || []).map((item) => String(item.userId)));
       setPeople((prev) => prev.map((person) => ({ ...person, online: onlineIds.has(String(person._id)) })));
@@ -187,22 +197,28 @@ function MessageCenterPage({
       }
     };
 
-    newSocket.on("new-message", handleSidebarMessage);
-    newSocket.on("incoming-call", handleIncomingCall);
-    newSocket.on("new-call-notification", handleCallNotification);
-    newSocket.on("missed-call", handleMissedCall);
-    newSocket.on("online-users", handlePresence);
-    setSocket(newSocket);
+    activeSocket.on("connect", handleConnect);
+    activeSocket.on("connect_error", handleConnectError);
+    activeSocket.on("new-message", handleSidebarMessage);
+    activeSocket.on("incoming-call", handleIncomingCall);
+    activeSocket.on("new-call-notification", handleCallNotification);
+    activeSocket.on("missed-call", handleMissedCall);
+    activeSocket.on("online-users", handlePresence);
+    setSocket(activeSocket);
+
+    if (!activeSocket.connected) activeSocket.connect();
+    else handleConnect();
 
     return () => {
-      newSocket.off("new-message", handleSidebarMessage);
-      newSocket.off("incoming-call", handleIncomingCall);
-      newSocket.off("new-call-notification", handleCallNotification);
-      newSocket.off("missed-call", handleMissedCall);
-      newSocket.off("online-users", handlePresence);
-      setSocket(null);
+      activeSocket.off("connect", handleConnect);
+      activeSocket.off("connect_error", handleConnectError);
+      activeSocket.off("new-message", handleSidebarMessage);
+      activeSocket.off("incoming-call", handleIncomingCall);
+      activeSocket.off("new-call-notification", handleCallNotification);
+      activeSocket.off("missed-call", handleMissedCall);
+      activeSocket.off("online-users", handlePresence);
     };
-  }, [actorId, currentUser?.role, authUser?.role]);
+  }, [actorId, currentUser?.role, authUser?.role, contextSocket]);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search || "");
@@ -359,23 +375,31 @@ function MessageCenterPage({
     setMobileChatOpen(false);
   };
 
-  const startCall = (type) => {
-    if (!socket?.connected) {
-      setBanner("Call cannot start because the chat server is offline.");
-      return;
-    }
-
+  const startCall = async (type) => {
     if (!selectedConversation?.partner?._id) {
       setBanner("Select a member before starting a call.");
       return;
     }
 
-    setCall({
-      direction: "outgoing",
-      callType: type,
-      partner: selectedConversation.partner,
-      incomingCall: null,
-    });
+    const activeSocket = socket || contextSocket || socketClient;
+    try {
+      if (!activeSocket.connected) {
+        setBanner("Connecting to secure calling…");
+        if (activeSocket.connect) activeSocket.connect();
+        await waitForSocketConnection(activeSocket, 9000);
+      }
+
+      setBanner("");
+      setCall({
+        direction: "outgoing",
+        callType: type === "video" ? "video" : "audio",
+        partner: selectedConversation.partner,
+        incomingCall: null,
+      });
+    } catch (error) {
+      console.warn("Unable to start call:", error);
+      setBanner("Secure calling is temporarily unavailable. Check your connection and try again.");
+    }
   };
 
   if (isFullscreenChat) {
@@ -592,6 +616,28 @@ function MessageCenterPage({
       )}
     </DashboardLayout>
   );
+}
+
+function waitForSocketConnection(activeSocket, timeout = 9000) {
+  if (activeSocket.connected) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const timer = window.setTimeout(() => finish(new Error("SOCKET_TIMEOUT")), timeout);
+    const finish = (error) => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timer);
+      activeSocket.off("connect", onConnect);
+      activeSocket.off("connect_error", onError);
+      error ? reject(error) : resolve();
+    };
+    const onConnect = () => finish();
+    const onError = (error) => {
+      if (String(error?.message || "").includes("AUTH_")) finish(error);
+    };
+    activeSocket.on("connect", onConnect);
+    activeSocket.on("connect_error", onError);
+  });
 }
 
 function getToken(role) {

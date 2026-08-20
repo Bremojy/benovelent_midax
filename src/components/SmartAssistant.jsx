@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Bot, ChevronDown, HelpCircle, MessageCircle, RotateCcw, Send, ShieldCheck, Sparkles, X } from "lucide-react";
+import { Bot, HelpCircle, RotateCcw, Send, ShieldCheck, Sparkles, X } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useLocation } from "react-router-dom";
 import API from "../services/api";
@@ -31,7 +31,7 @@ function fallbackAnswer(question, role) {
   if (text.includes("who are you") || text.includes("what can you do")) return "I’m MIDAX Assistant. I can explain published Benovelent MIDAX information, guide you around the portal and point you to the right section.";
   const hit = FAQ.find((item) => item.keys.some((key) => text.includes(key)));
   if (hit) return hit.answer;
-  if (role === "member") return "I could not match that to a published portal topic. Try Support, Claims, Profile, Contributions, Chat, Notifications, Polls or the Constitution.";
+  if (role === "member") return "I could not match that to a published portal topic. Try Support, Claims, Profile, Accounts, Chat, Notifications, Polls or the Constitution.";
   if (role === "admin" || role === "superadmin") return "I could not match that to a published admin topic. Try Members, Support, Claims, Chat, Notifications, Polls, News or the Constitution.";
   return "I could not match that to a published website topic. Try Membership, Support, the Constitution, News or Contact information.";
 }
@@ -58,7 +58,6 @@ export default function SmartAssistant() {
   const [input, setInput] = useState("");
   const [typing, setTyping] = useState(false);
   const [showTeaser, setShowTeaser] = useState(true);
-  const [showLauncher, setShowLauncher] = useState(true);
   const [messages, setMessages] = useState(() => loadHistory(roleName, location.pathname));
   const endRef = useRef(null);
   const inputRef = useRef(null);
@@ -75,11 +74,10 @@ export default function SmartAssistant() {
   }, [messages, roleName, path]);
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }); }, [messages, typing]);
   useEffect(() => {
-    if (open) { setShowLauncher(true); setShowTeaser(false); window.setTimeout(() => inputRef.current?.focus(), 120); return undefined; }
-    setShowLauncher(true); setShowTeaser(true);
+    if (open) { setShowTeaser(false); window.setTimeout(() => inputRef.current?.focus(), 120); return undefined; }
+    setShowTeaser(true);
     const t1 = window.setTimeout(() => setShowTeaser(false), 5200);
-    const t2 = window.setTimeout(() => setShowLauncher(false), 9000);
-    return () => { window.clearTimeout(t1); window.clearTimeout(t2); };
+    return () => window.clearTimeout(t1);
   }, [open, path]);
   useEffect(() => {
     if (!open) return undefined;
@@ -130,6 +128,5 @@ export default function SmartAssistant() {
       <form className="smart-assistant-input" onSubmit={(event) => { event.preventDefault(); ask(); }}><input ref={inputRef} value={input} onChange={(event) => setInput(event.target.value)} placeholder="Ask MIDAX anything…" aria-label="Ask the assistant" maxLength={500} /><button type="submit" aria-label="Send question" disabled={!input.trim() || typing}><Send size={17} /></button></form>
       <p className="assistant-note"><HelpCircle size={13} /> No private member data is exposed through the public assistant.</p>
     </section>}
-    {(showLauncher || open) && <button className={`smart-assistant-trigger ${open ? "is-active" : ""}`} type="button" onClick={() => { setOpen((value) => !value); setShowTeaser(false); setShowLauncher(true); }} aria-expanded={open} aria-label={open ? "Close MIDAX Assistant" : "Open MIDAX Assistant"}>{open ? <MessageCircle size={20} /> : <Bot size={20} />}<span>{open ? "Close" : "Ask MIDAX"}</span><ChevronDown className="assistant-chevron" size={15} /></button>}
   </div>;
 }

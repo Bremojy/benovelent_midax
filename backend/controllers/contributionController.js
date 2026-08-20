@@ -147,6 +147,14 @@ exports.createBulkContributionRun = async (req, res) => {
         const paidAmount = recordAsCollected ? amount : 0;
         let contribution = await Contribution.findOne({ member: member._id, month, year });
 
+        // A payroll run is idempotent, but it must never silently overwrite a
+        // contribution that has already been deducted/paid. Re-running the
+        // same month should leave the existing accounting event intact.
+        if (contribution && Number(contribution.paidAmount || 0) > 0) {
+          updated += 1;
+          continue;
+        }
+
         if (!contribution) {
           contribution = new Contribution({
             member: member._id,
@@ -171,23 +179,25 @@ exports.createBulkContributionRun = async (req, res) => {
           if (recordAsCollected) {
             contribution.paidAmount = amount;
             contribution.paymentDate = paymentDate;
-          } else if (Number(contribution.paidAmount || 0) === 0) {
-            contribution.paidAmount = 0;
+          } else {
+            contribution.paidAmount = Number(contribution.paidAmount || 0);
           }
           await contribution.save();
           updated += 1;
         }
 
-        // Keep the financial ledger in sync with the contribution record.
+        // Keep the financial ledger in sync with this specific contribution.
+        // Do not search for and overwrite an unrelated transaction from the
+        // same month when the link is missing.
         if (recordAsCollected) {
           let finance = contribution.finance
             ? await Finance.findById(contribution.finance)
-            : await Finance.findOne({ member: member._id, type: "contribution", category: "Monthly Payroll Contribution", transactionDate: { $gte: new Date(year, month - 1, 1), $lt: new Date(year, month, 1) } }).sort({ createdAt: -1 });
+            : null;
 
           if (!finance) {
             finance = await Finance.create({
               member: member._id,
-              transactionNumber: `PAYROLL-${year}${String(month).padStart(2, "0")}-${member.memberNumber}-${Date.now()}`,
+              transactionNumber: `PAYROLL-${year}${String(month).padStart(2, "0")}-${member.memberNumber}-${Date.now()}-${Math.random().toString(36).slice(2,7)}`,
               type: "contribution",
               category: "Monthly Payroll Contribution",
               amount,
@@ -199,16 +209,6 @@ exports.createBulkContributionRun = async (req, res) => {
               approvedAt: new Date(),
               notes,
             });
-          } else {
-            finance.amount = amount;
-            finance.paymentMethod = paymentMethod;
-            finance.transactionDate = paymentDate;
-            finance.description = `Payroll contribution ${month}/${year}`;
-            finance.notes = notes;
-            finance.status = "approved";
-            finance.approvedBy = req.user._id;
-            finance.approvedAt = new Date();
-            await finance.save();
           }
           contribution.finance = finance._id;
           await contribution.save();

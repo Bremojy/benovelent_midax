@@ -11,3 +11,51 @@
   .message-input-container { padding-left: 8px; padding-right: 8px; }
   .message-input-container button { min-width: 40px; }
 }
+
+/* Final calling experience */
+.call-overlay{
+  background:
+    radial-gradient(circle at 20% 10%, rgba(124,58,237,.22), transparent 34%),
+    radial-gradient(circle at 85% 75%, rgba(21,148,71,.16), transparent 36%),
+    rgba(5,8,14,.91);
+  backdrop-filter:blur(18px);
+  -webkit-backdrop-filter:blur(18px);
+}
+.call-card{
+  width:min(920px,100%);
+  padding:20px;
+  border:1px solid rgba(255,255,255,.12);
+  background:linear-gradient(180deg,rgba(20,24,33,.97),rgba(10,13,19,.98));
+  color:#f8fafc;
+}
+.call-card-header h2{color:#fff}
+.call-card-header p{color:#a7afbd}
+.call-status-dot{width:10px;height:10px;border-radius:999px;background:#f59e0b;box-shadow:0 0 0 7px rgba(245,158,11,.12)}
+.call-status-dot.connected{background:#22c55e;box-shadow:0 0 0 7px rgba(34,197,94,.12)}
+.call-error{border-radius:14px;padding:10px 12px;background:rgba(239,68,68,.11);border:1px solid rgba(239,68,68,.2);color:#fecaca}
+.call-control{
+  min-width:110px;
+  min-height:46px;
+  border-radius:15px;
+  border:1px solid rgba(255,255,255,.1);
+  background:rgba(255,255,255,.07);
+  color:#fff;
+  font-weight:800;
+  box-shadow:none;
+}
+.call-control:hover{background:rgba(255,255,255,.12);transform:translateY(-1px)}
+.call-control.accept{background:linear-gradient(135deg,#16a34a,#15803d);border-color:transparent}
+.call-control.decline{background:linear-gradient(135deg,#ef4444,#b91c1c);border-color:transparent}
+.audio-call-avatar{
+  width:104px;height:104px;border-radius:30px;overflow:hidden;
+  border:3px solid rgba(255,255,255,.12);
+  box-shadow:0 20px 50px rgba(0,0,0,.32);
+}
+.audio-call-avatar img{width:100%;height:100%;object-fit:cover}
+@media(max-width:700px){
+  .call-overlay{padding:0}
+  .call-card{width:100%;height:100%;border-radius:0;padding:18px 14px;display:flex;flex-direction:column}
+  .call-videos{flex:1;min-height:0}
+  .call-controls{padding-bottom:max(8px,env(safe-area-inset-bottom))}
+  .call-control{min-width:0;flex:1}
+}
