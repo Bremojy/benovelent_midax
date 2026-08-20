@@ -1,122 +1,121 @@
-import { useEffect, useMemo, useState } from "react";
-import { Bot, ChevronDown, HelpCircle, MessageCircle, Send, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Bot, ChevronDown, HelpCircle, MessageCircle, RotateCcw, Send, ShieldCheck, Sparkles, X } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useLocation } from "react-router-dom";
 import API from "../services/api";
 import "../styles/smart-assistant.css";
 
-const BASE_FAQ = [
-  { keys: ["contribution", "pay", "500", "monthly"], answer: "The public website describes the member contribution as Ksh 500. Members should follow the approved scheme rules and their portal records for the current position." },
-  { keys: ["funeral", "death", "burial"], answer: "The website describes funeral support as part of the scheme benefits. Eligibility and the exact amount are governed by the Constitution, so open the Constitution page for the authoritative rules." },
-  { keys: ["medical", "hospital", "inpatient"], answer: "Medical support is available under the scheme subject to the constitutional eligibility and bill thresholds. Check the Constitution or your member Support area for the current process." },
-  { keys: ["constitution", "rules", "governance"], answer: "The official Constitution can be viewed, printed or downloaded from the Constitution page on the public website." },
-  { keys: ["news", "announcement", "update"], answer: "Public updates are available in News. Members can also see portal announcements after signing in." },
-  { keys: ["chat", "message", "leader"], answer: "Signed-in members can use Chat to communicate privately with members and leaders. Administrators have broader member-management and filtering tools." },
-  { keys: ["poll", "vote", "voting"], answer: "Polls are available inside the portal when an active poll is published. Open Polls from your dashboard to participate." },
-  { keys: ["support", "claim", "help request"], answer: "Members can submit support requests from the Support/Claims area. Keep required documentation ready before submitting." },
-  { keys: ["profile", "photo", "account"], answer: "Open Profile or Settings in your portal to update your personal information and account settings." },
-  { keys: ["home", "website", "public site"], answer: "Use the Website button in an authenticated portal to return to the public Benovelent MIDAX website." },
-  { keys: ["filter", "station", "department", "position"], answer: "Administrators and SuperAdmins can filter the member/chat directory by site station, department, position, status and presence." },
+const STORAGE_KEY = "benovelentMidaxAssistantHistory";
+const MAX_MESSAGES = 30;
+
+const FAQ = [
+  { keys: ["contribution", "pay", "500", "monthly"], answer: "The public website describes the member contribution as Ksh 500. For the current position, use your portal contribution records and approved scheme rules." },
+  { keys: ["funeral", "death", "burial"], answer: "Funeral support is part of the scheme benefits. Eligibility and exact amounts follow the Constitution, which remains the authoritative source." },
+  { keys: ["medical", "hospital", "inpatient"], answer: "Medical support is available under the scheme subject to the published eligibility and bill rules. Open Support in your portal or read the Constitution for the current process." },
+  { keys: ["constitution", "rules", "governance"], answer: "Open the Constitution page to read, print or download the official rules and governance document." },
+  { keys: ["news", "announcement", "update"], answer: "Public updates are available in News. Signed-in members can also see portal announcements and notifications." },
+  { keys: ["chat", "message", "leader"], answer: "Signed-in users can use Messages/Chat to communicate privately. Admin and SuperAdmin accounts have broader directory controls." },
+  { keys: ["poll", "vote", "voting"], answer: "Open Polls in your portal when an active poll is published. Available tools depend on your account role." },
+  { keys: ["support", "claim", "help request"], answer: "Open Support or Claims to submit and track a request. Keep the required supporting documents ready before submitting." },
+  { keys: ["profile", "photo", "account"], answer: "Open Profile or Settings to update your personal information, profile photo and account preferences." },
+  { keys: ["notification"], answer: "Use the notification centre for announcements, messages, polls and other account updates. Browser push works only after permission is granted." },
+  { keys: ["home", "website", "public site"], answer: "Use the Website/Home action in the portal to return to the public Benovelent MIDAX website." },
 ];
 
-function normalize(value) {
-  return String(value || "").toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
-}
-
-function answerFor(question, role) {
+function normalize(value) { return String(value || "").toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim(); }
+function makeMessage(from, text) { return { id: `${Date.now()}-${Math.random().toString(36).slice(2)}`, from, text, at: new Date().toISOString() }; }
+function fallbackAnswer(question, role) {
   const text = normalize(question);
-  if (!text) return "Ask me about the Constitution, support, contributions, chat, polls, notifications, the public website, or portal navigation.";
-  if (text.includes("another phone") || text.includes("other phone") || text.includes("logged out") || text.includes("security")) return role ? "For security, signing in to the same account on another device replaces the older session. The older device is logged out automatically." : "Members and portal users are protected by server-side session controls. Signing in on another device replaces the older session.";
-  if (text.includes("notification")) return "Use the notification centre for new messages, announcements, polls and missed-call alerts. Browser push is used only when permission is granted.";
-  if (text.includes("who are you") || text.includes("what can you do")) return "I am the Benovelent MIDAX website assistant. I answer from the public website knowledge in this application and can guide signed-in users around their portal.";
-  if (text.includes("constituency")) return "I can explain Benovelent MIDAX website and Constitution information, but I do not invent constituency rules or official government information. Ask about a specific section and I will stay within the information published by this site.";
-  const hit = BASE_FAQ.find(item => item.keys.some(key => text.includes(key)));
+  if (!text) return "Ask me about the Constitution, support, contributions, chat, polls, notifications or portal navigation.";
+  if (text.includes("another phone") || text.includes("other phone") || text.includes("logged out") || text.includes("security")) return role ? "For account security, signing in on another device can replace the older session. Keep your login details private and use only trusted devices." : "Benovelent MIDAX uses server-side account protection. Keep your login details private and use only trusted devices.";
+  if (text.includes("who are you") || text.includes("what can you do")) return "I’m MIDAX Assistant. I can explain published Benovelent MIDAX information, guide you around the portal and point you to the right section.";
+  const hit = FAQ.find((item) => item.keys.some((key) => text.includes(key)));
   if (hit) return hit.answer;
-  if (role === "member") return "I could not match that to a published Benovelent MIDAX topic. Try asking about your profile, accounts, support, claims, chat, notifications, polls, announcements or the Constitution.";
-  if (role === "admin" || role === "superadmin") return "I could not match that to a published portal topic. Try asking about members, filters, support, chat, notifications, polls, news, Constitution management or portal navigation.";
-  return "I could not match that to a published website topic. Try asking about membership, support, the Constitution, news, contact information or how to access the portal.";
+  if (role === "member") return "I could not match that to a published portal topic. Try Support, Claims, Profile, Contributions, Chat, Notifications, Polls or the Constitution.";
+  if (role === "admin" || role === "superadmin") return "I could not match that to a published admin topic. Try Members, Support, Claims, Chat, Notifications, Polls, News or the Constitution.";
+  return "I could not match that to a published website topic. Try Membership, Support, the Constitution, News or Contact information.";
+}
+function loadHistory(role) {
+  try {
+    const parsed = JSON.parse(sessionStorage.getItem(STORAGE_KEY) || "null");
+    if (Array.isArray(parsed) && parsed.length) return parsed.slice(-MAX_MESSAGES);
+  } catch (_) {}
+  return [makeMessage("bot", `Hello! I’m MIDAX Assistant. ${role ? "How can I help with your portal today?" : "How can I help you today?"}`)];
 }
 
 export default function SmartAssistant() {
   const { role } = useAuth();
   const location = useLocation();
+  const roleName = String(role || "").toLowerCase();
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
+  const [typing, setTyping] = useState(false);
   const [showTeaser, setShowTeaser] = useState(true);
   const [showLauncher, setShowLauncher] = useState(true);
-  const [messages, setMessages] = useState([{ from: "bot", text: "Hi — I’m the Benovelent MIDAX assistant. What would you like to know?" }]);
-
+  const [messages, setMessages] = useState(() => loadHistory(roleName));
+  const endRef = useRef(null);
+  const inputRef = useRef(null);
   const path = location.pathname;
   const isPortal = /^\/(member|admin|superadmin)(?:\/|$)/.test(path);
-  const isPortalDashboard = /^\/(member|admin|superadmin)\/?$/.test(path);
 
+  useEffect(() => { try { sessionStorage.setItem(STORAGE_KEY, JSON.stringify(messages.slice(-MAX_MESSAGES))); } catch (_) {} }, [messages]);
+  useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }); }, [messages, typing]);
   useEffect(() => {
-    if (open) { setShowLauncher(true); setShowTeaser(false); return undefined; }
-    setShowLauncher(true);
-    setShowTeaser(true);
-    const hideTeaser = window.setTimeout(() => setShowTeaser(false), 5200);
-    const hideLauncher = window.setTimeout(() => setShowLauncher(false), 9000);
-    const repeat = window.setInterval(() => {
-      setShowLauncher(true);
-      setShowTeaser(true);
-      window.setTimeout(() => setShowTeaser(false), 5200);
-      window.setTimeout(() => setShowLauncher(false), 9000);
-    }, 42000);
-    return () => { window.clearTimeout(hideTeaser); window.clearTimeout(hideLauncher); window.clearInterval(repeat); };
+    if (open) { setShowLauncher(true); setShowTeaser(false); window.setTimeout(() => inputRef.current?.focus(), 120); return undefined; }
+    setShowLauncher(true); setShowTeaser(true);
+    const t1 = window.setTimeout(() => setShowTeaser(false), 5200);
+    const t2 = window.setTimeout(() => setShowLauncher(false), 9000);
+    return () => { window.clearTimeout(t1); window.clearTimeout(t2); };
   }, [open, path]);
+  useEffect(() => {
+    if (!open) return undefined;
+    const onKeyDown = (event) => { if (event.key === "Escape") setOpen(false); };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [open]);
 
-  const suggested = useMemo(() => (role ? ["How do I submit support?", "How do I use chat?", "How do I stay secure on another phone?", "How do I use notifications?"] : ["What does the scheme support?", "How do I read the Constitution?", "How do I access the portal?", "How do I contact Benevolent?"]), [role]);
+  const suggested = useMemo(() => {
+    if (path.includes("support") || path.includes("claims")) return ["How do I submit a support request?", "What documents should I prepare?", "How do I track my request?"];
+    if (path.includes("messages")) return ["How do I use chat?", "How do I find a member?", "How do I stay secure on another phone?"];
+    if (path.includes("profile") || path.includes("settings")) return ["How do I complete my profile?", "How do I change my photo?", "How do I stay secure on another phone?"];
+    if (path.includes("contribution") || path.includes("accounts")) return ["How do contributions work?", "Where is contribution history?", "What support does the scheme provide?"];
+    return roleName ? ["How do I submit support?", "How do I use chat?", "Where are notifications?", "How do I read the Constitution?"] : ["What does the scheme support?", "How do I read the Constitution?", "How do I access the portal?", "How do I contact Benevolent?"];
+  }, [path, roleName]);
 
+  const clearChat = () => setMessages([makeMessage("bot", `Fresh chat ready. ${roleName ? "What can I help you do in the portal?" : "What would you like to know?"}`)]);
   const ask = async (question = input) => {
     const clean = String(question || "").trim();
-    if (!clean) return;
-    setMessages((items) => [...items, { from: "user", text: clean }, { from: "bot", text: "Checking the current Benovelent MIDAX information…" }]);
-    setInput("");
+    if (!clean || typing) return;
+    setMessages((items) => [...items, makeMessage("user", clean)]);
+    setInput(""); setTyping(true);
     try {
-      const endpoint = role ? "/platform/assistant" : "/platform/public/assistant";
+      const endpoint = roleName ? "/platform/assistant" : "/platform/public/assistant";
       const { data } = await API.post(endpoint, { question: clean });
-      const answer = data?.answer || answerFor(clean, String(role || "").toLowerCase());
-      setMessages((items) => { const next = [...items]; const index = next.map((m,i)=>[m,i]).reverse().find(([,i])=>next[i]?.from === "bot")?.[1]; if (index !== undefined && next[index].text.includes("Checking the current")) next[index] = { from:"bot", text: answer }; return next; });
+      setMessages((items) => [...items, makeMessage("bot", data?.answer || fallbackAnswer(clean, roleName))]);
     } catch (_) {
-      setMessages((items) => [...items, { from: "bot", text: answerFor(clean, String(role || "").toLowerCase()) }]);
-    }
+      setMessages((items) => [...items, makeMessage("bot", fallbackAnswer(clean, roleName))]);
+    } finally { setTyping(false); }
   };
 
-  const openAssistant = () => { setOpen(true); setShowTeaser(false); };
-
-  return (
-    <div className={`smart-assistant ${open ? "is-open" : ""} ${isPortal ? "is-portal" : ""} ${isPortalDashboard ? "is-portal-dashboard" : ""}`}>
-      {showTeaser && !open && (
-        <button type="button" className="smart-assistant-teaser" onClick={openAssistant} aria-label="Open MIDAX help">
-          <span className="teaser-dot" />
-          <span>Hi — Benovelent MIDAX is available. Tap for help.</span>
-          <span className="teaser-close" onClick={(event) => { event.stopPropagation(); setShowTeaser(false); }} aria-hidden="true">×</span>
-        </button>
-      )}
-      {open && (
-        <section className="smart-assistant-panel" aria-label="Benovelent MIDAX assistant">
-          <header className="smart-assistant-header">
-            <div><span className="assistant-orb"><Bot size={18} /></span><div><strong>MIDAX Assistant</strong><small>{role ? `${role} portal guidance` : "Public website guidance"}</small></div></div>
-            <button type="button" onClick={() => setOpen(false)} aria-label="Close assistant"><X size={17} /></button>
-          </header>
-          <div className="smart-assistant-messages">
-            {messages.slice(-8).map((message, index) => <div key={`${message.from}-${index}`} className={`assistant-message ${message.from}`}>{message.text}</div>)}
-          </div>
-          <div className="assistant-suggestions">{suggested.map((item) => <button type="button" key={item} onClick={() => ask(item)}>{item}</button>)}</div>
-          <form className="smart-assistant-input" onSubmit={(e) => { e.preventDefault(); ask(); }}>
-            <input value={input} onChange={(e) => setInput(e.target.value)} placeholder="Ask about this website…" aria-label="Ask the assistant" />
-            <button type="submit" aria-label="Send question"><Send size={17} /></button>
-          </form>
-          <p className="assistant-note"><HelpCircle size={13} /> Answers are based on Benovelent MIDAX information published in this application.</p>
-        </section>
-      )}
-      {(showLauncher || open) && (
-        <button className="smart-assistant-trigger" type="button" onClick={() => { setOpen((value) => !value); setShowTeaser(false); setShowLauncher(true); }} aria-expanded={open} aria-label={open ? "Close MIDAX Assistant" : "Open MIDAX Assistant"}>
-          {open ? <MessageCircle size={20} /> : <Bot size={20} />}
-          <span>Ask MIDAX</span>
-          <ChevronDown className="assistant-chevron" size={15} />
-        </button>
-      )}
-    </div>
-  );
+  return <div className={`smart-assistant ${open ? "is-open" : ""} ${isPortal ? "is-portal" : ""}`}>
+    {showTeaser && !open && <button type="button" className="smart-assistant-teaser" onClick={() => { setOpen(true); setShowTeaser(false); }} aria-label="Open MIDAX help">
+      <span className="teaser-dot"><Sparkles size={11} /></span><span><strong>MIDAX Assistant</strong><small>Need help navigating?</small></span><span className="teaser-close" onClick={(event) => { event.stopPropagation(); setShowTeaser(false); }} aria-hidden="true">×</span>
+    </button>}
+    {open && <section className="smart-assistant-panel" aria-label="Benovelent MIDAX assistant">
+      <header className="smart-assistant-header"><div className="assistant-header-main"><span className="assistant-orb"><Bot size={19} /></span><div><strong>MIDAX Assistant</strong><span className="assistant-status"><i /> {roleName ? `${roleName} portal • ready` : "Public website • ready"}</span></div></div><div className="assistant-header-actions"><button type="button" onClick={clearChat} aria-label="Start a new chat" title="New chat"><RotateCcw size={16} /></button><button type="button" onClick={() => setOpen(false)} aria-label="Close assistant" title="Close"><X size={17} /></button></div></header>
+      <div className="smart-assistant-privacy"><ShieldCheck size={14} /> Guided answers use published Benovelent MIDAX information.</div>
+      <div className="smart-assistant-messages" role="log" aria-live="polite" aria-busy={typing}>
+        {messages.slice(-MAX_MESSAGES).map((message) => <div key={message.id} className={`assistant-message ${message.from}`}>
+          {message.from === "bot" && <span className="message-avatar"><Bot size={13} /></span>}
+          <div className="message-bubble"><p>{message.text}</p><time>{new Date(message.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</time></div>
+        </div>)}
+        {typing && <div className="assistant-message bot"><span className="message-avatar"><Bot size={13} /></span><div className="message-bubble typing-bubble"><span /><span /><span /></div></div>}
+        <div ref={endRef} />
+      </div>
+      <div className="assistant-suggestions" aria-label="Suggested questions">{suggested.map((item) => <button type="button" key={item} onClick={() => ask(item)} disabled={typing}>{item}</button>)}</div>
+      <form className="smart-assistant-input" onSubmit={(event) => { event.preventDefault(); ask(); }}><input ref={inputRef} value={input} onChange={(event) => setInput(event.target.value)} placeholder="Ask MIDAX anything…" aria-label="Ask the assistant" maxLength={500} /><button type="submit" aria-label="Send question" disabled={!input.trim() || typing}><Send size={17} /></button></form>
+      <p className="assistant-note"><HelpCircle size={13} /> No private member data is exposed through the public assistant.</p>
+    </section>}
+    {(showLauncher || open) && <button className={`smart-assistant-trigger ${open ? "is-active" : ""}`} type="button" onClick={() => { setOpen((value) => !value); setShowTeaser(false); setShowLauncher(true); }} aria-expanded={open} aria-label={open ? "Close MIDAX Assistant" : "Open MIDAX Assistant"}>{open ? <MessageCircle size={20} /> : <Bot size={20} />}<span>{open ? "Close" : "Ask MIDAX"}</span><ChevronDown className="assistant-chevron" size={15} /></button>}
+  </div>;
 }

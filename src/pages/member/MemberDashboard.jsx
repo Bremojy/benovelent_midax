@@ -32,18 +32,57 @@ export default function MemberDashboard() {
   const [loading, setLoading] = useState(true);
 
   const load = async () => {
-    try {
-      setLoading(true);
-      setError("");
-      const [a, b, accountResponse] = await Promise.all([getMemberDashboard(), API.get("/member/community-stats"), API.get(`/member/accounts?year=${new Date().getFullYear()}`)]);
-      setD(a?.dashboard || {});
-      setC(b.data?.stats || {});
-      setAccounts(accountResponse.data || null);
-    } catch (x) {
-      setError(x.response?.data?.message || x.message || "Unable to load your dashboard");
-    } finally {
-      setLoading(false);
+    setLoading(true);
+    setError("");
+
+    let dashboardResponse = null;
+    let dashboardError = null;
+
+    // The dashboard should not fail just because one secondary card is slow
+    // during a refresh. Retry the primary member payload once, then render
+    // whatever non-critical data is available.
+    for (let attempt = 0; attempt < 2 && !dashboardResponse; attempt += 1) {
+      try {
+        dashboardResponse = await getMemberDashboard();
+        if (!dashboardResponse?.dashboard) {
+          throw new Error(dashboardResponse?.message || "Member dashboard data is unavailable.");
+        }
+      } catch (error) {
+        dashboardError = error;
+        if (attempt === 0) {
+          await new Promise((resolve) => window.setTimeout(resolve, 900));
+        }
+      }
     }
+
+    if (!dashboardResponse?.dashboard) {
+      setError(dashboardError?.response?.data?.message || dashboardError?.message || "Unable to load your dashboard. Please try again.");
+      setLoading(false);
+      return;
+    }
+
+    setD(dashboardResponse.dashboard || {});
+
+    const [communityResult, accountsResult] = await Promise.allSettled([
+      API.get("/member/community-stats"),
+      API.get(`/member/accounts?year=${new Date().getFullYear()}`),
+    ]);
+
+    if (communityResult.status === "fulfilled") {
+      setC(communityResult.value?.data?.stats || {});
+    }
+
+    if (accountsResult.status === "fulfilled") {
+      setAccounts(accountsResult.value?.data || null);
+    }
+
+    if (communityResult.status === "rejected" || accountsResult.status === "rejected") {
+      // Secondary widgets are intentionally non-blocking. Keep the dashboard
+      // visible even when one endpoint is temporarily unavailable.
+      console.warn("Some dashboard widgets could not refresh.");
+    }
+
+    setLoading(false);
   };
 
   useEffect(() => { load(); }, []);

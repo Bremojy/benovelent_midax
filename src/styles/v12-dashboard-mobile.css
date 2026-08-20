@@ -203,3 +203,17 @@
     padding-bottom: calc(var(--dashboard-bottom-nav-height) + env(safe-area-inset-bottom) + 18px) !important;
   }
 }
+
+
+/* V14 — persistent mobile bottom navigation. */
+@media (max-width: 900px) {
+  .dashboard-container { --dashboard-bottom-nav-height: 92px; }
+  .dashboard-content,
+  .dashboard-container.dashboard-mobile-subpage .dashboard-content {
+    padding-bottom: calc(var(--dashboard-bottom-nav-height) + env(safe-area-inset-bottom) + 28px) !important;
+  }
+  .dashboard-container .dashboard-main { padding-bottom: 0 !important; }
+}
+@media (max-width: 560px) {
+  .dashboard-container { --dashboard-bottom-nav-height: 96px; }
+}

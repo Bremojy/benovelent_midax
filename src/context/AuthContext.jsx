@@ -188,11 +188,14 @@ const saveSession = (
 export function AuthProvider({
   children,
 }) {
+  // Restore the last known account immediately. The backend may take a moment
+  // to wake after a refresh, but that should never throw an already-authenticated
+  // member back to the login page.
   const [user, setUser] =
-    useState(null);
+    useState(() => getStoredUser());
 
   const [loading, setLoading] =
-    useState(true);
+    useState(() => !Boolean(getStoredUser()));
 
   const [authError, setAuthError] =
     useState("");
@@ -327,7 +330,9 @@ export function AuthProvider({
         }
 
         try {
-          setLoading(true);
+          // When a cached user exists, keep the dashboard rendered while the
+          // server verifies the session in the background.
+          if (!user) setLoading(true);
           setAuthError("");
 
           // --------------------------------
@@ -457,27 +462,47 @@ export function AuthProvider({
           return currentUser;
 
         } catch (error) {
-          console.error(
-            "Session verification failed:",
-            error
-          );
+          const status = error?.response?.status;
+          const code = error?.response?.data?.code;
+          const definitiveAuthFailure =
+            status === 401 ||
+            [
+              "TOKEN_EXPIRED",
+              "TOKEN_INVALID",
+              "TOKEN_MISSING",
+              "USER_NOT_FOUND",
+              "AUTH_FAILED",
+              "SESSION_REPLACED",
+            ].includes(code);
 
-          clearSession();
-
-          setAuthError(
-            error.response?.data
-              ?.message ||
+          if (definitiveAuthFailure) {
+            console.warn("Session verification rejected:", error);
+            clearSession();
+            setAuthError(
+              error.response?.data?.message ||
               error.message ||
               "Your session has expired."
-          );
+            );
+            return null;
+          }
 
-          return null;
+          // Network errors, Render cold starts, timeouts and temporary 5xx
+          // responses are not logout conditions. Keep the cached user and let
+          // the next verification restore a healthy connection.
+          console.warn(
+            "Session verification temporarily unavailable:",
+            error.response?.data || error.message
+          );
+          setAuthError(
+            "Connection is slow. Your saved session is still active."
+          );
+          return user || getStoredUser();
 
         } finally {
           setLoading(false);
         }
       },
-      [clearSession]
+      [clearSession, user]
     );
 
   // ======================================
