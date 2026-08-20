@@ -331,7 +331,7 @@ function AppContent() {
       <CookieConsent />
       <InstallPWA />
       {!isLogin && <SmartAssistant />}
-      {dashboardRoute && location.pathname.startsWith("/member") && <LoginFeedbackPrompt />}
+      {dashboardRoute && (location.pathname === "/member" || location.pathname === "/admin" || location.pathname === "/superadmin" || location.pathname === "/member/" || location.pathname === "/admin/" || location.pathname === "/superadmin/") && <LoginFeedbackPrompt />}
 
       <Suspense
         fallback={<LoadingScreen />}

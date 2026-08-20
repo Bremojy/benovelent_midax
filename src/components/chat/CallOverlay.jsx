@@ -26,11 +26,17 @@ export default function CallOverlay({ socket, currentUser, partner, callType, in
 
   const me = String(currentUser?.chatId || currentUser?._id || "");
   const partnerId = String(partner?._id || partner?.id || incomingCall?.callerUserId || "");
+  const selfCall = Boolean(me && partnerId && me === partnerId);
 
   useEffect(() => {
+    if (selfCall) {
+      setError("Calling yourself is not available.");
+      onClose?.();
+      return undefined;
+    }
     if (incomingCall) ringtoneRef.current = startCallTone();
     return () => { ringtoneRef.current?.stop?.(); stopNativeIncomingCall(incomingCall?.callId || callId); };
-  }, [incomingCall, callId]);
+  }, [incomingCall, callId, selfCall, onClose]);
   useEffect(() => { if (connected) timerRef.current = window.setInterval(() => setDuration((v) => v + 1), 1000); return () => window.clearInterval(timerRef.current); }, [connected]);
 
   useEffect(() => {
@@ -61,7 +67,7 @@ export default function CallOverlay({ socket, currentUser, partner, callType, in
   }
 
   async function startCall() {
-    if (!socket || !partnerId || !accepted) return;
+    if (selfCall || !socket || !partnerId || !accepted) return;
     const stream = await getMedia();
     localStreamRef.current = stream;
     if (localVideoRef.current) localVideoRef.current.srcObject = stream;

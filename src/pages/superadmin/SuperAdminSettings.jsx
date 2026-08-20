@@ -458,7 +458,7 @@ export default function SuperAdminSettings() {
           <div className="portal-form-grid">
             <div className="portal-field" style={{ gridColumn: "1 / -1" }}>
               <p style={{ margin: 0, color: "#666", lineHeight: 1.6 }}>
-                The public site can be edited through the Website content tab. V8 also gives SuperAdmin dedicated controls for the Newsroom, event/resource presentation and the assistant guidance scope. Carousel slides are what show on the home hero. Leaders are shown on the public leadership page. Gallery images are reflected on the public gallery page.
+                The public site can be edited through the Website content tab. The SuperAdmin area also provides dedicated controls for the Newsroom, event/resource presentation and the assistant guidance scope. Carousel slides are what show on the home hero. Leaders are shown on the public leadership page. Gallery images are reflected on the public gallery page.
               </p>
             </div>
           </div>

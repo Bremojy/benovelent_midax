@@ -62,11 +62,15 @@ exports.create = async (req, res) => {
     if (kind === "native" && !Array.isArray(questions)) {
       return res.status(400).json({ success: false, message: "Native feedback questions are required." });
     }
+    const normalizedQuestions = kind === "native" ? normalizeQuestions(questions) : [];
+    if (Boolean(requireOnLogin) && (!normalizedQuestions.length || !normalizedQuestions.some((question) => question.required))) {
+      return res.status(400).json({ success: false, message: "A required login feedback request must contain at least one required question." });
+    }
     validatePromptSettings({ promptOnLogin: Boolean(promptOnLogin), requireOnLogin: Boolean(requireOnLogin), kind });
     const doc = await FeedbackCollection.create({
       title: String(title).trim().slice(0, 160), description: String(description || "").trim().slice(0, 2000), kind,
       googleFormUrl: kind === "google_form" ? String(googleFormUrl).trim() : "",
-      questions: kind === "native" ? normalizeQuestions(questions) : [], anonymous: Boolean(anonymous),
+      questions: kind === "native" ? normalizedQuestions : [], anonymous: Boolean(anonymous),
       preventDuplicate: preventDuplicate !== false, status: ["draft", "active", "closed"].includes(status) ? status : "active",
       startDate: startDate || null, endDate: endDate || null,
       promptOnLogin: Boolean(promptOnLogin), requireOnLogin: Boolean(requireOnLogin),
@@ -89,6 +93,9 @@ exports.update = async (req, res) => {
       if (req.body[key] === undefined) continue;
       doc[key] = key === "questions" ? normalizeQuestions(req.body[key]) : req.body[key];
     }
+    if (Boolean(doc.requireOnLogin) && (!doc.questions?.length || !doc.questions.some((question) => question.required))) {
+      throw new Error("A required login feedback request must contain at least one required question.");
+    }
     validatePromptSettings({ promptOnLogin: Boolean(doc.promptOnLogin), requireOnLogin: Boolean(doc.requireOnLogin), kind: doc.kind });
     if (doc.googleFormUrl && doc.kind === "google_form" && !/^https:\/\//i.test(doc.googleFormUrl)) {
       return res.status(400).json({ success: false, message: "Google Forms URL must use HTTPS." });
@@ -107,14 +114,18 @@ exports.remove = async (req, res) => {
 };
 
 exports.pendingLogin = async (req, res) => {
-  if (req.user.role !== "member") return res.json({ success: true, prompt: null });
   const now = new Date();
+  const actorId = String(req.user?._id || "");
+  const actorRole = String(req.user?.role || "member").toLowerCase();
   const docs = await FeedbackCollection.find({
     kind: "native", status: "active", promptOnLogin: true,
     $and: [{ $or: [{ startDate: null }, { startDate: { $lte: now } }] }, { $or: [{ endDate: null }, { endDate: { $gte: now } }] }],
   }).sort({ requireOnLogin: -1, createdAt: -1 });
   for (const doc of docs) {
-    const alreadyAnswered = doc.responses?.some((r) => String(r.member || "") === String(req.user._id));
+    const alreadyAnswered = doc.responses?.some((r) =>
+      String(r.member || "") === actorId &&
+      (!r.respondentRole || String(r.respondentRole) === actorRole)
+    );
     if (alreadyAnswered && doc.preventDuplicate) continue;
     return res.json({ success: true, prompt: visible(doc), required: Boolean(doc.requireOnLogin) });
   }
@@ -129,7 +140,8 @@ exports.submit = async (req, res) => {
   if (doc.endDate && now > doc.endDate) return res.status(400).json({ success: false, message: "Feedback collection has closed." });
   if (doc.kind !== "native") return res.status(400).json({ success: false, message: "Only native feedback can be submitted here." });
   const memberId = req.user._id;
-  if (doc.preventDuplicate && memberId && doc.responses.some((r) => String(r.member) === String(memberId))) {
+  const actorRole = String(req.user?.role || "member").toLowerCase();
+  if (doc.preventDuplicate && memberId && doc.responses.some((r) => String(r.member) === String(memberId) && (!r.respondentRole || String(r.respondentRole) === actorRole))) {
     return res.status(409).json({ success: false, message: "You have already submitted this feedback." });
   }
   const answers = req.body.answers || {};
@@ -144,23 +156,39 @@ exports.submit = async (req, res) => {
     if (value !== undefined && q.type === "single_choice" && q.options.length && !q.options.includes(String(value))) {
       return res.status(400).json({ success: false, message: `Invalid choice for: ${q.label}` });
     }
+    if (value !== undefined && q.type === "multiple_choice" && q.options.length) {
+      if (!Array.isArray(value) || value.some((option) => !q.options.includes(String(option)))) {
+        return res.status(400).json({ success: false, message: `Invalid choices for: ${q.label}` });
+      }
+    }
   }
   const cleanAnswers = {};
   for (const q of doc.questions) {
     if (answers[q.id] !== undefined) cleanAnswers[q.id] = Array.isArray(answers[q.id]) ? answers[q.id].slice(0, 20) : String(answers[q.id]).slice(0, 4000);
   }
-  doc.responses.push({ member: doc.anonymous ? null : memberId, anonymous: doc.anonymous, answers: cleanAnswers });
+  doc.responses.push({
+    member: memberId,
+    respondentRole: actorRole,
+    anonymous: doc.anonymous,
+    answers: cleanAnswers,
+  });
   await doc.save();
   res.status(201).json({ success: true, message: "Thank you for your feedback." });
 };
 
 exports.ensureBuiltIn = async (req, res) => {
-  const title = "Benovelent Website Experience Check-in";
-  const existing = await FeedbackCollection.findOne({ title });
+  const title = "Benevolent Website Experience Check-in";
+  const existing = await FeedbackCollection.findOne({
+    $or: [{ title }, { title: "Benovelent Website Experience Check-in" }],
+  });
+  if (existing && existing.title !== title) {
+    existing.title = title;
+    await existing.save();
+  }
   if (existing) return res.json({ success: true, collection: visible(existing), existing: true });
   const doc = await FeedbackCollection.create({
     title,
-    description: "A short member check-in to help the administration improve the portal. This request is clearly labelled and does not silently collect responses.",
+    description: "A short portal check-in to help the administration improve the website. This request is clearly labelled and does not silently collect responses.",
     kind: "native",
     questions: normalizeQuestions([
       { id: "experience", type: "rating", label: "How would you rate your overall website experience?", required: true },
@@ -188,5 +216,10 @@ exports.autoGenerate = async (req, res) => {
 exports.responses = async (req, res) => {
   const doc = await FeedbackCollection.findById(req.params.id).populate("responses.member", "fullName email memberNumber");
   if (!doc) return res.status(404).json({ success: false, message: "Feedback collection not found." });
-  res.json({ success: true, collection: visible(doc), responses: doc.responses });
+  const responses = (doc.responses || []).map((response) => {
+    const item = response.toObject ? response.toObject() : { ...response };
+    if (item.anonymous) item.member = null;
+    return item;
+  });
+  res.json({ success: true, collection: visible(doc), responses });
 };

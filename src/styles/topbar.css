@@ -379,3 +379,9 @@ transform:translateY(-2px);
   .user-info{max-width:145px}
   .user-info h4,.user-info p{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 }
+
+/* The desktop sidebar is persistent; the hamburger is only a mobile drawer control. */
+.menu-btn { display: none; }
+@media (max-width: 900px) {
+  .menu-btn { display: flex; }
+}

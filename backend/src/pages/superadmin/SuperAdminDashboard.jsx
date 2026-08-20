@@ -119,7 +119,7 @@ export default function SuperAdminDashboard() {
           </article>
 
           <article className="portal-panel modern-panel">
-            <div className="panel-heading"><div><span className="panel-kicker">PWA · V6 FOUNDATION</span><h2>Benovelent MIDAX app status.</h2><p>Keep the installation experience visible and healthy.</p></div><button className="panel-link button-link" onClick={() => window.dispatchEvent(new Event("benovelent:open-install"))}>Install / Help <ArrowUpRight size={16} /></button></div>
+            <div className="panel-heading"><div><span className="panel-kicker">APP INSTALLATION</span><h2>Benovelent MIDAX app status.</h2><p>Keep the installation experience visible and healthy.</p></div><button className="panel-link button-link" onClick={() => window.dispatchEvent(new Event("benovelent:open-install"))}>Install / Help <ArrowUpRight size={16} /></button></div>
             <div className="pwa-status-modern">
               <div><span>Display mode</span><strong>{window.matchMedia?.("(display-mode: standalone)")?.matches ? "Installed" : "Browser"}</strong></div>
               <div><span>Service worker</span><strong>{"serviceWorker" in navigator ? "Supported" : "Unavailable"}</strong></div>

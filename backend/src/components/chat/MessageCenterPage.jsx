@@ -197,12 +197,22 @@ function MessageCenterPage({
       }
     };
 
+    const handleCallError = (payload) => {
+      const code = String(payload?.code || payload?.error || "");
+      const message = code === "SELF_CALL_BLOCKED"
+        ? "You cannot call yourself. Choose another member."
+        : payload?.message || "The call could not be started.";
+      setBanner(message);
+      setCall(null);
+    };
+
     activeSocket.on("connect", handleConnect);
     activeSocket.on("connect_error", handleConnectError);
     activeSocket.on("new-message", handleSidebarMessage);
     activeSocket.on("incoming-call", handleIncomingCall);
     activeSocket.on("new-call-notification", handleCallNotification);
     activeSocket.on("missed-call", handleMissedCall);
+    activeSocket.on("call-error", handleCallError);
     activeSocket.on("online-users", handlePresence);
     setSocket(activeSocket);
 
@@ -216,6 +226,7 @@ function MessageCenterPage({
       activeSocket.off("incoming-call", handleIncomingCall);
       activeSocket.off("new-call-notification", handleCallNotification);
       activeSocket.off("missed-call", handleMissedCall);
+      activeSocket.off("call-error", handleCallError);
       activeSocket.off("online-users", handlePresence);
     };
   }, [actorId, currentUser?.role, authUser?.role, contextSocket]);
@@ -312,6 +323,10 @@ function MessageCenterPage({
 
   const selectConversation = (conversation) => {
     if (!conversation?._id) return;
+    if (conversation.partner && isSameUser(normalizeContact(conversation.partner, conversation.partner?.role || "member"), actor)) {
+      setBanner("You cannot open a chat with yourself.");
+      return;
+    }
     const opened = { ...conversation, unreadCount: 0 };
     setConversations((previous) => previous.map((item) => String(item?._id) === String(conversation._id) ? opened : item));
     setSelectedConversation(opened);
@@ -375,14 +390,30 @@ function MessageCenterPage({
     setMobileChatOpen(false);
   };
 
+  const ensureCallNotifications = async () => {
+    try {
+      if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "default") {
+        await Notification.requestPermission();
+      }
+    } catch (_) {}
+  };
+
   const startCall = async (type) => {
-    if (!selectedConversation?.partner?._id) {
+    const partner = selectedConversation?.partner;
+    if (!partner?._id) {
       setBanner("Select a member before starting a call.");
+      return;
+    }
+    if (isSameUser(normalizeContact(partner, partner?.role || "member"), actor)) {
+      setBanner("Calling yourself is not available.");
+      setSelectedConversation(null);
+      setMobileChatOpen(false);
       return;
     }
 
     const activeSocket = socket || contextSocket || socketClient;
     try {
+      await ensureCallNotifications();
       if (!activeSocket.connected) {
         setBanner("Connecting to secure calling…");
         if (activeSocket.connect) activeSocket.connect();
@@ -701,6 +732,7 @@ function normalizeConversation(conversation, currentUserId) {
   const safePartner = partner
     ? { ...partner, fullName: safeDisplayName(partner.fullName || partner.name || partner.username, partner) }
     : null;
+  if (safePartner?._id && String(safePartner._id) === String(currentUserId)) return null;
 
   return {
     ...conversation,

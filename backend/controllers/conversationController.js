@@ -154,8 +154,8 @@ updatedAt:-1
 });
 
 const visibleConversations = conversations.filter((conversation) => {
-    const partnerId = getConversationPartnerIds(conversation, currentUserId)[0];
-    return Boolean(partnerId);
+    const partnerIds = getConversationPartnerIds(conversation, currentUserId);
+    return partnerIds.length > 0 && partnerIds.some((id) => String(id) !== String(currentUserId));
 });
 
 res.json({

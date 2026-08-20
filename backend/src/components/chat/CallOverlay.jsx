@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Mic, MicOff, Phone, PhoneOff, Video, VideoOff } from "lucide-react";
 import { startCallTone } from "../../utils/callTone";
+import { stopNativeIncomingCall } from "../../utils/nativeCallBridge";
 import "./CallOverlay.css";
 
 const ICE_SERVERS = [{ urls: "stun:stun.l.google.com:19302" }, { urls: "stun:stun1.l.google.com:19302" }];
@@ -25,8 +26,17 @@ export default function CallOverlay({ socket, currentUser, partner, callType, in
 
   const me = String(currentUser?.chatId || currentUser?._id || "");
   const partnerId = String(partner?._id || partner?.id || incomingCall?.callerUserId || "");
+  const selfCall = Boolean(me && partnerId && me === partnerId);
 
-  useEffect(() => { ringtoneRef.current = startCallTone(); return () => ringtoneRef.current?.stop?.(); }, []);
+  useEffect(() => {
+    if (selfCall) {
+      setError("Calling yourself is not available.");
+      onClose?.();
+      return undefined;
+    }
+    if (incomingCall) ringtoneRef.current = startCallTone();
+    return () => { ringtoneRef.current?.stop?.(); stopNativeIncomingCall(incomingCall?.callId || callId); };
+  }, [incomingCall, callId, selfCall, onClose]);
   useEffect(() => { if (connected) timerRef.current = window.setInterval(() => setDuration((v) => v + 1), 1000); return () => window.clearInterval(timerRef.current); }, [connected]);
 
   useEffect(() => {
@@ -47,7 +57,7 @@ export default function CallOverlay({ socket, currentUser, partner, callType, in
     peerRef.current = peer;
     peer.onicecandidate = (event) => { if (event.candidate && partnerId) socket?.emit("ice-candidate", { to: partnerId, candidate: event.candidate }); };
     peer.ontrack = (event) => { const stream = event.streams?.[0]; if (!stream) return; if (remoteVideoRef.current) remoteVideoRef.current.srcObject = stream; if (remoteAudioRef.current) remoteAudioRef.current.srcObject = stream; };
-    peer.onconnectionstatechange = () => { const state = peer.connectionState; if (state === "connected") { setConnected(true); setStatus("Connected"); ringtoneRef.current?.stop?.(); } else if (["failed", "disconnected", "closed"].includes(state)) { setConnected(false); if (state === "failed") setError("The call connection failed. Check your internet connection."); } };
+    peer.onconnectionstatechange = () => { const state = peer.connectionState; if (state === "connected") { setConnected(true); setStatus("Connected"); ringtoneRef.current?.stop?.(); stopNativeIncomingCall(callId); } else if (["failed", "disconnected", "closed"].includes(state)) { setConnected(false); if (state === "failed") setError("The call connection failed. Check your internet connection."); } };
     return peer;
   }
 
@@ -57,7 +67,7 @@ export default function CallOverlay({ socket, currentUser, partner, callType, in
   }
 
   async function startCall() {
-    if (!socket || !partnerId || !accepted) return;
+    if (selfCall || !socket || !partnerId || !accepted) return;
     const stream = await getMedia();
     localStreamRef.current = stream;
     if (localVideoRef.current) localVideoRef.current.srcObject = stream;
@@ -87,8 +97,8 @@ export default function CallOverlay({ socket, currentUser, partner, callType, in
 
   function toggleMute() { const next = !muted; localStreamRef.current?.getAudioTracks().forEach((track) => { track.enabled = !next; }); setMuted(next); }
   function toggleCamera() { const next = !cameraOff; localStreamRef.current?.getVideoTracks().forEach((track) => { track.enabled = !next; }); setCameraOff(next); }
-  function rejectCall() { if (incomingCall?.from) socket?.emit("call-rejected", { to: incomingCall.from, callId: incomingCall.callId || callId }); finish(false); }
-  function finish(notify = true) { if (notify && partnerId) socket?.emit("end-call", { to: incomingCall?.from || partnerId, callId: incomingCall?.callId || callId }); ringtoneRef.current?.stop?.(); cleanupMedia(); onClose?.(); }
+  function rejectCall() { if (incomingCall?.from) socket?.emit("call-rejected", { to: incomingCall.from, callId: incomingCall.callId || callId }); stopNativeIncomingCall(incomingCall?.callId || callId); finish(false); }
+  function finish(notify = true) { if (notify && partnerId) socket?.emit("end-call", { to: incomingCall?.from || partnerId, callId: incomingCall?.callId || callId }); ringtoneRef.current?.stop?.(); stopNativeIncomingCall(incomingCall?.callId || callId); cleanupMedia(); onClose?.(); }
   function cleanupMedia() { peerRef.current?.close(); peerRef.current = null; localStreamRef.current?.getTracks().forEach((track) => track.stop()); localStreamRef.current = null; if (localVideoRef.current) localVideoRef.current.srcObject = null; if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null; if (remoteAudioRef.current) remoteAudioRef.current.srcObject = null; }
 
   const mins = String(Math.floor(duration / 60)).padStart(2, "0");
@@ -115,14 +125,14 @@ export default function CallOverlay({ socket, currentUser, partner, callType, in
           </div>
         ) : (
           <div className="audio-call-center">
-            <div className="audio-call-avatar"><img src={partner?.profileImage || "/default-avatar.svg"} alt={partner?.fullName || "Member"} /></div>
+            <div className="audio-call-avatar"><img src={partner?.profileImage || incomingCall?.callerProfileImage || "/default-avatar.svg"} alt={partner?.fullName || "Member"} /></div>
             <h3>{partner?.fullName || incomingCall?.callerName || "Member"}</h3>
             <p>{connected ? durationText(mins, secs) : status}</p>
             <audio ref={remoteAudioRef} autoPlay />
           </div>
         )}
         <div className="call-controls">
-          {incomingCall && !accepted && (<><button type="button" className="call-control accept" onClick={() => { ringtoneRef.current?.stop?.(); setAccepted(true); }}><Phone size={18} />Accept</button><button type="button" className="call-control decline" onClick={rejectCall}><PhoneOff size={18} />Decline</button></>)}
+          {incomingCall && !accepted && (<><button type="button" className="call-control accept" onClick={() => { ringtoneRef.current?.stop?.(); setAccepted(true); stopNativeIncomingCall(incomingCall?.callId || callId); }}><Phone size={18} />Accept</button><button type="button" className="call-control decline" onClick={rejectCall}><PhoneOff size={18} />Decline</button></>)}
           {accepted && (<><button type="button" className="call-control" onClick={toggleMute}>{muted ? <MicOff size={18} /> : <Mic size={18} />}{muted ? "Unmute" : "Mute"}</button>{isVideo && <button type="button" className="call-control" onClick={toggleCamera}>{cameraOff ? <VideoOff size={18} /> : <Video size={18} />}{cameraOff ? "Camera on" : "Camera off"}</button>}<button type="button" className="call-control decline" onClick={() => finish(true)}><PhoneOff size={18} />End</button></>)}
         </div>
       </div>

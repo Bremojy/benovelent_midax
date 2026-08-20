@@ -430,11 +430,11 @@ export default function SuperAdminSettings() {
             <p>See what the public website contains, then edit pages, leaders, gallery images and theme settings from one place.</p>
           </div>
           <div className="portal-actions">
-            <button className={activeTab === "website" ? "portal-btn" : "portal-btn light"} onClick={() => setActiveTab("website")} type="button">Website content</button>
-            <button className={activeTab === "carousel" ? "portal-btn" : "portal-btn light"} onClick={() => setActiveTab("carousel")} type="button">Carousel</button>
-            <button className={activeTab === "leaders" ? "portal-btn" : "portal-btn light"} onClick={() => setActiveTab("leaders")} type="button">Leaders</button>
-            <button className={activeTab === "gallery" ? "portal-btn" : "portal-btn light"} onClick={() => setActiveTab("gallery")} type="button">Gallery</button>
-            <button className={activeTab === "settings" ? "portal-btn" : "portal-btn light"} onClick={() => setActiveTab("settings")} type="button">Theme</button>
+            <button type="button" className={activeTab === "website" ? "portal-btn" : "portal-btn light"} onClick={() => setActiveTab("website")} type="button">Website content</button>
+            <button type="button" className={activeTab === "carousel" ? "portal-btn" : "portal-btn light"} onClick={() => setActiveTab("carousel")} type="button">Carousel</button>
+            <button type="button" className={activeTab === "leaders" ? "portal-btn" : "portal-btn light"} onClick={() => setActiveTab("leaders")} type="button">Leaders</button>
+            <button type="button" className={activeTab === "gallery" ? "portal-btn" : "portal-btn light"} onClick={() => setActiveTab("gallery")} type="button">Gallery</button>
+            <button type="button" className={activeTab === "settings" ? "portal-btn" : "portal-btn light"} onClick={() => setActiveTab("settings")} type="button">Theme</button>
           </div>
         </header>
 
@@ -458,7 +458,7 @@ export default function SuperAdminSettings() {
           <div className="portal-form-grid">
             <div className="portal-field" style={{ gridColumn: "1 / -1" }}>
               <p style={{ margin: 0, color: "#666", lineHeight: 1.6 }}>
-                The public site can be edited through the Website content tab. V8 also gives SuperAdmin dedicated controls for the Newsroom, event/resource presentation and the assistant guidance scope. Carousel slides are what show on the home hero. Leaders are shown on the public leadership page. Gallery images are reflected on the public gallery page.
+                The public site can be edited through the Website content tab. The SuperAdmin area also provides dedicated controls for the Newsroom, event/resource presentation and the assistant guidance scope. Carousel slides are what show on the home hero. Leaders are shown on the public leadership page. Gallery images are reflected on the public gallery page.
               </p>
             </div>
           </div>
@@ -503,7 +503,7 @@ export default function SuperAdminSettings() {
                     </div>
 
                     <div className="portal-actions">
-                      <button className="portal-btn" onClick={() => saveSection(item.key)} disabled={savingKey === item.key} type="button">
+                      <button type="button" className="portal-btn" onClick={() => saveSection(item.key)} disabled={savingKey === item.key} type="button">
                         <Save size={16} /> {savingKey === item.key ? "Saving..." : "Save section"}
                       </button>
                     </div>

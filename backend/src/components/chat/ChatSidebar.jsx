@@ -32,6 +32,7 @@ function ChatSidebar({
     const sorted = [...members]
       .filter((member) => String(member?.role || "").toLowerCase() !== "superadmin")
       .filter((member) => !isSameIdentity(member, actor))
+      .filter((member) => !isExactActorId(member, actor))
       .sort((a, b) => {
         const roleRank = rankRole(a.role) - rankRole(b.role);
         if (roleRank !== 0) return roleRank;
@@ -51,7 +52,10 @@ function ChatSidebar({
 
   const filteredConversations = useMemo(() => {
     const keyword = String(search || "").trim().toLowerCase();
-    const withoutSelf = conversations.filter((conversation) => !isSameIdentity(conversation.partner || {}, actor));
+    const withoutSelf = conversations.filter((conversation) => {
+      const partner = conversation.partner || {};
+      return !isSameIdentity(partner, actor) && !isExactActorId(partner, actor);
+    });
     if (!keyword) return withoutSelf;
 
     return withoutSelf.filter((conversation) => {
@@ -306,6 +310,17 @@ function buildActorIdentity(user) {
     memberNumber: String(user?.memberNumber || "").trim().toLowerCase(),
     phone: normalizePhone(user?.phone || user?.mobile || user?.telephone || ""),
   };
+}
+
+
+function isExactActorId(candidate, actor) {
+  const ids = [candidate?._id, candidate?.id, candidate?.chatId, candidate?.memberId]
+    .filter(Boolean)
+    .map((value) => String(value).trim());
+  const actorIds = [actor?.id, actor?.chatId, actor?.memberId]
+    .filter(Boolean)
+    .map((value) => String(value).trim());
+  return ids.some((id) => actorIds.includes(id));
 }
 
 function isSameIdentity(candidate, actor) {

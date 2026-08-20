@@ -260,3 +260,30 @@ html[data-appearance="dark"] .dashboard-portal-footer span:first-child{color:#e5
   .dashboard-portal-footer{justify-content:space-between;padding-left:12px;padding-right:12px}
 }
 
+
+/* Final portal footer positioning and clean shell. */
+.dashboard-portal-footer span:nth-child(3),
+.dashboard-portal-footer .portal-version {
+  display: none !important;
+}
+@media (max-width: 900px) {
+  .dashboard-portal-footer {
+    bottom: calc(70px + env(safe-area-inset-bottom) + 6px) !important;
+    left: 8px !important;
+    right: 8px !important;
+    min-height: 28px !important;
+    z-index: 1100 !important;
+  }
+}
+
+/* Final scroll fix: authenticated portal pages use the document viewport for scrolling. */
+.dashboard-container {
+  overflow-x: clip !important;
+  overflow-y: visible !important;
+}
+.dashboard-content {
+  overflow: visible !important;
+  max-height: none !important;
+  min-height: 0 !important;
+  scrollbar-gutter: auto !important;
+}

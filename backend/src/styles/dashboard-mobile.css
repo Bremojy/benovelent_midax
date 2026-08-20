@@ -183,11 +183,18 @@
   }
 
   .dashboard-content,
-  .dashboard-container.dashboard-mobile-subpage .dashboard-content {
+  .dashboard-container.dashboard-home-shell .dashboard-content {
     min-height: calc(100dvh - 72px);
     max-height: none;
     overflow-y: visible;
     padding-bottom: calc(var(--dashboard-bottom-nav-height) + env(safe-area-inset-bottom) + 24px) !important;
+  }
+
+  .dashboard-container.dashboard-mobile-subpage .dashboard-content {
+    min-height: calc(100dvh - 72px);
+    max-height: none;
+    overflow-y: visible;
+    padding-bottom: 24px !important;
   }
 }
 
@@ -197,9 +204,78 @@
   }
 
   .dashboard-content,
-  .dashboard-container.dashboard-mobile-subpage .dashboard-content {
+  .dashboard-container .dashboard-content {
     padding-left: 10px !important;
     padding-right: 10px !important;
+  }
+
+  .dashboard-container.dashboard-home-shell .dashboard-content {
     padding-bottom: calc(var(--dashboard-bottom-nav-height) + env(safe-area-inset-bottom) + 18px) !important;
+  }
+
+  .dashboard-container.dashboard-mobile-subpage .dashboard-content {
+    padding-bottom: 18px !important;
+  }
+}
+
+
+/* Portal — persistent mobile bottom navigation. */
+@media (max-width: 900px) {
+  .dashboard-container { --dashboard-bottom-nav-height: 92px; }
+  .dashboard-container.dashboard-home-shell .dashboard-content {
+    padding-bottom: calc(var(--dashboard-bottom-nav-height) + env(safe-area-inset-bottom) + 28px) !important;
+  }
+  .dashboard-container.dashboard-mobile-subpage .dashboard-content {
+    padding-bottom: 28px !important;
+  }
+  .dashboard-container .dashboard-main { padding-bottom: 0 !important; }
+}
+@media (max-width: 560px) {
+  .dashboard-container { --dashboard-bottom-nav-height: 96px; }
+}
+
+/* Final shell/scroll hardening. Use the document as the mobile scroll container. */
+.dashboard-container {
+  overflow-x: clip !important;
+  overflow-y: visible !important;
+}
+
+.dashboard-content {
+  overflow: visible !important;
+  max-height: none !important;
+  min-height: 0 !important;
+  scrollbar-gutter: auto !important;
+}
+
+@media (max-width: 900px) {
+  .dashboard-container,
+  .dashboard-main,
+  .dashboard-container.dashboard-mobile-subpage .dashboard-main {
+    min-height: 100dvh !important;
+    height: auto !important;
+  }
+
+  .dashboard-main,
+  .dashboard-container.dashboard-mobile-subpage .dashboard-main {
+    padding-bottom: calc(92px + env(safe-area-inset-bottom)) !important;
+  }
+
+  .dashboard-content,
+  .dashboard-container.dashboard-mobile-subpage .dashboard-content,
+  .dashboard-container.dashboard-home-shell .dashboard-content {
+    overflow: visible !important;
+    max-height: none !important;
+    min-height: 0 !important;
+    padding-bottom: calc(108px + env(safe-area-inset-bottom)) !important;
+  }
+}
+
+@media (max-width: 560px) {
+  .dashboard-content,
+  .dashboard-container.dashboard-mobile-subpage .dashboard-content,
+  .dashboard-container.dashboard-home-shell .dashboard-content {
+    padding-left: 10px !important;
+    padding-right: 10px !important;
+    padding-bottom: calc(112px + env(safe-area-inset-bottom)) !important;
   }
 }

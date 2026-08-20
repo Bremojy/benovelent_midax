@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { CheckCircle2, ChevronLeft, ChevronRight, MessageSquareText, X, Star } from "lucide-react";
 import toast from "react-hot-toast";
 import { getPendingLoginFeedback, submitFeedback } from "../../services/feedbackService";
+import { useAuth } from "../../context/AuthContext";
+import { useLocation } from "react-router-dom";
 import "./LoginFeedbackPrompt.css";
 
 function AnswerControl({ question, value, onChange }) {
@@ -26,10 +28,15 @@ export default function LoginFeedbackPrompt() {
   const [answers, setAnswers] = useState({});
   const [loading, setLoading] = useState(false);
   const [closed, setClosed] = useState(false);
+  const { user, loading: authLoading } = useAuth();
+  const location = useLocation();
+  const role = String(user?.role || "member").toLowerCase();
+  const basePath = role === "superadmin" ? "/superadmin" : role === "admin" ? "/admin" : "/member";
 
   useEffect(() => {
     let active = true;
     const load = async () => {
+      if (authLoading || !user || location.pathname !== basePath) return;
       try {
         const response = await getPendingLoginFeedback();
         const data = response.data || {};
@@ -46,7 +53,14 @@ export default function LoginFeedbackPrompt() {
     };
     load();
     return () => { active = false; };
-  }, []);
+  }, [authLoading, user, location.pathname, basePath]);
+
+  useEffect(() => {
+    if (!prompt || closed) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = previousOverflow; };
+  }, [prompt, closed]);
 
   const questions = useMemo(() => prompt?.questions || [], [prompt]);
   const question = questions[step];
@@ -59,7 +73,7 @@ export default function LoginFeedbackPrompt() {
     setLoading(true);
     try {
       await submitFeedback(prompt._id, answers);
-      localStorage.setItem(`benovelentFeedbackPrompt:${prompt._id}`, String(Date.now()));
+      if (!required) localStorage.setItem(`benovelentFeedbackPrompt:${prompt._id}`, String(Date.now()));
       setClosed(true);
       toast.success("Thank you. Your feedback helps improve Benovelent Midax.");
     } catch (error) {
@@ -71,7 +85,7 @@ export default function LoginFeedbackPrompt() {
     <div className="lfp-card">
       {!required && <button type="button" className="lfp-close" onClick={() => setClosed(true)} aria-label="Close feedback"><X size={18} /></button>}
       <div className="lfp-icon"><MessageSquareText size={23} /></div>
-      <span className="lfp-eyebrow">MEMBER FEEDBACK</span>
+      <span className="lfp-eyebrow">PORTAL FEEDBACK</span>
       <h2 id="lfp-title">{prompt.title}</h2>
       <p className="lfp-description">{prompt.description || "We are asking for a short, clearly labelled feedback check-in to improve the portal."}</p>
       <div className="lfp-progress"><span>{step + 1} of {questions.length}</span><div><span style={{ width: `${((step + 1) / questions.length) * 100}%` }} /></div></div>
@@ -81,7 +95,7 @@ export default function LoginFeedbackPrompt() {
         {step > 0 && <button type="button" className="lfp-secondary" onClick={() => setStep((n) => n - 1)}><ChevronLeft size={16} /> Back</button>}
         {step < questions.length - 1 ? <button type="button" className="lfp-primary" disabled={!valid} onClick={() => setStep((n) => n + 1)}>Next <ChevronRight size={16} /></button> : <button type="button" className="lfp-primary" disabled={!valid || loading} onClick={finish}>{loading ? "Submitting…" : <><CheckCircle2 size={16} /> Submit</>}</button>}
       </div>
-      <small className="lfp-note">{required ? "The administration has marked this feedback check-in as required. It is clearly identified before you respond." : "You can skip this request. No hidden or silent responses are collected."}</small>
+      <small className="lfp-note">{required ? "This check-in is required and must be completed before you continue into the portal." : "This is an optional feedback request. You may skip it."}</small>
     </div>
   </div>;
 }

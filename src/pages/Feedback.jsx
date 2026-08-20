@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, ExternalLink, MessageSquarePlus, Star, Trash2, Plus, X, Home, UserRound, Clock3, MessageCircle } from "lucide-react";
-import { getFeedbackCollections, createFeedbackCollection, deleteFeedbackCollection, submitFeedback, getFeedbackResponses, createBuiltInFeedback, autoGenerateFeedback } from "../services/feedbackService";
+import { getFeedbackCollections, createFeedbackCollection, deleteFeedbackCollection, submitFeedback, getFeedbackResponses, createBuiltInFeedback } from "../services/feedbackService";
 import { useLocation, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 
@@ -9,7 +9,6 @@ const questionTypes = ["short_text", "long_text", "email", "number", "rating", "
 function AdminComposer({ onCreated }) {
   const [form, setForm] = useState({ title: "", description: "", kind: "native", googleFormUrl: "", anonymous: false, preventDuplicate: true, promptOnLogin: false, requireOnLogin: false, promptFrequencyDays: 7, questions: [] });
   const addQuestion = () => setForm((f) => ({ ...f, questions: [...f.questions, { id: crypto.randomUUID(), type: "short_text", label: "", required: false, options: [] }] }));
-  const generate = async () => { try { const topic = form.title || "member website experience"; const r = await autoGenerateFeedback(topic); setForm((f) => ({ ...f, kind: "native", questions: r.data.questions || [] })); toast.success("Questions generated. Review them before publishing."); } catch (e) { toast.error(e.response?.data?.message || "Could not generate questions"); } };
   const updateQ = (id, key, value) => setForm((f) => ({ ...f, questions: f.questions.map((q) => q.id === id ? { ...q, [key]: value } : q) }));
   const save = async (e) => {
     e.preventDefault();
@@ -30,7 +29,7 @@ function AdminComposer({ onCreated }) {
     </div>
     <label>Description<textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} /></label>
     {form.kind === "google_form" ? <label>Google Forms URL<input type="url" required value={form.googleFormUrl} onChange={e => setForm({ ...form, googleFormUrl: e.target.value })} /></label> : <>
-      <div className="feedback-question-toolbar"><strong>Questions</strong><div style={{display:"flex",gap:8,flexWrap:"wrap"}}><button type="button" className="btn btn-secondary" onClick={generate}>Auto-generate questions</button><button type="button" className="btn btn-secondary" onClick={addQuestion}><Plus size={16} /> Add question</button></div></div>
+      <div className="feedback-question-toolbar"><strong>Questions</strong><button type="button" className="btn btn-secondary" onClick={addQuestion}><Plus size={16} /> Add question</button></div>
       {form.questions.map((q, i) => <div className="feedback-question" key={q.id}>
         <div className="feedback-question-head"><span>Question {i + 1}</span><button type="button" className="icon-btn" onClick={() => setForm(f => ({ ...f, questions: f.questions.filter(x => x.id !== q.id) }))}><X size={16} /></button></div>
         <input type="text" placeholder="Question text" required value={q.label} onChange={e => updateQ(q.id, "label", e.target.value)} />
@@ -42,11 +41,11 @@ function AdminComposer({ onCreated }) {
       </div>)}
     </>}
     <div className="feedback-grid">
-      <label className="inline-check"><input type="checkbox" checked={form.promptOnLogin} onChange={e => setForm({ ...form, promptOnLogin: e.target.checked, requireOnLogin: e.target.checked ? form.requireOnLogin : false })} /> Show once after member login</label>
+      <label className="inline-check"><input type="checkbox" checked={form.promptOnLogin} onChange={e => setForm({ ...form, promptOnLogin: e.target.checked, requireOnLogin: e.target.checked ? form.requireOnLogin : false })} /> Show after portal login</label>
       <label className="inline-check"><input type="checkbox" checked={form.requireOnLogin} disabled={!form.promptOnLogin || form.kind !== "native"} onChange={e => setForm({ ...form, requireOnLogin: e.target.checked })} /> Require completion before portal access</label>
       <label>Prompt frequency (days)<input type="number" min="0" max="3650" value={form.promptFrequencyDays} onChange={e => setForm({ ...form, promptFrequencyDays: Number(e.target.value) })} /></label>
       <label className="inline-check"><input type="checkbox" checked={form.anonymous} onChange={e => setForm({ ...form, anonymous: e.target.checked })} /> Allow anonymous answers</label>
-      <label className="inline-check"><input type="checkbox" checked={form.preventDuplicate} onChange={e => setForm({ ...form, preventDuplicate: e.target.checked })} /> Prevent duplicate member responses</label>
+      <label className="inline-check"><input type="checkbox" checked={form.preventDuplicate} onChange={e => setForm({ ...form, preventDuplicate: e.target.checked })} /> Prevent duplicate responses</label>
     </div>
     <button className="btn btn-primary" type="submit"><MessageSquarePlus size={16} /> Publish feedback</button>
   </form>;
@@ -65,6 +64,7 @@ export default function Feedback() {
   const location = useLocation();
   const navigate = useNavigate();
   const role = location.pathname.startsWith("/member") ? "member" : location.pathname.startsWith("/superadmin") ? "superadmin" : "admin";
+  const basePath = role === "superadmin" ? "/superadmin" : role === "admin" ? "/admin" : "/member";
   const canManage = role !== "member";
   const isSuperAdmin = role === "superadmin";
   const [items, setItems] = useState([]);
@@ -76,34 +76,49 @@ export default function Feedback() {
 
   const load = async () => { try { const r = await getFeedbackCollections(); setItems(r.data.collections || []); } catch { toast.error("Could not load feedback"); } finally { setLoading(false); } };
   useEffect(() => { load(); }, []);
+  useEffect(() => {
+    if (!active) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = previousOverflow; };
+  }, [active]);
   const questions = useMemo(() => active?.questions || [], [active]);
   const currentQuestion = questions[step];
   const closeForm = () => { setActive(null); setStep(0); setAnswers({}); };
   const validateCurrent = () => {
     if (!currentQuestion?.required) return true;
     const value = answers[currentQuestion.id];
-    return !(value === undefined || value === "" || (Array.isArray(value) && !value.length));
+    if (value === undefined || value === null) return false;
+    if (typeof value === "string" && !value.trim()) return false;
+    if (Array.isArray(value) && value.length === 0) return false;
+    if (currentQuestion.type === "rating" && (!Number.isFinite(Number(value)) || Number(value) < 1 || Number(value) > 5)) return false;
+    if (["single_choice", "multiple_choice"].includes(currentQuestion.type) && (currentQuestion.options || []).length) {
+      const values = Array.isArray(value) ? value : [value];
+      if (values.some((option) => !(currentQuestion.options || []).includes(option))) return false;
+    }
+    return true;
   };
   const next = () => { if (!validateCurrent()) { toast.error("Please answer this question before continuing."); return; } setStep((n) => Math.min(n + 1, questions.length - 1)); };
   const back = () => setStep((n) => Math.max(0, n - 1));
   const submit = async () => {
+    if (!questions.length) { toast.error("This feedback form has no questions yet."); return; }
     if (!validateCurrent()) { toast.error("Please answer this question before submitting."); return; }
     try { await submitFeedback(active._id, answers); toast.success("Thank you for your feedback."); closeForm(); } catch (e) { toast.error(e.response?.data?.message || "Could not submit feedback"); }
   };
   const openResponses = async item => { try { const r = await getFeedbackResponses(item._id); setResponses(r.data.responses || []); setActive({ ...item, showResponses: true }); } catch { toast.error("Could not load responses"); } };
 
   return <div className="portal-page feedback-page">
-    <div className="feedback-mobile-back"><button type="button" className="feedback-back-button" onClick={() => navigate(-1)}><ChevronLeft size={18} /> Back</button><button type="button" className="feedback-home-button" onClick={() => navigate("/")}><Home size={17} /> Home</button></div>
+    <div className="feedback-mobile-back"><button type="button" className="feedback-back-button" onClick={() => navigate(basePath)}><ChevronLeft size={18} /> Dashboard</button><button type="button" className="feedback-home-button" onClick={() => navigate("/")}><Home size={17} /> Website</button></div>
     <div className="portal-module-header feedback-page-header"><div><span>COMMUNITY VOICE</span><h1>Feedback</h1><p>Share your experience, ideas and suggestions with the Benovelent Fund Scheme.</p></div>{isSuperAdmin && <button type="button" className="btn btn-primary" onClick={async () => { try { const r = await createBuiltInFeedback(); setItems(prev => prev.some(x => x._id === r.data.collection?._id) ? prev : [r.data.collection, ...prev]); toast.success(r.data.existing ? "Built-in feedback is already active." : "Built-in experience feedback launched for all users."); } catch (e) { toast.error(e.response?.data?.message || "Could not launch built-in feedback"); } }}><MessageSquarePlus size={16} /> Launch experience check-in</button>}</div>
     {canManage && <AdminComposer onCreated={c => setItems(prev => [c, ...prev])} />}
     {loading ? <div className="feedback-skeleton">Loading feedback…</div> : <div className="feedback-card-grid">{items.map(item => <article className="interactive-card feedback-card" key={item._id}>
-      <div className="feedback-card-top"><span className="feedback-badge">{item.kind === "native" ? "Native" : "Google Forms"}</span>{canManage && <button type="button" className="icon-btn" onClick={async () => { await deleteFeedbackCollection(item._id); setItems(x => x.filter(y => y._id !== item._id)); toast.success("Deleted"); }}><Trash2 size={16} /></button>}</div>
+      <div className="feedback-card-top"><span className="feedback-badge">{item.kind === "native" ? "Native" : "Google Forms"}</span>{canManage && <button type="button" className="icon-btn" aria-label="Delete feedback" onClick={async () => { try { await deleteFeedbackCollection(item._id); setItems(x => x.filter(y => y._id !== item._id)); toast.success("Feedback deleted"); } catch (e) { toast.error(e.response?.data?.message || "Could not delete feedback"); } }}><Trash2 size={16} /></button>}</div>
       <h3>{item.title}</h3><p>{item.description || "We value your feedback."}</p>
       <div className="feedback-card-actions">{item.kind === "google_form" ? <a className="btn btn-primary" href={item.googleFormUrl} target="_blank" rel="noreferrer">Open form <ExternalLink size={16} /></a> : <button className="btn btn-primary" type="button" onClick={() => { setAnswers({}); setStep(0); setActive(item); }}>Give feedback</button>}{canManage && <button className="btn btn-secondary" type="button" onClick={() => openResponses(item)}>Responses ({item.responseCount || 0})</button>}</div>
     </article>)}</div>}
 
     {active && !active.showResponses && <div className="feedback-modal-backdrop" onMouseDown={closeForm}>
-      <div className="feedback-modal feedback-step-modal" onMouseDown={e => e.stopPropagation()}>
+      <div className="feedback-modal feedback-step-modal" role="dialog" aria-modal="true" aria-label="Feedback form" onMouseDown={e => e.stopPropagation()}>
         <div className="feedback-step-head"><div><span>QUESTION {step + 1} OF {Math.max(questions.length, 1)}</span><h2>{active.title}</h2><p>{active.description}</p></div><button type="button" className="icon-btn" onClick={closeForm}><X /></button></div>
         <div className="feedback-progress"><span style={{ width: `${questions.length ? ((step + 1) / questions.length) * 100 : 0}%` }} /></div>
         {currentQuestion ? <div className="feedback-single-question"><label><strong>{currentQuestion.label}</strong>{currentQuestion.required && <em>Required</em>}<QuestionControl question={currentQuestion} value={answers[currentQuestion.id]} onChange={value => setAnswers(prev => ({ ...prev, [currentQuestion.id]: value }))} /></label></div> : <div className="portal-empty">This feedback collection has no questions.</div>}
@@ -112,10 +127,10 @@ export default function Feedback() {
     </div>}
 
     {active?.showResponses && <div className="feedback-modal-backdrop" onMouseDown={closeForm}>
-      <div className="feedback-modal feedback-responses-modal" onMouseDown={e => e.stopPropagation()}>
+      <div className="feedback-modal feedback-responses-modal" role="dialog" aria-modal="true" aria-label="Feedback responses" onMouseDown={e => e.stopPropagation()}>
         <div className="feedback-responses-head"><div><span>COLLECTED RESPONSES</span><h2>{active.title}</h2><p>{responses.length} response{responses.length === 1 ? "" : "s"} captured.</p></div><button type="button" className="icon-btn" onClick={closeForm}><X /></button></div>
         {responses.length ? <div className="response-list">{responses.map((r, index) => { const answerEntries = Object.entries(r.answers || {}); return <article className="response-card" key={r._id || index}>
-          <div className="response-card-head"><div className="response-person"><span className="response-avatar"><UserRound size={17}/></span><div><strong>{r.anonymous ? "Anonymous response" : (r.member?.fullName || "Member response")}</strong><span>{r.member?.memberNumber || "Private member response"}</span></div></div><span className="response-time"><Clock3 size={14}/>{r.createdAt ? new Date(r.createdAt).toLocaleString() : "Submitted"}</span></div>
+          <div className="response-card-head"><div className="response-person"><span className="response-avatar"><UserRound size={17}/></span><div><strong>{r.anonymous ? "Anonymous response" : (r.member?.fullName || (r.respondentRole === "superadmin" ? "Super Admin response" : r.respondentRole === "admin" ? "Administrator response" : "Member response"))}</strong><span>{r.anonymous ? "Anonymous response" : (r.member?.memberNumber || (r.respondentRole === "superadmin" ? "Super Admin portal" : r.respondentRole === "admin" ? "Administrator portal" : "Member portal"))}</span></div></div><span className="response-time"><Clock3 size={14}/>{r.createdAt ? new Date(r.createdAt).toLocaleString() : "Submitted"}</span></div>
           <div className="response-answer-list">{answerEntries.length ? answerEntries.map(([qid, value]) => { const question = (active.questions || []).find(q => q.id === qid); return <div className="response-answer" key={qid}><span className="response-question"><MessageCircle size={14}/>{question?.label || qid}</span><p>{Array.isArray(value) ? value.join(", ") : String(value ?? "—")}</p></div>; }) : <p className="response-empty">No answer data recorded.</p>}</div>
         </article>; })}</div> : <div className="response-empty-state"><MessageCircle size={28}/><strong>No responses yet</strong><span>Member submissions will appear here in a clean, readable format.</span></div>}
       </div>

@@ -10,6 +10,7 @@ const feedbackQuestionSchema = new mongoose.Schema({
 
 const feedbackResponseSchema = new mongoose.Schema({
   member: { type: mongoose.Schema.Types.ObjectId, ref: "Member", default: null },
+  respondentRole: { type: String, enum: ["member", "admin", "superadmin"], default: "member" },
   anonymous: { type: Boolean, default: false },
   answers: { type: mongoose.Schema.Types.Mixed, default: {} },
   submittedAt: { type: Date, default: Date.now },

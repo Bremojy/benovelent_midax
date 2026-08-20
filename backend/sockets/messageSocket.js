@@ -177,6 +177,10 @@ module.exports = (io, socket) => {
     const caller = await resolveActor(callerUserId || socket.data.userId, callerRole || socket.data.role);
     if (!recipient || !caller) return;
     const normalizedType = callType === "video" ? "video" : "audio";
+    if (String(recipient.chatId) === String(caller.chatId)) {
+      socket.emit("call-error", { code: "SELF_CALL_BLOCKED", message: "Calling yourself is not available." });
+      return;
+    }
     const title = normalizedType === "video" ? "Incoming video call" : "Incoming audio call";
     const message = `${caller.user.fullName || caller.user.name || callerName || "A member"} is calling you.`;
     const callId = `${String(caller.user._id)}-${Date.now()}-${Math.random().toString(36).slice(2,8)}`;

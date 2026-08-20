@@ -233,3 +233,49 @@
 @media (max-width: 560px) {
   .dashboard-container { --dashboard-bottom-nav-height: 96px; }
 }
+
+/* Final shell/scroll hardening. Use the document as the mobile scroll container. */
+.dashboard-container {
+  overflow-x: clip !important;
+  overflow-y: visible !important;
+}
+
+.dashboard-content {
+  overflow: visible !important;
+  max-height: none !important;
+  min-height: 0 !important;
+  scrollbar-gutter: auto !important;
+}
+
+@media (max-width: 900px) {
+  .dashboard-container,
+  .dashboard-main,
+  .dashboard-container.dashboard-mobile-subpage .dashboard-main {
+    min-height: 100dvh !important;
+    height: auto !important;
+  }
+
+  .dashboard-main,
+  .dashboard-container.dashboard-mobile-subpage .dashboard-main {
+    padding-bottom: calc(92px + env(safe-area-inset-bottom)) !important;
+  }
+
+  .dashboard-content,
+  .dashboard-container.dashboard-mobile-subpage .dashboard-content,
+  .dashboard-container.dashboard-home-shell .dashboard-content {
+    overflow: visible !important;
+    max-height: none !important;
+    min-height: 0 !important;
+    padding-bottom: calc(108px + env(safe-area-inset-bottom)) !important;
+  }
+}
+
+@media (max-width: 560px) {
+  .dashboard-content,
+  .dashboard-container.dashboard-mobile-subpage .dashboard-content,
+  .dashboard-container.dashboard-home-shell .dashboard-content {
+    padding-left: 10px !important;
+    padding-right: 10px !important;
+    padding-bottom: calc(112px + env(safe-area-inset-bottom)) !important;
+  }
+}

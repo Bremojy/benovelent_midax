@@ -22,10 +22,9 @@ function DashboardLayout({ children }) {
 
   const isDashboardHome = location.pathname === basePath || location.pathname === `${basePath}/`;
   const mobileSubpage = !isDashboardHome;
-  // The mobile bottom dashboard dock belongs to the portal dashboard home only.
-  // Portal subpages use the topbar menu + drawer instead of placing dashboard
-  // navigation below their page content.
-  const mobileBottomNav = isMobile && isDashboardHome;
+  // Keep the dashboard dock visible on every authenticated mobile portal page.
+  // The hamburger opens a separate full navigation drawer when needed.
+  const mobileBottomNav = isMobile;
 
   useEffect(() => {
     const resize = () => {
@@ -66,7 +65,7 @@ function DashboardLayout({ children }) {
 
   return (
     <div className={`dashboard-container portal-role-${String((role || user?.role || "member").toLowerCase())} ${mobileSubpage ? "dashboard-mobile-subpage" : ""} ${mobileBottomNav ? "dashboard-home-shell" : ""}`}>
-      {isMobile && !mobileBottomNav && sidebarOpen && (
+      {isMobile && sidebarOpen && (
         <button
           type="button"
           className="dashboard-drawer-backdrop"
