@@ -21,6 +21,7 @@ import "./styles/feedback-pwa.css";
 import "./styles/v9-modern-forms.css";
 import "./styles/v11-responsive-hardening.css";
 import "./App.css";
+import "./styles/portal-shell-final.css";
 
 createRoot(
   document.getElementById("root")

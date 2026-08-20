@@ -47,24 +47,37 @@ function DashboardLayout({ children }) {
     setSidebarOpen(false);
   }, [isMobile]);
 
-  // Only lock the document while the mobile drawer is actually open. The
-  // persistent bottom navigation and all portal pages remain naturally scrollable.
+  // Lock document scrolling only while the mobile drawer is open.
+  // Normal portal pages, including every mobile sub-page, always use the
+  // document itself as the scroll container.
   useEffect(() => {
-    if (!isMobile || !sidebarOpen) return undefined;
+    const body = document.body;
+    body.classList.add("benevolent-portal-active");
+
+    if (!isMobile || !sidebarOpen) {
+      body.style.overflowY = "auto";
+      return () => {
+        body.classList.remove("benevolent-portal-active");
+      };
+    }
 
     const onKeyDown = (event) => {
       if (event.key === "Escape") setSidebarOpen(false);
     };
 
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    const previousOverflowY = body.style.overflowY;
+    body.style.overflowY = "hidden";
     window.addEventListener("keydown", onKeyDown);
 
     return () => {
-      document.body.style.overflow = previousOverflow;
+      body.style.overflowY = previousOverflowY || "auto";
       window.removeEventListener("keydown", onKeyDown);
     };
   }, [isMobile, sidebarOpen]);
+
+  useEffect(() => () => {
+    document.body.classList.remove("benevolent-portal-active");
+  }, []);
 
   const goHome = () => navigate(basePath);
   const portalRole = String(role || user?.role || "member").toLowerCase();
