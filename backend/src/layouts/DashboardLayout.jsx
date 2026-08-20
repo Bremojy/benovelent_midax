@@ -94,6 +94,11 @@ function DashboardLayout({ children }) {
         <main className="dashboard-content">
           <div className="dashboard-page">{children}</div>
         </main>
+        <footer className="dashboard-portal-footer" aria-label="Portal footer">
+          <span>Benevolent MIDAX</span>
+          <span>Secure member portal</span>
+          <span>v{import.meta.env.VITE_APP_VERSION || "12.0.0"}</span>
+        </footer>
       </div>
     </div>
   );
