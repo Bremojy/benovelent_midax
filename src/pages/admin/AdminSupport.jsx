@@ -213,7 +213,7 @@ export default function AdminSupport() {
               <label>Message</label>
               <textarea rows="7" value={form.message} onChange={e => setForm({ ...form, message: e.target.value })} placeholder={broadcast ? "Write the message for all members..." : "Write the message to the member..."} />
             </div>
-            <button className="portal-btn" disabled={sending}>{sending ? "Sending..." : broadcast ? "Send Broadcast" : "Send Support Message"}</button>
+            <button className="portal-btn" type="submit" disabled={sending}>{sending ? "Sending..." : broadcast ? "Send Broadcast" : "Send Support Message"}</button>
           </form>
           <p style={{ marginTop: 12, color: "#64748b" }}>
             Broadcasts can create in-app notifications and send email notifications. SMS is optional and stays off until you enable it.
@@ -247,7 +247,7 @@ export default function AdminSupport() {
                 </div>
               ))}
             </div>
-            <button className="portal-btn primary" disabled={inviting}>{inviting ? "Creating..." : "Create member invite"}</button>
+            <button className="portal-btn primary" type="submit" disabled={inviting}>{inviting ? "Creating..." : "Create member invite"}</button>
           </form>
         </section>
 

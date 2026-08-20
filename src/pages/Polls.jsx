@@ -161,7 +161,7 @@ export default function Polls({ mode = "member" }) {
                 : "Have your say on Benovelent Midax decisions and community matters."}
             </p>
           </div>
-          <button className="poll-refresh" onClick={load} disabled={loading}>
+          <button type="button" className="poll-refresh" onClick={load} disabled={loading}>
             <RefreshCw size={17} /> Refresh
           </button>
         </header>

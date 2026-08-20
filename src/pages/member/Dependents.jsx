@@ -112,7 +112,7 @@ export default function Dependents() {
               <div className="support-list">{dependents.map(d => (
                 <div className="support-item" key={d._id}>
                   <div><strong>{d.fullName}</strong><span>{d.relationship} {d.verified ? "• Verified" : "• Pending verification"}</span></div>
-                  <div className="support-item-right"><button className="support-mini-button" onClick={()=>edit(d)}>Edit</button><button className="support-mini-button danger" onClick={()=>remove(d._id)}>Remove</button></div>
+                  <div className="support-item-right"><button type="button" className="support-mini-button" onClick={()=>edit(d)}>Edit</button><button type="button" className="support-mini-button danger" onClick={()=>remove(d._id)}>Remove</button></div>
                 </div>
               ))}</div>}
           </section>

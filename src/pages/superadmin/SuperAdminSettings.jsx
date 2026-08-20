@@ -430,11 +430,11 @@ export default function SuperAdminSettings() {
             <p>See what the public website contains, then edit pages, leaders, gallery images and theme settings from one place.</p>
           </div>
           <div className="portal-actions">
-            <button className={activeTab === "website" ? "portal-btn" : "portal-btn light"} onClick={() => setActiveTab("website")} type="button">Website content</button>
-            <button className={activeTab === "carousel" ? "portal-btn" : "portal-btn light"} onClick={() => setActiveTab("carousel")} type="button">Carousel</button>
-            <button className={activeTab === "leaders" ? "portal-btn" : "portal-btn light"} onClick={() => setActiveTab("leaders")} type="button">Leaders</button>
-            <button className={activeTab === "gallery" ? "portal-btn" : "portal-btn light"} onClick={() => setActiveTab("gallery")} type="button">Gallery</button>
-            <button className={activeTab === "settings" ? "portal-btn" : "portal-btn light"} onClick={() => setActiveTab("settings")} type="button">Theme</button>
+            <button type="button" className={activeTab === "website" ? "portal-btn" : "portal-btn light"} onClick={() => setActiveTab("website")} type="button">Website content</button>
+            <button type="button" className={activeTab === "carousel" ? "portal-btn" : "portal-btn light"} onClick={() => setActiveTab("carousel")} type="button">Carousel</button>
+            <button type="button" className={activeTab === "leaders" ? "portal-btn" : "portal-btn light"} onClick={() => setActiveTab("leaders")} type="button">Leaders</button>
+            <button type="button" className={activeTab === "gallery" ? "portal-btn" : "portal-btn light"} onClick={() => setActiveTab("gallery")} type="button">Gallery</button>
+            <button type="button" className={activeTab === "settings" ? "portal-btn" : "portal-btn light"} onClick={() => setActiveTab("settings")} type="button">Theme</button>
           </div>
         </header>
 
@@ -503,7 +503,7 @@ export default function SuperAdminSettings() {
                     </div>
 
                     <div className="portal-actions">
-                      <button className="portal-btn" onClick={() => saveSection(item.key)} disabled={savingKey === item.key} type="button">
+                      <button type="button" className="portal-btn" onClick={() => saveSection(item.key)} disabled={savingKey === item.key} type="button">
                         <Save size={16} /> {savingKey === item.key ? "Saving..." : "Save section"}
                       </button>
                     </div>

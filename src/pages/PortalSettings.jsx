@@ -346,7 +346,7 @@ const saveAppearance = async (value) => {
                 )}
               </div>
 
-              <button className="settings-primary-btn" disabled={savingProfile}>
+              <button className="settings-primary-btn" type="submit" disabled={savingProfile}>
                 <Save size={17} />
                 {savingProfile ? "Saving..." : "Save profile"}
               </button>

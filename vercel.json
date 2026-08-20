@@ -59,5 +59,6 @@
       "src": "/(.*)",
       "dest": "/index.html"
     }
-  ]
+  ],
+  "installCommand": "npm ci --include=dev --no-audit --no-fund"
 }

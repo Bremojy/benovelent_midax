@@ -250,7 +250,7 @@ export default function Profile() {
             <div className="profile-status-box">
               <strong>{pct}% complete</strong>
               <p>{missing.length ? `Still missing: ${missing.join(", ")}` : "You are ready. Admins can see your full profile instantly."}</p>
-              <button className="portal-btn" disabled={saving}>{saving ? "Saving..." : "Save profile"}</button>
+              <button className="portal-btn" type="submit" disabled={saving}>{saving ? "Saving..." : "Save profile"}</button>
             </div>
           </section>
         </form>

@@ -233,9 +233,9 @@ export default function AdminFinance() {
         <header className="portal-module-header">
           <div><span>FINANCIAL CONTROL</span><h1>Accounts</h1><p>Live scheme accounts: contributions, approved transactions, support disbursements and the current ledger.</p></div>
           <div className="portal-actions">
-            <button className="portal-btn secondary" onClick={startCreate}><Plus size={16} /> New transaction</button>
-            <button className="portal-btn secondary" onClick={printLedger} disabled={!ledger}><span>Print ledger</span></button>
-            <button className="portal-btn" onClick={load} disabled={loading}>{loading ? "Refreshing..." : "Refresh"}</button>
+            <button type="button" className="portal-btn secondary" onClick={startCreate}><Plus size={16} /> New transaction</button>
+            <button type="button" className="portal-btn secondary" onClick={printLedger} disabled={!ledger}><span>Print ledger</span></button>
+            <button type="button" className="portal-btn" onClick={load} disabled={loading}>{loading ? "Refreshing..." : "Refresh"}</button>
           </div>
         </header>
 
@@ -322,7 +322,7 @@ export default function AdminFinance() {
           <h2>Recent Transactions</h2>
           {sortedTransactions.length === 0 ? <div className="portal-empty">No finance transactions returned.</div> :
             <div className="portal-table-wrap"><table className="portal-table"><thead><tr><th>Date</th><th>Type</th><th>Description</th><th>Amount</th><th>Status</th><th>Actions</th></tr></thead><tbody>
-              {sortedTransactions.slice(0, 30).map((x, i) => <tr key={x._id || i}><td>{date(x.transactionDate || x.createdAt)}</td><td>{x.type || "—"}</td><td>{x.description || x.reference || "—"}</td><td>{number(x.amount)}</td><td><span className="portal-badge">{x.status || "Recorded"}</span></td><td><div className="portal-actions"><button className="portal-btn secondary" onClick={() => startEdit(x)}><Edit3 size={14} /> Edit</button><button className="portal-btn danger" onClick={() => removeTransaction(x)}><Trash2 size={14} /> Delete</button></div></td></tr>)}
+              {sortedTransactions.slice(0, 30).map((x, i) => <tr key={x._id || i}><td>{date(x.transactionDate || x.createdAt)}</td><td>{x.type || "—"}</td><td>{x.description || x.reference || "—"}</td><td>{number(x.amount)}</td><td><span className="portal-badge">{x.status || "Recorded"}</span></td><td><div className="portal-actions"><button type="button" className="portal-btn secondary" onClick={() => startEdit(x)}><Edit3 size={14} /> Edit</button><button type="button" className="portal-btn danger" onClick={() => removeTransaction(x)}><Trash2 size={14} /> Delete</button></div></td></tr>)}
             </tbody></table></div>}
         </section>
 
