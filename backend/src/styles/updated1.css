@@ -1,0 +1,169 @@
+/* Updated1: global responsive polish and error/loading states. */
+:root {
+  --ui-radius: 18px;
+  --ui-shadow: 0 12px 36px rgba(37, 37, 37, .08);
+}
+
+html {
+  scroll-padding-top: 84px;
+}
+
+body {
+  min-width: 320px;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+:where(button, a, input, select, textarea) {
+  -webkit-tap-highlight-color: transparent;
+}
+
+:where(button, a) {
+  touch-action: manipulation;
+}
+
+:focus-visible {
+  outline: 3px solid rgba(232, 117, 26, .45);
+  outline-offset: 3px;
+}
+
+.page-transition-shell {
+  min-height: 100%;
+}
+
+.app-error-screen {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background:
+    radial-gradient(circle at top right, rgba(232,117,26,.16), transparent 35%),
+    #f6f7f9;
+}
+
+.app-error-card {
+  width: min(100%, 620px);
+  padding: clamp(24px, 5vw, 44px);
+  border-radius: 24px;
+  background: #fff;
+  box-shadow: var(--ui-shadow);
+  border: 1px solid rgba(37,37,37,.07);
+}
+
+.app-error-icon {
+  width: 56px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  border-radius: 16px;
+  background: rgba(232,117,26,.12);
+  color: var(--orange);
+  margin-bottom: 18px;
+}
+
+.app-error-card h1 {
+  margin: 6px 0 12px;
+  font-size: clamp(2rem, 6vw, 3.25rem);
+}
+
+.app-error-card p {
+  margin-bottom: 18px;
+}
+
+.app-error-card details {
+  margin: 16px 0 20px;
+  overflow-wrap: anywhere;
+}
+
+.app-error-card code {
+  display: block;
+  margin-top: 10px;
+  padding: 12px;
+  border-radius: 12px;
+  background: #f5f5f3;
+  font-size: .82rem;
+  white-space: pre-wrap;
+}
+
+.app-error-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.app-error-actions button {
+  min-height: 46px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--orange);
+  color: #fff;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.app-error-actions .secondary {
+  background: #252525;
+}
+
+@media (max-width: 700px) {
+  .navbar-container {
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+  }
+
+  .hero {
+    min-height: 760px !important;
+    background-position: center;
+  }
+
+  .hero h1 {
+    font-size: clamp(2.2rem, 12vw, 3.2rem) !important;
+  }
+
+  .hero-description {
+    font-size: 1rem !important;
+    line-height: 1.65;
+  }
+
+  .hero-buttons {
+    width: 100%;
+  }
+
+  .hero-buttons > * {
+    flex: 1 1 100%;
+  }
+
+  .dashboard-content,
+  .admin-section {
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+  }
+
+  .admin-header {
+    padding-left: 74px !important;
+    padding-right: 16px !important;
+  }
+
+  .table-responsive,
+  .data-table-wrap,
+  .admin-table-wrap {
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  input, select, textarea {
+    font-size: 16px !important; /* avoids iOS zoom */
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-pulse-transition {
+    display: none !important;
+  }
+}

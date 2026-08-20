@@ -1,0 +1,117 @@
+.notifications-page{
+
+max-width:900px;
+
+margin:auto;
+
+}
+
+.notifications-page h1{
+
+margin-bottom:30px;
+
+font-size:34px;
+
+}
+
+.notification-card{
+
+display:flex;
+
+gap:20px;
+
+background:white;
+
+padding:22px;
+
+border-radius:18px;
+
+margin-bottom:20px;
+
+box-shadow:0 10px 25px rgba(0,0,0,.06);
+
+transition:.3s;
+
+}
+
+.notification-card:hover{
+
+transform:translateY(-4px);
+
+}
+
+.notification-icon{
+
+width:55px;
+
+height:55px;
+
+border-radius:50%;
+
+background:#fff2e7;
+
+display:flex;
+
+justify-content:center;
+
+align-items:center;
+
+color:#ff7a00;
+
+}
+
+.notification-content{
+
+flex:1;
+
+}
+
+.notification-content h4{
+
+margin:0;
+
+font-size:18px;
+
+}
+
+.notification-content p{
+
+margin:8px 0;
+
+color:#666;
+
+line-height:1.5;
+
+}
+
+.notification-content span{
+
+font-size:13px;
+
+color:#999;
+
+}
+
+@media(max-width:900px){
+
+.notification-card{
+
+padding:18px;
+
+}
+
+}
+.notifications-summary{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:14px 16px;border-radius:16px;background:#fafafa;border:1px solid #ececec;margin-bottom:16px}
+.notifications-summary span{display:block;font-size:11px;font-weight:800;letter-spacing:1.3px;color:#777}
+.notifications-summary strong{display:block;font-size:30px;color:#202428}
+.notifications-list{display:grid;gap:12px}
+.notification-card{display:flex;align-items:flex-start;gap:14px;padding:14px;border-radius:16px;border:1px solid #ececec;background:#fff}
+.notification-card.history{opacity:.92}
+.notification-icon{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;background:#fff3e8;color:#ff7a00;flex-shrink:0}
+.notification-icon.muted{background:#f3f5f7;color:#667085}
+.notification-content{flex:1}
+.notification-content h3{margin:0 0 5px;font-size:15px;color:#202428}
+.notification-content p{margin:0;color:#5f6670;line-height:1.5}
+.notification-content small{display:block;margin-top:6px;color:#8a9097}
+.notifications-history-header{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px}
+@media(max-width:760px){.notifications-summary,.notifications-history-header,.notification-card{flex-direction:column;align-items:flex-start}.notifications-summary strong{font-size:24px}}

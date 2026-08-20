@@ -1,0 +1,31 @@
+{
+  "name": "Benovelent MIDAX",
+  "short_name": "MIDAX",
+  "start_url": "/?source=pwa",
+  "id": "/?app=benovelent-midax",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0d182a",
+  "theme_color": "#ff8b14",
+  "description": "Benovelent MIDAX community and member support portal.",
+  "categories": [
+    "social",
+    "lifestyle",
+    "productivity"
+  ],
+  "icons": [
+    {
+      "src": "/pwa-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/pwa-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

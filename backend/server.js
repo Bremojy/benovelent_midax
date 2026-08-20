@@ -123,6 +123,17 @@ app.use("/uploads", express.static(uploadRoot, {
 app.use("/documents", express.static(documentRoot));
 app.use("/documents", express.static(path.join(__dirname, "..", "public", "documents")));
 
+// Serve bundled frontend/public assets from the API host as a safe fallback.
+// This prevents requests such as /about-welcome.svg from falling into the API 404 handler
+// when the frontend and backend are hosted behind the same origin or proxy.
+const publicRoot = path.join(__dirname, "..", "public");
+app.use(express.static(publicRoot, {
+    index: false,
+    maxAge: process.env.NODE_ENV === "production" ? "1d" : 0,
+    etag: true,
+    lastModified: true,
+}));
+
 app.get("/documents/:filename", (req, res, next) => {
     const filename = String(req.params.filename || "").trim();
     if (!filename) {

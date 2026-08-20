@@ -1,0 +1,381 @@
+/* ========================================
+   TOPBAR
+======================================== */
+
+.dashboard-topbar {
+  height: 72px;
+
+background:rgba(255,255,255,.82);
+
+backdrop-filter:blur(18px);
+
+
+  border-bottom: 1px solid #e8e8e8;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 30px;
+  position: sticky;
+  top: 0;
+  z-index: 900;
+}
+
+/* LEFT */
+
+.topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.menu-btn {
+  width: 42px;
+  height: 42px;
+  border: none;
+  border-radius: 10px;
+  background: #f3f3f3;
+  cursor: pointer;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.menu-btn:hover {
+  background: #ff7a00;
+  color: white;
+}
+
+.search-box{
+
+width:420px;
+
+height:48px;
+
+border-radius:50px;
+
+background:#f5f5f5;
+
+}
+
+.search-box input {
+  width: 100%;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 15px;
+}
+
+/* RIGHT */
+
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.icon-btn {
+  position: relative;
+  width: 42px;
+  height: 42px;
+  border: none;
+  border-radius: 10px;
+  background: #f3f3f3;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+}
+
+.icon-btn:hover {
+  background: #ff7a00;
+  color: white;
+}
+
+.badge {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  min-width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #ff3b30;
+  color: white;
+  font-size: 11px;
+  font-weight: 600;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.user-box {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.avatar{
+
+width:48px;
+
+height:48px;
+
+border-radius:50%;
+
+background:linear-gradient(
+135deg,
+#ff7a00,
+#ff9800
+);
+
+font-size:19px;
+
+font-weight:700;
+
+color:white;
+
+box-shadow:0 10px 20px rgba(255,122,0,.3);
+
+}
+
+.user-info h4 {
+  margin: 0;
+  font-size: 15px;
+  color: #333;
+}
+
+.user-info p {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: #777;
+}
+
+/* MOBILE */
+
+@media (max-width: 900px) {
+  .dashboard-topbar {
+    padding: 0 16px;
+  }
+
+  .search-box {
+    display: none;
+  }
+
+  .user-info {
+    display: none;
+  }
+}
+
+.online-dot{
+
+position:absolute;
+
+bottom:2px;
+
+right:2px;
+
+width:12px;
+
+height:12px;
+
+border-radius:50%;
+
+background:#22c55e;
+
+border:2px solid white;
+
+}
+
+.avatar{
+
+position:relative;
+
+}
+
+.user-box{
+
+cursor:pointer;
+
+transition:.3s;
+
+}
+
+.user-box:hover{
+
+transform:translateY(-2px);
+
+}
+
+.search-box{
+
+max-width:420px;
+
+width:100%;
+
+}
+
+.search-box input::placeholder{
+
+color:#999;
+
+}
+
+.icon-btn{
+
+transition:.25s;
+
+}
+
+.icon-btn:hover{
+
+transform:translateY(-2px);
+
+}
+.avatar img{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  border-radius:50%;
+  display:block;
+}
+.dashboard-topbar .badge{
+  background:var(--portal-accent,#ff7a00);
+}
+.icon-btn:hover,.menu-btn:hover{
+  border-color:var(--portal-accent,#ff7a00);
+}
+
+/* ========================================
+   ACCOUNT MENU / LOGOUT
+======================================== */
+.user-menu {
+  position: relative;
+}
+
+.user-box {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font: inherit;
+  text-align: left;
+}
+
+.profile-dropdown {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 10px);
+  min-width: 190px;
+  padding: 8px;
+  border: 1px solid rgba(0,0,0,.08);
+  border-radius: 16px;
+  background: rgba(255,255,255,.98);
+  box-shadow: 0 18px 45px rgba(0,0,0,.16);
+  z-index: 1500;
+}
+
+.profile-dropdown button {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  border-radius: 11px;
+  padding: 11px 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  color: #333;
+  font-weight: 600;
+  text-align: left;
+}
+
+.profile-dropdown button:hover {
+  background: rgba(255,122,0,.10);
+  color: #d96600;
+}
+
+.profile-dropdown .profile-logout {
+  color: #dc2626;
+}
+
+.profile-dropdown .profile-logout:hover {
+  background: rgba(220,38,38,.08);
+  color: #b91c1c;
+}
+
+@media (max-width: 900px) {
+  .profile-dropdown {
+    right: -4px;
+    min-width: 175px;
+  }
+}
+
+
+.home-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  height: 42px;
+  padding: 0 16px;
+  border: none;
+  border-radius: 12px;
+  background: #f3f3f3;
+  color: #222;
+  cursor: pointer;
+  font-weight: 700;
+  transition: 0.25s;
+}
+
+.home-btn:hover {
+  transform: translateY(-2px);
+  background: #ff7a00;
+  color: #fff;
+}
+
+@media (max-width: 900px) {
+  .home-btn {
+    background: rgba(255, 122, 0, 0.12);
+    color: #ff7a00;
+    border: 1px solid rgba(255, 122, 0, 0.18);
+    height: 40px;
+    padding: 0 14px;
+    border-radius: 999px;
+  }
+
+  .home-btn span {
+    display: inline;
+  }
+}
+
+/* V7 floating command bar */
+.dashboard-topbar{height:78px;padding:0 26px;background:rgba(255,255,255,.72);border-bottom:1px solid rgba(15,23,42,.07);box-shadow:0 10px 30px rgba(15,23,42,.035)}
+.topbar-left{gap:14px}.menu-btn,.home-btn,.icon-btn{border:1px solid rgba(15,23,42,.06);background:rgba(248,250,252,.94);box-shadow:0 8px 18px rgba(15,23,42,.045)}
+.search-box{display:flex;align-items:center;gap:10px;padding:0 15px;height:44px;border:1px solid rgba(15,23,42,.06);background:rgba(248,250,252,.92);box-shadow:inset 0 1px 0 rgba(255,255,255,.75)}
+.search-box input{padding:0;font-size:13px}.topbar-right{gap:10px}.icon-btn{width:44px;height:44px;border-radius:13px}.avatar{width:45px;height:45px;box-shadow:0 10px 20px rgba(15,23,42,.12)}
+.dashboard-container.portal-role-superadmin .icon-btn:hover,.dashboard-container.portal-role-superadmin .menu-btn:hover{background:#f2eaff;color:#6d28d9}.dashboard-container.portal-role-member .icon-btn:hover,.dashboard-container.portal-role-member .menu-btn:hover{background:#eaf9f0;color:#159447}
+@media(max-width:900px){.dashboard-topbar{height:70px;padding:0 14px}.topbar-left{gap:8px}.icon-btn{width:40px;height:40px}.user-box{max-width:44px}.avatar{width:40px;height:40px}}
+
+
+/* V9 install action */
+.install-topbar-btn{width:auto;min-width:86px;padding:0 12px;gap:6px;font-weight:800}
+@media(max-width:560px){.dashboard-topbar{padding:0 10px;gap:6px}.topbar-left,.topbar-right{gap:6px;min-width:0}.portal-website-home-btn{display:none!important}.icon-btn.install-topbar-btn{width:40px;min-width:40px;padding:0;border-radius:12px}.icon-btn.install-topbar-btn span{display:none}.topbar-right{margin-left:auto}.user-box{max-width:40px}}
+
+/* V12 portal identity and compact laptop behavior. */
+.dashboard-container .dashboard-topbar{
+  box-shadow:0 8px 26px var(--portal-soft,rgba(15,23,42,.06));
+}
+
+.dashboard-container .portal-website-home-btn:hover,
+.dashboard-container .menu-btn:hover,
+.dashboard-container .icon-btn:hover{
+  color:var(--portal-accent,#ff7a00);
+  border-color:color-mix(in srgb, var(--portal-accent,#ff7a00) 45%, transparent);
+  background:var(--portal-soft,rgba(255,122,0,.10));
+}
+
+@media(max-width:1200px) and (min-width:901px){
+  .dashboard-topbar{padding:0 18px}
+  .topbar-left{gap:9px}
+  .topbar-right{gap:7px}
+  .search-box{max-width:300px}
+  .user-info{max-width:145px}
+  .user-info h4,.user-info p{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+}

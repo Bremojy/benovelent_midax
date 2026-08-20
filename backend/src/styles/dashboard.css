@@ -1,0 +1,210 @@
+/* ===========================
+   DASHBOARD
+=========================== */
+
+.dashboard-container {
+    display: flex;
+    min-height: 100vh;
+    background: #f5f7fb;
+    position: relative;
+}
+
+.dashboard-main {
+    flex: 1;
+    margin-left: 270px;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+.dashboard-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px;
+    padding-bottom: 24px;
+}
+
+.dashboard-page {
+    max-width: 1450px;
+    width: 100%;
+    margin: auto;
+    position: relative;
+}
+
+.dashboard-content::-webkit-scrollbar {
+    width: 8px;
+}
+
+.dashboard-content::-webkit-scrollbar-thumb {
+    background: #d7d7d7;
+    border-radius: 20px;
+}
+
+.dashboard-content::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+@media (max-width: 900px) {
+  .dashboard-main {
+    margin-left: 0;
+    padding-bottom: 84px;
+  }
+
+  .dashboard-content {
+    padding: 16px;
+    padding-bottom: 96px;
+  }
+}
+
+.dashboard-container {
+    position: relative;
+    background:
+      radial-gradient(circle at 12% 8%, rgba(255,122,0,.07), transparent 28%),
+      radial-gradient(circle at 92% 86%, rgba(80,90,100,.07), transparent 30%),
+      #f5f7fb;
+}
+
+.dashboard-page {
+    position: relative;
+}
+
+:root{
+  --portal-accent:#ff7a00;
+  --portal-accent-soft:#ff7a0018;
+}
+.dashboard-container .portal-btn,
+.dashboard-container .primary-btn{
+  background:var(--portal-accent,#ff7a00);
+}
+.dashboard-container a:focus-visible,
+.dashboard-container button:focus-visible,
+.dashboard-container input:focus-visible,
+.dashboard-container select:focus-visible,
+.dashboard-container textarea:focus-visible{
+  outline:3px solid var(--portal-accent-soft,#ff7a0018);
+  outline-offset:2px;
+}
+
+html[data-appearance="dark"] .dashboard-container{
+  background:
+    radial-gradient(circle at 12% 8%, rgba(255,122,0,.10), transparent 28%),
+    radial-gradient(circle at 92% 86%, rgba(120,130,140,.10), transparent 30%),
+    #111318;
+}
+html[data-appearance="dark"] .dashboard-content,
+html[data-appearance="dark"] .dashboard-main{
+  color:#eef0f3;
+}
+html[data-appearance="dark"] .portal-panel,
+html[data-appearance="dark"] .portal-module-header h1,
+html[data-appearance="dark"] .portal-stat,
+html[data-appearance="dark"] .settings-panel,
+html[data-appearance="dark"] .portal-settings-header{
+  color:#eef0f3;
+  background:#191c21;
+  border-color:#2a2f37;
+}
+html[data-appearance="dark"] .portal-table th,
+html[data-appearance="dark"] .portal-table td,
+html[data-appearance="dark"] .portal-module-header p,
+html[data-appearance="dark"] .portal-stat span{
+  color:#b8c0cc;
+}
+html[data-appearance="dark"] .portal-empty{
+  color:#b8c0cc;
+}
+html[data-appearance="dark"] .portal-table th,
+html[data-appearance="dark"] .portal-table td{
+  border-bottom-color:#2b313a;
+}
+html[data-appearance="dark"] .portal-field input,
+html[data-appearance="dark"] .portal-field select,
+html[data-appearance="dark"] .portal-field textarea,
+html[data-appearance="dark"] .settings-field input,
+html[data-appearance="dark"] .settings-field textarea{
+  background:#11151a;
+  border-color:#2c323b;
+  color:#eef0f3;
+}
+
+
+@media (max-width: 900px) {
+}
+
+
+/* Extra responsiveness for narrow screens */
+@media (max-width: 1200px) {
+  .dashboard-content {
+    padding: 20px;
+  }
+}
+
+@media (max-width: 900px) {
+  .dashboard-page {
+    max-width: 100%;
+  }
+
+  .dashboard-container .portal-panel,
+  .dashboard-container .settings-panel,
+  .dashboard-container .portal-table {
+    border-radius: 18px;
+  }
+
+  .dashboard-container .portal-table-wrapper,
+  .dashboard-container .table-responsive {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+@media (max-width: 560px) {
+  .dashboard-content {
+    padding: 12px;
+    padding-bottom: 88px;
+  }
+
+  .dashboard-container .portal-btn,
+  .dashboard-container .primary-btn,
+  .dashboard-container button {
+    max-width: 100%;
+  }
+}
+
+.dashboard-container{--portal-accent:#ff8b14;--portal-accent-2:#ff6b00;--portal-soft:rgba(255,139,20,.10)}.portal-role-superadmin{--portal-accent:#6d28d9;--portal-accent-2:#4c1d95;--portal-soft:rgba(109,40,217,.10)}.portal-role-admin{--portal-accent:#ff7a00;--portal-accent-2:#d95f00}.portal-role-member{--portal-accent:#159447;--portal-accent-2:#0f6f35;--portal-soft:rgba(21,148,71,.10)}.dashboard-container .dashboard-topbar{border-bottom:1px solid rgba(20,30,45,.08);box-shadow:0 8px 28px rgba(16,24,40,.045)}.dashboard-container .icon-btn:hover,.dashboard-container .menu-btn:hover,.dashboard-container .home-btn:hover{color:var(--portal-accent);border-color:var(--portal-accent)}.dashboard-container .portal-btn,.dashboard-container .primary-btn{background:linear-gradient(135deg,var(--portal-accent),var(--portal-accent-2));box-shadow:0 10px 24px var(--portal-soft)}.dashboard-container .admin-stat-card,.dashboard-container .admin-overview-card,.dashboard-container .superadmin-panel,.dashboard-container .superadmin-live-overview,.dashboard-container .profile-completion-card{border-color:rgba(15,23,42,.08);box-shadow:0 12px 32px rgba(16,24,40,.055)}.install-topbar-btn{position:relative}.install-topbar-btn::after{content:"";position:absolute;inset:-3px;border:1px solid var(--portal-accent);border-radius:inherit;opacity:.18;pointer-events:none}
+
+/* V7 global portal canvas */
+.dashboard-content{background:linear-gradient(180deg,rgba(248,250,252,.88),rgba(245,247,251,.98));}
+.dashboard-container.portal-role-superadmin{background:radial-gradient(circle at 10% 5%,rgba(124,58,237,.08),transparent 26%),radial-gradient(circle at 90% 90%,rgba(168,85,247,.06),transparent 28%),#f6f3fa}
+.dashboard-container.portal-role-member{background:radial-gradient(circle at 10% 5%,rgba(34,167,97,.08),transparent 28%),radial-gradient(circle at 92% 86%,rgba(86,182,120,.05),transparent 30%),#f4f8f5}
+.dashboard-container.portal-role-admin{background:radial-gradient(circle at 12% 8%,rgba(255,122,0,.08),transparent 28%),radial-gradient(circle at 92% 86%,rgba(255,172,87,.06),transparent 30%),#f5f7fb}
+.dashboard-content{scrollbar-width:thin;scrollbar-color:rgba(100,116,139,.28) transparent}
+
+/* V2: always-available public website home */
+.portal-website-home-btn{display:inline-flex;align-items:center;gap:7px;border:1px solid rgba(148,163,184,.22);background:rgba(255,255,255,.72);color:inherit;border-radius:10px;padding:8px 10px;font-weight:700;cursor:pointer;white-space:nowrap}
+.portal-website-home-btn:hover{transform:translateY(-1px)}
+@media(max-width:700px){.portal-website-home-btn span{display:none}.portal-website-home-btn{padding:9px}.dashboard-topbar .search-box{display:none}}
+
+
+/* V9: mobile portal navigation exists only on portal home. Other portal pages use an overlay drawer. */
+@media (max-width:900px){.dashboard-home-shell .dashboard-main{padding-bottom:84px}.dashboard-mobile-subpage .dashboard-main{padding-bottom:0}.dashboard-home-shell .dashboard-content{padding-bottom:96px}.dashboard-mobile-subpage .dashboard-content{padding-bottom:24px}}
+
+
+@media (max-width: 900px) {
+  .dashboard-main { width: 100%; min-width: 0; }
+  .dashboard-content { width: 100%; overflow-x: clip; }
+  .dashboard-page { overflow-wrap: anywhere; }
+}
+@media (max-width: 640px) {
+  .dashboard-container .portal-panel, .dashboard-container .settings-panel, .dashboard-container .admin-stat-card, .dashboard-container .admin-overview-card, .dashboard-container .superadmin-panel { padding: 14px !important; }
+  .dashboard-container .portal-table-wrapper, .dashboard-container .table-responsive { max-width: 100%; }
+}
+
+
+/* Cross-device shell guard: page content never sits beneath the persistent sidebar/topbar/mobile dock. */
+.dashboard-container{--dashboard-nav-space:270px;min-width:0;overflow-x:hidden}
+.dashboard-main{min-width:0;width:calc(100% - var(--dashboard-nav-space));max-width:calc(100vw - var(--dashboard-nav-space))}
+.dashboard-content{min-width:0;overflow-x:hidden;scrollbar-gutter:stable;padding-bottom:clamp(32px,4vw,56px)}
+.dashboard-page{min-width:0;max-width:1450px;box-sizing:border-box}
+@media (max-width:1200px){.dashboard-main{width:calc(100% - 250px);max-width:calc(100vw - 250px)}}
+@media (max-width:900px){.dashboard-container{--mobile-dock-space:92px}.dashboard-main{width:100%;max-width:100%;margin-left:0;padding-bottom:var(--mobile-dock-space)}.dashboard-content{padding-bottom:calc(var(--mobile-dock-space) + env(safe-area-inset-bottom))}.dashboard-page{width:100%;max-width:none}}
+@media (max-width:560px){.dashboard-content{padding-left:10px!important;padding-right:10px!important;padding-bottom:calc(96px + env(safe-area-inset-bottom))}}

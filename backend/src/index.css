@@ -1,0 +1,107 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap');
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  --orange: #e8751a;
+  --orange-dark: #c75d0d;
+  --dark: #252525;
+  --grey: #6b6b6b;
+  --light-grey: #f5f5f3;
+  --white: #ffffff;
+}
+
+body {
+  font-family: "DM Sans", sans-serif;
+  color: var(--dark);
+  background: var(--white);
+}
+
+a {
+  text-decoration: none;
+  color: inherit;
+}
+
+button,
+input,
+textarea {
+  font-family: inherit;
+}
+
+.section {
+  padding: 100px 0;
+}
+
+.section-container {
+  width: 90%;
+  max-width: 1200px;
+  margin: auto;
+}
+
+.section-label {
+  color: var(--orange);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  margin-bottom: 15px;
+}
+
+h1,
+h2,
+h3 {
+  font-family: "Playfair Display", serif;
+}
+
+h2 {
+  font-size: 42px;
+  line-height: 1.2;
+}
+
+p {
+  line-height: 1.8;
+  color: var(--grey);
+}
+
+/* Mobile-width hardening: prevent fixed desktop assets/cards from widening the viewport. */
+html, body, #root { max-width:100%; overflow-x:hidden; }
+img, video, canvas, svg { max-width:100%; }
+button, input, select, textarea { max-width:100%; }
+.dashboard-container, .dashboard-main, .dashboard-content, .dashboard-page { min-width:0; max-width:100%; }
+@media (max-width: 900px){
+  .section-container { width:calc(100% - 28px); max-width:100%; }
+  .hero-content { margin-left:5%; margin-right:5%; }
+  .hero h1 { font-size:clamp(2.2rem,10vw,3.4rem); }
+  .hero-arrow { width:46px; height:46px; }
+  .hero-arrow-left { left:12px; }
+  .hero-arrow-right { right:12px; }
+}
+@media (max-width:560px){
+  .dashboard-content { width:100%; min-width:0; }
+  .portal-panel, .portal-module, .admin-members-page { max-width:100%; min-width:0; }
+}
+
+
+/* V10–V15 responsive foundation */
+html, body, #root { max-width: 100%; min-width: 0; }
+body { overflow-x: hidden; }
+img, video, canvas, svg { max-width: 100%; }
+button, input, select, textarea { font: inherit; }
+button, [role="button"] { min-height: 40px; }
+:focus-visible { outline: 3px solid rgba(255,122,0,.35); outline-offset: 3px; }
+@media (max-width: 900px) {
+  .dashboard-content, .dashboard-page, .portal-module, .portal-panel, .admin-page, .superadmin-page { min-width: 0; }
+  .dashboard-page { width: 100%; }
+}
+@media (max-width: 560px) {
+  h1 { font-size: clamp(1.55rem, 8vw, 2.15rem); }
+  h2 { font-size: clamp(1.25rem, 6vw, 1.75rem); }
+  .dashboard-content { padding-left: 10px; padding-right: 10px; }
+  .portal-btn, .primary-btn, .secondary-btn, .danger-btn { min-height: 44px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
+}
