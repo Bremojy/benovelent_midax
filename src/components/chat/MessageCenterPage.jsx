@@ -105,10 +105,6 @@ function MessageCenterPage({
     if (!actorId) return undefined;
 
     const activeSocket = contextSocket || socketClient;
-    const token = getToken(currentUser?.role || authUser?.role);
-    activeSocket.auth = { token };
-    if (activeSocket.io?.opts) activeSocket.io.opts.query = { token };
-
     const handleConnectError = (error) => {
       console.warn("Chat socket connection error:", error?.message || error);
       setBanner("Chat is reconnecting. Messaging stays available; calls will work once the secure call connection is ready.");
@@ -669,13 +665,6 @@ function waitForSocketConnection(activeSocket, timeout = 9000) {
     activeSocket.on("connect", onConnect);
     activeSocket.on("connect_error", onError);
   });
-}
-
-function getToken(role) {
-  const normalized = String(role || "").toLowerCase();
-  if (normalized === "superadmin") return sessionStorage.getItem("superAdminToken");
-  if (normalized === "admin") return sessionStorage.getItem("adminToken");
-  return sessionStorage.getItem("memberToken");
 }
 
 function buildActorProfile(user) {

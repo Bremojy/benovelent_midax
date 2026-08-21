@@ -11,10 +11,8 @@ const socketUpgrade = String(import.meta.env.VITE_SOCKET_UPGRADE || "false").toL
 const socket = io(SOCKET_URL, {
   autoConnect: false,
   transports: ["polling", "websocket"],
-  auth: { token: "" },
-  // Render deployments can accept Socket.IO polling while a WebSocket upgrade
-  // is intermittently closed by the proxy. Keep polling as the stable default;
-  // production can opt into websocket upgrades with VITE_SOCKET_UPGRADE=true.
+  withCredentials: true,
+  auth: {},
   upgrade: socketUpgrade,
   reconnection: true,
   reconnectionAttempts: 10,
@@ -23,24 +21,17 @@ const socket = io(SOCKET_URL, {
   timeout: 10000,
 });
 
-export const setSocketToken = (token) => {
-  socket.auth = { token: token || "" };
-  if (socket.io?.opts) socket.io.opts.query = token ? { token } : {};
-};
-
-export const clearSocketAuth = () => setSocketToken("");
+// Retained as no-op compatibility exports for older components/mobile bridges.
+// Browser authentication now travels only in the HttpOnly cookie.
+export const setSocketToken = () => undefined;
+export const clearSocketAuth = () => undefined;
 
 socket.on("connect_error", (error) => {
   const message = String(error?.message || error || "");
   console.debug("Socket.IO connection unavailable:", message);
-  if (
-    message.includes("SESSION_REPLACED") ||
-    message.includes("Authentication required")
-  ) {
+  if (message.includes("SESSION_REPLACED") || message.includes("AUTH_REQUIRED") || message.includes("AUTH_INVALID")) {
     try {
-      window.dispatchEvent(
-        new CustomEvent("benovelent:session-replaced")
-      );
+      window.dispatchEvent(new CustomEvent("benovelent:session-replaced"));
     } catch {
       // Ignore browser event failures.
     }
@@ -49,9 +40,7 @@ socket.on("connect_error", (error) => {
 
 socket.on("session-replaced", () => {
   try {
-    window.dispatchEvent(
-      new CustomEvent("benovelent:session-replaced")
-    );
+    window.dispatchEvent(new CustomEvent("benovelent:session-replaced"));
   } catch {
     // Ignore browser event failures.
   }

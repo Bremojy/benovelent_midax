@@ -1,9 +1,5 @@
 import axios from "axios";
 
-// ========================================
-// BASE URL
-// ========================================
-
 const DEFAULT_REMOTE_API_URL = "https://benovelent-midax.onrender.com";
 const DEFAULT_LOCAL_API_URL = "http://localhost:5000";
 
@@ -27,165 +23,89 @@ export const API_BASE_URL = BASE_URL;
 
 export const resolveApiUrl = (path = "") => {
   if (!path) return BASE_URL;
-  if (
-    path.startsWith("http://") ||
-    path.startsWith("https://") ||
-    path.startsWith("blob:") ||
-    path.startsWith("data:")
-  ) {
-    return path;
-  }
+  if (/^(https?:\/\/|blob:|data:)/i.test(path)) return path;
   return `${BASE_URL}${path.startsWith("/") ? "" : "/"}${path}`;
 };
 
-// ========================================
-// AXIOS INSTANCE
-// ========================================
+let csrfToken = "";
+let csrfRequest = null;
+
+export const setCsrfToken = (value) => {
+  csrfToken = String(value || "").trim();
+  return csrfToken;
+};
+
+export const clearCsrfToken = () => {
+  csrfToken = "";
+};
+
+const getCsrfToken = async () => {
+  if (csrfToken) return csrfToken;
+  if (!csrfRequest) {
+    csrfRequest = axios
+      .get(`${BASE_URL}/api/auth/csrf`, {
+        timeout: Number(import.meta.env.VITE_API_TIMEOUT || 20000),
+        withCredentials: true,
+      })
+      .then(({ data }) => setCsrfToken(data?.csrfToken || ""))
+      .finally(() => { csrfRequest = null; });
+  }
+  return csrfRequest;
+};
 
 const API = axios.create({
   baseURL: `${BASE_URL}/api`,
-  // Keep ordinary portal calls responsive while still allowing Render cold-starts.
   timeout: Number(import.meta.env.VITE_API_TIMEOUT || 20000),
-
+  withCredentials: true,
   headers: {
     "Content-Type": "application/json",
   },
 });
 
-// ========================================
-// GET AUTH TOKEN
-// ========================================
+const isMutating = (method) => !["get", "head", "options"].includes(String(method || "get").toLowerCase());
 
-const getToken = () => {
-  let user = null;
-  try {
-    user = JSON.parse(sessionStorage.getItem("user") || "null");
-  } catch (_) {
-    user = null;
-  }
-
-  const role = String(user?.role || "").trim().toLowerCase();
-  const tokenByRole = {
-    superadmin: "superAdminToken",
-    admin: "adminToken",
-    member: "memberToken",
-  };
-
-  // Prefer the authenticated account role. Do not silently use another
-  // portal's token; that can produce confusing 401/403 responses.
-  const roleKey = tokenByRole[role];
-  if (roleKey) {
-    return sessionStorage.getItem(roleKey);
-  }
-
-  // Only use pathname as a recovery path when the role has not yet been
-  // restored, never as a way to switch credentials between portals.
-  const pathname = typeof window !== "undefined" ? window.location.pathname : "";
-  if (pathname.startsWith("/superadmin")) return sessionStorage.getItem("superAdminToken");
-  if (pathname.startsWith("/admin")) return sessionStorage.getItem("adminToken");
-  if (pathname.startsWith("/member")) return sessionStorage.getItem("memberToken");
-  return null;
-};
-
-// ========================================
-// REQUEST INTERCEPTOR
-// ========================================
-
-API.interceptors.request.use(
-  (config) => {
-    const token = getToken();
-
+API.interceptors.request.use(async (config) => {
+  if (isMutating(config.method) && !config.skipCsrf) {
+    const token = await getCsrfToken();
     if (token) {
-      config.headers =
-        config.headers || {};
-
-      config.headers.Authorization =
-        `Bearer ${token}`;
+      config.headers = config.headers || {};
+      config.headers["X-CSRF-Token"] = token;
     }
-
-    return config;
-  },
-
-  (error) =>
-    Promise.reject(error)
-);
-
-// ========================================
-// CLEAR AUTH SESSION
-// ========================================
+  }
+  return config;
+}, (error) => Promise.reject(error));
 
 export const clearAuthSession = () => {
-  sessionStorage.removeItem(
-    "memberToken"
-  );
-
-  sessionStorage.removeItem(
-    "adminToken"
-  );
-
-  sessionStorage.removeItem(
-    "superAdminToken"
-  );
-
-  sessionStorage.removeItem(
-    "user"
-  );
+  try { sessionStorage.removeItem("user"); } catch {}
+  try { sessionStorage.removeItem("benovelentMidaxLastActivity"); } catch {}
+  clearCsrfToken();
 };
 
-// ========================================
-// RESPONSE INTERCEPTOR
-// ========================================
-
 API.interceptors.response.use(
-  (response) =>
-    response,
-
+  (response) => response,
   (error) => {
-    const status =
-      error.response?.status;
+    const status = error.response?.status;
+    const code = error.response?.data?.code;
 
-    const code =
-      error.response?.data?.code;
+    console.error("API Error:", error.response?.data || error.message);
 
-    console.error(
-      "API Error:",
-      error.response?.data ||
-        error.message
-    );
-
-    // ======================================
-    // AUTHENTICATION FAILURE
-    // ======================================
+    if (code === "CSRF_INVALID") {
+      clearCsrfToken();
+    }
 
     if (
       status === 401 &&
-      [
-        "TOKEN_EXPIRED",
-        "TOKEN_INVALID",
-        "TOKEN_MISSING",
-        "USER_NOT_FOUND",
-        "AUTH_FAILED",
-      "SESSION_REPLACED",
-      ].includes(code)
+      ["TOKEN_EXPIRED", "TOKEN_INVALID", "TOKEN_MISSING", "USER_NOT_FOUND", "AUTH_FAILED", "SESSION_REPLACED"].includes(code)
     ) {
       clearAuthSession();
-
-      if (
-        window.location.pathname !==
-        "/login"
-      ) {
-        window.location.href =
-          "/login";
+      if (typeof window !== "undefined" && window.location.pathname !== "/login") {
+        window.location.href = "/login";
       }
     }
 
     return Promise.reject(error);
   }
 );
-
-// ========================================
-// EXPORT
-// ========================================
 
 export default API;
 

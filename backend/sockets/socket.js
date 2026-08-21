@@ -10,6 +10,16 @@ const registerNewsSocket = require("./newsSocket");
 const registerPollSocket = require("./pollSocket");
 const SOCKET_SESSION_ROOM = "session:";
 const SESSION_VERSION_FIELD = "sessionVersion";
+const AUTH_COOKIE_NAME = "benevolent_access";
+
+const parseCookies = (header = "") => String(header).split(";").reduce((out, chunk) => {
+    const index = chunk.indexOf("=");
+    if (index < 0) return out;
+    const key = chunk.slice(0, index).trim();
+    const value = chunk.slice(index + 1).trim();
+    if (key) out[key] = decodeURIComponent(value);
+    return out;
+}, {});
 
 let io;
 
@@ -55,9 +65,14 @@ const initSocket = (server) => {
     // or emitting message/call events.
     io.use(async (socket, next) => {
         try {
-            const token = socket.handshake.auth?.token || socket.handshake.query?.token;
+            const cookies = parseCookies(socket.handshake.headers?.cookie || "");
+            const token = cookies[AUTH_COOKIE_NAME] || socket.handshake.auth?.token || socket.handshake.query?.token;
             if (!token) return next(new Error("AUTH_REQUIRED"));
-            const decoded = jwt.verify(token, process.env.JWT_SECRET);
+            const decoded = jwt.verify(token, process.env.JWT_SECRET, {
+                algorithms: ["HS256"],
+                issuer: "benevolent-midax",
+                audience: "benevolent-midax-users",
+            });
             const userType = String(decoded.role || decoded.userType || "").toLowerCase();
             const UserModel = userType === "superadmin" ? SuperAdmin : userType === "admin" ? Admin : Member;
             const user = await UserModel.findById(decoded.id || decoded.userId || decoded._id).select("_id role status sessionVersion fullName").lean();

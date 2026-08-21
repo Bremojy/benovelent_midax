@@ -19,6 +19,8 @@ const auditService = require("../services/auditService");
 
 const notificationService = require("../services/notificationService");
 const { getIO } = require("../sockets/socket");
+const crypto = require("crypto");
+const { setAuthCookies, clearAuthCookies } = require("../utils/authCookies");
 
 // ==========================================
 // LOGIN
@@ -26,6 +28,7 @@ const { getIO } = require("../sockets/socket");
 // ==========================================
 
 exports.login = async (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
   try {
     let { email, password } = req.body;
 
@@ -215,6 +218,8 @@ exports.login = async (req, res) => {
     const token = generateToken(user, {
       chatId: chatProfile?._id?.toString?.() || user._id.toString(),
     });
+    const csrfToken = crypto.randomBytes(32).toString("hex");
+    setAuthCookies(res, token, csrfToken);
 
     // --------------------------------------
     // NORMALIZED NAME
@@ -236,7 +241,9 @@ exports.login = async (req, res) => {
 
       message: "Login successful.",
 
-      token,
+      ...(String(process.env.ALLOW_LEGACY_BEARER_RESPONSE || "false").toLowerCase() === "true" ? { token } : {}),
+
+      csrfToken,
 
       user: {
         id: user._id,
@@ -300,6 +307,7 @@ exports.login = async (req, res) => {
 // ==========================================
 
 exports.getMe = async (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
   try {
     if (!req.user) {
       return res.status(401).json({
@@ -387,6 +395,7 @@ exports.getMe = async (req, res) => {
 // ==========================================
 
 exports.logout = async (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
   try {
     if (req.user) {
       req.user.lastSeen = new Date();
@@ -402,6 +411,8 @@ exports.logout = async (req, res) => {
 
       await req.user.save();
     }
+
+    clearAuthCookies(res);
 
     return res.status(200).json({
       success: true,

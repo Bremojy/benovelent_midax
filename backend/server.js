@@ -2,6 +2,7 @@ const express = require("express");
 const http = require("http");
 const cors = require("cors");
 const compression = require("compression");
+const cookieParser = require("cookie-parser");
 const mongoose = require("mongoose");
 const path = require("path");
 const fs = require("fs");
@@ -116,6 +117,10 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.options(/.*/, cors(corsOptions));
 
+app.use(cookieParser());
+const { verifyCsrf } = require("./middleware/csrfMiddleware");
+app.use(verifyCsrf);
+
 app.use(compression({ threshold: 1024 }));
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({
@@ -184,7 +189,7 @@ app.get("/", (req, res) => {
     res.status(200).json({
         success: true,
         application: "Benevolent Midax API",
-        version: "2.0.0",
+        version: process.env.APP_VERSION || "12.0.0",
         status: "Running",
         timestamp: new Date().toISOString(),
     });

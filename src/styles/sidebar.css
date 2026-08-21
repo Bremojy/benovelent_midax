@@ -133,6 +133,7 @@
 }
 
 .sidebar-footer {
+  margin-top: auto;
   flex: 0 0 auto;
   padding: 10px 14px max(18px, env(safe-area-inset-bottom));
 }

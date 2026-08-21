@@ -7,6 +7,7 @@ const router = express.Router();
 // =====================================================
 
 const authController = require("../controllers/authController");
+const { csrfEndpoint } = require("../middleware/csrfMiddleware");
 
 // =====================================================
 // MIDDLEWARE
@@ -25,6 +26,8 @@ const {
  * @desc    Authenticate Member/Admin/SuperAdmin
  * @access  Public
  */
+router.get("/csrf", csrfEndpoint);
+
 router.post(
     "/login",
     authController.login

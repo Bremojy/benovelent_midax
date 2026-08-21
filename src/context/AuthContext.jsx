@@ -9,6 +9,7 @@ import {
 } from "react";
 
 import {
+  getCsrfToken,
   getCurrentUser,
   loginUser,
   logoutUser,
@@ -17,73 +18,12 @@ import {
 const AuthContext = createContext(null);
 
 // ========================================
-// TOKEN KEYS
-// ========================================
-
-const TOKEN_KEYS = {
-  member: "memberToken",
-  admin: "adminToken",
-  superadmin: "superAdminToken",
-};
-
-// ========================================
 // SESSION SETTINGS
 // ========================================
 
-// 30 minutes of inactivity
 const INACTIVITY_TIMEOUT = 30 * 60 * 1000;
 
-
-// ========================================
-// SESSION-ONLY AUTH STORAGE
-// ========================================
-
-// Authentication belongs to the current browser tab only. This prevents two
-// accounts opened on the same computer from sharing credentials through
-// localStorage and lets member/admin tabs stay independently signed in.
-const LEGACY_TOKEN_KEYS = [
-  "memberToken",
-  "adminToken",
-  "superAdminToken",
-  "user",
-  "benovelentMidaxLastActivity",
-];
-
-const SESSION_KEYS = {
-  member: "memberToken",
-  admin: "adminToken",
-  superadmin: "superAdminToken",
-};
-
-const migrateLegacySession = () => {
-  try {
-    const existingUser = sessionStorage.getItem("user");
-    const hasSessionAuth = Object.values(SESSION_KEYS).some((key) => Boolean(sessionStorage.getItem(key)));
-    if (!existingUser && !hasSessionAuth) {
-      const legacyUser = localStorage.getItem("user");
-      let legacyRole = "";
-      try { legacyRole = String(JSON.parse(legacyUser || "null")?.role || "").toLowerCase(); } catch {}
-      const legacyKey = SESSION_KEYS[legacyRole];
-      const legacyToken = legacyKey ? localStorage.getItem(legacyKey) : null;
-      if (legacyUser && legacyToken) {
-        sessionStorage.setItem("user", legacyUser);
-        sessionStorage.setItem(legacyKey, legacyToken);
-        const legacyActivity = localStorage.getItem("benovelentMidaxLastActivity");
-        if (legacyActivity) sessionStorage.setItem("benovelentMidaxLastActivity", legacyActivity);
-      }
-    }
-    LEGACY_TOKEN_KEYS.forEach((key) => localStorage.removeItem(key));
-  } catch (_) {
-    // Private browsing/storage-disabled environments are handled by callers.
-  }
-};
-
-migrateLegacySession();
-
 const clearStoredSession = () => {
-  Object.values(SESSION_KEYS).forEach((key) => {
-    try { sessionStorage.removeItem(key); } catch {}
-  });
   try { sessionStorage.removeItem("user"); } catch {}
   try { sessionStorage.removeItem("benovelentMidaxLastActivity"); } catch {}
 };
@@ -97,35 +37,11 @@ const getStoredUser = () => {
   }
 };
 
-const getTokenForRole = (role) => {
-  const normalizedRole = String(role || "").toLowerCase();
-  const tokenKey = SESSION_KEYS[normalizedRole];
-  if (!tokenKey) return null;
-  try { return sessionStorage.getItem(tokenKey); } catch { return null; }
-};
-
-const getStoredToken = () => {
-  const storedUser = getStoredUser();
-  if (storedUser?.role) {
-    const roleToken = getTokenForRole(storedUser.role);
-    if (roleToken) return roleToken;
-  }
-  for (const key of Object.values(SESSION_KEYS)) {
-    try {
-      const token = sessionStorage.getItem(key);
-      if (token) return token;
-    } catch {}
-  }
-  return null;
-};
-
-const saveSession = (token, user) => {
-  clearStoredSession();
+const saveSession = (user) => {
   const role = String(user?.role || "").toLowerCase();
-  if (!token || !role) throw new Error("Invalid authentication response.");
-  const tokenKey = SESSION_KEYS[role];
-  if (!tokenKey) throw new Error("Unknown account role.");
-  sessionStorage.setItem(tokenKey, token);
+  if (!["member", "admin", "superadmin"].includes(role)) {
+    throw new Error("Unknown account role.");
+  }
   sessionStorage.setItem("user", JSON.stringify({ ...user, role }));
   sessionStorage.setItem("benovelentMidaxLastActivity", String(Date.now()));
 };
@@ -195,8 +111,9 @@ export function AuthProvider({
   // ======================================
 
   const handleInactivityLogout =
-    useCallback(() => {
+    useCallback(async () => {
       console.warn("Session expired because of inactivity.");
+      try { await logoutUser(); } catch {}
       clearSession();
       setAuthError("You have been logged out due to inactivity.");
     }, [clearSession]);
@@ -242,17 +159,8 @@ export function AuthProvider({
   const loadCurrentUser =
     useCallback(
       async () => {
-        const token =
-          getStoredToken();
-
-        if (!token) {
-          setUser(null);
-          setLoading(false);
-
-          return null;
-        }
-
         try {
+          await getCsrfToken();
           // When a cached user exists, keep the dashboard rendered while the
           // server verifies the session in the background.
           if (!user) setLoading(true);
@@ -342,21 +250,6 @@ export function AuthProvider({
           ) {
             throw new Error(
               "Account role has changed. Please log in again."
-            );
-          }
-
-          // --------------------------------
-          // Verify matching token
-          // --------------------------------
-
-          const roleToken =
-            getTokenForRole(
-              currentUser.role
-            );
-
-          if (!roleToken) {
-            throw new Error(
-              "Authentication token is missing."
             );
           }
 
@@ -479,7 +372,6 @@ export function AuthProvider({
 
           if (
             !response?.success ||
-            !response?.token ||
             !response?.user
           ) {
             throw new Error(
@@ -519,21 +411,14 @@ export function AuthProvider({
           // Save session
           // --------------------------------
 
-          saveSession(
-            response.token,
-            normalizedUser
-          );
+          saveSession(normalizedUser);
 
           setUser(
             normalizedUser
           );
 
           return {
-            token:
-              response.token,
-
-            user:
-              normalizedUser,
+            user: normalizedUser,
           };
 
         } catch (error) {

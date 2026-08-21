@@ -7,6 +7,7 @@ const Response = require("../utils/response");
 const { ensureChatProfile } = require("../utils/chatProfile");
 
 const ROLES = require("../constants/roles");
+const { ACCESS_COOKIE } = require("../utils/authCookies");
 
 const {
     LOGIN_ALLOWED,
@@ -18,20 +19,11 @@ const {
 const verifyToken = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
+    const cookieToken = req.cookies?.[ACCESS_COOKIE];
 
-    // --------------------------------------
-    // CHECK AUTH HEADER
-    // --------------------------------------
-
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return res.status(401).json({
-        success: false,
-        message: "Authorization token missing.",
-        code: "TOKEN_MISSING",
-      });
-    }
-
-    const token = authHeader.split(" ")[1];
+    // Prefer the HttpOnly browser session cookie. A bearer token remains as a
+    // compatibility path for controlled non-browser clients/mobile builds.
+    const token = cookieToken || (authHeader?.startsWith("Bearer ") ? authHeader.slice(7).trim() : "");
 
     if (!token) {
       return res.status(401).json({
@@ -47,7 +39,12 @@ const verifyToken = async (req, res, next) => {
 
     const decoded = jwt.verify(
       token,
-      process.env.JWT_SECRET
+      process.env.JWT_SECRET,
+      {
+        algorithms: ["HS256"],
+        issuer: "benevolent-midax",
+        audience: "benevolent-midax-users",
+      }
     );
 
     req.auth = decoded;
