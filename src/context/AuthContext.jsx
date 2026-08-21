@@ -56,11 +56,12 @@ export function AuthProvider({
   // Restore the last known account immediately. The backend may take a moment
   // to wake after a refresh, but that should never throw an already-authenticated
   // member back to the login page.
-  const [user, setUser] =
-    useState(() => getStoredUser());
+  // The server-side HttpOnly cookie is the authentication source of truth.
+  // Do not render a cached browser profile as authenticated until /auth/me
+  // confirms the current session.
+  const [user, setUser] = useState(null);
 
-  const [loading, setLoading] =
-    useState(() => !Boolean(getStoredUser()));
+  const [loading, setLoading] = useState(true);
 
   const [authError, setAuthError] =
     useState("");
@@ -310,9 +311,9 @@ export function AuthProvider({
             error.response?.data || error.message
           );
           setAuthError(
-            "Connection is slow. Your saved session is still active."
+            "Connection is temporarily unavailable. Please wait and try again."
           );
-          return user || getStoredUser();
+          return null;
 
         } finally {
           setLoading(false);

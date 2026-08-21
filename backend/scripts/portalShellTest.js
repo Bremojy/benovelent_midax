@@ -34,6 +34,9 @@ if (!dashboard.includes("overflow: visible;")) failures.push("Portal content mus
 if (dashboard.includes("position: fixed") && dashboard.includes("dashboard-portal-footer")) failures.push("Portal footer must not be viewport-fixed over portal content.");
 
 if (!sidebar.includes("position: fixed;")) failures.push("Desktop sidebar is not fixed to the viewport.");
+const shellFinal = read("src/styles/portal-shell-final.css");
+if (!shellFinal.includes("position: relative;\n  z-index: 1;")) failures.push("Dashboard main must form a lower stacking context so normal pages cannot pass over the fixed sidebar.");
+if (!shellFinal.includes("z-index: 15000 !important;")) failures.push("Persistent desktop sidebar stacking order is not high enough to stay above normal portal content.");
 if (!sidebar.includes("dashboard-sidebar.mobile-bottom-nav")) failures.push("Mobile bottom dock is missing.");
 if (!sidebar.includes("bottom: 0;")) failures.push("Mobile bottom dock is not anchored to the viewport bottom.");
 if (!sidebar.includes("background: rgba(255, 255, 255, .98);")) failures.push("Mobile dock visual hierarchy is not using the intended light thumb-friendly surface.");

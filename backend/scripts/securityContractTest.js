@@ -34,7 +34,8 @@ if (!server.includes('"X-CSRF-Token"')) failures.push("CORS must allow X-CSRF-To
 for (const needle of ["sessionStorage.setItem(\"user\"", "saveSession(normalizedUser)"]) {
   if (!authContext.includes(needle)) failures.push(`Frontend user-only session contract missing: ${needle}`);
 }
-if (/sessionStorage\.(getItem|setItem)\(["'](?:memberToken|adminToken|superAdminToken)/.test(authContext)) {
+if (!authContext.includes("const [user, setUser] = useState(null);")) failures.push("AuthContext must not treat cached sessionStorage user data as authenticated before server verification.");
+if (!authContext.includes("Connection is temporarily unavailable. Please wait and try again.")) failures.push("Temporary verification failures must not restore a stale cached authenticated dashboard.");if (/sessionStorage\.(getItem|setItem)\(["'](?:memberToken|adminToken|superAdminToken)/.test(authContext)) {
   failures.push("AuthContext still stores a bearer token in sessionStorage.");
 }
 if (!socketClient.includes("withCredentials: true")) failures.push("Socket client must send credentials with cross-origin cookies.");
