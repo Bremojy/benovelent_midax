@@ -108,6 +108,7 @@ const corsOptions = {
         "Content-Type",
         "Accept",
         "Authorization",
+        "X-CSRF-Token",
         "Cache-Control",
         "Pragma",
     ],

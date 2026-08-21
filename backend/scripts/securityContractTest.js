@@ -11,6 +11,7 @@ const jwt = read("backend/utils/generateToken.js");
 const socketServer = read("backend/sockets/socket.js");
 const csrf = read("backend/middleware/csrfMiddleware.js");
 const api = read("src/services/api.js");
+const server = read("backend/server.js");
 const authContext = read("src/context/AuthContext.jsx");
 const socketClient = read("src/sockets/socket.js");
 
@@ -29,6 +30,7 @@ for (const needle of ["X-CSRF-Token", 'code: "CSRF_INVALID"']) {
 for (const needle of ["withCredentials: true", "setCsrfToken", "getCsrfToken"]) {
   if (!api.includes(needle)) failures.push(`Frontend cookie/CSRF transport missing: ${needle}`);
 }
+if (!server.includes('"X-CSRF-Token"')) failures.push("CORS must allow X-CSRF-Token for cookie-authenticated browser requests.");
 for (const needle of ["sessionStorage.setItem(\"user\"", "saveSession(normalizedUser)"]) {
   if (!authContext.includes(needle)) failures.push(`Frontend user-only session contract missing: ${needle}`);
 }
