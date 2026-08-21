@@ -45,7 +45,8 @@ const messageSchema = new mongoose.Schema(
             "image",
             "video",
             "audio",
-            "document"
+            "document",
+            "call"
         ],
         default:"text"
     },
@@ -68,6 +69,24 @@ const messageSchema = new mongoose.Schema(
     mimeType:{
         type:String,
         default:""
+    },
+
+    callType:{
+        type:String,
+        enum:["audio","video"],
+        default:undefined
+    },
+
+    callStatus:{
+        type:String,
+        enum:["completed","declined","missed"],
+        default:undefined
+    },
+
+    callDurationSeconds:{
+        type:Number,
+        default:0,
+        min:0
     },
 
     replyTo:{

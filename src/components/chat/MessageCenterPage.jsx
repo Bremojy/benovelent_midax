@@ -8,7 +8,6 @@ import ChatWindow from "./ChatWindow";
 import CallOverlay from "./CallOverlay";
 import API from "../../services/api";
 import { getPendingCall, removePendingCall } from "../../utils/pushCallStore";
-import { startCallTone } from "../../utils/callTone";
 import { startNativeIncomingCall } from "../../utils/nativeCallBridge";
 import { useAuth } from "../../context/AuthContext";
 import { useSocket } from "../../context/SocketContext";
@@ -126,11 +125,6 @@ function MessageCenterPage({
     const handleCallNotification = (payload) => {
       const title = payload?.title || "Incoming call";
       const body = payload?.message || "Someone is calling you.";
-      // Sound must begin with the incoming-call notification itself, not only
-      // after the call overlay mounts. The shared tone prevents double ringing.
-      if (payload?.callType === "audio" || payload?.callType === "video" || payload?.type === "incoming_call") {
-        startCallTone();
-      }
       setBanner(`${title}: ${body}`);
       if (typeof document !== "undefined" && document.visibilityState !== "visible" && typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
         try { new Notification(title, { body, tag: `call-${payload?.callerUserId || Date.now()}` }); } catch {}
@@ -235,31 +229,45 @@ function MessageCenterPage({
 
   useEffect(() => {
     const params = new URLSearchParams(location.search || "");
-    const callId = params.get("incomingPushCall");
-    if (!callId) return;
+    const callId = params.get("incomingPushCall") || params.get("incomingNativeCall");
+    if (!callId) return undefined;
+
     let active = true;
     (async () => {
       const pending = await getPendingCall(callId);
       if (!active || !pending?.data) return;
-      const action = String(params.get("callAction") || "open");
+      const action = String(params.get("callAction") || "open").toLowerCase();
       const payload = pending.data;
+      const activeSocket = socket || contextSocket || socketClient;
+
       if (action === "decline") {
-        if (socketClient.connected && payload.from) socketClient.emit("call-rejected", { to: payload.from });
+        if (!activeSocket.connected) activeSocket.connect?.();
+        if (payload.from) activeSocket.emit("call-rejected", { to: payload.from, callId });
         await removePendingCall(callId);
         window.history.replaceState({}, "", location.pathname);
         return;
       }
+
       setCall({
         direction: "incoming",
         incomingCall: payload,
+        autoAccept: action === "answer",
         callType: payload.callType === "video" ? "video" : "audio",
-        partner: { _id: payload.callerUserId, fullName: payload.callerName || "Member", profileImage: payload.profileImage || "" },
+        conversationId: payload.conversationId || "",
+        partner: {
+          _id: payload.callerUserId,
+          fullName: payload.callerName || "Member",
+          profileImage: payload.callerProfileImage || payload.profileImage || "",
+        },
       });
       await removePendingCall(callId);
       window.history.replaceState({}, "", location.pathname);
-    })();
+    })().catch((error) => {
+      console.warn("Incoming push call handling failed:", error);
+    });
+
     return () => { active = false; };
-  }, [location.pathname, location.search]);
+  }, [location.pathname, location.search, socket, contextSocket]);
 
   const loadChatData = async () => {
     try {
@@ -427,6 +435,7 @@ function MessageCenterPage({
         direction: "outgoing",
         callType: type === "video" ? "video" : "audio",
         partner: selectedConversation.partner,
+        conversationId: selectedConversation._id,
         incomingCall: null,
       });
     } catch (error) {
@@ -456,6 +465,8 @@ function MessageCenterPage({
             partner={call.partner}
             callType={call.callType}
             incomingCall={call.incomingCall}
+            conversationId={call.conversationId || call.incomingCall?.conversationId || selectedConversation?._id || ""}
+            autoAccept={Boolean(call.autoAccept)}
             onClose={() => setCall(null)}
           />
         )}
@@ -644,6 +655,8 @@ function MessageCenterPage({
           partner={call.partner}
           callType={call.callType}
           incomingCall={call.incomingCall}
+          conversationId={call.conversationId || call.incomingCall?.conversationId || selectedConversation?._id || ""}
+          autoAccept={Boolean(call.autoAccept)}
           onClose={() => setCall(null)}
         />
       )}

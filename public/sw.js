@@ -61,6 +61,7 @@ self.addEventListener("push", (event) => {
       { action: "decline", title: "Decline" },
     ] : [],
     silent: false,
+    timestamp: Date.now(),
     data: payload.data || { link: "/" },
   };
 

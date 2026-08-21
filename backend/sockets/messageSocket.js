@@ -4,11 +4,12 @@ const SuperAdmin = require("../models/SuperAdmin");
 const Message = require("../models/Message");
 const Conversation = require("../models/Conversation");
 const Notification = require("../models/Notification");
-const { addUser, removeUser } = require("./onlineUsers");
+const { addUser, removeUser, getPresence } = require("./onlineUsers");
 const { sendPushToRecipient } = require("../services/pushService");
 
 const modelsByRole = { member: Member, admin: Admin, superadmin: SuperAdmin };
 const activeCalls = new Map();
+const CALL_TIMEOUT_MS = 35_000;
 
 async function resolveActor(id, hintedRole = "") {
   const requestedRole = String(hintedRole || "").toLowerCase();
@@ -119,6 +120,46 @@ async function deliverCallNotification({ recipient, caller, callType, title, mes
   return notification;
 }
 
+async function recordCallSummary(call, status = "completed", durationSeconds = 0) {
+  if (!call?.conversationId || !call?.caller?.chatId || !call?.recipient?.chatId || call.summaryCreated) return null;
+  call.summaryCreated = true;
+  activeCalls.set(call.callId, call);
+  try {
+    const conversation = await Conversation.findOne({
+      _id: call.conversationId,
+      participants: { $all: [call.caller.chatId, call.recipient.chatId] },
+    });
+    if (!conversation) return null;
+    const safeDuration = Math.max(0, Math.round(Number(durationSeconds) || 0));
+    const mins = String(Math.floor(safeDuration / 60)).padStart(2, "0");
+    const secs = String(safeDuration % 60).padStart(2, "0");
+    const typeLabel = call.callType === "video" ? "Video call" : "Audio call";
+    const statusLabel = status === "completed" ? `${typeLabel} • ${mins}:${secs}` : status === "declined" ? `${typeLabel} • Declined` : `${typeLabel} • Missed`;
+    const summary = await Message.create({
+      conversation: conversation._id,
+      sender: call.caller.chatId,
+      message: statusLabel,
+      messageType: "call",
+      callType: call.callType,
+      callStatus: status,
+      callDurationSeconds: safeDuration,
+    });
+    await summary.populate("sender", "fullName profileImage online lastSeen");
+    conversation.lastMessage = summary._id;
+    conversation.lastMessageText = statusLabel;
+    conversation.lastMessageSender = call.caller.chatId;
+    conversation.lastMessageTime = new Date();
+    await conversation.save();
+    call.io.to(String(conversation._id)).emit("new-message", summary);
+    return summary;
+  } catch (error) {
+    call.summaryCreated = false;
+    activeCalls.set(call.callId, call);
+    console.warn("Call summary creation failed:", error.message);
+    return null;
+  }
+}
+
 function clearCall(callId) {
   const call = activeCalls.get(callId);
   if (call?.timeout) clearTimeout(call.timeout);
@@ -197,8 +238,14 @@ module.exports = (io, socket) => {
       offer,
       callId,
     };
-    const active = { io, recipient, caller, recipientChatId: String(recipient.chatId), callerChatId: String(caller.chatId), callType: normalizedType, callId, incomingPayload, answered: false, missedNotified: false, timeout: null };
-    active.timeout = setTimeout(() => { void markMissedCall(callId, "missed"); }, 35000);
+    const active = { io, recipient, caller, recipientChatId: String(recipient.chatId), callerChatId: String(caller.chatId), callType: normalizedType, callId, conversationId: conversationId || "", incomingPayload, answered: false, missedNotified: false, summaryCreated: false, answeredAt: null, timeout: null };
+    active.timeout = setTimeout(() => {
+      void markMissedCall(callId, "missed");
+      void recordCallSummary(activeCalls.get(callId), "missed", 0);
+      io.to(String(caller.chatId)).emit("call-ended", { callId, reason: "timeout" });
+      io.to(String(recipient.chatId)).emit("call-ended", { callId, reason: "timeout" });
+      clearCall(callId);
+    }, CALL_TIMEOUT_MS);
     activeCalls.set(callId, active);
 
     try {
@@ -207,21 +254,18 @@ module.exports = (io, socket) => {
       const recipientPortalRoom = String(recipient.user?._id || "");
       io.to(String(caller.chatId)).emit("call-started", { callId, recipientUserId: recipientChatRoom, callType: normalizedType });
 
-      // Deliver the live call to the canonical chat-profile room. Keep the
-      // original `to` room emission for existing clients, then add the portal
-      // account room for mirrored Admin/SuperAdmin identities.
-      io.to(String(to)).emit("incoming-call", incomingPayload);
-      io.to(recipientChatRoom).emit("incoming-call", incomingPayload);
-      if (recipientPortalRoom && recipientPortalRoom !== recipientChatRoom) {
-        io.to(recipientPortalRoom).emit("incoming-call", incomingPayload);
+      // Deliver only to the intended recipient's authenticated sockets.
+      // Do not broadcast to generic ID rooms: mirrored Admin/SuperAdmin chat
+      // profiles can otherwise cause the caller to receive their own alert.
+      const recipientSockets = new Set();
+      for (const targetId of [recipientChatRoom, recipientPortalRoom]) {
+        const presence = getPresence(targetId);
+        for (const socketId of presence?.sockets || []) recipientSockets.add(String(socketId));
       }
+      recipientSockets.forEach((socketId) => io.to(socketId).emit("incoming-call", incomingPayload));
 
       const callNotification = { title, message, callType: normalizedType, callId, callerUserId: String(caller.chatId), callerName: incomingPayload.callerName, notification };
-      io.to(`user:${String(to)}`).emit("new-call-notification", callNotification);
-      io.to(`user:${recipientPortalRoom}`).emit("new-call-notification", callNotification);
-      if (recipientPortalRoom !== recipientChatRoom) {
-        io.to(`user:${recipientChatRoom}`).emit("new-call-notification", callNotification);
-      }
+      recipientSockets.forEach((socketId) => io.to(socketId).emit("new-call-notification", callNotification));
     } catch (error) { console.warn("Could not save/deliver call notification:", error.message); }
   });
 
@@ -229,23 +273,45 @@ module.exports = (io, socket) => {
     const call = callId ? activeCalls.get(String(callId)) : null;
     if (call) {
       call.answered = true;
+      call.answeredAt = Date.now();
       if (call.timeout) clearTimeout(call.timeout);
       activeCalls.set(call.callId, call);
     }
     if (to && answer) io.to(String(to)).emit("call-answered", { answer, callId: callId || "" });
   });
 
-  socket.on("call-rejected", async ({ to, callId }) => {
+  socket.on("call-mode-offer", async ({ to, offer, callId }) => {
+    if (to && offer) io.to(String(to)).emit("call-mode-offer", { offer, callId: callId || "" });
+  });
+
+  socket.on("call-mode-answer", async ({ to, answer, callId }) => {
+    if (to && answer) io.to(String(to)).emit("call-mode-answer", { answer, callId: callId || "" });
+  });
+
+  socket.on("call-rejected", async ({ to, callId, reason = "declined" }) => {
     const call = callId ? activeCalls.get(String(callId)) : null;
-    if (to) io.to(String(to)).emit("call-rejected", { callId: callId || "" });
-    if (call) clearCall(call.callId);
+    if (to) io.to(String(to)).emit("call-rejected", { callId: callId || "", reason });
+    if (call) {
+      if (!call.answered) {
+        await markMissedCall(call.callId, reason === "declined" ? "declined" : "missed");
+        if (reason === "declined") await recordCallSummary(call, "declined", 0);
+      }
+      clearCall(call.callId);
+    }
   });
 
   socket.on("ice-candidate", ({ to, candidate }) => { if (to && candidate) io.to(String(to)).emit("ice-candidate", { candidate }); });
 
   socket.on("end-call", async ({ to, callId }) => {
     const call = callId ? activeCalls.get(String(callId)) : null;
-    if (call && !call.answered) await markMissedCall(call.callId, "missed");
+    if (call) {
+      if (!call.answered) {
+        await markMissedCall(call.callId, "missed");
+      } else {
+        const durationSeconds = call.answeredAt ? Math.max(0, Math.round((Date.now() - call.answeredAt) / 1000)) : 0;
+        await recordCallSummary(call, "completed", durationSeconds);
+      }
+    }
     if (to) io.to(String(to)).emit("call-ended", { callId: callId || "" });
     if (call) clearCall(call.callId);
   });

@@ -15,8 +15,9 @@ const tonePath = path.join(root, "public/sounds/benovelent-call.mp3");
 for (const [label, source, needles] of [
   ["socket call flow", socket, [
     'socket.on("call-user"',
-    'io.to(String(to)).emit("incoming-call"',
-    'io.to(`user:${String(to)}`).emit("new-call-notification"',
+    'const recipientSockets = new Set()',
+    'recipientSockets.forEach((socketId) => io.to(socketId).emit("incoming-call"',
+    'recipientSockets.forEach((socketId) => io.to(socketId).emit("new-call-notification"',
     'socket.on("call-answer"',
     'socket.on("call-rejected"',
     'socket.on("end-call"',
@@ -34,6 +35,8 @@ for (const [label, source, needles] of [
     'onVideoCall={() => startCall("video")}',
     'action === "decline"',
     'incomingPushCall',
+    'incomingNativeCall',
+    'autoAccept={Boolean(call.autoAccept)}',
   ]],
   ["ringtone utility", tone, [
     '/sounds/benovelent-call.mp3',

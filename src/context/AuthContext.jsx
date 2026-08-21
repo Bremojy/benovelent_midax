@@ -22,6 +22,24 @@ const AuthContext = createContext(null);
 // ========================================
 
 const INACTIVITY_TIMEOUT = 30 * 60 * 1000;
+const ACTIVE_ACCOUNT_KEY = "benovelentMidaxActiveAccount";
+
+const normalizeAccountIdentity = (value) => ({
+  id: String(value?.id || value?._id || value?.chatId || ""),
+  role: String(value?.role || "").toLowerCase(),
+});
+
+const setActiveAccount = (value) => {
+  try {
+    const identity = normalizeAccountIdentity(value);
+    localStorage.setItem(ACTIVE_ACCOUNT_KEY, JSON.stringify({ ...identity, changedAt: Date.now() }));
+  } catch {}
+};
+
+const clearActiveAccount = () => {
+  try { localStorage.removeItem(ACTIVE_ACCOUNT_KEY); } catch {}
+};
+
 
 const clearStoredSession = () => {
   try { sessionStorage.removeItem("user"); } catch {}
@@ -275,6 +293,7 @@ export function AuthProvider({
           }
 
           setUser(currentUser);
+          setActiveAccount(currentUser);
 
           return currentUser;
 
@@ -321,6 +340,35 @@ export function AuthProvider({
       },
       [clearSession, user]
     );
+
+  // ======================================
+  // ONE ACCOUNT PER BROWSER ORIGIN
+  // ======================================
+
+  useEffect(() => {
+    const handleStorage = (event) => {
+      const raw = event?.type === "storage" ? event.newValue : JSON.stringify(event?.data?.account || {});
+      if (event?.type === "storage" && event.key !== ACTIVE_ACCOUNT_KEY) return;
+      if (!raw) return;
+      try {
+        const incoming = JSON.parse(raw);
+        const current = normalizeAccountIdentity(user);
+        if (!current.id || !incoming?.id) return;
+        if (current.id !== String(incoming.id) || current.role !== String(incoming.role || "").toLowerCase()) {
+          clearSession();
+          setAuthError("Another account was signed in on this device. You have been logged out from this portal.");
+          window.dispatchEvent(new CustomEvent("benevolent:session-ended", { detail: { message: "Another account was signed in on this device." } }));
+        }
+      } catch {}
+    };
+    window.addEventListener("storage", handleStorage);
+    const channel = typeof BroadcastChannel !== "undefined" ? new BroadcastChannel("benovelent-account-session") : null;
+    channel?.addEventListener("message", handleStorage);
+    return () => {
+      window.removeEventListener("storage", handleStorage);
+      channel?.close?.();
+    };
+  }, [user, clearSession]);
 
   // ======================================
   // SERVER-SIDE SESSION REPLACEMENT
@@ -530,6 +578,35 @@ export function AuthProvider({
     resetInactivityTimer,
     clearInactivityTimer,
   ]);
+
+  // ======================================
+  // ONE ACCOUNT PER BROWSER ORIGIN
+  // ======================================
+
+  useEffect(() => {
+    const handleStorage = (event) => {
+      const raw = event?.type === "storage" ? event.newValue : JSON.stringify(event?.data?.account || {});
+      if (event?.type === "storage" && event.key !== ACTIVE_ACCOUNT_KEY) return;
+      if (!raw) return;
+      try {
+        const incoming = JSON.parse(raw);
+        const current = normalizeAccountIdentity(user);
+        if (!current.id || !incoming?.id) return;
+        if (current.id !== String(incoming.id) || current.role !== String(incoming.role || "").toLowerCase()) {
+          clearSession();
+          setAuthError("Another account was signed in on this device. You have been logged out from this portal.");
+          window.dispatchEvent(new CustomEvent("benevolent:session-ended", { detail: { message: "Another account was signed in on this device." } }));
+        }
+      } catch {}
+    };
+    window.addEventListener("storage", handleStorage);
+    const channel = typeof BroadcastChannel !== "undefined" ? new BroadcastChannel("benovelent-account-session") : null;
+    channel?.addEventListener("message", handleStorage);
+    return () => {
+      window.removeEventListener("storage", handleStorage);
+      channel?.close?.();
+    };
+  }, [user, clearSession]);
 
   // ======================================
   // SERVER-SIDE SESSION REPLACEMENT

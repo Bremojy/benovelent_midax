@@ -1,4 +1,4 @@
-const CACHE = "benovelent-shell-v19-final-v2";
+const CACHE = "benovelent-shell-v20-call-hardening";
 const ASSETS = ["/", "/index.html", "/manifest.webmanifest", "/pwa-icon-192.png", "/pwa-icon-512.png", "/apple-touch-icon.png"];
 const DB_NAME = "benovelent-pwa";
 const DB_STORE = "calls";
@@ -61,6 +61,7 @@ self.addEventListener("push", (event) => {
       { action: "decline", title: "Decline" },
     ] : [],
     silent: false,
+    timestamp: Date.now(),
     data: payload.data || { link: "/" },
   };
 

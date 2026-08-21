@@ -27,7 +27,11 @@ async function sendPushToRecipient({ recipient, recipientModel = "Member", title
     data:{ link, ...data },
   });
   for (const subscription of subscriptions) {
-    try { await webpush.sendNotification({ endpoint:subscription.endpoint, expirationTime:subscription.expirationTime ? subscription.expirationTime.getTime() : null, keys:subscription.keys }, payload); sent++; }
+    try { await webpush.sendNotification(
+        { endpoint:subscription.endpoint, expirationTime:subscription.expirationTime ? subscription.expirationTime.getTime() : null, keys:subscription.keys },
+        payload,
+        isCall ? { TTL: 60, urgency: "high" } : undefined
+      ); sent++; }
     catch (error) { if (error.statusCode===404 || error.statusCode===410) { await PushSubscription.deleteOne({_id:subscription._id}); removed++; } else console.warn("Web push delivery failed:",error.message); }
   }
   return { sent, removed, subscriptions: subscriptions.length };
