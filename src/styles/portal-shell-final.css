@@ -244,6 +244,7 @@
     backdrop-filter: blur(20px) saturate(145%) !important;
     -webkit-backdrop-filter: blur(20px) saturate(145%) !important;
     z-index: 12000 !important;
+    overflow: visible !important;
   }
 
   .dashboard-sidebar.mobile-bottom-nav .sidebar-menu {
@@ -256,6 +257,11 @@
     width: 100% !important;
     padding: 0 !important;
     overflow: visible !important;
+  }
+
+  /* The More sheet is a fixed child of the dock; keep the dock from clipping it. */
+  .dashboard-sidebar.mobile-bottom-nav .mobile-more-panel {
+    overflow-y: auto !important;
   }
 
   .dashboard-sidebar.mobile-bottom-nav .sidebar-link,

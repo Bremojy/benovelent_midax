@@ -8,6 +8,7 @@ import ChatWindow from "./ChatWindow";
 import CallOverlay from "./CallOverlay";
 import API from "../../services/api";
 import { getPendingCall, removePendingCall } from "../../utils/pushCallStore";
+import { startCallTone } from "../../utils/callTone";
 import { startNativeIncomingCall } from "../../utils/nativeCallBridge";
 import { useAuth } from "../../context/AuthContext";
 import { useSocket } from "../../context/SocketContext";
@@ -105,10 +106,6 @@ function MessageCenterPage({
     if (!actorId) return undefined;
 
     const activeSocket = contextSocket || socketClient;
-    const token = getToken(currentUser?.role || authUser?.role);
-    activeSocket.auth = { token };
-    if (activeSocket.io?.opts) activeSocket.io.opts.query = { token };
-
     const handleConnectError = (error) => {
       console.warn("Chat socket connection error:", error?.message || error);
       setBanner("Chat is reconnecting. Messaging stays available; calls will work once the secure call connection is ready.");
@@ -129,6 +126,11 @@ function MessageCenterPage({
     const handleCallNotification = (payload) => {
       const title = payload?.title || "Incoming call";
       const body = payload?.message || "Someone is calling you.";
+      // Sound must begin with the incoming-call notification itself, not only
+      // after the call overlay mounts. The shared tone prevents double ringing.
+      if (payload?.callType === "audio" || payload?.callType === "video" || payload?.type === "incoming_call") {
+        startCallTone();
+      }
       setBanner(`${title}: ${body}`);
       if (typeof document !== "undefined" && document.visibilityState !== "visible" && typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
         try { new Notification(title, { body, tag: `call-${payload?.callerUserId || Date.now()}` }); } catch {}
@@ -671,17 +673,15 @@ function waitForSocketConnection(activeSocket, timeout = 9000) {
   });
 }
 
-function getToken(role) {
-  const normalized = String(role || "").toLowerCase();
-  if (normalized === "superadmin") return sessionStorage.getItem("superAdminToken");
-  if (normalized === "admin") return sessionStorage.getItem("adminToken");
-  return sessionStorage.getItem("memberToken");
-}
-
 function buildActorProfile(user) {
-  const id = String(user?._id || user?.id || user?.chatId || user?.memberId || "").trim();
+  // Admin/SuperAdmin accounts have a mirrored Member chat profile. The
+  // chatId is therefore the canonical identity for contacts/conversations;
+  // portal id remains useful for account-level data but must not win here.
+  const id = String(user?.chatId || user?._id || user?.id || user?.memberId || "").trim();
+  const portalId = String(user?.portalOwnerId || user?._id || user?.id || "").trim();
   return {
     id,
+    portalId,
     email: String(user?.email || "").trim().toLowerCase(),
     username: String(user?.username || "").trim().toLowerCase(),
     phone: normalizePhone(user?.phone || user?.mobile || user?.telephone || ""),
@@ -704,6 +704,7 @@ function normalizeMembers(items, actor) {
 
     const contact = normalizeContact(member, role === "admin" ? "admin" : "member");
     if (isSameUser(contact, actor)) return;
+    if (actor.portalId && String(contact?.portalOwnerId || "") === String(actor.portalId)) return;
 
     const dedupeKey = [contact.role, contact.email || contact.phone || contact.memberNumber || contact.username || id].filter(Boolean).join("|");
     if (unique.has(dedupeKey)) return;
@@ -755,7 +756,10 @@ function normalizeConversations(items, actor) {
     .filter((conversation) => {
       if (!conversation) return false;
       if (!conversation.partner?._id) return false;
-      return !isSameUser(normalizeContact(conversation.partner, conversation.partner?.role || "member"), actor);
+      const partner = normalizeContact(conversation.partner, conversation.partner?.role || "member");
+      if (isSameUser(partner, actor)) return false;
+      if (actor.portalId && String(partner?.portalOwnerId || "") === String(actor.portalId)) return false;
+      return true;
     })
     .sort((a, b) =>
       new Date(b.lastMessageTime || b.updatedAt || b.createdAt) -

@@ -67,20 +67,37 @@ export default function MessageInput({ onSend, socket, conversation, currentUser
 
   const handleSend = async () => {
     const cleanMessage = String(message || "").trim();
+    const draftMessage = cleanMessage;
+    const draftAttachment = attachment;
+    const draftAttachmentPreview = attachmentPreview;
+    const draftType = messageType;
     if ((!cleanMessage && !attachment) || busy || sendingRef.current || recording) return;
     sendingRef.current = true;
     setBusy(true);
+
+    // Match WhatsApp/Instagram composer behaviour: clear the draft as soon
+    // as the user taps Send, while keeping a local copy for failure recovery.
+    setMessage("");
+    clearAttachment();
+    setShowEmoji(false);
+    setShowMore(false);
+    socket?.emit("stop-typing", { conversationId: conversation?._id, sender: currentId });
+
     try {
       await onSend(cleanMessage, attachment, messageType);
-      setMessage("");
-      clearAttachment();
-      setShowEmoji(false);
-      setShowMore(false);
-      socket?.emit("stop-typing", { conversationId: conversation?._id, sender: currentId });
+    } catch (error) {
+      // Put unsent text back so a temporary network error never destroys a draft.
+      setMessage((current) => current || draftMessage);
+      if (draftAttachment) {
+        setAttachment(draftAttachment);
+        setAttachmentPreview(draftAttachmentPreview);
+        setMessageType(draftType);
+      }
+      throw error;
     } finally {
       sendingRef.current = false;
       setBusy(false);
-      textareaRef.current?.focus?.();
+      requestAnimationFrame(() => textareaRef.current?.focus?.());
     }
   };
 

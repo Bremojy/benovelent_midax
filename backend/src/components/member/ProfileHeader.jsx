@@ -73,9 +73,9 @@ function ProfileHeader({ member }) {
 
         </div>
 
-        <button className="edit-profile-btn">
+        <a className="edit-profile-btn" href="/member/profile">
           Edit Profile
-        </button>
+        </a>
 
       </div>
 

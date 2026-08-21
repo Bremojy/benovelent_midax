@@ -86,7 +86,7 @@ function DashboardLayout({ children }) {
     <div
       className={`dashboard-container portal-role-${portalRole} ${
         isMobile ? "dashboard-mobile-shell" : "dashboard-desktop-shell"
-      } ${isDashboardHome ? "dashboard-is-home" : "dashboard-is-subpage"}`}
+      } ${isDashboardHome ? "dashboard-is-home dashboard-home-shell" : "dashboard-is-subpage dashboard-mobile-subpage"}`}
     >
       {isMobile && sidebarOpen && (
         <button

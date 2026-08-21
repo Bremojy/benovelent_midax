@@ -1,6 +1,7 @@
 const DEFAULT_RINGTONE_URL = "/sounds/benovelent-call.mp3";
 let sharedContext = null;
 let unlockBound = false;
+let activeTone = null;
 
 function ensureAudioContext() {
   if (typeof window === "undefined") return null;
@@ -26,13 +27,28 @@ export function unlockCallAudio() {
 
 export function startCallTone() {
   if (typeof window === "undefined") return { stop() {} };
+  if (activeTone) return activeTone;
   unlockCallAudio();
   const configured = String(import.meta.env.VITE_CALL_RINGTONE_URL || "").trim();
   const src = configured || DEFAULT_RINGTONE_URL;
   const audio = new Audio(src);
   audio.loop = true; audio.preload = "auto"; audio.volume = 0.95; audio.setAttribute("playsinline", "true");
-  const tryPlay = () => audio.play().catch(() => {});
+  let playRetry = null;
+  const tryPlay = () => {
+    audio.play().catch(() => {
+      // Mobile browsers may defer autoplay even after a prior interaction.
+      // Retry on the next user gesture/visibility change instead of failing silently forever.
+    });
+  };
   tryPlay();
+  const retryPlay = () => tryPlay();
+  window.addEventListener("pointerdown", retryPlay, { passive: true });
+  window.addEventListener("touchstart", retryPlay, { passive: true });
+  document.addEventListener("visibilitychange", retryPlay);
+  playRetry = window.setInterval(() => {
+    if (!audio.paused) return;
+    tryPlay();
+  }, 1500);
   const ctx = ensureAudioContext();
   let interval = null;
   if (ctx) {
@@ -49,5 +65,20 @@ export function startCallTone() {
     };
     ring(); interval = window.setInterval(ring, 1800);
   }
-  return { stop() { if (interval) window.clearInterval(interval); audio.pause(); audio.currentTime = 0; audio.src = ""; } };
+  const handle = {
+    stop() {
+      if (activeTone !== handle) return;
+      activeTone = null;
+      if (interval) window.clearInterval(interval);
+      if (playRetry) window.clearInterval(playRetry);
+      window.removeEventListener("pointerdown", retryPlay);
+      window.removeEventListener("touchstart", retryPlay);
+      document.removeEventListener("visibilitychange", retryPlay);
+      audio.pause();
+      audio.currentTime = 0;
+      audio.src = "";
+    }
+  };
+  activeTone = handle;
+  return handle;
 }

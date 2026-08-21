@@ -203,9 +203,25 @@ module.exports = (io, socket) => {
 
     try {
       const notification = await deliverCallNotification({ recipient, caller, callType: normalizedType, title, message, callId, incomingPayload, missed: false });
-      io.to(String(caller.chatId)).emit("call-started", { callId, recipientUserId: String(recipient.chatId), callType: normalizedType });
+      const recipientChatRoom = String(recipient.chatId);
+      const recipientPortalRoom = String(recipient.user?._id || "");
+      io.to(String(caller.chatId)).emit("call-started", { callId, recipientUserId: recipientChatRoom, callType: normalizedType });
+
+      // Deliver the live call to the canonical chat-profile room. Keep the
+      // original `to` room emission for existing clients, then add the portal
+      // account room for mirrored Admin/SuperAdmin identities.
       io.to(String(to)).emit("incoming-call", incomingPayload);
-      io.to(`user:${String(to)}`).emit("new-call-notification", { title, message, callType: normalizedType, callId, callerUserId: String(caller.chatId), callerName: incomingPayload.callerName, notification });
+      io.to(recipientChatRoom).emit("incoming-call", incomingPayload);
+      if (recipientPortalRoom && recipientPortalRoom !== recipientChatRoom) {
+        io.to(recipientPortalRoom).emit("incoming-call", incomingPayload);
+      }
+
+      const callNotification = { title, message, callType: normalizedType, callId, callerUserId: String(caller.chatId), callerName: incomingPayload.callerName, notification };
+      io.to(`user:${String(to)}`).emit("new-call-notification", callNotification);
+      io.to(`user:${recipientPortalRoom}`).emit("new-call-notification", callNotification);
+      if (recipientPortalRoom !== recipientChatRoom) {
+        io.to(`user:${recipientChatRoom}`).emit("new-call-notification", callNotification);
+      }
     } catch (error) { console.warn("Could not save/deliver call notification:", error.message); }
   });
 
