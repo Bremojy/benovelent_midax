@@ -326,7 +326,7 @@ exports.savePushSubscription = async (req,res) => {
     if(!subscription?.endpoint || !subscription?.keys?.p256dh || !subscription?.keys?.auth) return res.status(400).json({success:false,message:"A valid browser push subscription is required."});
     const role=String(req.userRole||req.user?.role||"member").toLowerCase();
     const recipientModel=role==="admin"?"Admin":role==="superadmin"?"SuperAdmin":"Member";
-    const saved=await PushSubscription.findOneAndUpdate({recipient:req.user._id,recipientModel,endpoint:String(subscription.endpoint)},{ $set:{ expirationTime:subscription.expirationTime?new Date(subscription.expirationTime):null, keys:{p256dh:String(subscription.keys.p256dh),auth:String(subscription.keys.auth)}, userAgent:String(req.headers["user-agent"]||"").slice(0,500) } },{upsert:true,new:true,setDefaultsOnInsert:true});
+    const saved=await PushSubscription.findOneAndUpdate({recipient:req.user._id,recipientModel,endpoint:String(subscription.endpoint)},{ $set:{ expirationTime:subscription.expirationTime?new Date(subscription.expirationTime):null, keys:{p256dh:String(subscription.keys.p256dh),auth:String(subscription.keys.auth)}, userAgent:String(req.headers["user-agent"]||"").slice(0,500) } },{upsert:true,returnDocument:"after",setDefaultsOnInsert:true});
     res.status(201).json({success:true,subscriptionId:saved._id});
   } catch(error){res.status(500).json({success:false,message:error.message});}
 };

@@ -14,7 +14,7 @@ const generateToken = (user, extra = {}) => {
   };
 
   return jwt.sign(payload, process.env.JWT_SECRET, {
-    expiresIn: process.env.JWT_EXPIRES_IN || '30m',
+    expiresIn: process.env.JWT_EXPIRE || process.env.JWT_EXPIRES_IN || '7d',
     issuer: 'benevolent-midax',
     audience: 'benevolent-midax-users',
     subject: user._id.toString(),
