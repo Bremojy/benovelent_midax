@@ -138,15 +138,25 @@ export default function CallOverlay({
         await flushCandidates();
         const answer = await peerRef.current.createAnswer();
         await peerRef.current.setLocalDescription(answer);
-        socket.emit("call-mode-answer", { to: partnerId, answer, callId: incomingCallId || callId });
+        socket.emit("call-mode-answer", {
+          to: incomingCall?.from || partnerId,
+          answer,
+          callId: incomingCallId || callId,
+          mode: mode === "video" ? "video" : "audio",
+        });
       } catch (err) {
         setError(err.message || "Could not switch the call mode.");
       }
     };
-    const handleModeAnswer = async ({ answer }) => {
+    const handleModeAnswer = async ({ answer, mode }) => {
       if (!peerRef.current || !answer) return;
       try {
         await peerRef.current.setRemoteDescription(new RTCSessionDescription(answer));
+        if (mode === "video" || mode === "audio") {
+          setActiveCallType(mode);
+          setCameraOff(mode !== "video");
+        }
+        await flushCandidates();
         renegotiatingRef.current = false;
       } catch (err) {
         renegotiatingRef.current = false;
@@ -300,27 +310,49 @@ export default function CallOverlay({
     renegotiatingRef.current = true;
     const nextType = activeCallType === "video" ? "audio" : "video";
     try {
+      const videoTransceiver = videoTransceiverRef.current;
+      if (!videoTransceiver) throw new Error("The call video channel is not ready yet.");
+
       if (nextType === "video") {
-        const videoStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false });
+        const videoStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } },
+          audio: false,
+        });
         const videoTrack = videoStream.getVideoTracks()[0];
-        if (!videoTrack || !videoTransceiverRef.current) throw new Error("Camera could not be started.");
-        localStreamRef.current?.getVideoTracks().forEach((track) => track.stop());
+        if (!videoTrack) throw new Error("Camera could not be started.");
+
+        localStreamRef.current?.getVideoTracks().forEach((track) => {
+          track.stop();
+          localStreamRef.current?.removeTrack?.(track);
+        });
         localStreamRef.current?.addTrack(videoTrack);
-        await videoTransceiverRef.current.sender.replaceTrack(videoTrack);
-        videoTransceiverRef.current.direction = "sendrecv";
+        await videoTransceiver.sender.replaceTrack(videoTrack);
+        videoTransceiver.direction = "sendrecv";
         if (localVideoRef.current) localVideoRef.current.srcObject = localStreamRef.current;
         setCameraOff(false);
       } else {
-        await videoTransceiverRef.current?.sender.replaceTrack(null);
-        if (videoTransceiverRef.current) videoTransceiverRef.current.direction = "recvonly";
+        await videoTransceiver.sender.replaceTrack(null);
+        videoTransceiver.direction = "recvonly";
         localStreamRef.current?.getVideoTracks().forEach((track) => track.stop());
-        localStreamRef.current?.getTracks().filter((track) => track.kind === "video").forEach((track) => localStreamRef.current.removeTrack(track));
+        localStreamRef.current?.getTracks()
+          .filter((track) => track.kind === "video")
+          .forEach((track) => localStreamRef.current?.removeTrack?.(track));
+        if (localVideoRef.current) localVideoRef.current.srcObject = localStreamRef.current;
         setCameraOff(true);
       }
-      setActiveCallType(nextType);
-      const offer = await peerRef.current.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true });
+
+      const offer = await peerRef.current.createOffer({
+        offerToReceiveAudio: true,
+        offerToReceiveVideo: true,
+      });
       await peerRef.current.setLocalDescription(offer);
-      socket.emit("call-mode-offer", { to: incomingCall?.from || partnerId, offer, callId, mode: nextType });
+      setActiveCallType(nextType);
+      socket.emit("call-mode-offer", {
+        to: incomingCall?.from || partnerId,
+        offer,
+        callId: incomingCall?.callId || callId,
+        mode: nextType,
+      });
     } catch (err) {
       setError(err.message || "Could not change the call mode.");
       renegotiatingRef.current = false;

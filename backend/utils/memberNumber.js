@@ -51,7 +51,7 @@ const generateMemberNumber = async () => {
             },
           },
         ],
-        { new: true, upsert: true }
+        { new: true, upsert: true, updatePipeline: true }
       ).lean();
 
       const number = Number(counter?.seq || 0);

@@ -18,6 +18,7 @@ for (const [label, source, needles] of [
     'const recipientSockets = new Set()',
     'recipientSockets.forEach((socketId) => io.to(socketId).emit("incoming-call"',
     'recipientSockets.forEach((socketId) => io.to(socketId).emit("new-call-notification"',
+    'mode: normalizedMode',
     'socket.on("call-answer"',
     'socket.on("call-rejected"',
     'socket.on("end-call"',
@@ -27,6 +28,9 @@ for (const [label, source, needles] of [
     "stopNativeIncomingCall",
     "getUserMedia",
     "new RTCPeerConnection",
+    "toggleCallMode",
+    "call-mode-offer",
+    "call-mode-answer",
   ]],
   ["message center", center, [
     'activeSocket.on("incoming-call", handleIncomingCall)',

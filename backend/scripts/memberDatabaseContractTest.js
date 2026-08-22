@@ -13,6 +13,7 @@ const expect = (condition, message) => { if (!condition) failures.push(message);
 
 expect(memberNumber.includes('const memberNumber = `BM${String(number).padStart(3, "0")}`'), "Member numbers must be generated as BM###.");
 expect(memberNumber.includes("aggregation-pipeline update") || memberNumber.includes("$ifNull"), "Member number allocation must avoid conflicting $max/$inc updates on seq.");
+expect(memberNumber.includes("updatePipeline: true"), "Member sequence pipeline updates must explicitly enable Mongoose updatePipeline mode.");
 expect(!memberNumber.includes("{ $max: { seq: floor }, $inc: { seq: 1 } }"), "Member sequence allocator must not combine conflicting updates to seq.");
 
 expect(admin.includes("const cleanMemberNumber = await generateMemberNumber();"), "Member creation must generate the member number server-side.");

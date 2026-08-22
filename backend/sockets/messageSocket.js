@@ -280,12 +280,24 @@ module.exports = (io, socket) => {
     if (to && answer) io.to(String(to)).emit("call-answered", { answer, callId: callId || "" });
   });
 
-  socket.on("call-mode-offer", async ({ to, offer, callId }) => {
-    if (to && offer) io.to(String(to)).emit("call-mode-offer", { offer, callId: callId || "" });
+  socket.on("call-mode-offer", async ({ to, offer, callId, mode }) => {
+    if (!to || !offer) return;
+    const normalizedMode = mode === "video" ? "video" : "audio";
+    io.to(String(to)).emit("call-mode-offer", {
+      offer,
+      callId: callId || "",
+      mode: normalizedMode,
+    });
   });
 
-  socket.on("call-mode-answer", async ({ to, answer, callId }) => {
-    if (to && answer) io.to(String(to)).emit("call-mode-answer", { answer, callId: callId || "" });
+  socket.on("call-mode-answer", async ({ to, answer, callId, mode }) => {
+    if (!to || !answer) return;
+    const normalizedMode = mode === "video" ? "video" : "audio";
+    io.to(String(to)).emit("call-mode-answer", {
+      answer,
+      callId: callId || "",
+      mode: normalizedMode,
+    });
   });
 
   socket.on("call-rejected", async ({ to, callId, reason = "declined" }) => {
