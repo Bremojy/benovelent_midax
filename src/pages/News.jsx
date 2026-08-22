@@ -35,6 +35,7 @@ function News() {
   const [search, setSearch] = useState("");
   const [videoFailed, setVideoFailed] = useState(false);
   const [selectedNews, setSelectedNews] = useState(null);
+  const [reportBusy, setReportBusy] = useState(false);
 
   const activeTab = tabs.some((item) => item.key === searchParams.get("tab")) ? searchParams.get("tab") : "all";
 
@@ -85,6 +86,20 @@ function News() {
     setSearchParams(next, { replace: true });
   };
 
+  const downloadPublishedReport = async (newsItem, format) => {
+    if (!newsItem?.feedbackReportId) return;
+    try {
+      const user = (() => { try { return JSON.parse(sessionStorage.getItem("user") || "null"); } catch { return null; } })();
+      if (!user) { window.location.href = "/login"; return; }
+      setReportBusy(true);
+      const response = await api.get(`/feedback/published/${newsItem.feedbackReportId}/download`, { params: { format }, responseType: "blob" });
+      const url = URL.createObjectURL(response.data);
+      const a = document.createElement("a"); a.href = url; a.download = `feedback-report.${format}`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    } catch (e) { console.error(e); } finally { setReportBusy(false); }
+  };
+
+  const printSelectedNews = () => { window.print(); };
+
   return (
     <main className="news-page newsroom-v8">
       <section className={`news-video-hero ${videoFailed ? "video-failed" : ""}`}>
@@ -120,7 +135,7 @@ function News() {
 
         <section className="public-polls-section newsroom-v8-section"><div className="news-section-title"><div><span>MEMBER VOICE</span><h2>Live community polls</h2></div><Vote size={25}/></div>{polls.length === 0 ? <div className="empty-news compact"><Vote size={32}/><p>No active community poll right now.</p></div> : <div className="public-poll-grid">{polls.map((poll) => <article className="public-poll-card" key={poll._id}><div className="public-poll-title"><BarChart3 size={22}/><div><span>LIVE POLL</span><h3>{poll.title}</h3></div></div><p>{poll.description}</p><div className="public-poll-options">{(poll.options || []).map((option) => { const percent = poll.totalVotes ? Math.round((option.votes / poll.totalVotes) * 100) : 0; return <div className="public-poll-option" key={option._id}><div><span>{option.text}</span><b>{percent}%</b></div><i><em style={{ width: `${percent}%` }}/></i></div>; })}</div><small>{poll.totalVotes || 0} votes • Members vote inside the secure portal</small></article>)}</div>}</section>
 
-        {selectedNews && <div className="news-modal-backdrop" onClick={() => setSelectedNews(null)}><div className="news-modal" onClick={(e) => e.stopPropagation()}><button type="button" className="news-modal-close" onClick={() => setSelectedNews(null)} aria-label="Close update">×</button><img src={imageFor(selectedNews)} alt={selectedNews.title} onError={(e) => { e.currentTarget.src = "/news-placeholder.svg"; }}/><span className="featured-tag">Full update</span><h2>{selectedNews.title}</h2><p>{selectedNews.content}</p>{Array.isArray(selectedNews.attachments) && selectedNews.attachments.length > 0 && <div className="news-attachments"><strong>Attachments</strong>{selectedNews.attachments.map((attachment,index)=>{const url=typeof attachment === "string" ? attachment : attachment?.fileUrl || attachment?.url;if(!url)return null;const fullUrl=url.startsWith("http")?url:`${UPLOAD_URL}${url.startsWith("/")?"":"/"}${url}`;return <a href={fullUrl} target="_blank" rel="noreferrer" key={`${fullUrl}-${index}`}>Open attachment {index+1}</a>;})}</div>}<button type="button" className="read-more-btn" onClick={()=>setSelectedNews(null)}>Close <ChevronRight size={16}/></button></div></div>}
+        {selectedNews && <div className="news-modal-backdrop" onClick={() => setSelectedNews(null)}><div className="news-modal" onClick={(e) => e.stopPropagation()}><button type="button" className="news-modal-close" onClick={() => setSelectedNews(null)} aria-label="Close update">×</button><img src={imageFor(selectedNews)} alt={selectedNews.title} onError={(e) => { e.currentTarget.src = "/news-placeholder.svg"; }}/><span className="featured-tag">Full update</span><h2>{selectedNews.title}</h2><p style={{ whiteSpace: "pre-wrap" }}>{selectedNews.content}</p>{selectedNews.feedbackReportId && <div className="feedback-report-actions"><strong>Feedback report</strong><div><button type="button" className="read-more-btn" disabled={reportBusy} onClick={() => downloadPublishedReport(selectedNews,"csv")}><Download size={16}/> Download CSV</button><button type="button" className="read-more-btn" disabled={reportBusy} onClick={() => downloadPublishedReport(selectedNews,"json")}><Download size={16}/> Download JSON</button><button type="button" className="read-more-btn" onClick={printSelectedNews}><Printer size={16}/> Print</button></div><small>Members and authorised portal users must be signed in to download the full response file.</small></div>}{Array.isArray(selectedNews.attachments) && selectedNews.attachments.length > 0 && <div className="news-attachments"><strong>Attachments</strong>{selectedNews.attachments.map((attachment,index)=>{const url=typeof attachment === "string" ? attachment : attachment?.fileUrl || attachment?.url;if(!url)return null;const fullUrl=url.startsWith("http")?url:`${UPLOAD_URL}${url.startsWith("/")?"":"/"}${url}`;return <a href={fullUrl} target="_blank" rel="noreferrer" key={`${fullUrl}-${index}`}>Open attachment {index+1}</a>;})}</div>}<button type="button" className="read-more-btn" onClick={()=>setSelectedNews(null)}>Close <ChevronRight size={16}/></button></div></div>}
       </div>
     </main>
   );

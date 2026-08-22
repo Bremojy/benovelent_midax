@@ -57,9 +57,18 @@ const newsSchema = new mongoose.Schema(
         {
             fileName:String,
             fileUrl:String,
-            fileType:String
+            fileType:String,
+            name:String,
+            url:String,
+            type:String
         }
     ],
+
+    feedbackReportId:{
+        type:mongoose.Schema.Types.ObjectId,
+        ref:"FeedbackCollection",
+        default:null
+    },
 
     author:{
         type:mongoose.Schema.Types.ObjectId,

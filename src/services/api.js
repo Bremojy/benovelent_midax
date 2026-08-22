@@ -63,7 +63,7 @@ const API = axios.create({
   timeout: Number(import.meta.env.VITE_API_TIMEOUT || 20000),
   withCredentials: true,
   headers: {
-    "Content-Type": "application/json",
+    Accept: "application/json",
   },
 });
 

@@ -35,9 +35,14 @@ async function createAccounts() {
       });
 
     if (admin) {
-      console.log(
-        "⚠️ Admin account already exists."
-      );
+      admin.password = adminInitialPassword;
+      admin.status = "active";
+      admin.role = "admin";
+      admin.mustChangePassword = true;
+      admin.failedLoginAttempts = 0;
+      admin.accountLockedUntil = null;
+      await admin.save();
+      console.log("✅ Existing Admin account repaired and password synchronized.");
     } else {
       admin = new Admin({
         name:
@@ -83,9 +88,14 @@ async function createAccounts() {
       });
 
     if (superAdmin) {
-      console.log(
-        "⚠️ SuperAdmin account already exists."
-      );
+      superAdmin.password = superAdminInitialPassword;
+      superAdmin.status = "active";
+      superAdmin.role = "superadmin";
+      superAdmin.mustChangePassword = true;
+      superAdmin.failedLoginAttempts = 0;
+      superAdmin.accountLockedUntil = null;
+      await superAdmin.save();
+      console.log("✅ Existing SuperAdmin account repaired and password synchronized.");
     } else {
       superAdmin =
         new SuperAdmin({
