@@ -15,7 +15,7 @@
     "test": "npm run test:security && npm run test:quality && npm run test:integrity && npm run test:routes && npm run test:ui && npm run test:call && npm run test:call-auth && npm run test:verification && npm run test:shell && npm run test:regression",
     "test:shell": "node backend/scripts/portalShellTest.js",
     "test:regression": "node backend/scripts/regressionAuditTest.js",
-    "vercel-build": "vite build && node scripts/copy-vite-output.mjs",
+    "vercel-build": "npm run build && node scripts/verify-vercel-assets.mjs",
     "test:call": "node backend/scripts/callFlowContractTest.js",
     "test:security": "node backend/scripts/securityContractTest.js",
     "test:call-auth": "node backend/scripts/callAuthRegressionTest.js",
@@ -45,5 +45,6 @@
   },
   "engines": {
     "node": ">=20.19.0"
-  }
+  },
+  "test:vercel-assets": "node scripts/verify-vercel-assets.mjs"
 }
