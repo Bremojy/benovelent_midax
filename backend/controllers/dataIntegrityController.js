@@ -960,18 +960,24 @@ exports.getMemberReconciliation = async (req, res) => {
             Member.find({ role: "member", isDeleted: false }).select("_id fullName email status memberNumber verified createdAt updatedAt").sort({ createdAt: -1 }).lean(),
             Member.find({ role: "member", isDeleted: true }).select("_id fullName email status memberNumber deletedBy createdAt updatedAt").sort({ updatedAt: -1 }).lean(),
         ]);
+        const liveMembers = live;
+        const archivedMembers = archived;
+        const portalChatProfiles = all.filter(
+            (x) => String(x.role || "").toLowerCase() !== "member" || x.portalOwnerId || x.portalOwnerRole
+        );
+
         return res.json({
             success: true,
             database: { connected: mongoose.connection.readyState === 1, name: mongoose.connection.name || "" },
             summary: {
                 rawMemberCollectionDocuments: all.length,
-                liveMembers: live.length,
-                archivedMembers: archived.length,
-                portalChatProfiles: all.filter((x) => String(x.role || "").toLowerCase() !== "member" || x.portalOwnerId || x.portalOwnerRole).length,
+                liveMembers: liveMembers.length,
+                archivedMembers: archivedMembers.length,
+                portalChatProfiles: portalChatProfiles.length,
             },
             liveMembers,
-            archivedMembers: archived,
-            portalChatProfiles: all.filter((x) => String(x.role || "").toLowerCase() !== "member" || x.portalOwnerId || x.portalOwnerRole),
+            archivedMembers,
+            portalChatProfiles,
         });
     } catch (error) {
         console.error("Member reconciliation error:", error);
