@@ -61,7 +61,27 @@ for (const item of jsAssets) {
 const rewrites = cfg.rewrites || [];
 const spaFallback = rewrites.find((rule) => rule?.destination === "/index.html");
 if (!spaFallback) fail("SPA fallback rewrite to /index.html is missing.");
-if (!String(spaFallback.source).includes("assets")) fail("SPA fallback does not exclude /assets/*.");
-if (!String(spaFallback.source).includes("api")) fail("SPA fallback does not exclude /api/*.");
+const spaSource = String(spaFallback.source);
+if (!spaSource.includes("assets") || !spaSource.includes("api")) {
+  fail(`SPA fallback must explicitly exclude /assets/* and /api/*: ${spaSource}`);
+}
+// Guard against the exact failure mode this check is intended to prevent.
+// The fallback must not match API or built asset requests, while still matching client-side routes.
+const excludes = [
+  { path: "/assets/index-ABC123.js", label: "/assets/*" },
+  { path: "/api/health", label: "/api/*" },
+];
+for (const item of excludes) {
+  const pattern = new RegExp(`^${spaSource.replace(/^\//, "")}`);
+  if (pattern.test(item.path.replace(/^\//, ""))) {
+    fail(`SPA fallback still matches ${item.label}: ${spaSource}`);
+  }
+}
+const normalized = spaSource.replace(/^\//, "");
+const routeCandidate = "/member/dashboard".replace(/^\//, "");
+const routePattern = new RegExp(`^${normalized}`);
+if (!routePattern.test(routeCandidate)) {
+  fail(`SPA fallback does not match a client-side route such as /member/dashboard: ${spaSource}`);
+}
 
 console.log(`VERCEL ASSET VERIFICATION PASSED: ${checked.length} local index assets checked; ${jsAssets.length} JavaScript assets verified as non-HTML.`);

@@ -94,7 +94,7 @@
       "destination": "https://benovelent-midax.onrender.com/api/:path*"
     },
     {
-      "source": "/((?!.*\\.[^/]+$).*)",
+      "source": "/((?!api(?:/|$))(?!assets(?:/|$))(?!.*\\.[^/]+$).*)",
       "destination": "/index.html"
     }
   ]
