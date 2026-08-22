@@ -11,6 +11,7 @@ const PROFILE_FIELDS = [
   { key: "maritalStatus", label: "Marital status" },
   { key: "dateOfBirth", label: "Date of birth" },
   { key: "physicalAddress", label: "Physical address" },
+  { key: "position", label: "Position" },
   { key: "siteStation", label: "Site station" },
   { key: "acceptedConstitution", label: "Constitution accepted" },
   { key: "acceptedPrivacyPolicy", label: "Privacy policy accepted" },

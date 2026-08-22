@@ -36,12 +36,12 @@ exports.createContribution = async (req, res) => {
       memberId = found?._id || null;
     }
     if (!memberId) {
-      return res.status(400).json({ success: false, message: "Employee number is required." });
+      return res.status(400).json({ success: false, message: "Benovelent MIDAX Number is required." });
     }
 
     const memberExists = await Member.exists({ _id: memberId });
     if (!memberExists) {
-      return res.status(404).json({ success: false, message: "Employee number not found." });
+      return res.status(404).json({ success: false, message: "Benovelent MIDAX Number not found." });
     }
 
     const exists = await Contribution.findOne({ member: memberId, month, year });

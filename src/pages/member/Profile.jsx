@@ -18,7 +18,7 @@ const DEFAULT_MEMBER = {
   physicalAddress: "",
   siteStation: "",
   customSiteStation: "",
-  occupation: "",
+  position: "",
   employer: "",
   mpesaNumber: "",
   bankName: "",
@@ -101,7 +101,7 @@ export default function Profile() {
         physicalAddress: member.physicalAddress || "",
         siteStation: member.siteStation || "",
         customSiteStation: member.customSiteStation || "",
-        occupation: member.occupation || "",
+        position: member.position || "",
         employer: member.employer || "",
         mpesaNumber: member.mpesaNumber || "",
         bankName: member.bankName || "",
@@ -216,7 +216,7 @@ export default function Profile() {
               {member.siteStation === "None of above" && (
                 <Field label="Custom site station" value={member.customSiteStation} onChange={(v) => set("customSiteStation", v)} required />
               )}
-              <Field label="Occupation" value={member.occupation} onChange={(v) => set("occupation", v)} />
+              <Field label="Position" value={member.position} onChange={(v) => set("position", v)} />
               <Field label="Employer" value={member.employer} onChange={(v) => set("employer", v)} />
               <Field label="M-Pesa number" value={member.mpesaNumber} onChange={(v) => set("mpesaNumber", v)} />
               <Field label="Bank name" value={member.bankName} onChange={(v) => set("bankName", v)} />

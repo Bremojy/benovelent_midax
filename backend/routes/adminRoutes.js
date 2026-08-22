@@ -38,6 +38,7 @@ const {
   deleteMember,
   restoreMember,
   resetPassword,
+  verifyMember,
   getRecentMembers,
   getStatistics,
   filterMembers,
@@ -196,6 +197,17 @@ router.put(
   protect,
   isAdminOrSuperAdmin,
   updateMember
+);
+
+// =======================================
+// VERIFY MEMBER
+// =======================================
+
+router.patch(
+  "/members/:id/verify",
+  protect,
+  isAdminOrSuperAdmin,
+  verifyMember
 );
 
 // =======================================

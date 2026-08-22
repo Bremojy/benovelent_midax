@@ -127,7 +127,7 @@ export const getAdminMember = async (
 ) => {
   if (!memberId) {
     throw new Error(
-      "Employee number is required."
+      "Benovelent MIDAX Number is required."
     );
   }
 
@@ -165,13 +165,20 @@ export const createAdminMember = async (
 // UPDATE MEMBER
 // ========================================
 
+export const verifyAdminMember = async (memberId) => {
+  if (!memberId) throw new Error("Member ID is required.");
+  const { data } = await API.patch(`/admin/members/${memberId}/verify`);
+  return data;
+};
+
+
 export const updateAdminMember = async (
   memberId,
   memberData
 ) => {
   if (!memberId) {
     throw new Error(
-      "Employee number is required."
+      "Benovelent MIDAX Number is required."
     );
   }
 
@@ -199,7 +206,7 @@ export const deleteAdminMember = async (
 ) => {
   if (!memberId) {
     throw new Error(
-      "Employee number is required."
+      "Benovelent MIDAX Number is required."
     );
   }
 
@@ -220,7 +227,7 @@ export const suspendAdminMember = async (
 ) => {
   if (!memberId) {
     throw new Error(
-      "Employee number is required."
+      "Benovelent MIDAX Number is required."
     );
   }
 
@@ -241,7 +248,7 @@ export const activateAdminMember = async (
 ) => {
   if (!memberId) {
     throw new Error(
-      "Employee number is required."
+      "Benovelent MIDAX Number is required."
     );
   }
 
@@ -262,7 +269,7 @@ export const restoreAdminMember = async (
 ) => {
   if (!memberId) {
     throw new Error(
-      "Employee number is required."
+      "Benovelent MIDAX Number is required."
     );
   }
 
@@ -282,7 +289,7 @@ export const resetAdminMemberPassword =
   async (memberId) => {
     if (!memberId) {
       throw new Error(
-        "Employee number is required."
+        "Benovelent MIDAX Number is required."
       );
     }
 
@@ -535,6 +542,7 @@ export default {
   getAdminMember,
   createAdminMember,
   updateAdminMember,
+  verifyAdminMember,
   deleteAdminMember,
   suspendAdminMember,
   activateAdminMember,

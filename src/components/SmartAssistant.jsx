@@ -72,14 +72,12 @@ function normalize(value) { return String(value || "").toLowerCase().replace(/[^
 function makeMessage(from, text) { return { id: `${Date.now()}-${Math.random().toString(36).slice(2)}`, from, text, at: new Date().toISOString() }; }
 function fallbackAnswer(question, role) {
   const text = normalize(question);
-  if (!text) return "Hello! Ask me about Benevolent MIDAX, the Constitution, services, contributions, support, claims, members, chat, calls, notifications, polls, resources or portal navigation.";
+  if (!text) return "Hello! I’m here to help. Ask me what you want to know or do, and I’ll explain it in simple, human language.";
   if (text.includes("another phone") || text.includes("other phone") || text.includes("same device") || text.includes("two accounts") || text.includes("different accounts") || text.includes("logged out") || text.includes("security")) return "Benevolent MIDAX keeps one active portal account per browser/device session. Signing into another account replaces the previous portal session, and server-side session protection can also sign out an older login.";
-  if (text.includes("who are you") || text.includes("what can you do")) return "I’m Benevolent Assistant. I can explain published Benovelent MIDAX information, guide you around the portal and point you to the right section.";
+  if (text.includes("who are you") || text.includes("what can you do")) return "I’m Benevolent Assistant. I can explain Benevolent MIDAX information, guide you around the website and portal, and help you understand what to do next without technical language.";
   const hit = FAQ.find((item) => item.keys.some((key) => text.includes(key)));
   if (hit) return hit.answer;
-  if (role === "member") return "I could not match that to a published portal topic. Try Support, Claims, Profile, Accounts, Chat, Notifications, Polls or the Constitution.";
-  if (role === "admin" || role === "superadmin") return "I could not match that to a published admin topic. Try Members, Support, Claims, Chat, Notifications, Polls, News or the Constitution.";
-  return "I could not match that to a published website topic. Try Membership, Support, the Constitution, News or Contact information.";
+  return "I do not want to guess and give you the wrong answer. Tell me what you are trying to do in simple words—such as completing your profile, getting verified, adding a dependant, submitting support, finding a member, making an audio/video call, or finding the Constitution—and I’ll guide you from there.";
 }
 function getHistoryKey(role, path) {
   const portal = String(role || "public").toLowerCase();

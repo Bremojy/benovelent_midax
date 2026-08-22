@@ -7,6 +7,13 @@ import "./CallOverlay.css";
 const ICE_SERVERS = [
   { urls: "stun:stun.l.google.com:19302" },
   { urls: "stun:stun1.l.google.com:19302" },
+  ...(String(import.meta.env.VITE_TURN_SERVER_URL || "").trim()
+    ? [{
+        urls: String(import.meta.env.VITE_TURN_SERVER_URL).split(",").map((value) => value.trim()).filter(Boolean),
+        username: String(import.meta.env.VITE_TURN_USERNAME || "").trim() || undefined,
+        credential: String(import.meta.env.VITE_TURN_CREDENTIAL || "").trim() || undefined,
+      }]
+    : []),
 ];
 const RING_TIMEOUT_SECONDS = 35;
 
@@ -195,6 +202,11 @@ export default function CallOverlay({
       if (remoteVideoRef.current) remoteVideoRef.current.srcObject = stream;
       if (remoteAudioRef.current) remoteAudioRef.current.srcObject = stream;
     };
+    peer.oniceconnectionstatechange = () => {
+      if (peer.iceConnectionState === "failed") {
+        setError("The call could not reach the other device. A TURN server may be required on restrictive networks.");
+      }
+    };
     peer.onconnectionstatechange = () => {
       const state = peer.connectionState;
       if (state === "connected") {
@@ -214,10 +226,24 @@ export default function CallOverlay({
     if (!navigator.mediaDevices?.getUserMedia) {
       throw new Error("Your browser does not support camera and microphone calls.");
     }
-    return navigator.mediaDevices.getUserMedia({
-      audio: true,
-      video: type === "video" ? { facingMode: "user" } : false,
-    });
+    if (typeof window !== "undefined" && !window.isSecureContext && !["localhost", "127.0.0.1"].includes(window.location.hostname)) {
+      throw new Error("Secure calling requires HTTPS. Open the Benovelent site over HTTPS and allow microphone/camera access.");
+    }
+    try {
+      return await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+        video: type === "video" ? { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } } : false,
+      });
+    } catch (error) {
+      const code = String(error?.name || "");
+      if (code === "NotAllowedError" || code === "SecurityError") {
+        throw new Error("Microphone/camera permission was denied. Allow access in your browser settings and try the call again.");
+      }
+      if (code === "NotFoundError") {
+        throw new Error(type === "video" ? "No camera and microphone were found on this device." : "No microphone was found on this device.");
+      }
+      throw error;
+    }
   }
 
   async function startCall() {

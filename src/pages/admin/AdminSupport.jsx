@@ -140,7 +140,7 @@ export default function AdminSupport() {
       setInviting(true);
 
       const payload = {
-        memberNumber: invite.memberNumber.trim(),
+        memberNumber: invite.memberNumber.trim().toUpperCase(),
         fullName: invite.fullName.trim(),
         username: invite.username.trim(),
         phone: invite.phone.trim(),
@@ -297,7 +297,7 @@ export default function AdminSupport() {
                       <div><strong>National ID:</strong> {member.nationalId || "—"} | <strong>Gender:</strong> {member.gender || "—"} | <strong>DOB:</strong> {member.dateOfBirth ? new Date(member.dateOfBirth).toLocaleDateString() : "—"}</div>
                       <div><strong>Address:</strong> {member.physicalAddress || "—"}</div>
                       <div><strong>Site station:</strong> {member.siteStation === "None of above" ? member.customSiteStation || "—" : member.siteStation || "—"}</div>
-                      <div><strong>Occupation:</strong> {member.occupation || "—"} | <strong>Employer:</strong> {member.employer || "—"}</div>
+                      <div><strong>Position:</strong> {member.position || "—"} | <strong>Employer:</strong> {member.employer || "—"}</div>
                       <div><strong>M-Pesa:</strong> {member.mpesaNumber || "—"} | <strong>Bank:</strong> {member.bankName || "—"} / {member.bankBranch || "—"} | <strong>Account:</strong> {member.accountNumber || "—"}</div>
                       <div><strong>Emergency contact:</strong> {member.emergencyContact?.fullName || "—"} {member.emergencyContact?.phone ? `(${member.emergencyContact.phone})` : ""}</div>
                       <div><strong>Next of kin:</strong> {member.nextOfKin?.fullName || "—"} {member.nextOfKin?.phone ? `(${member.nextOfKin.phone})` : ""}</div>

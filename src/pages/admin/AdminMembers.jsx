@@ -13,6 +13,7 @@ import {
   getAdminMembers,
   createAdminMember,
   updateAdminMember,
+  verifyAdminMember,
   deleteAdminMember,
   suspendAdminMember,
   activateAdminMember,
@@ -79,6 +80,9 @@ function AdminMembers() { const { role }=useAuth(); const isSuperAdmin=role==="s
     useState(null);
 
   const [resettingId, setResettingId] =
+    useState(null);
+
+  const [verifyingId, setVerifyingId] =
     useState(null);
 
   // ========================================
@@ -368,6 +372,34 @@ function AdminMembers() { const { role }=useAuth(); const isSuperAdmin=role==="s
   };
 
   // ========================================
+  // VERIFY MEMBER
+  // ========================================
+
+  const handleVerify = async (member) => {
+    const memberId = member._id || member.id;
+    if (!memberId) return;
+    if (Number(member.profileCompletion || 0) < 100) {
+      setError("The member must complete the profile to 100% before verification.");
+      return;
+    }
+    const confirmed = window.confirm(`Verify ${member.fullName || "this member"}? After verification, the member can add dependents and submit support requests.`);
+    if (!confirmed) return;
+    try {
+      setVerifyingId(memberId);
+      setError("");
+      const response = await verifyAdminMember(memberId);
+      if (!response?.success) throw new Error(response?.message || "Unable to verify member.");
+      setSelectedMember(null);
+      await loadMembers();
+    } catch (err) {
+      console.error("Verify member error:", err);
+      setError(err.response?.data?.message || err.message || "Unable to verify member.");
+    } finally {
+      setVerifyingId(null);
+    }
+  };
+
+  // ========================================
   // RESET PASSWORD
   // ========================================
 
@@ -577,6 +609,11 @@ function AdminMembers() { const { role }=useAuth(); const isSuperAdmin=role==="s
             value={suspendedMembers}
           />
 
+          <StatCard
+            label="Verification Pending"
+            value={members.filter((member) => member.verificationPending || (Number(member.profileCompletion || 0) === 100 && !member.verified)).length}
+          />
+
         </section>
 
         {/* ==================================
@@ -679,6 +716,10 @@ function AdminMembers() { const { role }=useAuth(); const isSuperAdmin=role==="s
 
                     <th>
                       Status
+                    </th>
+
+                    <th>
+                      Verification
                     </th>
 
                     <th>
@@ -800,6 +841,25 @@ function AdminMembers() { const { role }=useAuth(); const isSuperAdmin=role==="s
                               )}
                             </span>
 
+                          </td>
+
+                          {/* VERIFICATION */}
+
+                          <td>
+                            {member.verified ? (
+                              <span className="admin-member-status active">Verified</span>
+                            ) : member.verificationPending || Number(member.profileCompletion || 0) === 100 ? (
+                              <button
+                                type="button"
+                                className="verify-member-button"
+                                disabled={verifyingId === memberId}
+                                onClick={() => handleVerify(member)}
+                              >
+                                {verifyingId === memberId ? "Verifying..." : "Verify Member"}
+                              </button>
+                            ) : (
+                              <span className="verification-pending-text">Complete 100%</span>
+                            )}
                           </td>
 
                           {/* ACTIONS */}
@@ -1181,7 +1241,7 @@ function MemberFormModal({
       !form.phone.trim()
     ) {
       setFormError(
-        "Member Number, Full Name and Phone are required."
+        "Benovelent MIDAX Number, Full Name and Phone are required."
       );
 
       return;
@@ -1304,7 +1364,7 @@ function MemberFormModal({
           <div className="admin-form-grid">
 
             <FormField
-              label="Member Number *"
+              label="Benovelent MIDAX Number *"
               name="memberNumber"
               value={
                 form.memberNumber
@@ -1313,6 +1373,8 @@ function MemberFormModal({
                 handleChange
               }
               placeholder="e.g. BM001"
+              readOnly={editing}
+              title={editing ? "This Benovelent MIDAX Number is permanent and cannot be changed." : "Enter the existing Benovelent MIDAX Number, for example BM001."}
             />
 
             <FormField
@@ -1352,7 +1414,7 @@ function MemberFormModal({
             />
 
             <FormField
-              label="Email"
+              label="Email *"
               name="email"
               type="email"
               value={
@@ -1555,7 +1617,7 @@ function MemberDetailsModal({
         <div className="admin-member-modal-body admin-member-modal-body-grid">
 
           <MemberDetail label="Full Name" value={member.fullName} />
-          <MemberDetail label="Member / Employee Number" value={member.memberNumber} />
+          <MemberDetail label="Benovelent MIDAX Number" value={member.memberNumber} />
           <MemberDetail label="Username" value={member.username} />
           <MemberDetail label="Email" value={member.email} />
           <MemberDetail label="Phone" value={member.phone} />

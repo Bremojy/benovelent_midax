@@ -220,7 +220,7 @@ export default function AdminFinance() {
       <html><head><title>Benovelent Midax Ledger</title>${printHeadStyles()}</head><body>
       ${buildPrintHeadHtml({ title: `Benovelent Fund Ledger — ${ledger?.year || new Date().getFullYear()}`, subtitle: "Official scheme financial ledger." })}
       <p class="print-note">Credits: ${number(totals.credit)} • Debits: ${number(totals.debit)} • Balance: ${number(totals.balance)}</p>
-      <table><thead><tr><th>Date</th><th>Employee number</th><th>Description</th><th>Debit</th><th>Credit</th><th>Balance</th></tr></thead><tbody>
+      <table><thead><tr><th>Date</th><th>Benovelent MIDAX Number</th><th>Description</th><th>Debit</th><th>Credit</th><th>Balance</th></tr></thead><tbody>
       ${rows.map((row) => `<tr><td>${date(row.transactionDate || row.createdAt)}</td><td>${escapeHtml(row.employeeNumber || "—")}</td><td>${escapeHtml(row.description || row.category || row.type || "—")}</td><td>${number(row.debit)}</td><td>${number(row.credit)}</td><td>${number(row.runningBalance)}</td></tr>`).join("")}
       <tr class="ledger-total-row"><td colspan="3">Totals</td><td>${number(totals.debit)}</td><td>${number(totals.credit)}</td><td>${number(totals.balance)}</td></tr>
       </tbody></table><script>window.onload=()=>window.print();</script></body></html>`);
@@ -268,7 +268,7 @@ export default function AdminFinance() {
         <section id="finance-editor" className="portal-panel">
           <h2>{editing ? "Edit Transaction" : "Add Transaction"}</h2>
           <form onSubmit={saveTransaction} className="portal-form-grid">
-            <label className="portal-field"><span>Employee number</span><input type="text" autoComplete="off" value={form.employeeNumber} onChange={(e) => setForm({ ...form, employeeNumber: e.target.value })} placeholder="Enter employee number" inputMode="text" required={form.type === "contribution" || form.type === "claim" || form.type === "refund"} /></label>
+            <label className="portal-field"><span>Benovelent MIDAX Number</span><input type="text" autoComplete="off" value={form.employeeNumber} onChange={(e) => setForm({ ...form, employeeNumber: e.target.value })} placeholder="Enter Benovelent MIDAX Number" inputMode="text" required={form.type === "contribution" || form.type === "claim" || form.type === "refund"} /></label>
             <label className="portal-field"><span>Date</span><input type="date" value={form.transactionDate} onChange={(e) => setForm({ ...form, transactionDate: e.target.value })} required /></label>
             <label className="portal-field"><span>Type</span><select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}><option value="contribution">Contribution</option><option value="claim">Support / Claim</option><option value="expense">Expense</option><option value="income">Income</option><option value="refund">Refund</option><option value="withdrawal">Withdrawal</option><option value="adjustment">Adjustment</option></select></label>
             <label className="portal-field"><span>Category</span><input type="text" inputMode="text" autoComplete="off" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} placeholder="Salary, funeral support, etc." /></label>
@@ -293,7 +293,7 @@ export default function AdminFinance() {
             <Stat label="Debits" value={number(ledger?.totals?.debit)} />
             <Stat label="Closing balance" value={number(ledger?.totals?.balance)} />
           </div>
-          <div className="portal-table-wrap"><table className="portal-table"><thead><tr><th>Date</th><th>Employee number</th><th>Description</th><th>Debit</th><th>Credit</th><th>Running balance</th></tr></thead><tbody>
+          <div className="portal-table-wrap"><table className="portal-table"><thead><tr><th>Date</th><th>Benovelent MIDAX Number</th><th>Description</th><th>Debit</th><th>Credit</th><th>Running balance</th></tr></thead><tbody>
             {(ledger?.entries || []).map((x, i) => <tr key={x._id || i}><td>{date(x.transactionDate || x.createdAt)}</td><td>{x.employeeNumber || "—"}</td><td>{x.description || x.category || x.type || "—"}</td><td>{x.debit ? number(x.debit) : "—"}</td><td>{x.credit ? number(x.credit) : "—"}</td><td>{number(x.runningBalance)}</td></tr>)}
             {!ledger?.entries?.length && <tr><td colSpan="6" className="ledger-muted">No approved/completed transactions for this year.</td></tr>}
           </tbody></table></div>

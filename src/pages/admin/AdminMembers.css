@@ -2380,3 +2380,32 @@ input[type="number"]::-webkit-outer-spin-button {
 @media(max-width:600px){.admin-member-temp-password-row{flex-direction:column}.admin-member-temp-password-generate{min-height:44px}}
 
 .admin-members-table-wrapper{width:100%;min-width:0;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain}
+
+
+.verify-member-button {
+  border: 0;
+  border-radius: 9px;
+  padding: 8px 11px;
+  background: #16803c;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.verify-member-button:hover:not(:disabled) {
+  background: #126b31;
+}
+
+.verify-member-button:disabled {
+  opacity: .65;
+  cursor: not-allowed;
+}
+
+.verification-pending-text {
+  font-size: 12px;
+  font-weight: 700;
+  color: #b26b00;
+  white-space: nowrap;
+}

@@ -11,6 +11,9 @@ const memberSchema = new mongoose.Schema(
       required: true,
       unique: true,
       trim: true,
+      immutable: true,
+      uppercase: true,
+      match: /^BM\d{3,}$/i,
     },
 
     fullName: {
@@ -72,11 +75,6 @@ sparse:true,
       trim: true,
     },
 
-    position: {
-      type: String,
-      trim: true,
-    },
-
     monthlyContribution: {
       type: Number,
       required: true,
@@ -98,6 +96,11 @@ sparse:true,
     verified: {
       type: Boolean,
       default: false,
+    },
+
+    verificationRequestedAt: {
+      type: Date,
+      default: null,
     },
 
     unreadNotifications: {
@@ -248,7 +251,7 @@ customSiteStation: {
 // EMPLOYMENT
 // =====================================
 
-occupation: {
+position: {
   type: String,
   trim: true,
 },

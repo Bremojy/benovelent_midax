@@ -15,6 +15,7 @@ const FuneralSupport = require("../models/FuneralSupport");
 const { resolveStoredFileUrl } = require("../utils/uploadUrl");
 const { deleteMemberPermanently } = require("../utils/permanentAccountDeletion");
 const generateTemporaryPassword = require("../utils/generateTemporaryPassword");
+const { createNotification } = require("../services/notificationService");
 
 /* =====================================================
    ADMIN DASHBOARD
@@ -153,12 +154,23 @@ exports.getMembers = async (req, res) => {
 
     const total = await Member.countDocuments(query);
 
-    const members = await Member.find(query)
+    const rawMembers = await Member.find(query)
       .select("-password -monthlyIncome")
       .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
       .limit(limit)
       .lean();
+
+    const members = rawMembers.map((member) => {
+      const completion = calculateProfileCompletion(member);
+      return {
+        ...member,
+        profileCompletion: completion.percentage,
+        profileCompleted: completion.percentage === 100,
+        verificationPending: completion.percentage === 100 && !member.verified,
+        missingFields: completion.missingFields,
+      };
+    });
 
     res.json({
       success: true,
@@ -166,6 +178,7 @@ exports.getMembers = async (req, res) => {
       page,
       totalPages: Math.ceil(total / limit),
       count: members.length,
+      verificationPendingCount: members.filter((member) => member.verificationPending).length,
       members,
     });
   } catch (error) {
@@ -234,7 +247,15 @@ exports.createMember = async (req, res) => {
     // ==========================================
 
     const cleanMemberNumber =
-      String(memberNumber || "").trim();
+      String(memberNumber || "").trim().toUpperCase();
+
+    if (!/^BM\d{3,}$/.test(cleanMemberNumber)) {
+      return res.status(400).json({
+        success: false,
+        code: "INVALID_BENOVELENT_MIDAX_NUMBER",
+        message: "Benovelent MIDAX Number must use the format BM001, BM002, BM003, etc."
+      });
+    }
 
     const cleanFullName =
       String(fullName || "").trim();
@@ -483,7 +504,8 @@ exports.createMember = async (req, res) => {
       `Hello ${member.fullName},`,
       "",
       "Your Benevolent Midax member account has been created.",
-      `Member Number: ${member.memberNumber}`,
+      `Benovelent MIDAX Number: ${member.memberNumber}`,
+      `Member Email: ${member.email}`,
       `Username: ${member.username || member.email || member.phone}`,
       `Temporary Password: ${temporaryPassword}`,
       "",
@@ -496,7 +518,8 @@ exports.createMember = async (req, res) => {
         <p>Hello ${member.fullName},</p>
         <p>Your Benevolent Midax member account has been created.</p>
         <ul>
-          <li><strong>Member Number:</strong> ${member.memberNumber}</li>
+          <li><strong>Benovelent MIDAX Number:</strong> ${member.memberNumber}</li>
+          <li><strong>Member Email:</strong> ${member.email}</li>
           <li><strong>Username:</strong> ${member.username || member.email || member.phone}</li>
           <li><strong>Temporary Password:</strong> ${temporaryPassword}</li>
         </ul>
@@ -508,7 +531,7 @@ exports.createMember = async (req, res) => {
         ? sendEmail({ to: member.email, subject: inviteSubject, text: inviteMessage, html: inviteHtml })
         : Promise.resolve({ skipped: true, reason: "no-email" }),
       member.phone
-        ? sendSmsNotification({ to: member.phone, message: `MIDAX login: ${member.username || member.email || member.phone}. Temp password: ${temporaryPassword}` })
+        ? sendSmsNotification({ to: member.phone, message: `Benevolent MIDAX invite: ${member.fullName}. Number: ${member.memberNumber}. Email: ${member.email}. Username: ${member.username || member.email || member.phone}. Temp password: ${temporaryPassword}` })
         : Promise.resolve({ skipped: true, reason: "no-phone" }),
     ]);
 
@@ -733,6 +756,55 @@ exports.updateMember = async (req, res) => {
   }
 };
 
+
+/* =====================================================
+   VERIFY MEMBER
+===================================================== */
+
+exports.verifyMember = async (req, res) => {
+  try {
+    const member = await Member.findOne({ _id: req.params.id, role: "member", isDeleted: false });
+    if (!member) return res.status(404).json({ success: false, message: "Member not found." });
+
+    const completion = calculateProfileCompletion(member);
+    if (completion.percentage < 100) {
+      return res.status(400).json({
+        success: false,
+        code: "PROFILE_INCOMPLETE",
+        message: "This member cannot be verified until the profile is 100% complete.",
+        completion,
+      });
+    }
+
+    const alreadyVerified = Boolean(member.verified);
+    member.verified = true;
+    member.profileVerified = true;
+    member.profileCompleted = true;
+    member.verificationRequestedAt = null;
+    await member.save();
+
+    if (!alreadyVerified) {
+      await createNotification({
+        recipient: member._id,
+        recipientModel: "Member",
+        sender: req.user._id,
+        senderModel: req.user.role === "superadmin" ? "SuperAdmin" : "Admin",
+        title: "Membership verified",
+        message: "Your membership has been verified. You can now add dependents and submit support requests.",
+        type: "system",
+        referenceId: member._id,
+        referenceModel: "Member",
+        icon: "verified",
+        link: "/member/dashboard",
+      });
+    }
+
+    res.json({ success: true, message: alreadyVerified ? "Member is already verified." : "Member verified successfully.", member });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
 
 /* =====================================================
    SUSPEND MEMBER

@@ -125,7 +125,11 @@ export default function MemberDashboard() {
             <div><div className="completion-head"><span>PROFILE COMPLETION</span><strong>{pct}%</strong></div><h2>Finish your profile to unlock the full member experience.</h2><p>{(profile.missingFields || []).join(", ") || "Add the remaining required information."}</p><div className="completion-track"><div className="completion-progress" style={{ width: `${Math.max(0, Math.min(100, pct))}%` }} /></div></div><Link className="portal-primary-btn member-primary" to="/member/profile">Complete profile <ArrowUpRight size={16} /></Link>
           </section>
         ) : (
-          <section className="profile-unlocked-card v7-unlocked"><div className="unlocked-icon"><CheckCircle2 size={22} /></div><div><span>PROFILE COMPLETE</span><h2>You are all set.</h2><p>Your member tools are ready and your profile is complete.</p></div><Link className="portal-secondary-btn" to="/member/profile">View profile <ArrowUpRight size={16} /></Link></section>
+          member.verified ? (
+            <section className="profile-unlocked-card v7-unlocked"><div className="unlocked-icon"><CheckCircle2 size={22} /></div><div><span>PROFILE COMPLETE & VERIFIED</span><h2>You are all set.</h2><p>Your member tools are ready. You can add dependents and submit support requests.</p></div><Link className="portal-secondary-btn" to="/member/profile">View profile <ArrowUpRight size={16} /></Link></section>
+          ) : (
+            <section className="profile-unlocked-card v7-unlocked"><div className="unlocked-icon"><Bell size={22} /></div><div><span>VERIFICATION PENDING</span><h2>Your profile is complete and awaiting verification.</h2><p>An Admin or Super Admin will review your membership. Dependents and support requests will unlock after verification.</p></div><Link className="portal-secondary-btn" to="/member/notifications">Open notifications <ArrowUpRight size={16} /></Link></section>
+          )
         )}
 
         <section className="portal-panel community-pulse-panel">

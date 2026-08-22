@@ -357,6 +357,8 @@ exports.updateProfile = async (req, res) => {
 
         }
 
+        const wasComplete = calculateProfileCompletion(member).percentage === 100;
+
         // Prevent duplicate email
         if (
             req.body.email &&
@@ -430,6 +432,7 @@ exports.updateProfile = async (req, res) => {
             "physicalAddress",
             "siteStation",
             "customSiteStation",
+            "position",
             "acceptedConstitution",
             "acceptedPrivacyPolicy",
             "acceptedDeclaration",
@@ -439,7 +442,6 @@ exports.updateProfile = async (req, res) => {
             "bankName",
             "bankBranch",
             "accountNumber",
-            "occupation",
             "employer",
         ];
 
@@ -560,11 +562,59 @@ exports.updateProfile = async (req, res) => {
             member.documents.signature = resolveStoredFileUrl(file, fileBase);
         }
 
+        const completion =
+            calculateProfileCompletion(member);
+
+        if (completion.percentage === 100 && !member.verified && !wasComplete) {
+            member.profileCompleted = true;
+            member.verificationRequestedAt = new Date();
+        } else {
+            member.profileCompleted = completion.percentage === 100;
+        }
+
         member.lastSeen = new Date();
 
         await member.save();
 
-        const completion =
+        if (completion.percentage === 100 && !member.verified && !wasComplete) {
+            const createNotification = require("../services/notificationService").createNotification;
+            const Admin = require("../models/Admin");
+            const SuperAdmin = require("../models/SuperAdmin");
+            const recipients = await Promise.all([
+                Admin.find({ status: { $ne: "deleted" } }).select("_id").lean(),
+                SuperAdmin.find({ status: { $ne: "deleted" } }).select("_id").lean(),
+            ]);
+            const adminRecipients = [...(recipients[0] || []).map((row) => ({ id: row._id, model: "Admin" })), ...(recipients[1] || []).map((row) => ({ id: row._id, model: "SuperAdmin" }))];
+            await Promise.all(adminRecipients.map((recipient) => createNotification({
+                recipient: recipient.id,
+                recipientModel: recipient.model,
+                sender: member._id,
+                senderModel: "Member",
+                title: "Member verification required",
+                message: `${member.fullName || "A member"} has completed their profile to 100% and is waiting for verification.`,
+                type: "system",
+                referenceId: member._id,
+                referenceModel: "Member",
+                icon: "verified",
+                link: `/admin/members?verify=${member._id}`,
+            })));
+
+            await createNotification({
+                recipient: member._id,
+                recipientModel: "Member",
+                sender: member._id,
+                senderModel: "Member",
+                title: "Verification pending",
+                message: "Your profile is 100% complete. Verification is now pending review by the Admin or Super Admin. Dependents and support services become available after verification.",
+                type: "system",
+                referenceId: member._id,
+                referenceModel: "Member",
+                icon: "verified",
+                suppressPush: false,
+            });
+        }
+
+        const savedCompletion =
             calculateProfileCompletion(member);
 
         await createAuditLog({
@@ -589,7 +639,8 @@ exports.updateProfile = async (req, res) => {
 
             message: "Profile updated successfully.",
 
-            completion,
+            completion: savedCompletion,
+            verificationPending: savedCompletion.percentage === 100 && !member.verified,
 
             member
 
