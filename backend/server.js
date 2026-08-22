@@ -162,7 +162,6 @@ app.get("/documents/:filename", (req, res, next) => {
 
     const candidates = [
         path.join(documentRoot, filename),
-        path.join(__dirname, "..", "documents", filename),
         path.join(__dirname, "..", "public", "documents", filename),
     ];
 

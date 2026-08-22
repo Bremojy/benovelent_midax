@@ -10,12 +10,15 @@ if (!platform.includes('const WebsiteContent = require("../models/WebsiteContent
   failures.push("platformController: WebsiteContent model import is missing.");
 }
 
-const chatPreview = read("src/components/dashboard/ChatPreview.jsx");
-if (chatPreview.includes('localStorage.getItem("memberToken")')) {
-  failures.push("ChatPreview: still hardcodes memberToken.");
+const memberDashboard = read("src/pages/member/MemberDashboard.jsx");
+if (memberDashboard.includes('localStorage.getItem("memberToken")')) {
+  failures.push("MemberDashboard: still hardcodes memberToken.");
 }
-if (!chatPreview.includes('API.get("/conversations")')) {
-  failures.push("ChatPreview: shared authenticated API call is missing.");
+if (!memberDashboard.includes('to="/member/messages"') && !memberDashboard.includes("/member/messages")) {
+  failures.push("MemberDashboard: canonical Messages navigation is missing.");
+}
+if (!memberDashboard.includes('unreadMessages')) {
+  failures.push("MemberDashboard: unread message indicator contract is missing.");
 }
 
 const assistant = read("src/components/SmartAssistant.jsx");

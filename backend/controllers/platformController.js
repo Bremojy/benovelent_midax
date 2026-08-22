@@ -85,9 +85,16 @@ exports.search = async (req, res) => {
   const root = path.join(documentRoot);
   const publicRoot = path.join(__dirname, "..", "..", "public", "documents");
   const files = [];
+  const seenDocuments = new Set();
   for (const dir of [root, publicRoot]) {
     try {
-      for (const name of fs.readdirSync(dir)) if (/\.(pdf|docx?|xlsx?|pptx?)$/i.test(name) && regex.test(name)) files.push({ name, url: `/documents/${encodeURIComponent(name)}` });
+      for (const name of fs.readdirSync(dir)) {
+        if (!/\.(pdf|docx?|xlsx?|pptx?)$/i.test(name) || !regex.test(name)) continue;
+        const key = String(name).toLowerCase();
+        if (seenDocuments.has(key)) continue;
+        seenDocuments.add(key);
+        files.push({ name, url: `/documents/${encodeURIComponent(name)}` });
+      }
     } catch (_) {}
   }
   res.json({ success: true, data: { members, news, documents: files.slice(0, 12) } });

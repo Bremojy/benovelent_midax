@@ -42,7 +42,7 @@ function Constitution() {
           muted
           loop
           playsInline
-          preload="auto"
+          preload="metadata"
           poster="/hero.jpg"
           onError={() => setVideoFailed(true)}
           aria-hidden="true"

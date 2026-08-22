@@ -11,11 +11,16 @@ const normalizeBaseUrl = (value) =>
     .replace(/\/+$/, "")
     .replace(/\/api$/i, "");
 
+const isLocalHost = typeof window !== "undefined" &&
+  ["localhost", "127.0.0.1", "::1"].includes(window.location.hostname);
+
+// Production browsers use the Vercel same-origin /api proxy by default.
+// This avoids cross-site authentication/cookie drift between Vercel and Render.
+// A VITE_API_URL may still explicitly override this for a non-Vercel deployment.
 const BASE_URL = normalizeBaseUrl(
   configuredBaseUrl ||
-    (typeof window !== "undefined" &&
-    ["localhost", "127.0.0.1", "::1"].includes(window.location.hostname)
-      ? DEFAULT_LOCAL_API_URL
+    (typeof window !== "undefined"
+      ? (isLocalHost ? DEFAULT_LOCAL_API_URL : window.location.origin)
       : DEFAULT_REMOTE_API_URL)
 );
 

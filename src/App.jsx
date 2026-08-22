@@ -69,6 +69,7 @@ const Contact = lazy(
 
 const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
 const TermsConditions = lazy(() => import("./pages/TermsConditions"));
+const Disclaimer = lazy(() => import("./pages/Disclaimer"));
 
 const Login = lazy(
   () => import("./pages/Login")
@@ -404,6 +405,11 @@ function AppContent() {
           <Route
             path="/terms-conditions"
             element={<TermsConditions />}
+          />
+
+          <Route
+            path="/disclaimer"
+            element={<Disclaimer />}
           />
 
 
