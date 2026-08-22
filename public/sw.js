@@ -1,4 +1,4 @@
-const CACHE = "benevolent-shell-current";
+const CACHE = "benevolent-shell-v15";
 const ASSETS = ["/", "/index.html", "/manifest.webmanifest", "/pwa-icon-192.png", "/pwa-icon-512.png", "/apple-touch-icon.png"];
 const DB_NAME = "benovelent-pwa";
 const DB_STORE = "calls";
@@ -126,15 +126,26 @@ self.addEventListener("fetch", (event) => {
 
   // Static assets are fast on repeat visits; HTML falls back to the network so
   // deployments can roll forward without users being trapped on an old shell.
+  // Never allow an HTML response to be stored for a JavaScript/CSS/image URL.
   const isDocument = request.mode === "navigate" || request.destination === "document";
+  const isStaticAsset = /\.(?:js|mjs|css|json|wasm|png|jpe?g|gif|svg|webp|ico|woff2?|ttf|otf)$/i.test(url.pathname);
   event.respondWith((async () => {
     if (!isDocument) {
       const cached = await caches.match(request);
-      if (cached) return cached;
+      if (cached) {
+        const cachedType = cached.headers.get("content-type") || "";
+        if (!(isStaticAsset && /text\/html/i.test(cachedType))) return cached;
+        try {
+          const cache = await caches.open(CACHE);
+          await cache.delete(request);
+        } catch {}
+      }
     }
     try {
       const response = await fetch(request);
-      if (response.ok && response.status === 200 && response.type !== "opaque") {
+      const contentType = response.headers.get("content-type") || "";
+      const safeToCache = response.ok && response.status === 200 && response.type !== "opaque" && !(isStaticAsset && /text\/html/i.test(contentType));
+      if (safeToCache) {
         try {
           const cache = await caches.open(CACHE);
           await cache.put(request, response.clone());

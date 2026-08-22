@@ -26,7 +26,7 @@ if (!(await exists(indexPath))) {
 
 const cfg = JSON.parse(await readFile(resolve(projectRoot, "vercel.json"), "utf8"));
 if (cfg.outputDirectory !== "dist") fail(`vercel.json outputDirectory must be dist, got ${cfg.outputDirectory}`);
-if (cfg.buildCommand !== "npm run build") fail(`vercel.json buildCommand must be npm run build, got ${cfg.buildCommand}`);
+if (cfg.buildCommand !== "npm run vercel-build") fail(`vercel.json buildCommand must be npm run vercel-build, got ${cfg.buildCommand}`);
 
 const html = await readFile(indexPath, "utf8");
 const refs = new Set();
