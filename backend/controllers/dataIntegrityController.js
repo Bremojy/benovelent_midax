@@ -158,8 +158,8 @@ const chooseCanonical = (records) => [...records].sort((a, b) => {
 });
 
 async function buildReport() {
-    const [members, admins, superadmins, conversations, messages, carousels] = await Promise.all([
-        Member.find({ isDeleted: { $ne: true }, status: { $ne: "inactive" } }).select("fullName name email username memberNumber phone status isDeleted profileCompletion createdAt updatedAt").lean(),
+    const [memberDocuments, admins, superadmins, conversations, messages, carousels] = await Promise.all([
+        Member.find({}).select("fullName name email username memberNumber phone status role isDeleted portalOwnerId portalOwnerRole profileCompletion createdAt updatedAt").lean(),
         Admin.find({ status: { $nin: ["inactive", "deleted"] } }).select("fullName name email username memberNumber phone status deletedAt createdAt updatedAt").lean(),
         SuperAdmin.find({ status: { $nin: ["inactive", "deleted"] } }).select("fullName name email username memberNumber phone status createdAt updatedAt").lean(),
         Conversation.find({}).select("_id participants active updatedAt createdAt lastMessage").lean(),
@@ -167,15 +167,43 @@ async function buildReport() {
         Carousel.find({}).select("_id imageUrl contentHash title description isActive order createdAt updatedAt").lean(),
     ]);
 
+    // A Member document can also exist as a legacy chat profile for an Admin or
+    // SuperAdmin. Those records must never be counted as scheme members. This
+    // distinction is what previously made the integrity page show "2 members"
+    // after the real member accounts had been deleted.
+    const members = memberDocuments.filter((record) =>
+        String(record.role || "member").toLowerCase() === "member" && record.isDeleted !== true
+    );
+    const archivedMembers = memberDocuments.filter((record) =>
+        String(record.role || "member").toLowerCase() === "member" && record.isDeleted === true
+    );
+    const portalProfiles = memberDocuments.filter((record) =>
+        String(record.role || "").toLowerCase() !== "member"
+        || record.portalOwnerId
+        || record.portalOwnerRole
+    );
+    const invalidMemberNumbers = members
+        .filter((record) => !/^BM\d{3,}$/i.test(String(record.memberNumber || "")))
+        .map((record) => ({
+            id: String(record._id),
+            name: record.fullName || record.name || record.email || "Unnamed",
+            email: record.email || "",
+            currentNumber: record.memberNumber || "",
+            status: record.status || "active",
+        }));
+
     const memberDuplicates = findDuplicateGroups(members);
     const adminDuplicates = findDuplicateGroups(admins);
 
     const allAccounts = [
-        ...members.map((x) => ({ ...x, model: "Member" })),
+        ...memberDocuments.filter((x) => x.isDeleted !== true).map((x) => ({ ...x, model: x.role || "Member" })),
         ...admins.map((x) => ({ ...x, model: "Admin" })),
         ...superadmins.map((x) => ({ ...x, model: "SuperAdmin" })),
     ];
 
+    // Chat may legitimately use a legacy Member-collection profile for an
+    // administrator. Those identities are valid conversation participants even
+    // though they are not scheme members.
     const accountIds = new Set(allAccounts.map((x) => String(x._id)));
     const orphanConversations = conversations.filter((conversation) =>
         (conversation.participants || []).some((id) => !accountIds.has(String(id)))
@@ -280,6 +308,10 @@ async function buildReport() {
         counts: {
             members: members.length - memberDuplicates.reduce((sum, group) => sum + Math.max(0, group.length - 1), 0),
             liveMemberRecords: members.length,
+            rawMemberCollectionDocuments: memberDocuments.length,
+            archivedMemberRecords: archivedMembers.length,
+            legacyPortalProfiles: portalProfiles.length,
+            invalidMemberNumbers: invalidMemberNumbers.length,
             admins: admins.length,
             superadmins: superadmins.length,
             conversations: conversations.length,
@@ -309,6 +341,24 @@ async function buildReport() {
         selfConversations,
         duplicateCarousels,
         identityCollisions,
+        databaseReconciliation: {
+            realMembers: members.length,
+            archivedMembers: archivedMembers.length,
+            rawMemberCollectionDocuments: memberDocuments.length,
+            legacyPortalProfiles: portalProfiles.map((record) => ({
+                id: String(record._id),
+                role: record.role || "unknown",
+                name: record.fullName || record.name || record.email || "Unnamed",
+                email: record.email || "",
+                portalOwnerId: record.portalOwnerId ? String(record.portalOwnerId) : "",
+                portalOwnerRole: record.portalOwnerRole || "",
+                isDeleted: record.isDeleted === true,
+            })).slice(0, 100),
+            invalidMemberNumbers,
+            conclusion: members.length === 0
+                ? "No live scheme-member records are present. Any remaining Member-collection documents are archived records or legacy portal chat profiles."
+                : `${members.length} live scheme-member record${members.length === 1 ? "" : "s"} are present in the database.`,
+        },
     };
 }
 
@@ -899,6 +949,33 @@ exports.deleteDuplicateMember = async (req, res) => {
     } catch (error) {
         console.error("Delete duplicate member error:", error);
         return res.status(500).json({ success: false, message: error.message || "Unable to delete duplicate member." });
+    }
+};
+
+
+exports.getMemberReconciliation = async (req, res) => {
+    try {
+        const [all, live, archived] = await Promise.all([
+            Member.find({}).select("_id fullName email role status isDeleted memberNumber portalOwnerId portalOwnerRole createdAt updatedAt").sort({ createdAt: -1 }).lean(),
+            Member.find({ role: "member", isDeleted: false }).select("_id fullName email status memberNumber verified createdAt updatedAt").sort({ createdAt: -1 }).lean(),
+            Member.find({ role: "member", isDeleted: true }).select("_id fullName email status memberNumber deletedBy createdAt updatedAt").sort({ updatedAt: -1 }).lean(),
+        ]);
+        return res.json({
+            success: true,
+            database: { connected: mongoose.connection.readyState === 1, name: mongoose.connection.name || "" },
+            summary: {
+                rawMemberCollectionDocuments: all.length,
+                liveMembers: live.length,
+                archivedMembers: archived.length,
+                portalChatProfiles: all.filter((x) => String(x.role || "").toLowerCase() !== "member" || x.portalOwnerId || x.portalOwnerRole).length,
+            },
+            liveMembers,
+            archivedMembers: archived,
+            portalChatProfiles: all.filter((x) => String(x.role || "").toLowerCase() !== "member" || x.portalOwnerId || x.portalOwnerRole),
+        });
+    } catch (error) {
+        console.error("Member reconciliation error:", error);
+        return res.status(500).json({ success: false, message: error.message || "Unable to reconcile member records." });
     }
 };
 

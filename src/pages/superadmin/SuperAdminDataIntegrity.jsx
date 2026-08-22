@@ -15,7 +15,11 @@ import API from "../../services/api";
 import "../../styles/portalModule.css";
 
 const COUNT_ITEMS = [
-  ["members", "Members"],
+  ["members", "Live scheme members"],
+  ["rawMemberCollectionDocuments", "Raw Member collection documents"],
+  ["archivedMemberRecords", "Archived member records"],
+  ["legacyPortalProfiles", "Legacy admin chat profiles"],
+  ["invalidMemberNumbers", "Invalid/legacy member numbers"],
   ["admins", "Administrators"],
   ["conversations", "Conversations"],
   ["messages", "Messages"],
@@ -38,6 +42,8 @@ export default function SuperAdminDataIntegrity() {
   const [error, setError] = useState("");
   const [deletingId, setDeletingId] = useState("");
   const [cleaningCarousels, setCleaningCarousels] = useState(false);
+  const [reconciliation, setReconciliation] = useState(null);
+  const [reconLoading, setReconLoading] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -55,6 +61,21 @@ export default function SuperAdminDataIntegrity() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  const loadReconciliation = async () => {
+    try {
+      setReconLoading(true);
+      setError("");
+      const { data } = await API.get("/superadmin/data-integrity/members-reconciliation", {
+        params: { _ts: Date.now() },
+      });
+      setReconciliation(data || null);
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || "Unable to reconcile live member records.");
+    } finally {
+      setReconLoading(false);
+    }
+  };
 
   const downloadHumanBackup = async () => {
     try {
@@ -291,7 +312,8 @@ export default function SuperAdminDataIntegrity() {
       c.orphanConversations ||
       c.orphanMessages ||
       c.selfConversations ||
-      c.duplicateCarouselGroups
+      c.duplicateCarouselGroups ||
+      c.invalidMemberNumbers
     ) ? "attention" : "clean";
   }, [report]);
 
@@ -400,6 +422,58 @@ export default function SuperAdminDataIntegrity() {
               </div>
             ))}
           </div>
+        </section>
+
+        <section className="portal-panel">
+          <div className="audit-section-head">
+            <div>
+              <span>MEMBER DATABASE RECONCILIATION</span>
+              <h2>What actually exists in MongoDB?</h2>
+              <p>This separates real scheme members from archived records and legacy administrator chat profiles stored in the Member collection.</p>
+            </div>
+            <button className="portal-btn primary" type="button" onClick={loadReconciliation} disabled={reconLoading}>
+              <Database size={16} /> {reconLoading ? "Reading database..." : "Reconcile now"}
+            </button>
+          </div>
+          {reconciliation?.summary && (
+            <div className="integrity-count-grid">
+              {Object.entries({
+                "Raw Member documents": reconciliation.summary.rawMemberCollectionDocuments,
+                "Live scheme members": reconciliation.summary.liveMembers,
+                "Archived members": reconciliation.summary.archivedMembers,
+                "Portal chat profiles": reconciliation.summary.portalChatProfiles,
+              }).map(([label, value]) => (
+                <div className="integrity-count" key={label}>
+                  <span>{label}</span><strong>{value}</strong>
+                </div>
+              ))}
+            </div>
+          )}
+          {reconciliation && (
+            <div className="portal-alert success" style={{ marginTop: 16 }}>
+              <CheckCircle2 size={18} />
+              <span>{report?.databaseReconciliation?.conclusion || "Live member reconciliation completed."}</span>
+            </div>
+          )}
+          {(report?.databaseReconciliation?.legacyPortalProfiles || []).length > 0 && (
+            <div style={{ marginTop: 16 }}>
+              <h3>Legacy portal/chat profiles (not members)</h3>
+              <div className="integrity-duplicate-list">
+                {report.databaseReconciliation.legacyPortalProfiles.map((profile) => (
+                  <div className="integrity-record" key={profile.id}>
+                    <span>{profile.name}</span>
+                    <small>{profile.email || profile.id} · role: {profile.role} {profile.portalOwnerRole ? `· owner role: ${profile.portalOwnerRole}` : ""}</small>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {(report?.databaseReconciliation?.invalidMemberNumbers || []).length > 0 && (
+            <div className="portal-alert warning" style={{ marginTop: 16 }}>
+              <AlertTriangle size={18} />
+              <span>Legacy member identifiers remain on {report.databaseReconciliation.invalidMemberNumbers.length} live member record(s). Verification will replace these with a generated BM### number, and the next member creation will continue from the highest valid BM sequence.</span>
+            </div>
+          )}
         </section>
 
         <section id="integrity-snapshot" className="portal-panel integrity-snapshot-panel">

@@ -12,7 +12,7 @@
     "test:routes": "node backend/scripts/routeContractTest.js",
     "test:quality": "node backend/scripts/sourceQualityTest.js",
     "test:ui": "node backend/scripts/portalUiContractTest.js",
-    "test": "npm run test:security && npm run test:quality && npm run test:integrity && npm run test:routes && npm run test:ui && npm run test:call && npm run test:call-auth && npm run test:verification && npm run test:shell && npm run test:regression",
+    "test": "npm run test:security && npm run test:quality && npm run test:integrity && npm run test:routes && npm run test:ui && npm run test:call && npm run test:call-auth && npm run test:verification && npm run test:member-db && npm run test:shell && npm run test:regression",
     "test:shell": "node backend/scripts/portalShellTest.js",
     "test:regression": "node backend/scripts/regressionAuditTest.js",
     "vercel-build": "npm run build && node scripts/verify-vercel-assets.mjs",
@@ -20,6 +20,7 @@
     "test:security": "node backend/scripts/securityContractTest.js",
     "test:call-auth": "node backend/scripts/callAuthRegressionTest.js",
     "test:verification": "node backend/scripts/verificationFlowContractTest.js",
+    "test:member-db": "node backend/scripts/memberDatabaseContractTest.js",
     "test:vercel-assets": "node scripts/verify-vercel-assets.mjs"
   },
   "dependencies": {
