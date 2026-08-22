@@ -45,6 +45,17 @@ createRoot(
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
+      if (import.meta.env.DEV) {
+        // Never let the production PWA service worker control the Vite dev
+        // server. It can cache Vite dependency chunks and @vite/client, which
+        // causes stale React runtimes and HMR WebSocket 400 errors.
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(registrations.map((registration) => registration.unregister()));
+        const cacheNames = await caches.keys();
+        await Promise.all(cacheNames.map((name) => caches.delete(name)));
+        return;
+      }
+
       const registration = await navigator.serviceWorker.register("/sw.js", { updateViaCache: "none" });
       if ("Notification" in window && "PushManager" in window && Notification.permission === "granted") {
         // The settings page remains responsible for first-time permission prompts.

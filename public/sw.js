@@ -1,4 +1,4 @@
-const CACHE = "benevolent-shell-v16";
+const CACHE = "benevolent-shell-v17";
 const ASSETS = ["/", "/index.html", "/manifest.webmanifest", "/pwa-icon-192.png", "/pwa-icon-512.png", "/apple-touch-icon.png"];
 const DB_NAME = "benovelent-pwa";
 const DB_STORE = "calls";
@@ -115,9 +115,16 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(request.url);
   if (url.origin !== location.origin || request.method !== "GET") return;
 
-  // Never cache API responses, auth state, or realtime transports.
-  // These must remain live so dashboards and accounts never show stale data.
-  if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/socket.io/")) return;
+  // Never cache API responses, auth state, realtime transports, or Vite dev
+  // resources. The latter is critical when a user previously ran this app in
+  // development while the production service worker was installed.
+  if (
+    url.pathname.startsWith("/api/") ||
+    url.pathname.startsWith("/socket.io/") ||
+    url.pathname.startsWith("/@vite/") ||
+    url.pathname.startsWith("/node_modules/.vite/") ||
+    url.pathname.startsWith("/src/")
+  ) return;
 
   if (request.headers.has("range")) {
     event.respondWith(fetch(request));

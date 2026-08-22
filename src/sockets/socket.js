@@ -7,10 +7,11 @@ const SOCKET_URL = String(
 ).replace(/\/+$/, "");
 
 const socketUpgrade = String(import.meta.env.VITE_SOCKET_UPGRADE || "false").toLowerCase() === "true";
+const socketTransports = socketUpgrade ? ["polling", "websocket"] : ["polling"];
 
 const socket = io(SOCKET_URL, {
   autoConnect: false,
-  transports: ["polling", "websocket"],
+  transports: socketTransports,
   withCredentials: true,
   auth: {},
   upgrade: socketUpgrade,

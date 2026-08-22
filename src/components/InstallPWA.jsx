@@ -29,6 +29,7 @@ export default function InstallPWA() {
     const onPrompt = async (event) => {
       event.preventDefault();
       setDeferred(event);
+      setOpen(true);
       window.__benovelentPwaPrompt = event;
       if (pendingInstallIntent) {
         try {
