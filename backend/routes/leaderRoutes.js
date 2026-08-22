@@ -60,7 +60,7 @@ router.put("/:id", protect, isSuperAdmin, setUploadType("leaders"), uploadSingle
       updateData.order = Number(updateData.order) || 0;
     }
 
-    const leader = await Leader.findByIdAndUpdate(req.params.id, updateData, { new: true, runValidators: true });
+    const leader = await Leader.findByIdAndUpdate(req.params.id, updateData, { returnDocument: "after", runValidators: true });
     if (!leader) {
       return res.status(404).json({ message: "Leader not found" });
     }

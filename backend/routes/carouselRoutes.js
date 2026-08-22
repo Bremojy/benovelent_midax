@@ -118,7 +118,7 @@ router.put("/:id", protect, isSuperAdmin, setUploadType("carousel"), uploadSingl
       updateData.order = Number(updateData.order) || 0;
     }
 
-    const slide = await Carousel.findByIdAndUpdate(req.params.id, updateData, { new: true, runValidators: true });
+    const slide = await Carousel.findByIdAndUpdate(req.params.id, updateData, { returnDocument: "after", runValidators: true });
     if (!slide) {
       return res.status(404).json({ message: "Carousel slide not found" });
     }

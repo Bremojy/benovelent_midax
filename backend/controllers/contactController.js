@@ -86,7 +86,7 @@ exports.updateContactMessage = async (req, res) => {
     const update = { status: req.body.status };
     if (req.body.status === "replied") update.repliedAt = new Date();
 
-    const message = await ContactMessage.findByIdAndUpdate(req.params.id, update, { new: true }).lean();
+    const message = await ContactMessage.findByIdAndUpdate(req.params.id, update, { returnDocument: "after" }).lean();
     if (!message) return res.status(404).json({ success: false, message: "Contact message not found." });
 
     return res.json({ success: true, message });

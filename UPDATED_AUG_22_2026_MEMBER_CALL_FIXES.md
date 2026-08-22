@@ -17,3 +17,10 @@
 
 ## Validation limitation
 A full Vite production build could not be run in this sandbox because package installation timed out, and the sandbox could not resolve the Render hostname for a live authenticated API test. The public Vercel page itself was reachable.
+
+
+## V22 final hardening
+- Replaced the deprecated Mongoose `new: true` option in the atomic member-number `findOneAndUpdate()` with `returnDocument: "after"`.
+- Kept `updatePipeline: true` because the allocator intentionally uses a MongoDB update pipeline.
+- Added a scoped modern surface polish for portal cards, panels, tables and form controls without overriding call-overlay or public-page styles.
+- No credential or deployment environment values are bundled into the ZIP.
