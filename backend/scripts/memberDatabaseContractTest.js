@@ -11,7 +11,10 @@ const integrityRoute = read("backend/routes/dataIntegrityRoutes.js");
 const failures = [];
 const expect = (condition, message) => { if (!condition) failures.push(message); };
 
-expect(memberNumber.includes("const memberNumber = `BM${String(number).padStart(3, \"0\")}`"), "Member numbers must be generated as BM###.");
+expect(memberNumber.includes('const memberNumber = `BM${String(number).padStart(3, "0")}`'), "Member numbers must be generated as BM###.");
+expect(memberNumber.includes("aggregation-pipeline update") || memberNumber.includes("$ifNull"), "Member number allocation must avoid conflicting $max/$inc updates on seq.");
+expect(!memberNumber.includes("{ $max: { seq: floor }, $inc: { seq: 1 } }"), "Member sequence allocator must not combine conflicting updates to seq.");
+
 expect(admin.includes("const cleanMemberNumber = await generateMemberNumber();"), "Member creation must generate the member number server-side.");
 expect(!admin.includes("const requestedMemberNumber = normalizeLegacyMemberNumber(req.body?.memberNumber);"), "Member creation must not depend on the old employee-number input.");
 expect(admin.includes("let member = await Member.findOne({ _id: req.params.id, role: \"member\", isDeleted: false });"), "Verification must permit replacing a legacy member number before saving.");

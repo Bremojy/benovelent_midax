@@ -721,14 +721,19 @@ exports.updateMember = async (req, res) => {
     });
 
   } catch (error) {
+    console.error("Create member error:", error);
 
-    console.error(error);
-
-    res.status(500).json({
+    const duplicateKey = error?.code === 11000;
+    const sequenceConflict = /conflict|seq|memberNumber/i.test(String(error?.message || ""));
+    return res.status(duplicateKey || sequenceConflict ? 409 : 500).json({
       success: false,
-      message: error.message,
+      code: duplicateKey ? "DUPLICATE_MEMBER" : (sequenceConflict ? "MEMBER_NUMBER_SEQUENCE_ERROR" : "CREATE_MEMBER_ERROR"),
+      message: duplicateKey
+        ? "A member with one of these unique identifiers already exists. Refresh the member list and try again."
+        : sequenceConflict
+          ? "The Benevolent MIDAX member-number sequence could not be allocated safely. No employee number is required; please retry."
+          : (error.message || "Unable to create member."),
     });
-
   }
 };
 

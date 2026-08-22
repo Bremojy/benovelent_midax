@@ -34,10 +34,24 @@ const generateMemberNumber = async () => {
   for (let attempt = 0; attempt < 4; attempt += 1) {
     try {
       const floor = await getHighestMemberSequence();
+      // One atomic pipeline update avoids MongoDB's conflict error when
+      // `$max` and `$inc` both target `seq`. The next sequence value is always
+      // greater than both the stored counter and the highest live BM### member.
       const counter = await Sequence.findOneAndUpdate(
         { _id: MEMBER_SEQUENCE_KEY },
-        { $max: { seq: floor }, $inc: { seq: 1 } },
-        { new: true, upsert: true, setDefaultsOnInsert: true }
+        [
+          {
+            $set: {
+              seq: {
+                $add: [
+                  { $max: [{ $ifNull: ["$seq", 0] }, floor] },
+                  1,
+                ],
+              },
+            },
+          },
+        ],
+        { new: true, upsert: true }
       ).lean();
 
       const number = Number(counter?.seq || 0);

@@ -45,6 +45,10 @@ export default function SuperAdminDataIntegrity() {
   const [reconciliation, setReconciliation] = useState(null);
   const [reconLoading, setReconLoading] = useState(false);
 
+  const liveMembers = Array.isArray(reconciliation?.liveMembers) ? reconciliation.liveMembers : [];
+  const archivedMembers = Array.isArray(reconciliation?.archivedMembers) ? reconciliation.archivedMembers : [];
+  const portalChatProfiles = Array.isArray(reconciliation?.portalChatProfiles) ? reconciliation.portalChatProfiles : [];
+
   const load = useCallback(async () => {
     try {
       setLoading(true);
@@ -449,17 +453,44 @@ export default function SuperAdminDataIntegrity() {
               ))}
             </div>
           )}
+          {reconciliation?.summary && (
+            <div className="portal-panel" style={{ marginTop: 16 }}>
+              <div className="audit-section-head">
+                <div>
+                  <span>LIVE MEMBER RECORDS</span>
+                  <h3>{liveMembers.length} current scheme member{liveMembers.length === 1 ? "" : "s"}</h3>
+                  <p>Read directly from MongoDB after reconciliation. Administrator/chat profiles are intentionally excluded.</p>
+                </div>
+              </div>
+              {liveMembers.length ? (
+                <div className="integrity-record-list">
+                  {liveMembers.slice(0, 100).map((member) => (
+                    <div className="integrity-record" key={member._id || member.id}>
+                      <span>{member.fullName || "Unnamed member"}</span>
+                      <small>
+                        {member.memberNumber || "NO BM NUMBER"} · {member.email || "no email"} · {member.status || "active"}
+                        {member.verified ? " · VERIFIED" : " · NOT VERIFIED"}
+                      </small>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="portal-alert success">No live scheme member records currently exist in the Member collection.</div>
+              )}
+            </div>
+          )}
+
           {reconciliation && (
             <div className="portal-alert success" style={{ marginTop: 16 }}>
               <CheckCircle2 size={18} />
               <span>{report?.databaseReconciliation?.conclusion || "Live member reconciliation completed."}</span>
             </div>
           )}
-          {(report?.databaseReconciliation?.legacyPortalProfiles || []).length > 0 && (
+          {portalChatProfiles.length > 0 && (
             <div style={{ marginTop: 16 }}>
               <h3>Legacy portal/chat profiles (not members)</h3>
               <div className="integrity-duplicate-list">
-                {report.databaseReconciliation.legacyPortalProfiles.map((profile) => (
+                {portalChatProfiles.map((profile) => (
                   <div className="integrity-record" key={profile.id}>
                     <span>{profile.name}</span>
                     <small>{profile.email || profile.id} · role: {profile.role} {profile.portalOwnerRole ? `· owner role: ${profile.portalOwnerRole}` : ""}</small>
