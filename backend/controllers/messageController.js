@@ -7,6 +7,7 @@ const Member = require("../models/Member");
 const Admin = require("../models/Admin");
 const SuperAdmin = require("../models/SuperAdmin");
 const { resolveStoredFileUrl } = require("../utils/uploadUrl");
+const { sendPushToRecipient } = require("../services/pushService");
 
 async function getAuthorizedMessage(req) {
     const actorId = getChatActorId(req);
@@ -92,6 +93,18 @@ exports.sendMessage = async (req, res) => {
         conversation.lastMessageSender = actorId;
         conversation.lastMessageTime = new Date();
 
+        // Maintain per-user unread counts in the same write as the latest
+        // message metadata, avoiding a second conversation save/race.
+        conversation.unreadCounts = conversation.unreadCounts || new Map();
+        for (const recipientId of (conversation.participants || [])
+          .map((participant) => participant?.toString?.() || String(participant))
+          .filter((participantId) => participantId && participantId !== String(actorId))) {
+            conversation.unreadCounts.set(
+              String(recipientId),
+              Number(conversation.unreadCounts.get(String(recipientId)) || 0) + 1
+            );
+        }
+
         await conversation.save();
 
         const io = getIO();
@@ -140,16 +153,35 @@ exports.sendMessage = async (req, res) => {
             notifications.forEach((notification) => {
                 io?.to(`user:${notification.recipient.toString()}`).emit("new-notification", notification);
             });
+
+            // Deliver a real browser/mobile push notification when the recipient
+            // is offline or the chat page is not visible. The in-app Socket.IO
+            // notification remains the primary realtime path.
+            await Promise.allSettled(
+              notifications.map((notification, index) =>
+                sendPushToRecipient({
+                  recipient: notification.recipient,
+                  recipientModel: notification.recipientModel,
+                  title,
+                  message: notificationMessage,
+                  link: notification.recipientModel === "Admin"
+                    ? "/admin/messages"
+                    : notification.recipientModel === "SuperAdmin"
+                      ? "/superadmin/messages"
+                      : "/member/messages",
+                  data: {
+                    type: "message",
+                    conversationId: String(conversation._id),
+                    messageId: String(newMessage._id),
+                    senderId: String(actorId),
+                    senderName: req.user?.fullName || req.user?.name || "New message",
+                  },
+                }).catch((error) => console.warn(`Message push ${index + 1} skipped:`, error.message))
+              )
+            );
+
             await Promise.all(notificationTargets.filter((target) => target.recipientModel === "Member").map((target) => Member.findByIdAndUpdate(target.recipient, { $inc: { unreadMessages: 1, unreadNotifications: 1 } }).catch(() => null)));
         }
-
-        // Maintain per-user unread counts on the conversation for fast sidebar badges.
-        conversation.unreadCounts = conversation.unreadCounts || new Map();
-        for (const recipientId of recipients) {
-            const key = String(recipientId);
-            conversation.unreadCounts.set(key, Number(conversation.unreadCounts.get(key) || 0) + 1);
-        }
-        await conversation.save();
 
         return res.status(201).json({
             success: true,

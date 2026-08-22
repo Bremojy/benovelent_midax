@@ -1236,12 +1236,11 @@ function MemberFormModal({
     event.preventDefault();
 
     if (
-      !form.memberNumber.trim() ||
       !form.fullName.trim() ||
       !form.phone.trim()
     ) {
       setFormError(
-        "Benovelent MIDAX Number, Full Name and Phone are required."
+        "Full Name and Phone are required. A Benevolent MIDAX Number is generated automatically."
       );
 
       return;
@@ -1363,19 +1362,21 @@ function MemberFormModal({
 
           <div className="admin-form-grid">
 
-            <FormField
-              label="Benovelent MIDAX Number *"
-              name="memberNumber"
-              value={
-                form.memberNumber
-              }
-              onChange={
-                handleChange
-              }
-              placeholder="e.g. BM001"
-              readOnly={editing}
-              title={editing ? "This Benovelent MIDAX Number is permanent and cannot be changed." : "Enter the existing Benovelent MIDAX Number, for example BM001."}
-            />
+            {editing ? (
+              <FormField
+                label="Benovelent MIDAX Number"
+                name="memberNumber"
+                value={form.memberNumber}
+                onChange={handleChange}
+                readOnly
+                title="This Benevolent MIDAX Number is permanent and cannot be changed."
+              />
+            ) : (
+              <div className="admin-form-field" aria-label="Benovelent MIDAX Number">
+                <label>Benovelent MIDAX Number</label>
+                <div className="admin-readonly-field">Generated automatically after member creation (e.g. BM001)</div>
+              </div>
+            )}
 
             <FormField
               label="Full Name *"

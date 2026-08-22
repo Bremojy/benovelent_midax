@@ -23,6 +23,7 @@ const AuthContext = createContext(null);
 
 const INACTIVITY_TIMEOUT = 30 * 60 * 1000;
 const ACTIVE_ACCOUNT_KEY = "benovelentMidaxActiveAccount";
+const LOGGED_OUT_KEY = "benovelentMidaxLoggedOut";
 
 const normalizeAccountIdentity = (value) => ({
   id: String(value?.id || value?._id || value?.chatId || ""),
@@ -38,6 +39,18 @@ const setActiveAccount = (value) => {
 
 const clearActiveAccount = () => {
   try { localStorage.removeItem(ACTIVE_ACCOUNT_KEY); } catch {}
+};
+
+const markLoggedOut = () => {
+  try { localStorage.setItem(LOGGED_OUT_KEY, String(Date.now())); } catch {}
+};
+
+const clearLoggedOutMarker = () => {
+  try { localStorage.removeItem(LOGGED_OUT_KEY); } catch {}
+};
+
+const wasExplicitlyLoggedOut = () => {
+  try { return Boolean(localStorage.getItem(LOGGED_OUT_KEY)); } catch { return false; }
 };
 
 
@@ -179,6 +192,12 @@ export function AuthProvider({
     useCallback(
       async () => {
         try {
+          if (wasExplicitlyLoggedOut()) {
+            clearStoredSession();
+            clearActiveAccount();
+            setUser(null);
+            return null;
+          }
           await getCsrfToken();
           // When a cached user exists, keep the dashboard rendered while the
           // server verifies the session in the background.
@@ -413,6 +432,7 @@ export function AuthProvider({
         setAuthError("");
 
         try {
+          clearLoggedOutMarker();
           const response =
             await loginUser(
               email,
@@ -491,6 +511,7 @@ export function AuthProvider({
   const logout =
     useCallback(
       async () => {
+        markLoggedOut();
         try {
           await logoutUser();
         } catch (error) {

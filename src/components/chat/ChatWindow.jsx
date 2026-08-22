@@ -88,6 +88,12 @@ function ChatWindow({ conversation, socket, currentUser, onBack, onAudioCall, on
         }
         return [...previous, normalized];
       });
+
+      if (normalized?._id) {
+        void API.put(`/messages/${normalized._id}/read`).catch(() => {});
+        socket.emit("seen-message", { messageId: normalized._id });
+        void API.put(`/conversations/${conversation._id}/read`).catch(() => {});
+      }
     };
 
     const handleSeen = (payload) => {
