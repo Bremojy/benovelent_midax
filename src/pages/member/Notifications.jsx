@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Bell, CheckCheck, History, RefreshCw, Trash2 } from "lucide-react";
 import DashboardLayout from "../../layouts/DashboardLayout";
 import API from "../../services/api";
+import socket from "../../sockets/socket";
 import "./notifications.css";
 
 export default function Notifications() {
@@ -30,7 +31,66 @@ export default function Notifications() {
   };
 
   useEffect(() => {
+    let mounted = true;
+
     load();
+
+    const applyNotification = (notification) => {
+      if (!mounted || !notification?._id) return;
+      setActiveNotifications((previous) => [
+        notification,
+        ...previous.filter((item) => String(item._id) !== String(notification._id)),
+      ].filter((item) => !item.read));
+      setHistoryNotifications((previous) => previous.filter((item) => String(item._id) !== String(notification._id)));
+    };
+
+    const applyUpdated = (notification) => {
+      if (!mounted || !notification?._id) return;
+      if (notification.read) {
+        setActiveNotifications((previous) => previous.filter((item) => String(item._id) !== String(notification._id)));
+        setHistoryNotifications((previous) => [
+          notification,
+          ...previous.filter((item) => String(item._id) !== String(notification._id)),
+        ]);
+      } else {
+        applyNotification(notification);
+      }
+    };
+
+    const removeNotification = (notificationId) => {
+      if (!mounted || !notificationId) return;
+      const id = String(notificationId);
+      setActiveNotifications((previous) => previous.filter((item) => String(item._id) !== id));
+      setHistoryNotifications((previous) => previous.filter((item) => String(item._id) !== id));
+    };
+
+    const clearNotifications = () => {
+      if (!mounted) return;
+      setActiveNotifications([]);
+    };
+
+    const onConnect = () => {
+      socket.emit("notification-register");
+      socket.emit("get-notification-count");
+    };
+
+    if (!socket.connected) socket.connect();
+    else onConnect();
+
+    socket.on("connect", onConnect);
+    socket.on("new-notification", applyNotification);
+    socket.on("notification-updated", applyUpdated);
+    socket.on("notification-deleted", removeNotification);
+    socket.on("notifications-cleared", clearNotifications);
+
+    return () => {
+      mounted = false;
+      socket.off("connect", onConnect);
+      socket.off("new-notification", applyNotification);
+      socket.off("notification-updated", applyUpdated);
+      socket.off("notification-deleted", removeNotification);
+      socket.off("notifications-cleared", clearNotifications);
+    };
   }, []);
 
   const unreadCount = useMemo(() => activeNotifications.length, [activeNotifications]);
@@ -38,8 +98,16 @@ export default function Notifications() {
   const markOne = async (id) => {
     try {
       setBusy(true);
+      try { socket.emit("notification-read", id); } catch {}
       await API.put(`/notifications/${id}/read`);
-      await load();
+      const moved = activeNotifications.find((item) => String(item._id) === String(id));
+      setActiveNotifications((previous) => previous.filter((item) => String(item._id) !== String(id)));
+      if (moved) {
+        setHistoryNotifications((previous) => [
+          { ...moved, read: true, readAt: new Date().toISOString() },
+          ...previous.filter((item) => String(item._id) !== String(id)),
+        ]);
+      }
       setMessage("Notification marked as read.");
     } catch (err) {
       setError(err.response?.data?.message || err.message || "Unable to update notification.");
@@ -51,6 +119,7 @@ export default function Notifications() {
   const markAll = async () => {
     try {
       setBusy(true);
+      try { socket.emit("read-all-notifications"); } catch {}
       await API.put("/notifications/read-all");
       setHistoryNotifications((previous) => [
         ...activeNotifications.map((item) => ({ ...item, read: true, readAt: new Date().toISOString() })),

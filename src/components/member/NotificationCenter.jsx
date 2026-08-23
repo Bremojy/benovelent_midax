@@ -1,6 +1,7 @@
 import { Bell, Wallet, Calendar, HandHeart, Megaphone, Phone, Video, AlertCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import API from "../../services/api";
+import socket from "../../sockets/socket";
 import "./NotificationCenter.css";
 
 const iconFor = (type = "system") => {
@@ -17,7 +18,27 @@ const iconFor = (type = "system") => {
 export default function NotificationCenter() {
   const [notifications, setNotifications] = useState([]);
   const load = async () => { try { const { data } = await API.get("/notifications", { params: { limit: 6 } }); setNotifications(Array.isArray(data?.notifications) ? data.notifications : []); } catch {} };
-  useEffect(() => { load(); const id = window.setInterval(load, 30000); return () => window.clearInterval(id); }, []);
+  useEffect(() => {
+    load();
+    const id = window.setInterval(load, 30000);
+    const onConnect = () => socket.emit("notification-register");
+    const onChange = () => load();
+    if (!socket.connected) socket.connect();
+    else onConnect();
+    socket.on("connect", onConnect);
+    socket.on("new-notification", onChange);
+    socket.on("notification-updated", onChange);
+    socket.on("notification-deleted", onChange);
+    socket.on("notifications-cleared", onChange);
+    return () => {
+      window.clearInterval(id);
+      socket.off("connect", onConnect);
+      socket.off("new-notification", onChange);
+      socket.off("notification-updated", onChange);
+      socket.off("notification-deleted", onChange);
+      socket.off("notifications-cleared", onChange);
+    };
+  }, []);
   return <div className="notification-card">
     <div className="notification-header"><h2><Bell size={22} />Notifications</h2><a href="/member/notifications">View All</a></div>
     <div className="notification-list">

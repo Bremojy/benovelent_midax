@@ -36,7 +36,7 @@ function DashboardTopbar({
     Number(user?.unreadNotifications || 0)
   );
 
-  const unreadMessages = Number(user?.unreadMessages || 0);
+  const [unreadMessages, setUnreadMessages] = useState(Number(user?.unreadMessages || 0));
 
   const normalizedRole =
     (role || user?.role || "member").toLowerCase();
@@ -55,11 +55,43 @@ function DashboardTopbar({
 
     loadUnread();
     const interval = window.setInterval(loadUnread, 30000);
-    const onNotification = () => { if (mounted) { setUnreadNotifications((v) => Number(v) + 1); loadUnread(); } };
+    const loadUnreadMessages = async () => {
+      try {
+        const { data } = await API.get("/conversations");
+        const conversations = Array.isArray(data?.conversations) ? data.conversations : [];
+        const actorId = String(user?.chatId || user?._id || user?.id || "");
+        const total = conversations.reduce((sum, conversation) => {
+          const counts = conversation?.unreadCounts || {};
+          return sum + Math.max(0, Number(counts?.[actorId] || 0) || 0);
+        }, 0);
+        if (mounted) setUnreadMessages(total);
+      } catch {
+        // Non-blocking.
+      }
+    };
+
+    const onNotification = () => {
+      if (mounted) {
+        setUnreadNotifications((v) => Number(v) + 1);
+        loadUnread();
+      }
+    };
+    const onMessage = () => { if (mounted) loadUnreadMessages(); };
+
+    loadUnreadMessages();
     if (!socket.connected) socket.connect();
     socket.on("new-notification", onNotification);
     socket.on("new-call-notification", onNotification);
-    return () => { mounted = false; window.clearInterval(interval); socket.off("new-notification", onNotification); socket.off("new-call-notification", onNotification); };
+    socket.on("new-message", onMessage);
+    socket.on("message-seen", onMessage);
+    return () => {
+      mounted = false;
+      window.clearInterval(interval);
+      socket.off("new-notification", onNotification);
+      socket.off("new-call-notification", onNotification);
+      socket.off("new-message", onMessage);
+      socket.off("message-seen", onMessage);
+    };
   }, [user?.unreadNotifications, normalizedRole]);
 
   const initials = (
@@ -180,7 +212,7 @@ function DashboardTopbar({
 
         {/* MESSAGES */}
 
-        {normalizedRole !== "superadmin" && <button
+        <button
           type="button"
           className="icon-btn"
           onClick={goToMessages}

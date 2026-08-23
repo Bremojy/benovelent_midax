@@ -7,7 +7,13 @@ const SOURCES = [
   { type: "Medical", get: "/medical/admin/applications", approve: "/medical/admin/approve/", reject: "/medical/admin/reject/", remove: "/medical/admin/delete/", actionable: true },
   { type: "Funeral", get: "/funeral/", approve: "/funeral/approve/", reject: "/funeral/reject/", remove: "/funeral/", actionable: true },
   { type: "Education", get: "/education/", approve: "/education/", reject: "/education/", remove: "/education/", actionable: true },
-  { type: "Support Request", get: "/member/support-requests", actionable: false },
+  {
+    type: "Support Request",
+    get: "/member/support-requests",
+    approve: "/member/support-requests/",
+    reject: "/member/support-requests/",
+    actionable: true,
+  },
 ];
 
 export default function AdminClaims() {
@@ -56,13 +62,25 @@ export default function AdminClaims() {
     try {
       setBusy(key);
       const endpoint = kind === "approve" ? item.source.approve : item.source.reject;
-      const path =
-        item.supportType === "Medical"
-          ? `${endpoint}${item._id}`
-          : item.supportType === "Funeral"
-            ? `${endpoint}${item._id}`
-            : `${endpoint}${item._id}`;
-      const payload = kind === "reject" ? { rejectionReason: "Reviewed and rejected by administrator." } : {};
+      const path = `${endpoint}${item._id}`;
+      let payload = {};
+
+      if (item.supportType === "Support Request") {
+        payload = kind === "approve"
+          ? {
+              status: "Approved",
+              approvedAmount: Number(item.approvedAmount || item.requestedAmount || 0),
+              remarks: "Support request approved by administrator.",
+            }
+          : {
+              status: "Rejected",
+              rejectionReason: "Reviewed and rejected by administrator.",
+              remarks: "Support request rejected by administrator.",
+            };
+      } else if (kind === "reject") {
+        payload = { rejectionReason: "Reviewed and rejected by administrator." };
+      }
+
       const { data } = await API.put(path, payload);
       if (!data?.success) throw new Error(data?.message || "Action failed.");
       await load();
@@ -174,15 +192,61 @@ export default function AdminClaims() {
 
                     {item.source?.actionable && (
                       <div className="portal-actions">
+                        {item.supportType === "Support Request" && (
+                          <button
+                            className="portal-btn secondary"
+                            disabled={busy === `review-${item._id}` || ["Approved", "Rejected", "Closed"].includes(item.status)}
+                            onClick={async () => {
+                              try {
+                                setBusy(`review-${item._id}`);
+                                await API.put(`/member/support-requests/${item._id}`, {
+                                  status: "Under Review",
+                                  remarks: "Support request is now under administrative review.",
+                                });
+                                await load();
+                              } catch (err) {
+                                setError(err.response?.data?.message || err.message || "Unable to move support request into review.");
+                              } finally {
+                                setBusy("");
+                              }
+                            }}
+                          >
+                            {busy === `review-${item._id}` ? "Updating..." : "Under review"}
+                          </button>
+                        )}
                         <button className="portal-btn" disabled={busy === `approve-${item._id}`} onClick={() => action(item, "approve")}>
                           Approve
                         </button>
                         <button className="portal-btn secondary" disabled={busy === `reject-${item._id}`} onClick={() => action(item, "reject")}>
                           Reject
                         </button>
-                        <button className="portal-btn danger" disabled={busy === `delete-${item._id}`} onClick={() => deleteClaim(item)}>
-                          Delete
-                        </button>
+                        {item.supportType === "Support Request" && item.status === "Approved" && (
+                          <button
+                            className="portal-btn secondary"
+                            disabled={busy === `close-${item._id}`}
+                            onClick={async () => {
+                              try {
+                                setBusy(`close-${item._id}`);
+                                await API.put(`/member/support-requests/${item._id}`, {
+                                  status: "Closed",
+                                  remarks: "Support request closed after processing.",
+                                });
+                                await load();
+                              } catch (err) {
+                                setError(err.response?.data?.message || err.message || "Unable to close support request.");
+                              } finally {
+                                setBusy("");
+                              }
+                            }}
+                          >
+                            {busy === `close-${item._id}` ? "Closing..." : "Close"}
+                          </button>
+                        )}
+                        {item.supportType !== "Support Request" && (
+                          <button className="portal-btn danger" disabled={busy === `delete-${item._id}`} onClick={() => deleteClaim(item)}>
+                            Delete
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>
