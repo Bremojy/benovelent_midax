@@ -389,7 +389,10 @@ exports.createMember = async (req, res) => {
         cleanDepartment,
 
       position:
-        cleanPosition,
+        cleanPosition || "Employee",
+
+      employer:
+        "MIDAX",
 
       monthlyContribution:
         contribution,

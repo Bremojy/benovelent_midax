@@ -69,8 +69,8 @@ export default function Support() {
       const dependentsData = dependentsRes.status === "fulfilled" ? dependentsRes.value : null;
       const policiesData = policiesRes.status === "fulfilled" ? policiesRes.value : null;
       setClaims(Array.isArray(claimsData?.claims) ? claimsData.claims : []);
-      setDependents(Array.isArray(dependentsData?.data?.dependents) ? dependentsData.data.dependents : []);
-      setPolicies(Array.isArray(policiesData?.data?.policies) ? policiesData.data.policies : []);
+      setDependents(Array.isArray(dependentsData?.data?.dependents) ? dependentsData.data.dependents : (Array.isArray(dependentsData?.dependents) ? dependentsData.dependents : []));
+      setPolicies(Array.isArray(policiesData?.data?.policies) ? policiesData.data.policies : (Array.isArray(policiesData?.policies) ? policiesData.policies : []));
     } catch (err) {
       setError(err.response?.data?.message || err.message || "Unable to load your support centre.");
     } finally {

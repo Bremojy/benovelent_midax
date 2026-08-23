@@ -5,6 +5,7 @@ import { useAuth } from "../context/AuthContext";
 import { useLocation, useNavigate } from "react-router-dom";
 import "../styles/dashboard.css";
 import "../styles/dashboard-mobile.css";
+import "../styles/final-ui-polish.css";
 
 function DashboardLayout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(() => (

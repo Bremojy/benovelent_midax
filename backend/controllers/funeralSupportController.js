@@ -660,6 +660,8 @@ exports.approveApplication = async (req, res) => {
         application.remarks=
         req.body.remarks || "";
 
+        if (!Array.isArray(application.timeline)) application.timeline = [];
+        application.timeline.push({ status: "Pending", remarks: "Funeral application submitted by member.", updatedBy: req.user._id, date: new Date() });
         await application.save();
 
         await createNotification({

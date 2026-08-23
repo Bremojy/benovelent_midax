@@ -129,6 +129,9 @@ const medicalSupportSchema = new mongoose.Schema(
         enum: [
     "Pending",
     "Under Review",
+    "Documents Required",
+    "Eligibility Review",
+    "Approval Review",
     "Approved",
     "Rejected",
     "Paid",

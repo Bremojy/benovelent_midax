@@ -60,13 +60,20 @@ const supportRequestSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["Pending", "Under Review", "Approved", "Rejected", "Closed"],
+      enum: ["Pending", "Under Review", "Documents Required", "Eligibility Review", "Approval Review", "Approved", "Disbursement Pending", "Paid", "Completed", "Rejected", "Cancelled", "Closed"],
       default: "Pending",
     },
     approvedAmount: {
       type: Number,
       default: 0,
     },
+    repaymentEnabled: { type: Boolean, default: false },
+    repaymentMonths: { type: Number, default: 12, min: 1, max: 120 },
+    interestRate: { type: Number, default: 0, min: 0 },
+    totalRepayment: { type: Number, default: 0, min: 0 },
+    amountPaid: { type: Number, default: 0, min: 0 },
+    balance: { type: Number, default: 0, min: 0 },
+    monthlyInstallment: { type: Number, default: 0, min: 0 },
     rejectionReason: {
       type: String,
       default: "",
@@ -96,6 +103,16 @@ const supportRequestSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+supportRequestSchema.pre("save", function(next) {
+  if (this.isNew || this.isModified("approvedAmount") || this.isModified("repaymentEnabled") || this.isModified("interestRate")) {
+    const principal = Number(this.approvedAmount || this.requestedAmount || 0);
+    this.totalRepayment = this.repaymentEnabled ? principal + (principal * Number(this.interestRate || 0) / 100) : 0;
+    this.balance = this.repaymentEnabled ? Math.max(0, this.totalRepayment - Number(this.amountPaid || 0)) : 0;
+    this.monthlyInstallment = this.repaymentEnabled ? (this.repaymentMonths > 0 ? Math.ceil(this.totalRepayment / this.repaymentMonths) : this.totalRepayment) : 0;
+  }
+  next();
+});
 
 supportRequestSchema.index({ member: 1, status: 1 });
 supportRequestSchema.index({ createdAt: -1 });

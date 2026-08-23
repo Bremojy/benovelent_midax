@@ -4,6 +4,7 @@ const migrations = [
   require("../migrations/001_remove_invalid_member_nested_unique_indexes"),
   require("../migrations/002_migrate_member_occupation_to_position"),
   require("../migrations/003_seed_policies"),
+  require("../migrations/004_normalize_member_defaults"),
 ];
 
 async function runMigrations() {

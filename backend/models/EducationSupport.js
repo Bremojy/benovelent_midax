@@ -123,11 +123,18 @@ const educationSupportSchema = new mongoose.Schema(
       type: String,
       enum: [
         "Pending",
+        "Under Review",
+        "Documents Required",
+        "Eligibility Review",
+        "Approval Review",
         "Approved",
+        "Disbursement Pending",
+        "Paid",
         "Rejected",
         "Disbursed",
         "Completed",
         "Defaulted",
+        "Cancelled",
       ],
       default: "Pending",
     },
@@ -146,6 +153,10 @@ const educationSupportSchema = new mongoose.Schema(
     rejectionReason: String,
 
     remarks: String,
+
+    timeline: [
+      { status: String, remarks: String, updatedBy: { type: mongoose.Schema.Types.ObjectId }, date: { type: Date, default: Date.now } }
+    ],
 
     // =====================================
     // FILES

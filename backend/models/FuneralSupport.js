@@ -146,9 +146,15 @@ const funeralSupportSchema = new mongoose.Schema(
         enum:[
             "Pending",
             "Under Review",
+            "Documents Required",
+            "Eligibility Review",
+            "Approval Review",
             "Approved",
-            "Rejected",
+            "Disbursement Pending",
             "Paid",
+            "Completed",
+            "Rejected",
+            "Cancelled",
             "Closed"
         ],
         default:"Pending"
@@ -172,6 +178,10 @@ const funeralSupportSchema = new mongoose.Schema(
         type:String,
         default:""
     },
+
+    timeline: [
+      { status: String, remarks: String, updatedBy: { type: mongoose.Schema.Types.ObjectId }, date: { type: Date, default: Date.now } }
+    ],
 
     // =====================================
     // ELIGIBILITY

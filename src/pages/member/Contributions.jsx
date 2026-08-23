@@ -14,6 +14,7 @@ export default function Contributions() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [educationLoans, setEducationLoans] = useState([]);
+  const [repayableSupport, setRepayableSupport] = useState([]);
   const [loanLoading, setLoanLoading] = useState(true);
   const year = new Date().getFullYear();
 
@@ -21,9 +22,11 @@ export default function Contributions() {
     try {
       setLoading(true);
       setError("");
-      const [response, loanResponse] = await Promise.all([API.get(`/member/accounts?year=${year}`), API.get("/education/my-applications")]);
+      const [response, loanResponse, claimResponse] = await Promise.all([API.get(`/member/accounts?year=${year}`), API.get("/education/my-applications"), API.get("/member/claims")]);
       setData(response.data || null);
       setEducationLoans(Array.isArray(loanResponse.data?.applications) ? loanResponse.data.applications : []);
+      const allClaims = Array.isArray(claimResponse.data?.claims) ? claimResponse.data.claims : [];
+      setRepayableSupport(allClaims.filter((claim) => claim?.supportType && !["medical", "funeral", "Medical", "Funeral"].includes(claim.supportType) && claim.repaymentEnabled && ["Approved", "Disbursement Pending", "Paid"].includes(claim.status) && Number(claim.balance || 0) > 0));
     } catch (err) {
       setError(err.response?.data?.message || err.message || "Unable to load scheme accounts.");
     } finally {
@@ -81,6 +84,11 @@ export default function Contributions() {
           <div className="portal-module-header"><div><span>EDUCATION POLICY REPAYMENTS</span><h2>My loans</h2><p>Repay any outstanding Education Policy balance securely through an M-PESA STK Push.</p></div></div>
           {loanLoading ? <div className="portal-empty">Loading loan balances…</div> : educationLoans.filter((loan) => Number(loan.balance || 0) > 0 && ["Approved","Disbursed","Defaulted"].includes(loan.status)).length === 0 ? <div className="portal-empty"><h3>No outstanding education loan</h3><p>Approved or disbursed education policy loans will appear here with their live repayment balance.</p></div> : <div className="portal-grid two">{educationLoans.filter((loan) => Number(loan.balance || 0) > 0 && ["Approved","Disbursed","Defaulted"].includes(loan.status)).map((loan) => <article className="portal-panel" key={loan._id} style={{ margin:0 }}><span className="portal-badge">Education Policy</span><h3>{loan.dependentName || "Education loan"}</h3><p>{loan.school || ""}</p><div className="portal-stat-grid"><Stat label="Total repayment" value={money(loan.totalRepayment)} /><Stat label="Paid" value={money(loan.amountPaid)} /><Stat label="Balance" value={money(loan.balance)} /><Stat label="Monthly instalment" value={money(loan.monthlyInstallment)} /></div><MpesaPaymentButton purpose="loan_repayment" referenceId={loan._id} defaultAmount={Math.min(Number(loan.monthlyInstallment || 0), Number(loan.balance || 0))} maxAmount={Number(loan.balance || 0)} label="Repay with M-PESA" /></article>)}</div>}
         </section>
+
+        {repayableSupport.length > 0 && <section className="portal-panel">
+          <div className="portal-module-header"><div><span>OTHER REPAYABLE SUPPORT</span><h2>Other support balances</h2><p>Only policies explicitly configured as repayable can be repaid through M-PESA here.</p></div></div>
+          <div className="portal-grid two">{repayableSupport.map((claim) => <article className="portal-panel" key={claim._id} style={{margin:0}}><span className="portal-badge">{claim.policyName || claim.supportType}</span><h3>{claim.description || "Support balance"}</h3><div className="portal-stat-grid"><Stat label="Total repayment" value={money(claim.totalRepayment)} /><Stat label="Paid" value={money(claim.amountPaid)} /><Stat label="Balance" value={money(claim.balance)} /></div><MpesaPaymentButton purpose="support_repayment" referenceId={claim._id} defaultAmount={Math.min(Number(claim.balance || 0), Number(claim.monthlyInstallment || claim.balance || 0))} maxAmount={Number(claim.balance || 0)} label="Repay with M-PESA" /></article>)}</div>
+        </section>}
 
         <div className="portal-stat-grid">
           <Stat label="Standard monthly deduction" value={money(data?.standardMonthlyDeduction)} />

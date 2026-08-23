@@ -1,5 +1,19 @@
 const Policy = require("../models/Policy");
 
+const DEFAULT_POLICIES = [
+  { name: "Education Policy", slug: "education-policy", category: "loan", description: "Education support for eligible dependants with an agreed repayment plan.", enabled: true, maxAmount: 20000, minAmount: 1000, interestRate: 10, repaymentEnabled: true, repaymentMonths: 12, communityAssistanceEnabled: true, applicationPath: "/member/support", order: 10 },
+  { name: "Medical Support", slug: "medical-support", category: "support", description: "Medical assistance for eligible members and approved dependants.", enabled: true, maxAmount: 50000, minAmount: 0, interestRate: 0, repaymentEnabled: false, repaymentMonths: 12, communityAssistanceEnabled: true, applicationPath: "/member/support", order: 20 },
+  { name: "Funeral Support", slug: "funeral-support", category: "support", description: "Funeral assistance according to the applicable scheme limits.", enabled: true, maxAmount: 100000, minAmount: 0, interestRate: 0, repaymentEnabled: false, repaymentMonths: 12, communityAssistanceEnabled: true, applicationPath: "/member/support", order: 30 },
+];
+
+const ensureDefaultPolicies = async () => {
+  for (const policy of DEFAULT_POLICIES) {
+    await Policy.updateOne({ slug: policy.slug }, { $setOnInsert: policy }, { upsert: true });
+  }
+  await Policy.updateOne({ slug: "education-policy" }, { $set: { repaymentEnabled: true, category: "loan" } });
+  await Policy.updateMany({ slug: { $in: ["medical-support", "funeral-support"] } }, { $set: { repaymentEnabled: false, category: "support" } });
+};
+
 const slugify = (value) => String(value || "").toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80);
 const clean = (body = {}) => ({
   name: String(body.name || "").trim(),
@@ -19,6 +33,7 @@ const clean = (body = {}) => ({
 
 exports.publicList = async (_req, res) => {
   try {
+    await ensureDefaultPolicies();
     const policies = await Policy.find({ enabled: true }).sort({ order: 1, name: 1 }).lean();
     res.json({ success: true, policies });
   } catch (error) { res.status(500).json({ success: false, message: error.message }); }
@@ -26,6 +41,7 @@ exports.publicList = async (_req, res) => {
 
 exports.list = async (_req, res) => {
   try {
+    await ensureDefaultPolicies();
     const policies = await Policy.find().sort({ order: 1, name: 1 }).lean();
     res.json({ success: true, policies });
   } catch (error) { res.status(500).json({ success: false, message: error.message }); }

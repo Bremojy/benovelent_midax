@@ -1,4 +1,5 @@
 const SupportRequest = require("../models/SupportRequest");
+const Policy = require("../models/Policy");
 const { resolveStoredFileUrl } = require("../utils/uploadUrl");
 
 const safeParse = (value, fallback) => {
@@ -80,6 +81,11 @@ exports.create = async (req, res) => {
     }
 
     const attachments = buildAttachmentList(req);
+    const policy = policySlug ? await Policy.findOne({ slug: policySlug, enabled: true }).lean() : null;
+    const policyMax = Number(policy?.maxAmount || 0);
+    const policyMin = Number(policy?.minAmount || 0);
+    if (policyMin > 0 && amount < policyMin) return res.status(400).json({ success:false, message:`Minimum amount for ${policy.name} is KSh ${policyMin.toLocaleString("en-KE")}.` });
+    if (policyMax > 0 && amount > policyMax) return res.status(400).json({ success:false, message:`Maximum amount for ${policy.name} is KSh ${policyMax.toLocaleString("en-KE")}.` });
 
     const item = await SupportRequest.create({
       member: req.user._id,
@@ -88,6 +94,10 @@ exports.create = async (req, res) => {
       policyName: asText(policyName),
       description: asText(description),
       requestedAmount: amount,
+      approvedAmount: 0,
+      repaymentEnabled: Boolean(policy?.repaymentEnabled),
+      repaymentMonths: Number(policy?.repaymentMonths || 12),
+      interestRate: Number(policy?.interestRate || 0),
       documents: attachments,
       timeline: [
         {

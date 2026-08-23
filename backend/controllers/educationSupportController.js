@@ -229,6 +229,10 @@ await createNotification({
 });
 }
 
+    application.timeline = Array.isArray(application.timeline) ? application.timeline : [];
+    application.timeline.push({ status: "Pending", remarks: "Education application submitted by member.", updatedBy: req.user._id, date: new Date() });
+    await application.save();
+
     res.status(201).json({
       success: true,
       message:

@@ -422,6 +422,12 @@ exports.updateProfile = async (req, res) => {
 
         }
 
+        // Employment defaults are MIDAX-controlled and cannot be member-edited.
+        if (Object.prototype.hasOwnProperty.call(req.body, "employer") || Object.prototype.hasOwnProperty.call(req.body, "position")) {
+            delete req.body.employer;
+            delete req.body.position;
+        }
+
         // Update only supplied fields
         const allowedFields = [
             "phone",
@@ -433,7 +439,6 @@ exports.updateProfile = async (req, res) => {
             "physicalAddress",
             "siteStation",
             "customSiteStation",
-            "position",
             "acceptedConstitution",
             "acceptedPrivacyPolicy",
             "acceptedDeclaration",
@@ -443,7 +448,6 @@ exports.updateProfile = async (req, res) => {
             "bankName",
             "bankBranch",
             "accountNumber",
-            "employer",
         ];
 
         const parseMaybeJson = (value) => {

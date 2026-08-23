@@ -59,6 +59,23 @@ async function applyEducationRepayment(transaction) {
   return application;
 }
 
+async function applyGenericSupportRepayment(transaction) {
+  const application = await SupportRequest.findById(transaction.referenceId);
+  if (!application) throw new Error("Support repayment record was not found.");
+  if (String(application.member) !== String(transaction.member)) throw new Error("Support repayment ownership validation failed.");
+  if (!application.repaymentEnabled) throw new Error("This support request is not repayable.");
+  const amount = Math.min(Number(transaction.amount), Number(application.balance || 0));
+  if (amount <= 0) return application;
+  application.amountPaid = Number(application.amountPaid || 0) + amount;
+  application.balance = Math.max(0, Number(application.balance || 0) - amount);
+  if (application.balance === 0) application.status = "Completed";
+  if (!Array.isArray(application.timeline)) application.timeline = [];
+  application.timeline.push({ status: application.status, remarks: `M-PESA repayment of KSh ${amount.toLocaleString("en-KE")} recorded.`, updatedBy: transaction.member, date: new Date() });
+  await application.save();
+  await createNotification({ recipient: application.member, recipientModel: "Member", title: "Support Repayment Received", message: `M-PESA repayment of KSh ${amount.toLocaleString("en-KE")} received. Remaining balance: KSh ${Number(application.balance).toLocaleString("en-KE")}. Receipt: ${transaction.mpesaReceiptNumber || "pending"}.`, type: "payment", referenceId: application._id, referenceModel: "SupportRequest", icon: "payments" });
+  return application;
+}
+
 async function applyCommunityContribution(transaction) {
   const campaign = await CommunityAssistance.findById(transaction.referenceId);
   if (!campaign) throw new Error("Community assistance case was not found.");
@@ -86,8 +103,8 @@ exports.config = async (_req, res) => {
   res.json({
     success: true,
     configured: isConfigured(),
-    shortCode: String(process.env.MPESA_SHORTCODE || ""),
-    accountReference: String(process.env.MPESA_ACCOUNT_REFERENCE || ""),
+    shortCode: String(process.env.MPESA_SHORTCODE || "247247"),
+    accountReference: String(process.env.MPESA_ACCOUNT_REFERENCE || "0650186528835"),
     environment: String(process.env.MPESA_ENVIRONMENT || "production"),
   });
 };
@@ -115,7 +132,7 @@ exports.stk = async (req, res) => {
     const phoneNumber = normalizePhone(req.body?.phoneNumber || req.user?.phone || req.user?.mpesaNumber);
     if (!amount || amount <= 0) return res.status(400).json({ success: false, message: "Enter a valid M-PESA amount." });
     if (!phoneNumber || !/^254\d{9}$/.test(phoneNumber)) return res.status(400).json({ success: false, message: "Enter a valid Kenyan M-PESA number." });
-    if (!["loan_repayment", "community_assistance", "contribution", "other"].includes(purpose)) return res.status(400).json({ success: false, message: "Unsupported payment purpose." });
+    if (!["loan_repayment", "support_repayment", "community_assistance", "contribution", "other"].includes(purpose)) return res.status(400).json({ success: false, message: "Unsupported payment purpose." });
 
     let referenceModel = "";
     if (purpose === "loan_repayment") {
@@ -124,6 +141,13 @@ exports.stk = async (req, res) => {
       if (Number(application.balance) <= 0) return res.status(400).json({ success: false, message: "This education loan is already fully repaid." });
       if (amount > Number(application.balance)) return res.status(400).json({ success: false, message: "Repayment cannot exceed the current loan balance." });
       referenceModel = "EducationSupport";
+    } else if (purpose === "support_repayment") {
+      const application = await SupportRequest.findById(referenceId);
+      if (!application || String(application.member) !== String(req.user._id)) return res.status(404).json({ success: false, message: "Support repayment record not found." });
+      if (!application.repaymentEnabled || !["Approved", "Disbursement Pending", "Paid"].includes(application.status)) return res.status(400).json({ success: false, message: "This support request is not open for repayment." });
+      if (Number(application.balance) <= 0) return res.status(400).json({ success: false, message: "This support balance is already fully repaid." });
+      if (amount > Number(application.balance)) return res.status(400).json({ success: false, message: "Repayment cannot exceed the current balance." });
+      referenceModel = "SupportRequest";
     } else if (purpose === "community_assistance") {
       const campaign = await CommunityAssistance.findById(referenceId);
       if (!campaign || !campaign.enabled || String(campaign.status) !== "open") return res.status(404).json({ success: false, message: "Community assistance case is not available." });
@@ -140,8 +164,8 @@ exports.stk = async (req, res) => {
       referenceModel,
       phoneNumber,
       amount: Math.round(amount),
-      businessShortCode: String(process.env.MPESA_SHORTCODE || ""),
-      accountReference: String(process.env.MPESA_ACCOUNT_REFERENCE || ""),
+      businessShortCode: String(process.env.MPESA_SHORTCODE || "247247"),
+      accountReference: String(process.env.MPESA_ACCOUNT_REFERENCE || "0650186528835"),
       status: "pending",
     });
 
@@ -156,7 +180,7 @@ exports.stk = async (req, res) => {
       phoneNumber,
       amount: tx.amount,
       accountReference: tx.accountReference,
-      transactionDesc: purpose === "loan_repayment" ? "Loan repayment" : purpose === "community_assistance" ? "Community help" : "MIDAX payment",
+      transactionDesc: purpose === "loan_repayment" ? "Education repayment" : purpose === "support_repayment" ? "Support repayment" : purpose === "community_assistance" ? "Community help" : "MIDAX payment",
     });
 
     tx.merchantRequestId = String(result?.MerchantRequestID || "");
@@ -198,6 +222,7 @@ exports.callback = async (req, res) => {
       await transaction.save();
       try {
         if (transaction.purpose === "loan_repayment") await applyEducationRepayment(transaction);
+        if (transaction.purpose === "support_repayment") await applyGenericSupportRepayment(transaction);
         else if (transaction.purpose === "community_assistance") await applyCommunityContribution(transaction);
       } catch (applyError) {
         transaction.status = "failed";

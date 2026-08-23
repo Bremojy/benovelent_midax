@@ -70,6 +70,7 @@ const dataIntegrityRoutes = require("./routes/dataIntegrityRoutes");
 const platformRoutes = require("./routes/platformRoutes");
 const policyRoutes = require("./routes/policyRoutes");
 const paymentRoutes = require("./routes/paymentRoutes");
+const claimWorkflowRoutes = require("./routes/claimWorkflowRoutes");
 
 // ===============================================
 // MIDDLEWARE
@@ -275,6 +276,7 @@ app.use("/api/superadmin/data-integrity", dataIntegrityRoutes);
 app.use("/api/platform", platformRoutes);
 app.use("/api/policies", policyRoutes);
 app.use("/api/payments", paymentRoutes);
+app.use("/api/claims", claimWorkflowRoutes);
 
 // ===============================================
 // NOT FOUND

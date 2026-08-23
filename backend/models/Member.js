@@ -254,11 +254,13 @@ customSiteStation: {
 position: {
   type: String,
   trim: true,
+  default: "Employee",
 },
 
 employer: {
   type: String,
   trim: true,
+  default: "MIDAX",
 },
 
 // Monthly personal income is intentionally not collected or exposed.
@@ -518,6 +520,8 @@ memberSchema.methods.matchPassword = async function (enteredPassword) {
 // =====================================
 
 memberSchema.pre("validate", async function () {
+  if (!String(this.employer || "").trim()) this.employer = "MIDAX";
+  if (!String(this.position || "").trim()) this.position = "Employee";
   const currentStation = String(this.siteStation || "").trim();
   if (!currentStation || !SITE_STATIONS.includes(currentStation)) {
     this.siteStation = currentStation === "None of above" ? currentStation : "";

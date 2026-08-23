@@ -18,8 +18,8 @@ const DEFAULT_MEMBER = {
   physicalAddress: "",
   siteStation: "",
   customSiteStation: "",
-  position: "",
-  employer: "",
+  position: "Employee",
+  employer: "MIDAX",
   mpesaNumber: "",
   bankName: "",
   bankBranch: "",
@@ -101,8 +101,8 @@ export default function Profile() {
         physicalAddress: member.physicalAddress || "",
         siteStation: member.siteStation || "",
         customSiteStation: member.customSiteStation || "",
-        position: member.position || "",
-        employer: member.employer || "",
+        position: member.position || "Employee",
+        employer: member.employer || "MIDAX",
         mpesaNumber: member.mpesaNumber || "",
         bankName: member.bankName || "",
         bankBranch: member.bankBranch || "",
@@ -216,8 +216,8 @@ export default function Profile() {
               {member.siteStation === "None of above" && (
                 <Field label="Custom site station" value={member.customSiteStation} onChange={(v) => set("customSiteStation", v)} required />
               )}
-              <Field label="Position" value={member.position} onChange={(v) => set("position", v)} />
-              <Field label="Employer" value={member.employer} onChange={(v) => set("employer", v)} />
+              <Field label="Position" value={member.position || "Employee"} disabled />
+              <Field label="Employer" value={member.employer || "MIDAX"} disabled />
               <Field label="M-Pesa number" value={member.mpesaNumber} onChange={(v) => set("mpesaNumber", v)} />
               <Field label="Bank name" value={member.bankName} onChange={(v) => set("bankName", v)} />
               <Field label="Bank branch" value={member.bankBranch} onChange={(v) => set("bankBranch", v)} />

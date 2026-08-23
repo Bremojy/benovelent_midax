@@ -2,6 +2,8 @@ const axios = require("axios");
 const crypto = require("crypto");
 
 const env = (name, fallback = "") => String(process.env[name] || fallback).trim();
+const DEFAULT_MPESA_SHORTCODE = "247247";
+const DEFAULT_MPESA_ACCOUNT_REFERENCE = "0650186528835";
 const isDarajaConfigured = () => Boolean(
   env("MPESA_CONSUMER_KEY") &&
   env("MPESA_CONSUMER_SECRET")
@@ -49,7 +51,7 @@ async function getAccessToken() {
 async function stkPush({ phoneNumber, amount, accountReference, transactionDesc }) {
   const accessToken = await getAccessToken();
   const timestampValue = timestamp();
-  const shortcode = env("MPESA_SHORTCODE");
+  const shortcode = env("MPESA_SHORTCODE", DEFAULT_MPESA_SHORTCODE);
   const password = Buffer.from(`${shortcode}${env("MPESA_PASSKEY")}${timestampValue}`).toString("base64");
   const payload = {
     BusinessShortCode: shortcode,
@@ -61,7 +63,7 @@ async function stkPush({ phoneNumber, amount, accountReference, transactionDesc 
     PartyB: shortcode,
     PhoneNumber: normalizePhone(phoneNumber),
     CallBackURL: env("MPESA_CALLBACK_URL"),
-    AccountReference: String(accountReference || env("MPESA_ACCOUNT_REFERENCE")).slice(0, 20),
+    AccountReference: String(accountReference || env("MPESA_ACCOUNT_REFERENCE", DEFAULT_MPESA_ACCOUNT_REFERENCE)).slice(0, 20),
     TransactionDesc: String(transactionDesc || "Benevolent MIDAX payment").slice(0, 20),
   };
   const response = await axios.post(`${baseUrl()}/mpesa/stkpush/v1/processrequest`, payload, {

@@ -30,6 +30,7 @@ import "./styles/interaction-system.css";
 import "./styles/v8-responsive.css";
 import "./styles/final-v1-complete.css";
 import "./styles/modern-responsive-overrides.css";
+import "./styles/final-ui-polish.css";
 
 // =====================================================
 // PUBLIC PAGES
