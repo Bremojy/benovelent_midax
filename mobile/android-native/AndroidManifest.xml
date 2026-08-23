@@ -3,13 +3,13 @@
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
-    <application>
-        <activity android:name=".calls.IncomingCallActivity"
+    <application android:usesCleartextTraffic="false">
+        <activity android:name="com.benevolentmidax.calls.IncomingCallActivity"
             android:exported="false"
             android:showWhenLocked="true"
             android:turnScreenOn="true" />
         <service
-            android:name=".calls.BenevolentFirebaseMessagingService"
+            android:name="com.benevolentmidax.calls.BenevolentFirebaseMessagingService"
             android:exported="false">
             <intent-filter>
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />

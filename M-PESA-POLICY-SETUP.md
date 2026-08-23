@@ -12,12 +12,11 @@
 - M-PESA transaction status is idempotent and the frontend checks the transaction until it is successful/failed/pending.
 - Call foreground audio is primed after user interaction; background/closed-tab call alerts depend on Web Push/service-worker notifications because browser pages cannot guarantee arbitrary audio playback while closed.
 
-## Default M-PESA destination configured
+## M-PESA destination configuration
 
-- PayBill: `247247`
-- Account: `0650186528835`
+The application intentionally does **not** embed a PayBill, shortcode, or account reference. The live destination must be the organisation's Safaricom-authorised account supplied during onboarding and approved by the authorised account holder.
 
-These are defaults only and are controlled by backend environment variables. Confirm with Safaricom and the organisation's authorised M-PESA account holder that the shortcode/account is authorised for this scheme before processing live funds.
+For B2C, use the Safaricom-issued B2C shortcode and initiator/security credential; do not reuse a collection PayBill unless Safaricom has explicitly configured it for B2C.
 
 ## Production backend variables
 
@@ -29,11 +28,11 @@ MPESA_ENVIRONMENT=production
 MPESA_CONSUMER_KEY=
 MPESA_CONSUMER_SECRET=
 MPESA_PASSKEY=
-MPESA_SHORTCODE=247247
-MPESA_ACCOUNT_REFERENCE=0650186528835
+MPESA_SHORTCODE=<Safaricom-authorised collection shortcode>
+MPESA_ACCOUNT_REFERENCE=<scheme-approved account/reference>
 MPESA_TRANSACTION_TYPE=CustomerPayBillOnline
 MPESA_CALLBACK_URL=https://benovelent-midax.onrender.com/api/payments/callback
-MPESA_B2C_SHORTCODE=247247
+MPESA_B2C_SHORTCODE=<Safaricom-authorised B2C shortcode>
 MPESA_INITIATOR_NAME=
 MPESA_SECURITY_CREDENTIAL=
 MPESA_B2C_RESULT_URL=https://benovelent-midax.onrender.com/api/payments/b2c/result
@@ -45,13 +44,13 @@ The current release deliberately does not contain live Daraja credentials. The a
 
 ## Recommended rollout
 
-1. Create/verify the authorised Safaricom Daraja production application and the appropriate business collection/payout products.
-2. Set the backend environment variables above on Render.
-3. Deploy the frontend and backend.
-4. Confirm STK callback delivery to the Render callback URL.
-5. Test a small real payment and verify the M-PESA receipt is stored in the member transaction and, for loan repayment, the education balance decreases exactly once.
-6. Test a community contribution and administrator payout separately.
-7. Only then enable live financial collection for all members.
+1. Complete the Safaricom M-PESA Bulk Payment/B2C onboarding for the organisation and obtain the authorised B2C shortcode and credentials.
+2. Create/verify the Daraja production application and enable the products actually used by the scheme.
+3. Set the backend environment variables above on Render.
+4. Confirm the Render result/timeout callbacks are publicly reachable over HTTPS.
+5. Test STK collection with a small authorised payment and verify the callback, receipt and ledger update.
+6. Test a community contribution and a B2C administrator payout separately.
+7. Only then enable live financial transactions for all members.
 
 ## Security
 

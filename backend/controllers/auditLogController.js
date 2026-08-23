@@ -310,14 +310,9 @@ exports.getAuditCoverage = async (req, res) => {
         const Member = require("../models/Member");
         const Admin = require("../models/Admin");
         const SuperAdmin = require("../models/SuperAdmin");
+        const Leader = require("../models/Leader");
 
-        const constitutionLeadership = [
-            { position: "Chairperson", name: "Moses Machila" },
-            { position: "Treasurer", name: "Immaculate" },
-            { position: "Secretary", name: "Isabela" },
-        ];
-
-        const [members, admins, superadmins] = await Promise.all([
+        const [members, admins, superadmins, liveLeaders] = await Promise.all([
             Member.find({ isDeleted: { $ne: true } })
                 .select("fullName memberNumber email status role profileImage")
                 .sort({ fullName: 1 })
@@ -330,6 +325,7 @@ exports.getAuditCoverage = async (req, res) => {
                 .select("fullName email status role profileImage")
                 .sort({ fullName: 1 })
                 .lean(),
+            Leader.find({ isActive: true }).select("name position bio imageUrl order").sort({ order: 1, name: 1 }).lean(),
         ]);
 
         const accountSets = [
@@ -400,16 +396,19 @@ exports.getAuditCoverage = async (req, res) => {
         }
 
         const normalized = (value) => String(value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
-        const leadership = constitutionLeadership.map((entry) => {
+        const leadership = liveLeaders.map((entry) => {
             const wanted = normalized(entry.name);
             const matched = admins.find((admin) => {
                 const haystack = [admin.fullName, admin.email].map(normalized).join(" ");
-                const first = normalized(String(admin.fullName || "").split(" ")[0]);
-                return wanted && (haystack.includes(wanted) || (wanted.length >= 5 && first.startsWith(wanted)));
+                return wanted && haystack.includes(wanted);
             });
             const matchedCoverage = matched && coverage.find((item) => item.id === String(matched._id));
             return {
-                ...entry,
+                id: String(entry._id),
+                position: entry.position,
+                name: entry.name,
+                bio: entry.bio || "",
+                imageUrl: entry.imageUrl || "",
                 matchedAccountId: matchedCoverage?.id || null,
                 matchedAccountName: matchedCoverage?.name || null,
                 auditCount: matchedCoverage?.audit.total || 0,

@@ -1,6 +1,6 @@
 
 import { useEffect, useMemo, useState } from "react";
-import { Users, Search, BadgeCheck, Sparkles, ArrowRight } from "lucide-react";
+import { Users, Search, BadgeCheck, Sparkles } from "lucide-react";
 import api, { UPLOAD_URL } from "../services/api";
 import "./Leaders.css";
 
@@ -29,7 +29,6 @@ function Leaders() {
     return leaders.filter((leader) => `${leader.name || ""} ${leader.position || ""} ${leader.bio || ""}`.toLowerCase().includes(keyword));
   }, [search, leaders]);
 
-  const secretaryVacant = !leaders.some((leader) => /secretary/i.test(String(leader.position || "")));
 
   if (loading) {
     return (
@@ -58,14 +57,6 @@ function Leaders() {
         <Search size={20} />
         <input type="text" placeholder="Search leader..." value={search} onChange={(e) => setSearch(e.target.value)} />
       </div>
-
-      {secretaryVacant && (
-        <div className="leaders-vacancy-banner">
-          <strong>Secretary seat coming soon</strong>
-          <span>It is open for all members who are ready to serve.</span>
-          <a href="/contact">Apply or ask a question <ArrowRight size={16} /></a>
-        </div>
-      )}
 
       {filteredLeaders.length === 0 && (
         <div className="empty-state">

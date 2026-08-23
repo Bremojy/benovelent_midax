@@ -12,7 +12,8 @@ export default function MpesaPaymentButton({ purpose, referenceId, label = "Pay 
   const [phone, setPhone] = useState(phoneNumber || "");
   const [status, setStatus] = useState("idle");
   const [message, setMessage] = useState("");
-  const [configured, setConfigured] = useState(true);
+  const [configured, setConfigured] = useState(false);
+  const [mpesaConfig, setMpesaConfig] = useState({ shortCode: "", accountReference: "", environment: "production" });
   const [transactionId, setTransactionId] = useState("");
   useEffect(() => setPhone(phoneNumber || ""), [phoneNumber]);
   useEffect(() => setAmount(defaultAmount || ""), [defaultAmount]);
@@ -54,8 +55,13 @@ export default function MpesaPaymentButton({ purpose, referenceId, label = "Pay 
     try {
       const { data } = await API.get("/payments/config");
       setConfigured(Boolean(data?.configured));
+      setMpesaConfig({
+        shortCode: String(data?.shortCode || ""),
+        accountReference: String(data?.accountReference || ""),
+        environment: String(data?.environment || "production"),
+      });
       setStatus("idle"); setOpen(true);
-    } catch { setConfigured(true); setStatus("idle"); setOpen(true); }
+    } catch { setConfigured(false); setMpesaConfig({ shortCode: "", accountReference: "", environment: "production" }); setStatus("idle"); setOpen(true); }
   };
 
   const submit = async (event) => {
@@ -89,7 +95,7 @@ export default function MpesaPaymentButton({ purpose, referenceId, label = "Pay 
             <form onSubmit={submit} className="mpesa-form">
               <label>Amount (KES)<input type="number" min="1" step="1" value={amount} onChange={(e) => setAmount(e.target.value)} disabled={!configured || status === "sending"} /></label>
               <label>M-PESA number<input type="tel" inputMode="numeric" placeholder="0712345678" value={phone} onChange={(e) => setPhone(e.target.value)} disabled={!configured || status === "sending"} /></label>
-              <div className="mpesa-account-note">PayBill <strong>247247</strong> • Account <strong>0650186528835</strong></div>
+              {configured && <div className="mpesa-account-note">{mpesaConfig.environment === "sandbox" ? "Sandbox" : "Production"} • PayBill <strong>{mpesaConfig.shortCode || "configured shortcode"}</strong>{mpesaConfig.accountReference ? <> • Account <strong>{mpesaConfig.accountReference}</strong></> : null}</div>}
               <button className="mpesa-submit" type="submit" disabled={!configured || status === "sending"}>{status === "sending" ? <><Loader2 size={17} className="mpesa-spin" /> Sending STK Push…</> : "Send STK Push"}</button>
               <p className="mpesa-small">Your M-PESA PIN is entered only on the M-PESA prompt. Final payment status is confirmed by the server callback.</p>
             </form>

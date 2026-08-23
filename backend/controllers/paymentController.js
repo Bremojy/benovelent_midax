@@ -86,8 +86,8 @@ exports.config = async (_req, res) => {
   res.json({
     success: true,
     configured: isConfigured(),
-    shortCode: String(process.env.MPESA_SHORTCODE || "247247"),
-    accountReference: String(process.env.MPESA_ACCOUNT_REFERENCE || "0650186528835"),
+    shortCode: String(process.env.MPESA_SHORTCODE || ""),
+    accountReference: String(process.env.MPESA_ACCOUNT_REFERENCE || ""),
     environment: String(process.env.MPESA_ENVIRONMENT || "production"),
   });
 };
@@ -140,14 +140,14 @@ exports.stk = async (req, res) => {
       referenceModel,
       phoneNumber,
       amount: Math.round(amount),
-      businessShortCode: String(process.env.MPESA_SHORTCODE || "247247"),
-      accountReference: String(process.env.MPESA_ACCOUNT_REFERENCE || "0650186528835"),
+      businessShortCode: String(process.env.MPESA_SHORTCODE || ""),
+      accountReference: String(process.env.MPESA_ACCOUNT_REFERENCE || ""),
       status: "pending",
     });
 
     if (!isConfigured()) {
       tx.status = "failed";
-      tx.resultDescription = "M-PESA Daraja credentials are not configured. This is a safe integration placeholder until production credentials are added.";
+      tx.resultDescription = "M-PESA Daraja production credentials are not configured.";
       await tx.save();
       return res.status(503).json({ success: false, configured: false, message: "M-PESA is not enabled yet. Add the Daraja production credentials to the backend environment, then retry.", transaction: tx });
     }

@@ -1,4 +1,4 @@
-const CACHE = "benevolent-shell-v18-call-fix";
+const CACHE = "benevolent-shell-v22-pwa-hardening";
 const ASSETS = ["/", "/index.html", "/manifest.webmanifest", "/pwa-icon-192.png", "/pwa-icon-512.png", "/apple-touch-icon.png"];
 const DB_NAME = "benovelent-pwa";
 const DB_STORE = "calls";
@@ -24,6 +24,21 @@ async function savePendingCall(id, payload) {
     db.close();
   } catch (error) {
     console.warn("PWA call storage failed:", error);
+  }
+}
+async function removePendingCall(id) {
+  if (!id) return;
+  try {
+    const db = await openDb();
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(DB_STORE, "readwrite");
+      tx.objectStore(DB_STORE).delete(String(id));
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error);
+    });
+    db.close();
+  } catch (error) {
+    console.debug("PWA pending-call cleanup skipped:", error);
   }
 }
 
@@ -90,7 +105,8 @@ self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   const data = event.notification?.data || {};
   const action = event.action || "open";
-  const callId = data.callId ? encodeURIComponent(String(data.callId)) : "";
+  const callIdValue = data.callId ? String(data.callId) : "";
+  const callId = callIdValue ? encodeURIComponent(callIdValue) : "";
   let link = data.link || "/";
   if (data.incomingCall && callId) {
     const base = data.role === "admin" ? "/admin/messages" : data.role === "superadmin" ? "/superadmin/messages" : "/member/messages";
@@ -99,6 +115,7 @@ self.addEventListener("notificationclick", (event) => {
   else if (data.role === "superadmin") link = "/superadmin/messages";
 
   event.waitUntil((async () => {
+    if (callIdValue) await removePendingCall(callIdValue);
     const clientList = await clients.matchAll({ type: "window", includeUncontrolled: true });
     for (const client of clientList) {
       if ("focus" in client) {

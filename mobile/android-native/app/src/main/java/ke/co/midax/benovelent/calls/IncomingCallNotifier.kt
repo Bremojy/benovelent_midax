@@ -25,7 +25,7 @@ object IncomingCallNotifier {
                 .build()
             val channel = NotificationChannel(
                 CHANNEL_ID,
-                context.getString(ke.co.midax.benovelent.R.string.incoming_call_channel_name),
+                "Incoming calls",
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
                 description = "Incoming Benevolent MIDAX audio/video calls"
@@ -39,7 +39,7 @@ object IncomingCallNotifier {
 
         val title = if (callType.equals("video", true)) "Incoming video call" else "Incoming audio call"
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.sym_call_incoming)
+            .setSmallIcon(com.benevolentmidax.R.drawable.ic_call)
             .setContentTitle(title)
             .setContentText("$callerName is calling you")
             .setCategory(NotificationCompat.CATEGORY_CALL)

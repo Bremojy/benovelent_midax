@@ -68,14 +68,10 @@ export default function Home() {
         <section className="modern-section">
           <div className="modern-section-head">
             <span className="eyebrow">LEADERSHIP</span>
-            <h2>People facilitating the scheme</h2>
+            <h2>Meet the current scheme leadership</h2>
+            <p>The leadership directory is loaded from the portal so published names and positions remain the source of truth.</p>
           </div>
-          <div className="modern-card-grid">
-            <Card title="Moses Machila" text="Chairperson" />
-            <Card title="Immaculate" text="Treasurer" />
-            <Card title="Secretary seat — coming soon" text="Open for all members" />
-          </div>
-          <Link className="modern-btn-secondary" to="/leaders">See all leaders</Link>
+          <Link className="modern-btn-secondary" to="/leaders">Open leadership directory</Link>
         </section>
 
         <section className="modern-section v3-portal-cta">

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Download, X, Smartphone, Share2 } from "lucide-react";
 import "../styles/feedback-pwa.css";
 
@@ -16,7 +16,8 @@ export default function InstallPWA() {
   const [installed, setInstalled] = useState(false);
   const [iosDevice, setIosDevice] = useState(false);
   const [androidDevice, setAndroidDevice] = useState(false);
-  const [pendingInstallIntent, setPendingInstallIntent] = useState(false);
+  const pendingInstallIntentRef = useRef(false);
+  const deferredRef = useRef(null);
 
   useEffect(() => {
     if (standalone()) {
@@ -28,17 +29,18 @@ export default function InstallPWA() {
 
     const onPrompt = async (event) => {
       event.preventDefault();
+      deferredRef.current = event;
       setDeferred(event);
       setOpen(true);
       window.__benovelentPwaPrompt = event;
-      if (pendingInstallIntent) {
+      if (pendingInstallIntentRef.current) {
         try {
           await event.prompt();
           await event.userChoice;
         } catch (_) {
           // Browser may reject/consume the one-time prompt.
         } finally {
-          setPendingInstallIntent(false);
+          pendingInstallIntentRef.current = false;
           setDeferred(null);
           window.__benovelentPwaPrompt = null;
         }
@@ -62,15 +64,15 @@ export default function InstallPWA() {
           setDeferred(null);
           window.__benovelentPwaPrompt = null;
         }
-        setPendingInstallIntent(false);
+        pendingInstallIntentRef.current = false;
         return;
       }
-      setPendingInstallIntent(true);
+      pendingInstallIntentRef.current = true;
       if (ios()) {
-        setPendingInstallIntent(false);
+        pendingInstallIntentRef.current = false;
         setStatusMessage("On iPhone/iPad: tap Share, then Add to Home Screen.");
       } else {
-        setPendingInstallIntent(true);
+        pendingInstallIntentRef.current = true;
         setStatusMessage("Your browser controls installation. Open its menu and choose Install app when available.");
       }
       setOpen(true);
@@ -86,11 +88,11 @@ export default function InstallPWA() {
       window.removeEventListener("appinstalled", onInstalled);
       window.removeEventListener("benovelent:install-now", onDirectInstall);
     };
-  }, [pendingInstallIntent]);
+  }, []);
 
   const closeFallback = () => {
+    pendingInstallIntentRef.current = false;
     setOpen(false);
-    setPendingInstallIntent(false);
   };
 
   const install = async () => {
