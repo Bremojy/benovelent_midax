@@ -6,4 +6,8 @@ const controller = require("../controllers/claimWorkflowController");
 router.get("/statuses", verifyToken, isAdminOrSuperAdmin, controller.statuses);
 router.get("/", verifyToken, isAdminOrSuperAdmin, controller.list);
 router.put("/:type/:id/stage", verifyToken, isAdminOrSuperAdmin, controller.updateStage);
+router.delete("/:type/:id", verifyToken, isAdminOrSuperAdmin, controller.remove);
+router.post("/:type/:id/publish-news", verifyToken, isAdminOrSuperAdmin, controller.publishClaimToNews);
+router.post("/community/:id/publish-news", verifyToken, isAdminOrSuperAdmin, controller.publishCommunityToNews);
+router.post("/community/request", verifyToken, require("../middleware/roleMiddleware").isMember, controller.requestCommunityAssistance);
 module.exports = router;

@@ -2,7 +2,10 @@ const MedicalSupport = require("../models/MedicalSupport");
 const FuneralSupport = require("../models/FuneralSupport");
 const EducationSupport = require("../models/EducationSupport");
 const SupportRequest = require("../models/SupportRequest");
-const { createNotification } = require("../utils/createNotification");
+const createNotification = require("../utils/createNotification");
+const CommunityAssistance = require("../models/CommunityAssistance");
+const Member = require("../models/Member");
+const News = require("../models/News");
 
 const MODEL_MAP = { medical: MedicalSupport, funeral: FuneralSupport, education: EducationSupport, support: SupportRequest };
 const LABEL_MAP = { medical: "Medical", funeral: "Funeral", education: "Education", support: "Support" };
@@ -46,7 +49,8 @@ exports.updateStage = async (req, res) => {
     const remarks = String(req.body?.remarks || "").trim();
     const reason = String(req.body?.rejectionReason || "").trim();
     if (!STAGES.includes(nextStatus)) return res.status(400).json({ success: false, message: "Invalid claim review stage." });
-    if (!validateTransition(String(result.claim.status || "Pending"), nextStatus)) return res.status(409).json({ success: false, message: `Cannot move a ${result.claim.status} claim directly to ${nextStatus}.` });
+    const isSuperAdmin = String(req.user?.role || "").toLowerCase() === "superadmin";
+    if (!isSuperAdmin && !validateTransition(String(result.claim.status || "Pending"), nextStatus)) return res.status(409).json({ success: false, message: `Cannot move a ${result.claim.status} claim directly to ${nextStatus}.` });
     if (nextStatus === "Rejected" && !reason && !remarks) return res.status(400).json({ success: false, message: "A rejection reason is required." });
 
     if (req.body?.approvedAmount !== undefined) result.claim.approvedAmount = Math.max(0, Number(req.body.approvedAmount) || 0);
@@ -93,4 +97,81 @@ exports.list = async (req, res) => {
     const claims=[...normalize("medical",medical),...normalize("funeral",funeral),...normalize("education",education),...normalize("support",support)].sort((a,b)=>new Date(b.createdAt||b.applicationDate)-new Date(a.createdAt||a.applicationDate));
     res.json({ success:true, count:claims.length, claims, stages:STAGES });
   } catch (error) { res.status(500).json({ success:false, message:error.message }); }
+};
+
+
+exports.remove = async (req, res) => {
+  try {
+    if (String(req.user?.role || "").toLowerCase() !== "superadmin") {
+      return res.status(403).json({ success: false, message: "Only SuperAdmin can delete a claim." });
+    }
+    const result = await getClaim(req.params.type, req.params.id);
+    await result.claim.deleteOne();
+    return res.json({ success: true, message: `${LABEL_MAP[result.key]} claim deleted successfully.` });
+  } catch (error) {
+    return res.status(error.status || 500).json({ success: false, message: error.message });
+  }
+};
+
+exports.publishClaimToNews = async (req, res) => {
+  try {
+    const result = await getClaim(req.params.type, req.params.id);
+    const status = String(result.claim.status || "Pending");
+    if (!["Approved", "Paid", "Completed"].includes(status)) {
+      return res.status(400).json({ success: false, message: "Only an approved, paid, or completed support case can be published as a support approval." });
+    }
+    const member = await Member.findById(result.claim.member).select("fullName memberNumber").lean();
+    const sourceModel = result.Model.modelName;
+    const sourceId = String(result.claim._id);
+    let news = await News.findOne({ sourceModel, sourceId });
+    const title = `${LABEL_MAP[result.key]} Support Approved`;
+    const approvedAmount = Number(result.claim.approvedAmount || result.claim.requestedAmount || 0);
+    const content = `${title}.\n\nBenevolent MIDAX has approved KSh ${approvedAmount.toLocaleString("en-KE")} in ${LABEL_MAP[result.key].toLowerCase()} support for ${member?.fullName || "a member"}. This public update confirms the support decision without exposing private medical, education, funeral, or identity details.\n\nReference: ${member?.memberNumber || "Member support case"}.`;
+    const payload = { title, summary: `A ${LABEL_MAP[result.key].toLowerCase()} support case has been approved.`, content, category: "Announcement", published: true, status: "published", publishDate: new Date(), author: req.user._id, sourceModel, sourceId };
+    if (news) { Object.assign(news, payload); await news.save(); }
+    else news = await News.create(payload);
+    return res.json({ success: true, news, message: "Support approval published to public News." });
+  } catch (error) { return res.status(error.status || 500).json({ success: false, message: error.message }); }
+};
+
+exports.publishCommunityToNews = async (req, res) => {
+  try {
+    const campaign = await CommunityAssistance.findById(req.params.id).populate("recipientMember", "fullName memberNumber");
+    if (!campaign) return res.status(404).json({ success: false, message: "Community assistance request not found." });
+    if (!campaign.enabled || !["open", "target_reached"].includes(campaign.status)) return res.status(400).json({ success: false, message: "Only an active community assistance request can be published." });
+    const sourceModel = "CommunityAssistance";
+    const sourceId = String(campaign._id);
+    let news = await News.findOne({ sourceModel, sourceId });
+    const title = campaign.title || "Community Support Request";
+    const content = `${campaign.description || "A Benevolent MIDAX member has requested community assistance."}\n\nTarget: KSh ${Number(campaign.targetAmount || 0).toLocaleString("en-KE")}\nRaised so far: KSh ${Number(campaign.raisedAmount || 0).toLocaleString("en-KE")}\n\nCommunity members can support this verified request through the M-PESA community assistance option.`;
+    const payload = { title, summary: `Community assistance request for ${campaign.recipientMember?.fullName || "a member"}.`, content, category: "Announcement", published: true, status: "published", publishDate: new Date(), author: req.user._id, sourceModel, sourceId };
+    if (news) { Object.assign(news, payload); await news.save(); }
+    else news = await News.create(payload);
+    return res.json({ success: true, news, message: "Community support request published to public News." });
+  } catch (error) { return res.status(500).json({ success: false, message: error.message }); }
+};
+
+exports.requestCommunityAssistance = async (req, res) => {
+  try {
+    const { referenceModel, referenceId, targetAmount } = req.body || {};
+    const meta = modelFor(referenceModel === "EducationSupport" ? "education" : referenceModel === "FuneralSupport" ? "funeral" : referenceModel === "MedicalSupport" ? "medical" : "support");
+    if (!meta) return res.status(400).json({ success:false, message:"Unsupported claim type." });
+    const claim = await meta.Model.findById(referenceId);
+    if (!claim || String(claim.member) !== String(req.user._id)) return res.status(404).json({ success:false, message:"Claim not found." });
+    if (String(claim.status) !== "Rejected") return res.status(400).json({ success:false, message:"Community assistance is available after a declined claim." });
+    let campaign = await CommunityAssistance.findOne({ referenceModel: meta.Model.modelName, referenceId: claim._id });
+    const member = await Member.findById(req.user._id).select("fullName phone mpesaNumber");
+    const target = Number(targetAmount || claim.requestedAmount || claim.approvedAmount || 0);
+    if (!target || target <= 0) return res.status(400).json({ success:false, message:"Enter a valid community support target." });
+    if (!campaign) campaign = new CommunityAssistance({ referenceModel: meta.Model.modelName, referenceId: claim._id, recipientMember: req.user._id, createdBy: req.user._id });
+    campaign.title = `${meta.key.charAt(0).toUpperCase()+meta.key.slice(1)} Community Support for ${member?.fullName || "MIDAX member"}`;
+    campaign.description = `Community assistance requested after the ${meta.key} support claim was declined. Members may voluntarily contribute through M-PESA.`;
+    campaign.targetAmount = target;
+    campaign.enabled = true;
+    campaign.status = Number(campaign.raisedAmount || 0) >= target ? "target_reached" : "open";
+    campaign.payoutPhoneNumber = campaign.payoutPhoneNumber || member?.mpesaNumber || member?.phone || "";
+    await campaign.save();
+    await createNotification({ recipient:req.user._id, recipientModel:"Member", title:"Community Support Request Created", message:"Your declined support claim is now available for voluntary community assistance through M-PESA.", type:"claim", referenceId:campaign._id, referenceModel:"CommunityAssistance", icon:"volunteer_activism" });
+    return res.status(201).json({ success:true, campaign });
+  } catch (error) { return res.status(500).json({ success:false, message:error.message }); }
 };

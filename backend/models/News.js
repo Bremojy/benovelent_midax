@@ -64,6 +64,10 @@ const newsSchema = new mongoose.Schema(
         }
     ],
 
+    sourceModel:{ type:String, default:"", index:true },
+
+    sourceId:{ type:String, default:"", index:true },
+
     feedbackReportId:{
         type:mongoose.Schema.Types.ObjectId,
         ref:"FeedbackCollection",

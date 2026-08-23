@@ -8,7 +8,7 @@ const MedicalSupport = require("../models/MedicalSupport");
 const Member = require("../models/Member");
 const Dependent = require("../models/Dependent");
 
-const { createNotification } = require("../utils/createNotification");
+const createNotification = require("../utils/createNotification");
 
 
 
