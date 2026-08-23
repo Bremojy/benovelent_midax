@@ -138,6 +138,35 @@ export function AuthProvider({
       clearInactivityTimer,
     ]);
 
+  // Re-bind the browser push subscription after authentication. A service worker
+  // registered before login cannot reliably save the subscription to the correct
+  // member account until /auth/me has confirmed who is signed in.
+  useEffect(() => {
+    if (!user || typeof window === "undefined" || !("serviceWorker" in navigator) || !("PushManager" in window)) return;
+    if (!("Notification" in window) || Notification.permission !== "granted") return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const registration = await navigator.serviceWorker.ready;
+        const API = (await import("../services/api")).default;
+        const { data } = await API.get("/notifications/push/vapid-public-key");
+        if (!data?.configured || !data?.publicKey || cancelled) return;
+        const key = data.publicKey;
+        const padding = "=".repeat((4 - (key.length % 4)) % 4);
+        const raw = window.atob((key + padding).replace(/-/g, "+").replace(/_/g, "/"));
+        const appServerKey = Uint8Array.from([...raw].map((char) => char.charCodeAt(0)));
+        let subscription = await registration.pushManager.getSubscription();
+        if (!subscription) {
+          subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: appServerKey });
+        }
+        if (!cancelled && subscription) await API.post("/notifications/push/subscribe", { subscription: subscription.toJSON() });
+      } catch (error) {
+        console.debug("Authenticated push subscription skipped:", error?.message || error);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user]);
+
   // ======================================
   // AUTOMATIC INACTIVITY LOGOUT
   // ======================================

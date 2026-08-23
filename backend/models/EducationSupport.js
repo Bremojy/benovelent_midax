@@ -72,8 +72,7 @@ const educationSupportSchema = new mongoose.Schema(
     requestedAmount: {
       type: Number,
       required: true,
-      min: 1000,
-      max: 20000,
+      min: 0,
     },
 
     approvedAmount: {
@@ -175,6 +174,16 @@ const educationSupportSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Member",
     },
+
+    repayments: [
+      {
+        amount: { type: Number, required: true, min: 0 },
+        mpesaReceiptNumber: { type: String, default: "" },
+        paymentTransactionId: { type: mongoose.Schema.Types.ObjectId, ref: "MpesaTransaction", default: null },
+        paidAt: { type: Date, default: Date.now },
+        method: { type: String, default: "M-PESA" },
+      },
+    ],
   },
   {
     timestamps: true,
@@ -186,19 +195,22 @@ const educationSupportSchema = new mongoose.Schema(
 // =====================================
 
 educationSupportSchema.pre("save", async function () {
-  this.interestAmount =
-    (this.requestedAmount * this.interestRate) / 100;
+  const shouldRecalculate = this.isNew ||
+    this.isModified("requestedAmount") ||
+    this.isModified("approvedAmount") ||
+    this.isModified("interestRate") ||
+    this.isModified("repaymentPeriodMonths");
 
-  this.totalRepayment =
-    this.requestedAmount + this.interestAmount;
+  if (!shouldRecalculate) return;
 
-  this.balance = this.totalRepayment;
-
-  this.monthlyInstallment =
-    Math.ceil(
-      this.totalRepayment /
-        this.repaymentPeriodMonths
-    );
+  const principal = Number(this.approvedAmount || this.requestedAmount || 0);
+  this.interestAmount = (principal * Number(this.interestRate || 0)) / 100;
+  this.totalRepayment = principal + this.interestAmount;
+  const previousPaid = Number(this.amountPaid || 0);
+  this.balance = Math.max(0, this.totalRepayment - previousPaid);
+  this.monthlyInstallment = this.repaymentPeriodMonths > 0
+    ? Math.ceil(this.totalRepayment / this.repaymentPeriodMonths)
+    : this.totalRepayment;
 });
 
 // =====================================

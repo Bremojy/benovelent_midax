@@ -1,10 +1,14 @@
 import { useEffect, useState } from "react";
 import DashboardLayout from "../../layouts/DashboardLayout";
 import { getMemberClaims } from "../../services/memberService";
-import { resolveApiUrl } from "../../services/api";
+import API, { resolveApiUrl } from "../../services/api";
+import MpesaPaymentButton from "../../components/payments/MpesaPaymentButton";
+import { useAuth } from "../../context/AuthContext";
 import "./Support.css";
 
 export default function Claims() {
+  const { user } = useAuth();
+  const [communityCases, setCommunityCases] = useState([]);
   const [claims, setClaims] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -12,9 +16,10 @@ export default function Claims() {
   const load = async () => {
     try {
       setLoading(true);
-      const response = await getMemberClaims();
+      const [response, communityResponse] = await Promise.all([getMemberClaims(), API.get("/payments/community-assistance")]);
       if (!response?.success) throw new Error(response?.message || "Unable to load claims.");
       setClaims(Array.isArray(response.claims) ? response.claims : []);
+      setCommunityCases(Array.isArray(communityResponse.data?.campaigns) ? communityResponse.data.campaigns : []);
     } catch (err) {
       setError(err.response?.data?.message || err.message || "Unable to load claims.");
     } finally {
@@ -101,6 +106,12 @@ export default function Claims() {
               ))}
             </div>
           )}
+        </section>
+
+
+        <section className="support-history-card" style={{ marginTop: 18 }}>
+          <div className="support-section-heading"><span>COMMUNITY ASSISTANCE</span><h2>Help a member</h2><p>These voluntary cases were declined by the scheme and enabled for community help by an administrator.</p></div>
+          {communityCases.length === 0 ? <div className="support-empty"><h3>No community cases are open</h3><p>There are currently no verified declined cases open for voluntary assistance.</p></div> : <div className="support-list">{communityCases.map((campaign) => { const recipientId = campaign.recipientMember?._id || campaign.recipientMember; const remaining = Math.max(0, Number(campaign.targetAmount || 0) - Number(campaign.raisedAmount || 0)); return <article className="support-item" key={campaign._id}><div className="support-item-main"><strong>{campaign.title}</strong><span>{campaign.recipientMember?.memberNumber || "Member"}</span><p>{campaign.description}</p><div className="claim-timeline-mini"><div><strong>{money(campaign.raisedAmount)} raised</strong><span>of {money(campaign.targetAmount)} target</span></div></div></div><div className="support-item-right">{String(recipientId) === String(user?._id) ? <span className="claim-status">Your case</span> : remaining > 0 ? <MpesaPaymentButton purpose="community_assistance" referenceId={campaign._id} defaultAmount={Math.min(500, remaining)} maxAmount={remaining} label="Help with M-PESA" /> : <span className="claim-status approved">Target reached</span>}</div></article>; })}</div>}
         </section>
       </div>
     </DashboardLayout>

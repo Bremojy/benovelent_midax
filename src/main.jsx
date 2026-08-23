@@ -42,6 +42,16 @@ createRoot(
   </StrictMode>
 
 );
+
+// Prime foreground call audio after the browser receives a real user gesture.
+// When the tab/browser is hidden or closed, the service-worker push notification
+// is the supported alert channel; arbitrary page audio cannot be guaranteed there.
+window.addEventListener("pointerdown", async () => {
+  try {
+    const { unlockCallAudio } = await import("./utils/callTone");
+    await unlockCallAudio();
+  } catch {}
+}, { once: true, passive: true });
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {

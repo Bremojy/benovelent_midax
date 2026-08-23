@@ -477,23 +477,18 @@ function MessageCenterPage({
   return (
     <DashboardLayout>
       <div className={`message-center compact-message-center ${mobileChatOpen ? "chat-focus-mode" : ""}`}>
-        {!hidePageIntroOnMobile && (
-          <section className="message-center-hero compact-message-center-hero">
-            <div className="message-center-hero-copy">
-              <span className="message-center-kicker">{eyebrow}</span>
-              <h1>{title}</h1>
-              <p>{description}</p>
-            </div>
-            <div className="message-center-hero-actions">
-              <button type="button" className="portal-chip-action ghost" onClick={refreshChat}>
-                <RefreshCw size={16} />
-                Refresh
-              </button>
-            </div>
-          </section>
-        )}
+        <div className="chat-focused-toolbar">
+          <div>
+            <span className="message-center-kicker">{eyebrow}</span>
+            <h1>{title}</h1>
+          </div>
+          <button type="button" className="portal-chip-action ghost" onClick={refreshChat} title="Refresh conversations">
+            <RefreshCw size={16} />
+            Refresh
+          </button>
+        </div>
 
-        {!hidePageIntroOnMobile && banner && <div className="messages-call-banner">{banner}</div>}
+        {banner && <div className="messages-call-banner">{banner}</div>}
 
         {!isFullscreenChat && (
           <div className={`message-center-shell ${mobileChatOpen ? "chat-open" : ""}`}>
@@ -538,7 +533,6 @@ function MessageCenterPage({
               <div className={`mobile-chat-chooser ${showChooserOnMobile ? "show" : "hide"}`}>
                 <div className="mobile-chat-chooser-head">
                   <label htmlFor="chat-person-picker">Choose a chat</label>
-                  <p>Pick a conversation or member from the list below.</p>
                 </div>
 
                 <div className="message-center-chat-picker compact-picker">

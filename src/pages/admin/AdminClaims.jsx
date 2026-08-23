@@ -21,15 +21,19 @@ export default function AdminClaims() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState("");
+  const [communityCases, setCommunityCases] = useState([]);
 
   const load = async () => {
     try {
       setLoading(true);
       setError("");
-      const results = await Promise.allSettled(SOURCES.map((source) => API.get(source.get)));
+      const results = await Promise.allSettled([
+        ...SOURCES.map((source) => API.get(source.get)),
+        API.get("/payments/community-assistance/admin"),
+      ]);
       const merged = [];
 
-      results.forEach((result, index) => {
+      results.slice(0, SOURCES.length).forEach((result, index) => {
         if (result.status !== "fulfilled") return;
         const source = SOURCES[index];
         const data = result.value.data;
@@ -41,8 +45,10 @@ export default function AdminClaims() {
 
       merged.sort((a, b) => new Date(b.createdAt || b.applicationDate) - new Date(a.createdAt || a.applicationDate));
       setItems(merged);
+      const communityResult = results[SOURCES.length];
+      setCommunityCases(communityResult?.status === "fulfilled" ? (communityResult.value.data?.campaigns || []) : []);
 
-      if (!merged.length && results.every((result) => result.status === "rejected")) {
+      if (!merged.length && results.slice(0, SOURCES.length).every((result) => result.status === "rejected")) {
         throw results[0].reason;
       }
     } catch (err) {
@@ -89,6 +95,37 @@ export default function AdminClaims() {
     } finally {
       setBusy("");
     }
+  };
+
+  const enableCommunity = async (item) => {
+    if (!item?._id || item.status !== "Rejected") return;
+    const referenceModel = item.supportType === "Support Request" ? "SupportRequest" : item.supportType === "Medical" ? "MedicalSupport" : item.supportType === "Funeral" ? "FuneralSupport" : "EducationSupport";
+    const targetAmount = Number(item.requestedAmount || item.amount || item.approvedAmount || 0);
+    try {
+      setBusy(`community-${item._id}`);
+      await API.post("/payments/community-assistance", {
+        referenceModel,
+        referenceId: item._id,
+        targetAmount,
+        title: `Community assistance for ${item.member?.fullName || item.member?.memberNumber || "member"}`,
+        description: `This ${item.supportType.toLowerCase()} claim was declined by the scheme. Members may voluntarily help through M-PESA.`,
+      });
+      await load();
+    } catch (err) { setError(err.response?.data?.message || err.message || "Unable to enable community assistance."); }
+    finally { setBusy(""); }
+  };
+
+  const payoutCommunity = async (campaign) => {
+    if (!campaign?._id || Number(campaign.raisedAmount || 0) <= 0) return;
+    if (!window.confirm(`Send KSh ${Number(campaign.raisedAmount).toLocaleString("en-KE")} to ${campaign.recipientMember?.fullName || "the recipient"} by M-PESA?`)) return;
+    try {
+      setBusy(`payout-${campaign._id}`);
+      const { data } = await API.post(`/payments/community-assistance/${campaign._id}/payout`);
+      if (!data?.success) throw new Error(data?.message || "Payout request failed.");
+      await load();
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || "Unable to submit recipient payout.");
+    } finally { setBusy(""); }
   };
 
   const deleteClaim = async (item) => {
@@ -190,6 +227,23 @@ export default function AdminClaims() {
                     <strong>{money(item.amount || item.requestedAmount || 0)}</strong>
                     <small>{formatDate(item.createdAt || item.applicationDate)}</small>
 
+                    {(() => {
+                      const referenceModel = item.supportType === "Support Request" ? "SupportRequest" : item.supportType === "Medical" ? "MedicalSupport" : item.supportType === "Funeral" ? "FuneralSupport" : "EducationSupport";
+                      const campaign = communityCases.find((entry) => String(entry.referenceId) === String(item._id) && String(entry.referenceModel) === referenceModel);
+                      if (!campaign) return null;
+                      return (
+                        <div className="portal-community-progress">
+                          <small>Community help: KSh {Number(campaign.raisedAmount || 0).toLocaleString("en-KE")} / KSh {Number(campaign.targetAmount || 0).toLocaleString("en-KE")}</small>
+                          <span className={`portal-badge ${campaign.status}`}>{campaign.status.replace(/_/g, " ")}</span>
+                          {Number(campaign.raisedAmount || 0) > 0 && !["paid", "payout_pending"].includes(campaign.status) && (
+                            <button className="portal-btn secondary" disabled={busy === `payout-${campaign._id}`} onClick={() => payoutCommunity(campaign)}>
+                              {busy === `payout-${campaign._id}` ? "Sending…" : "Pay raised amount"}
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })()}
+
                     {item.source?.actionable && (
                       <div className="portal-actions">
                         {item.supportType === "Support Request" && (
@@ -240,6 +294,11 @@ export default function AdminClaims() {
                             }}
                           >
                             {busy === `close-${item._id}` ? "Closing..." : "Close"}
+                          </button>
+                        )}
+                        {item.status === "Rejected" && (
+                          <button className="portal-btn" disabled={busy === `community-${item._id}`} onClick={() => enableCommunity(item)}>
+                            {busy === `community-${item._id}` ? "Publishing…" : "Enable community help"}
                           </button>
                         )}
                         {item.supportType !== "Support Request" && (

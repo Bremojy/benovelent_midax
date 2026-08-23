@@ -1,3 +1,5 @@
+import { useEffect, useState } from "react";
+import API from "../services/api";
 
 import { Link } from "react-router-dom";
 import { Heart, Stethoscope, GraduationCap, BookOpen, ArrowRight, BadgeCheck, ShieldCheck, MessageCircle } from "lucide-react";
@@ -6,6 +8,8 @@ import "../styles/public-modern.css";
 const heroVideo = "/videos/benevolent-community-loop.mp4";
 
 export default function Services() {
+  const [policies, setPolicies] = useState([]);
+  useEffect(() => { API.get("/policies/public").then(({ data }) => setPolicies(data?.policies || [])).catch(() => setPolicies([])); }, []);
   return (
     <main className="public-modern-page">
       <section className="modern-hero modern-video-hero">
@@ -52,6 +56,19 @@ export default function Services() {
           <div className="trust-chip"><BookOpen size={19} /><strong>3 days</strong><span>Chairperson dispatch window</span></div>
         </div>
       </section>
+
+      {policies.length > 0 && (
+        <section className="modern-section">
+          <div className="modern-card-grid">
+            {policies.map((policy) => (
+              <article className="service-card" key={policy._id}>
+                <div className="service-icon">{policy.category === "loan" ? "🎓" : policy.category === "support" ? "🤝" : "📋"}</div>
+                <div><h3>{policy.name}</h3><p>{policy.description}</p>{policy.maxAmount ? <strong>Up to KSh {Number(policy.maxAmount).toLocaleString("en-KE")}</strong> : null}</div>
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
     </main>
   );
 }

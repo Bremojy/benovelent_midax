@@ -1,5 +1,6 @@
 const { resolveStoredFileUrl } = require("../utils/uploadUrl");
 const EducationSupport = require("../models/EducationSupport");
+const Policy = require("../models/Policy");
 const Member = require("../models/Member");
 const Dependent = require("../models/Dependent");
 const createNotification =
@@ -12,6 +13,8 @@ require("../utils/createNotification");
 
 exports.applyEducationSupport = async (req, res) => {
   try {
+    const educationPolicy = await Policy.findOne({ slug: "education-policy", enabled: true }).lean();
+    if (!educationPolicy) return res.status(403).json({ success: false, message: "Education Policy is currently unavailable. Please contact the administrator." });
     const {
       dependentId,
       purpose,
@@ -74,12 +77,13 @@ exports.applyEducationSupport = async (req, res) => {
       });
     }
 
-    if (requestedAmount > 20000) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "Maximum Education Support amount is KSh 20,000.",
-      });
+    const policyMinimum = Number(educationPolicy.minAmount || 0);
+    const policyMaximum = Number(educationPolicy.maxAmount || 0);
+    if (policyMinimum > 0 && Number(requestedAmount) < policyMinimum) {
+      return res.status(400).json({ success: false, message: `Minimum Education Policy amount is KSh ${policyMinimum.toLocaleString("en-KE")}.` });
+    }
+    if (policyMaximum > 0 && Number(requestedAmount) > policyMaximum) {
+      return res.status(400).json({ success: false, message: `Maximum Education Policy amount is KSh ${policyMaximum.toLocaleString("en-KE")}.` });
     }
 
     // =====================================
@@ -180,8 +184,7 @@ exports.applyEducationSupport = async (req, res) => {
 
         requestedAmount,
 
-        repaymentPeriodMonths:
-          repaymentPeriodMonths || 12,
+        repaymentPeriodMonths: Number(repaymentPeriodMonths) || Number(educationPolicy.repaymentMonths) || 12,
 
         feeStructure: fileUrl(feeStructureFile) || feeStructure,
 
@@ -566,6 +569,7 @@ exports.getEducationSummary = async (req, res) => {
 exports.approveApplication = async (req, res) => {
   try {
 
+    const educationPolicy = await Policy.findOne({ slug: "education-policy", enabled: true }).lean();
     const application =
       await EducationSupport.findById(req.params.id);
 
@@ -586,8 +590,16 @@ exports.approveApplication = async (req, res) => {
     const approvedAmount =
       Number(req.body.approvedAmount) ||
       application.requestedAmount;
+    const policyMaximum = Number(educationPolicy?.maxAmount || 0);
+    const policyMinimum = Number(educationPolicy?.minAmount || 0);
+    if (policyMinimum > 0 && approvedAmount < policyMinimum) return res.status(400).json({ success: false, message: `Approved amount cannot be below KSh ${policyMinimum.toLocaleString("en-KE")}.` });
+    if (policyMaximum > 0 && approvedAmount > policyMaximum) return res.status(400).json({ success: false, message: `Approved amount cannot exceed the Education Policy maximum of KSh ${policyMaximum.toLocaleString("en-KE")}.` });
 
     application.approvedAmount = approvedAmount;
+    application.interestRate = Number(req.body.interestRate ?? educationPolicy?.interestRate ?? application.interestRate ?? 0);
+    if (educationPolicy?.repaymentMonths) {
+      application.repaymentPeriodMonths = Number(req.body.repaymentPeriodMonths || application.repaymentPeriodMonths || educationPolicy.repaymentMonths);
+    }
 
     application.interestAmount =
       (approvedAmount * application.interestRate) / 100;

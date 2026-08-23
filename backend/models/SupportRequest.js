@@ -42,6 +42,8 @@ const supportRequestSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+    policySlug: { type: String, trim: true, default: "" },
+    policyName: { type: String, trim: true, default: "" },
     description: {
       type: String,
       required: true,

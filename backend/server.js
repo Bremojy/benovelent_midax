@@ -68,6 +68,8 @@ const supportRequestRoutes = require("./routes/supportRequestRoutes");
 const auditLogRoutes = require("./routes/auditLogRoutes");
 const dataIntegrityRoutes = require("./routes/dataIntegrityRoutes");
 const platformRoutes = require("./routes/platformRoutes");
+const policyRoutes = require("./routes/policyRoutes");
+const paymentRoutes = require("./routes/paymentRoutes");
 
 // ===============================================
 // MIDDLEWARE
@@ -271,6 +273,8 @@ app.use("/api/superadmin", superadminRoutes);
 app.use("/api/audit-logs", auditLogRoutes);
 app.use("/api/superadmin/data-integrity", dataIntegrityRoutes);
 app.use("/api/platform", platformRoutes);
+app.use("/api/policies", policyRoutes);
+app.use("/api/payments", paymentRoutes);
 
 // ===============================================
 // NOT FOUND

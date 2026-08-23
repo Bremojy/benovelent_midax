@@ -69,7 +69,7 @@ const normalizeDocuments = (documents = []) =>
 
 exports.create = async (req, res) => {
   try {
-    const { supportType, description, requestedAmount } = req.body;
+    const { supportType, policySlug, policyName, description, requestedAmount } = req.body;
     const amount = Number(requestedAmount);
 
     if (!supportType || !description || !Number.isFinite(amount) || amount <= 0) {
@@ -84,6 +84,8 @@ exports.create = async (req, res) => {
     const item = await SupportRequest.create({
       member: req.user._id,
       supportType: asText(supportType),
+      policySlug: asText(policySlug),
+      policyName: asText(policyName),
       description: asText(description),
       requestedAmount: amount,
       documents: attachments,

@@ -12,6 +12,7 @@ const Dependent = require("../models/Dependent");
 const MedicalSupport = require("../models/MedicalSupport");
 const FuneralSupport = require("../models/FuneralSupport");
 const EducationSupport = require("../models/EducationSupport");
+const Policy = require("../models/Policy");
 const { resolveStoredFileUrl } = require("../utils/uploadUrl");
 const { ensureChatProfile } = require("../utils/chatProfile");
 
@@ -1183,6 +1184,8 @@ exports.getEligibility = async (req,res)=>{
 
             profile.percentage===100;
 
+        const policies = await Policy.find({ enabled: true }).sort({ order: 1, name: 1 }).lean();
+
         res.json({
 
             success:true,
@@ -1214,7 +1217,12 @@ exports.getEligibility = async (req,res)=>{
 
                 memberPortal:eligible
 
-            }
+            },
+
+            policies: policies.map((policy) => ({
+                ...policy,
+                eligible,
+            }))
 
         });
 

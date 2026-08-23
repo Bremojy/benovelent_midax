@@ -54,17 +54,23 @@ export default function Support() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [attachments, setAttachments] = useState([newAttachment()]);
+  const [policies, setPolicies] = useState([]);
 
   const load = async () => {
     try {
       setLoading(true);
       setError("");
-      const [claimsRes, dependentsRes] = await Promise.all([
+      const [claimsRes, dependentsRes, policiesRes] = await Promise.allSettled([
         getMemberClaims(),
         API.get("/dependents/my"),
+        API.get("/policies/public"),
       ]);
-      setClaims(Array.isArray(claimsRes?.claims) ? claimsRes.claims : []);
-      setDependents(Array.isArray(dependentsRes?.data?.dependents) ? dependentsRes.data.dependents : []);
+      const claimsData = claimsRes.status === "fulfilled" ? claimsRes.value : null;
+      const dependentsData = dependentsRes.status === "fulfilled" ? dependentsRes.value : null;
+      const policiesData = policiesRes.status === "fulfilled" ? policiesRes.value : null;
+      setClaims(Array.isArray(claimsData?.claims) ? claimsData.claims : []);
+      setDependents(Array.isArray(dependentsData?.data?.dependents) ? dependentsData.data.dependents : []);
+      setPolicies(Array.isArray(policiesData?.data?.policies) ? policiesData.data.policies : []);
     } catch (err) {
       setError(err.response?.data?.message || err.message || "Unable to load your support centre.");
     } finally {
@@ -152,8 +158,14 @@ export default function Support() {
 
         attachFiles(formData);
       } else if (form.type === "education") {
-        if (!form.dependentId || !form.purpose || !form.school || !form.admissionNumber || Number(form.requestedAmount) < 1000) {
-          throw new Error("Please complete the education support details. Minimum requested amount is KES 1,000.");
+        const educationPolicy = policies.find((policy) => policy.slug === "education-policy");
+        const educationMinimum = Number(educationPolicy?.minAmount || 1000);
+        const educationMaximum = Number(educationPolicy?.maxAmount || 0);
+        if (!form.dependentId || !form.purpose || !form.school || !form.admissionNumber || Number(form.requestedAmount) < educationMinimum) {
+          throw new Error(`Please complete the education policy details. Minimum requested amount is KES ${educationMinimum.toLocaleString("en-KE")}.`);
+        }
+        if (educationMaximum > 0 && Number(form.requestedAmount) > educationMaximum) {
+          throw new Error(`Requested amount cannot exceed KES ${educationMaximum.toLocaleString("en-KE")}.`);
         }
 
         endpoint = "/education/apply";
@@ -168,12 +180,20 @@ export default function Support() {
 
         attachFiles(formData);
       } else {
-        if (!form.customType?.trim() || !form.caseDescription?.trim() || Number(form.requestedAmount) <= 0) {
-          throw new Error("Please complete the support type, description and amount.");
+        const selectedPolicy = policies.find((policy) => `policy:${policy.slug}` === form.type);
+        if (!form.customType?.trim() && !selectedPolicy?.name) {
+          throw new Error("Please select a valid support policy.");
+        }
+        if (!form.caseDescription?.trim() || Number(form.requestedAmount) <= 0) {
+          throw new Error("Please complete the support description and amount.");
         }
 
         endpoint = "/member/support-requests";
-        formData.append("supportType", form.customType.trim());
+        formData.append("supportType", selectedPolicy?.name || form.customType.trim());
+        if (selectedPolicy) {
+          formData.append("policySlug", selectedPolicy.slug);
+          formData.append("policyName", selectedPolicy.name);
+        }
         formData.append("description", form.caseDescription.trim());
         formData.append("requestedAmount", String(Number(form.requestedAmount)));
         attachFiles(formData);
@@ -218,12 +238,22 @@ export default function Support() {
             <form onSubmit={submit} className="support-form">
               <div className="support-field">
                 <label>Assistance Type</label>
-                <select value={form.type} onChange={(e) => set("type", e.target.value)}>
+                <select value={form.type} onChange={(e) => {
+                  const nextType = e.target.value;
+                  const selectedPolicy = policies.find((policy) => `policy:${policy.slug}` === nextType);
+                  setForm((current) => ({ ...current, type: nextType, customType: selectedPolicy?.name || current.customType }));
+                }}>
                   <option value="medical">Medical Support</option>
                   <option value="funeral">Funeral Support</option>
-                  <option value="education">Education Support</option>
-                  <option value="other">None of above</option>
+                  <option value="education">Education Policy</option>
+                  {policies.filter((policy) => !["medical-support", "funeral-support", "education-policy"].includes(policy.slug)).map((policy) => (
+                    <option key={policy._id} value={`policy:${policy.slug}`}>{policy.name}</option>
+                  ))}
+                  <option value="other">Other Support</option>
                 </select>
+                {policies.find((policy) => `policy:${policy.slug}` === form.type) && (
+                  <small className="support-policy-hint">{policies.find((policy) => `policy:${policy.slug}` === form.type)?.description}</small>
+                )}
               </div>
 
               {form.type === "other" && (
