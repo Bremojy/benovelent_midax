@@ -228,7 +228,7 @@ function DashboardTopbar({
                 : unreadMessages}
             </span>
           )}
-        </button>}
+        </button>
 
         {/* NOTIFICATIONS */}
 
