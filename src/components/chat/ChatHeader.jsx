@@ -41,7 +41,7 @@ function ChatHeader({ conversation, partner, typingUser, onAudioCall, onVideoCal
             {user.verified ? <BadgeCheck size={16} className="verified-dot" /> : null}
             {role ? <span className="role-chip">{role}</span> : null}
           </div>
-          {typingUser ? <p className="typing-status">Typing...</p> : <p>{user.online ? "Online now" : user.lastSeen ? `Last seen ${formatLastSeen(user.lastSeen)}` : "Offline"}</p>}
+          {typingUser ? <p className="typing-status">Typing...</p> : <p title={user.online ? "Online means this user has an active secure chat connection and has responded to a recent presence heartbeat." : "The user is not currently responding to chat presence."}>{user.online ? "Online now" : user.lastSeen ? `Last seen ${formatLastSeen(user.lastSeen)}` : "Offline"}</p>}
           {user.siteStation ? <span className="chat-profile-meta">{user.siteStation}{user.department ? ` • ${user.department}` : ""}</span> : null}
         </div>
       </div>

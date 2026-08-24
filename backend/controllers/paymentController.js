@@ -281,6 +281,9 @@ exports.payoutCommunity = async (req, res) => {
   try {
     const campaign = await CommunityAssistance.findById(req.params.id);
     if (!campaign) return res.status(404).json({ success: false, message: "Community assistance case not found." });
+    if (!campaign.enabled || !["open", "target_reached"].includes(String(campaign.status))) return res.status(400).json({ success: false, message: "This community assistance case is not open for payout." });
+    if (String(campaign.payoutStatus || "not_started") === "pending") return res.status(409).json({ success: false, message: "A payout for this community case is already processing." });
+    if (String(campaign.payoutStatus || "not_started") === "successful" || String(campaign.status) === "paid") return res.status(409).json({ success: false, message: "This community case has already been paid." });
     if (Number(campaign.raisedAmount) <= 0) return res.status(400).json({ success: false, message: "No funds are available to disburse." });
     const recipient = await Member.findById(campaign.recipientMember).select("fullName phone mpesaNumber");
     const phone = normalizePhone(req.body?.phoneNumber || campaign.payoutPhoneNumber || recipient?.mpesaNumber || recipient?.phone);

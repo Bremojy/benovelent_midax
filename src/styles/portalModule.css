@@ -130,3 +130,50 @@
 @media (max-width: 760px) {
   .payroll-run-panel .portal-field-wide { grid-column: auto; }
 }
+
+/* V17 mobile-first portal polish */
+.portal-field-wide { grid-column: 1 / -1; }
+.portal-field label { color:#344054; line-height:1.35; }
+.portal-field input, .portal-field select, .portal-field textarea { min-height:44px; font:inherit; color:#24262a; transition:border-color .18s ease, box-shadow .18s ease, background .18s ease; }
+.portal-field textarea { min-height:120px; resize:vertical; }
+.portal-field input:hover, .portal-field select:hover, .portal-field textarea:hover { background:#fff; border-color:#cfd4da; }
+.portal-field input:focus, .portal-field select:focus, .portal-field textarea:focus { background:#fff; }
+.portal-btn { min-height:42px; border:1px solid transparent; transition:transform .16s ease, box-shadow .16s ease, filter .16s ease; }
+.portal-btn:hover:not(:disabled) { transform:translateY(-1px); box-shadow:0 8px 18px rgba(17,24,39,.08); }
+.portal-btn:focus-visible, .portal-field input:focus-visible, .portal-field select:focus-visible, .portal-field textarea:focus-visible { outline:3px solid rgba(255,122,0,.18); outline-offset:2px; }
+.portal-btn:disabled { opacity:.58; cursor:not-allowed; transform:none; box-shadow:none; }
+.portal-stat-grid.compact { grid-template-columns:repeat(2,minmax(0,1fr)); margin-bottom:12px; }
+.portal-stat-grid.compact .portal-stat { padding:13px; }
+.portal-stat-grid.compact .portal-stat strong { font-size:20px; }
+.portal-modal-backdrop { position:fixed; inset:0; z-index:10000; display:grid; place-items:center; padding:16px; background:rgba(10,16,24,.62); backdrop-filter:blur(5px); }
+.portal-modal-card { width:min(760px,100%); max-height:min(92vh,900px); overflow:auto; background:#fff; border:1px solid rgba(255,255,255,.5); border-radius:22px; padding:22px; box-shadow:0 30px 80px rgba(0,0,0,.22); }
+.portal-modal-head { display:flex; justify-content:space-between; gap:16px; align-items:flex-start; margin-bottom:18px; }
+.portal-modal-head > div { min-width:0; }
+.portal-modal-head span { display:block; color:#ff7900; font-size:11px; font-weight:800; letter-spacing:1.5px; }
+.portal-modal-head h2 { margin:6px 0 5px; }
+.portal-modal-head p { margin:0; color:#667085; }
+.claim-card-head { display:flex; justify-content:space-between; gap:12px; align-items:flex-start; }
+.claim-card-head h2, .claim-card-head h3 { margin:8px 0 5px; color:#24262a; }
+.claim-card-head p { margin:0; color:#667085; font-size:13px; }
+.claim-documents { display:flex; flex-wrap:wrap; gap:8px; }
+.claim-latest { margin-top:14px; padding:12px 14px; border-radius:12px; background:#f8fafc; border:1px solid #e7ebef; }
+.claim-latest p { margin:4px 0 0; color:#56606b; }
+.community-admin-section { margin-top:18px; }
+.compact-header { margin-bottom:14px; align-items:flex-start; }
+.portal-badge.approved { background:#e9f7ef; color:#137333; }
+.portal-badge.rejected { background:#fff0f0; color:#b42318; }
+@media (max-width: 700px) {
+  .portal-module-header { align-items:flex-start; }
+  .portal-module-header h1 { font-size:25px; }
+  .portal-modal-card { padding:16px; border-radius:18px; }
+  .portal-modal-head { flex-direction:column; }
+  .portal-modal-head > button { align-self:flex-end; }
+  .claim-card-head { flex-direction:column; }
+  .portal-actions .portal-btn { flex:1 1 auto; justify-content:center; }
+}
+@media (max-width: 430px) {
+  .portal-panel { padding:14px; border-radius:16px; }
+  .portal-stat-grid.compact { grid-template-columns:1fr 1fr; gap:8px; }
+  .portal-stat-grid.compact .portal-stat strong { font-size:18px; }
+  .portal-form-grid { gap:10px; }
+}

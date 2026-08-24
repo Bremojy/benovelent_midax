@@ -143,8 +143,8 @@ exports.publishCommunityToNews = async (req, res) => {
     const sourceId = String(campaign._id);
     let news = await News.findOne({ sourceModel, sourceId });
     const title = campaign.title || "Community Support Request";
-    const content = `${campaign.description || "A Benevolent MIDAX member has requested community assistance."}\n\nTarget: KSh ${Number(campaign.targetAmount || 0).toLocaleString("en-KE")}\nRaised so far: KSh ${Number(campaign.raisedAmount || 0).toLocaleString("en-KE")}\n\nCommunity members can support this verified request through the M-PESA community assistance option.`;
-    const payload = { title, summary: `Community assistance request for ${campaign.recipientMember?.fullName || "a member"}.`, content, category: "Announcement", published: true, status: "published", publishDate: new Date(), author: req.user._id, sourceModel, sourceId };
+    const content = `${campaign.description || "A verified Benevolent MIDAX member has requested community assistance."}\n\nTarget: KSh ${Number(campaign.targetAmount || 0).toLocaleString("en-KE")}\nRaised so far: KSh ${Number(campaign.raisedAmount || 0).toLocaleString("en-KE")}\n\nCommunity members can support this verified request through the M-PESA community assistance option. Private identity, medical, funeral, education and contact details are intentionally omitted.`;
+    const payload = { title, summary: "A verified community assistance request is open for member support.", content, category: "Announcement", published: true, status: "published", publishDate: new Date(), author: req.user._id, sourceModel, sourceId };
     if (news) { Object.assign(news, payload); await news.save(); }
     else news = await News.create(payload);
     return res.json({ success: true, news, message: "Community support request published to public News." });

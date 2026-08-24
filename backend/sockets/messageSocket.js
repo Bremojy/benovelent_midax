@@ -4,7 +4,7 @@ const SuperAdmin = require("../models/SuperAdmin");
 const Message = require("../models/Message");
 const Conversation = require("../models/Conversation");
 const Notification = require("../models/Notification");
-const { addUser, removeUser, getPresence } = require("./onlineUsers");
+const { addUser, removeUser, touchUser, getPresence, cleanupStale, PRESENCE_TIMEOUT_MS } = require("./onlineUsers");
 const { sendPushToRecipient } = require("../services/pushService");
 
 const modelsByRole = { member: Member, admin: Admin, superadmin: SuperAdmin };
@@ -76,7 +76,23 @@ async function savePresence(actor, online, socketId = "") {
 }
 
 function broadcastPresence(io) {
-  io.emit("online-users", { users: require("./onlineUsers").getUsers() });
+  io.emit("online-users", { users: require("./onlineUsers").getUsers(), presenceTimeoutMs: PRESENCE_TIMEOUT_MS });
+}
+
+let presenceCleanupStarted = false;
+function ensurePresenceCleanup(io) {
+  if (presenceCleanupStarted) return;
+  presenceCleanupStarted = true;
+  const intervalMs = Math.max(15000, Math.round(PRESENCE_TIMEOUT_MS / 3));
+  setInterval(() => {
+    const stale = cleanupStale();
+    if (!stale.length) return;
+    Promise.all(stale.map(async ({ userId, lastSeen }) => {
+      const actor = await resolveActor(userId);
+      if (actor) await savePresence(actor, false, "").catch(() => null);
+      return lastSeen;
+    })).finally(() => broadcastPresence(io)).catch(() => null);
+  }, intervalMs).unref?.();
 }
 
 async function deliverCallNotification({ recipient, caller, callType, title, message, callId, incomingPayload, missed = false }) {
@@ -192,6 +208,8 @@ async function markMissedCall(callId, reason = "missed") {
 }
 
 module.exports = (io, socket) => {
+  ensurePresenceCleanup(io);
+
   socket.on("user-online", async () => {
     try {
       const role = socket.userRole || "member";
@@ -206,6 +224,20 @@ module.exports = (io, socket) => {
       await savePresence(actor, true, socket.id);
       broadcastPresence(io);
     } catch (error) { console.warn("Could not persist online state:", error.message); }
+  });
+
+  socket.on("presence-heartbeat", async () => {
+    try {
+      const touched = touchUser(socket.id);
+      if (!touched) {
+        socket.emit("presence-required");
+        return;
+      }
+      const actor = await resolveActor(socket.data?.userId, socket.data?.role || "member");
+      if (actor) await savePresence(actor, true, socket.id);
+    } catch (error) {
+      console.warn("Presence heartbeat failed:", error.message);
+    }
   });
 
   socket.on("join-conversation", (conversationId) => { if (conversationId) socket.join(String(conversationId)); });

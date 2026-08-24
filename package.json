@@ -1,7 +1,7 @@
 {
   "name": "benevolent-midax",
   "private": true,
-  "version": "16.0.0",
+  "version": "17.0.0",
   "type": "module",
   "scripts": {
     "dev": "node node_modules/vite/bin/vite.js",
@@ -12,7 +12,7 @@
     "test:routes": "node backend/scripts/routeContractTest.js",
     "test:quality": "node backend/scripts/sourceQualityTest.js",
     "test:ui": "node backend/scripts/portalUiContractTest.js",
-    "test": "npm run test:security && npm run test:quality && npm run test:integrity && npm run test:routes && npm run test:ui && npm run test:pages && npm run test:call && npm run test:call-auth && npm run test:verification && npm run test:member-db && npm run test:shell && npm run test:regression",
+    "test": "npm run test:security && npm run test:quality && npm run test:integrity && npm run test:routes && npm run test:ui && npm run test:pages && npm run test:call && npm run test:call-auth && npm run test:verification && npm run test:member-db && npm run test:shell && npm run test:regression && npm run test:presence && npm run test:community-mpesa && npm run test:production-config",
     "test:shell": "node backend/scripts/portalShellTest.js",
     "test:regression": "node backend/scripts/regressionAuditTest.js",
     "vercel-build": "npm run build && node scripts/verify-vercel-assets.mjs",
@@ -22,7 +22,10 @@
     "test:verification": "node backend/scripts/verificationFlowContractTest.js",
     "test:member-db": "node backend/scripts/memberDatabaseContractTest.js",
     "test:vercel-assets": "node scripts/verify-vercel-assets.mjs",
-    "test:pages": "node backend/scripts/pageParityTest.js"
+    "test:pages": "node backend/scripts/pageParityTest.js",
+    "test:presence": "node backend/scripts/presenceContractTest.js",
+    "test:community-mpesa": "node backend/scripts/communityMpesaContractTest.js",
+    "test:production-config": "node backend/scripts/productionConfigContractTest.js"
   },
   "dependencies": {
     "axios": "^1.18.1",

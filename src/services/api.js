@@ -11,17 +11,20 @@ const normalizeBaseUrl = (value) =>
     .replace(/\/+$/, "")
     .replace(/\/api$/i, "");
 
-const isLocalHost = typeof window !== "undefined" &&
-  ["localhost", "127.0.0.1", "::1"].includes(window.location.hostname);
+const hostname = typeof window !== "undefined" ? String(window.location.hostname || "").toLowerCase() : "";
+const isLocalHost = ["localhost", "127.0.0.1", "::1"].includes(hostname);
+const isVercelHost = hostname.endsWith(".vercel.app") || hostname === "vercel.app";
 
 // Production browsers use the Vercel same-origin /api proxy by default.
 // This avoids cross-site authentication/cookie drift between Vercel and Render.
 // A VITE_API_URL may still explicitly override this for a non-Vercel deployment.
 const BASE_URL = normalizeBaseUrl(
-  configuredBaseUrl ||
-    (typeof window !== "undefined"
-      ? (isLocalHost ? DEFAULT_LOCAL_API_URL : window.location.origin)
-      : DEFAULT_REMOTE_API_URL)
+  isVercelHost
+    ? (typeof window !== "undefined" ? window.location.origin : DEFAULT_REMOTE_API_URL)
+    : (configuredBaseUrl ||
+      (typeof window !== "undefined"
+        ? (isLocalHost ? DEFAULT_LOCAL_API_URL : window.location.origin)
+        : DEFAULT_REMOTE_API_URL))
 );
 
 export const API_BASE_URL = BASE_URL;
@@ -92,7 +95,9 @@ API.interceptors.response.use(
     const status = error.response?.status;
     const code = error.response?.data?.code;
 
-    console.error("API Error:", error.response?.data || error.message);
+    if (import.meta.env.DEV) {
+      console.error("API Error:", error.response?.data || error.message);
+    }
 
     if (code === "CSRF_INVALID") {
       clearCsrfToken();
