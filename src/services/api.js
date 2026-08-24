@@ -103,7 +103,9 @@ API.interceptors.response.use(
       clearCsrfToken();
     }
 
+    const isSocketTicketRequest = String(config?.url || "").includes("/auth/socket-ticket");
     if (
+      !isSocketTicketRequest &&
       status === 401 &&
       ["TOKEN_EXPIRED", "TOKEN_INVALID", "TOKEN_MISSING", "USER_NOT_FOUND", "AUTH_FAILED", "SESSION_REPLACED"].includes(code)
     ) {

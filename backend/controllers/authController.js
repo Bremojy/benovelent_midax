@@ -1,4 +1,5 @@
 const asyncHandler = require("../utils/asyncHandler");
+const jwt = require("jsonwebtoken");
 const Response = require("../utils/response");
 
 const ROLES = require("../constants/roles");
@@ -31,10 +32,17 @@ const { setAuthCookies, clearAuthCookies } = require("../utils/authCookies");
 
 exports.socketTicket = async (req, res) => {
   try {
+    if (!process.env.JWT_SECRET) {
+      return res.status(503).json({ success: false, message: "Authentication service is not configured." });
+    }
+    const role = String(req.user?.role || req.userRole || "").toLowerCase();
+    if (!req.user?._id || !["member", "admin", "superadmin"].includes(role)) {
+      return res.status(401).json({ success: false, message: "Authenticated account could not be prepared for realtime services.", code: "SOCKET_AUTH_INVALID" });
+    }
     const token = jwt.sign(
       {
         id: req.user._id.toString(),
-        role: req.user.role,
+        role,
         email: req.user.email,
         sessionVersion: Number(req.user.sessionVersion || 0),
         purpose: "socket",

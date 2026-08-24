@@ -150,9 +150,6 @@ exports.sendMessage = async (req, res) => {
                 }))
             );
 
-            notifications.forEach((notification) => {
-                io?.to(`user:${notification.recipient.toString()}`).emit("new-notification", notification);
-            });
 
             // Deliver a real browser/mobile push notification when the recipient
             // is offline or the chat page is not visible. The in-app Socket.IO

@@ -60,7 +60,6 @@ module.exports = (io, socket) => {
 
             }
 
-            io.emit("refresh-notifications");
 
         }
 
