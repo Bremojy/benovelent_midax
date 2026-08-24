@@ -6,6 +6,8 @@ const MedicalSupport = require("../models/MedicalSupport");
 const FuneralSupport = require("../models/FuneralSupport");
 const Member = require("../models/Member");
 const createNotification = require("../utils/createNotification");
+const createAuditLog = require("../utils/createAuditLog");
+const Finance = require("../models/Finance");
 const { stkPush, b2cPayment, normalizePhone, isConfigured, isB2CConfigured, idempotencyKey } = require("../services/mpesaService");
 
 const modelMap = { SupportRequest, MedicalSupport, FuneralSupport, EducationSupport };
@@ -79,12 +81,13 @@ async function applyGenericSupportRepayment(transaction) {
 async function applyCommunityContribution(transaction) {
   const campaign = await CommunityAssistance.findById(transaction.referenceId);
   if (!campaign) throw new Error("Community assistance case was not found.");
-  if (!campaign.enabled || !["open", "target_reached"].includes(campaign.status)) throw new Error("This community assistance case is closed.");
-  const remaining = Math.max(0, Number(campaign.targetAmount) - Number(campaign.raisedAmount || 0));
-  const amount = Math.min(Number(transaction.amount), remaining);
-  if (amount <= 0) throw new Error("This community assistance target has already been reached.");
+  const closedBeforePayment = campaign.status === "closed" && campaign.closedAt && transaction.initiatedAt && new Date(transaction.initiatedAt) <= new Date(campaign.closedAt);
+  if (!campaign.enabled && !closedBeforePayment) throw new Error("This community assistance case is closed.");
+  if (!["open", "target_reached", "closed"].includes(String(campaign.status))) throw new Error("This community assistance case is not accepting this payment settlement.");
+  const amount = Number(transaction.amount);
+  if (!amount || amount <= 0) throw new Error("Invalid community contribution amount.");
   campaign.raisedAmount = Number(campaign.raisedAmount || 0) + amount;
-  if (campaign.raisedAmount >= campaign.targetAmount) campaign.status = "target_reached";
+  if (campaign.raisedAmount >= campaign.targetAmount && campaign.status !== "closed") campaign.status = "target_reached";
   await campaign.save();
   await createNotification({
     recipient: campaign.recipientMember,
@@ -237,8 +240,11 @@ exports.callback = async (req, res) => {
         if (transaction.purpose === "support_repayment") await applyGenericSupportRepayment(transaction);
         else if (transaction.purpose === "community_assistance") await applyCommunityContribution(transaction);
       } catch (applyError) {
-        transaction.status = "failed";
-        transaction.resultDescription = `Payment received but application update failed: ${applyError.message}`;
+        // Safaricom has already confirmed receipt. Never mark a paid transaction as failed
+        // merely because our secondary application reconciliation failed. Keep the money
+        // record successful and surface the reconciliation issue for admin review.
+        transaction.status = "successful";
+        transaction.resultDescription = `Payment received; application reconciliation requires review: ${applyError.message}`;
         await transaction.save();
         console.error("M-PESA settlement application failed:", applyError);
       }
@@ -272,10 +278,12 @@ exports.enableCommunityAssistance = async (req, res) => {
   } catch (error) { res.status(500).json({ success: false, message: error.message }); }
 };
 
-exports.communityCases = async (_req, res) => {
+exports.communityCases = async (req, res) => {
   try {
-    const campaigns = await CommunityAssistance.find({ enabled: true, status: { $in: ["open", "target_reached"] } })
-      .populate("recipientMember", "_id fullName memberNumber profileImage department position")
+    const isAdminView = ["admin", "superadmin"].includes(String(req.user?.role || "").toLowerCase());
+    const filter = isAdminView ? {} : { enabled: true, status: { $in: ["open", "target_reached"] } };
+    const campaigns = await CommunityAssistance.find(filter)
+      .populate("recipientMember", "_id fullName memberNumber profileImage department position phone mpesaNumber")
       .sort({ createdAt: -1 })
       .lean();
     res.json({ success: true, campaigns });
@@ -293,16 +301,17 @@ exports.payoutCommunity = async (req, res) => {
   try {
     const campaign = await CommunityAssistance.findById(req.params.id);
     if (!campaign) return res.status(404).json({ success: false, message: "Community assistance case not found." });
-    if (!campaign.enabled || !["open", "target_reached"].includes(String(campaign.status))) return res.status(400).json({ success: false, message: "This community assistance case is not open for payout." });
+    if (!campaign.enabled || !["open", "target_reached"].includes(String(campaign.status))) return res.status(400).json({ success: false, message: "This community assistance case is not eligible for payout." });
     if (String(campaign.payoutStatus || "not_started") === "pending") return res.status(409).json({ success: false, message: "A payout for this community case is already processing." });
     if (String(campaign.payoutStatus || "not_started") === "successful" || String(campaign.status) === "paid") return res.status(409).json({ success: false, message: "This community case has already been paid." });
     if (Number(campaign.raisedAmount) <= 0) return res.status(400).json({ success: false, message: "No funds are available to disburse." });
     const recipient = await Member.findById(campaign.recipientMember).select("fullName phone mpesaNumber");
+    if (!recipient) return res.status(404).json({ success: false, message: "Recipient member not found." });
     const phone = normalizePhone(req.body?.phoneNumber || campaign.payoutPhoneNumber || recipient?.mpesaNumber || recipient?.phone);
     if (!/^254\d{9}$/.test(phone)) return res.status(400).json({ success: false, message: "Recipient does not have a valid M-PESA number." });
     const amount = Number(campaign.raisedAmount);
     if (!isB2CConfigured()) {
-      return res.status(503).json({ success: false, configured: false, message: "M-PESA B2C payout is not configured. Complete the server-side Daraja B2C settings before disbursing community funds." });
+      return res.status(503).json({ success: false, configured: false, message: "M-PESA B2C payout is not configured. Add the real Safaricom initiator and security credential before disbursing funds." });
     }
     const result = await b2cPayment({ phoneNumber: phone, amount, remarks: campaign.title, occasion: `CASE-${campaign._id.toString().slice(-8)}` });
     campaign.payoutPhoneNumber = phone;
@@ -312,8 +321,26 @@ exports.payoutCommunity = async (req, res) => {
     campaign.payoutStatus = "pending";
     campaign.status = "payout_pending";
     await campaign.save();
+    await createAuditLog({ user: req.user._id, userRole: req.user.role, action: "COMMUNITY_PAYOUT_SUBMITTED", module: "M-PESA", description: `SuperAdmin submitted KSh ${amount.toLocaleString("en-KE")} community payout for ${campaign.title}.`, req, metadata: { campaignId: campaign._id, amount, phone, conversationId: campaign.payoutConversationId } });
     res.json({ success: true, message: "M-PESA payout submitted for processing.", campaign });
-  } catch (error) { res.status(502).json({ success: false, message: error.message }); }
+  } catch (error) { res.status(502).json({ success: false, message: error.response?.data?.errorMessage || error.message }); }
+};
+
+exports.closeCommunity = async (req, res) => {
+  try {
+    const campaign = await CommunityAssistance.findById(req.params.id);
+    if (!campaign) return res.status(404).json({ success: false, message: "Community assistance case not found." });
+    if (!campaign.enabled && campaign.status === "closed") return res.status(409).json({ success: false, message: "This community M-PESA request is already closed." });
+    if (!["open", "target_reached"].includes(String(campaign.status))) return res.status(400).json({ success: false, message: `A ${campaign.status} community request cannot be closed from collection mode.` });
+    campaign.enabled = false;
+    campaign.status = "closed";
+    campaign.closedAt = new Date();
+    campaign.closedBy = req.user._id;
+    await campaign.save();
+    await createAuditLog({ user: req.user._id, userRole: req.user.role, action: "COMMUNITY_COLLECTION_CLOSED", module: "M-PESA", description: `SuperAdmin closed community M-PESA collection for ${campaign.title}.`, req, metadata: { campaignId: campaign._id, raisedAmount: campaign.raisedAmount, targetAmount: campaign.targetAmount } });
+    await createNotification({ recipient: campaign.recipientMember, recipientModel: "Member", title: "Community M-PESA Request Closed", message: `Your community support collection has been closed by the SuperAdmin. Collected amount: KSh ${Number(campaign.raisedAmount || 0).toLocaleString("en-KE")}.`, type: "claim", referenceId: campaign._id, referenceModel: "CommunityAssistance", icon: "lock" });
+    res.json({ success: true, message: "Community M-PESA collection closed.", campaign });
+  } catch (error) { res.status(500).json({ success: false, message: error.message }); }
 };
 
 exports.b2cResult = async (req, res) => {
@@ -324,12 +351,32 @@ exports.b2cResult = async (req, res) => {
     if (campaign) {
       const code = Number(result.ResultCode);
       campaign.payoutStatus = code === 0 ? "successful" : "failed";
-      campaign.status = code === 0 ? "paid" : (Number(campaign.raisedAmount) >= Number(campaign.targetAmount) ? "target_reached" : "open");
+      campaign.status = code === 0 ? "paid" : (Number(campaign.raisedAmount) >= Number(campaign.targetAmount) ? "target_reached" : (campaign.enabled ? "open" : "closed"));
       await campaign.save();
-      if (code === 0) await createNotification({ recipient: campaign.recipientMember, recipientModel: "Member", title: "Community Assistance Paid", message: `KSh ${Number(campaign.payoutAmount).toLocaleString("en-KE")} has been submitted to your M-PESA number.`, type: "claim", referenceId: campaign._id, referenceModel: "CommunityAssistance", icon: "payments" });
+      if (code === 0) {
+        const existing = await Finance.findOne({ referenceNumber: campaign.payoutConversationId, type: "withdrawal" });
+        if (!existing) {
+          await Finance.create({ member: campaign.recipientMember, transactionNumber: `BMX-PAYOUT-${campaign._id.toString().slice(-8)}-${Date.now()}`, type: "withdrawal", category: "Community assistance disbursement", amount: Number(campaign.payoutAmount || 0), description: campaign.title, paymentMethod: "M-PESA", referenceNumber: campaign.payoutConversationId, receiptNumber: String(result.ResultParameters?.ResultParameter?.find?.((x) => x.Key === "TransactionReceipt")?.Value || ""), status: "completed", transactionDate: new Date(), notes: `Community assistance disbursement confirmed by M-PESA. Case ${campaign._id}.` });
+        }
+        await createNotification({ recipient: campaign.recipientMember, recipientModel: "Member", title: "Community Assistance Paid", message: `KSh ${Number(campaign.payoutAmount).toLocaleString("en-KE")} has been sent to your registered M-PESA number.`, type: "claim", referenceId: campaign._id, referenceModel: "CommunityAssistance", icon: "payments" });
+      }
     }
   } catch (error) { console.error("B2C callback error:", error); }
   res.json({ ResultCode: 0, ResultDesc: "Accepted" });
 };
 
-exports.b2cTimeout = async (_req, res) => res.json({ ResultCode: 0, ResultDesc: "Accepted" });
+exports.b2cTimeout = async (req, res) => {
+  try {
+    const result = req.body?.Result || {};
+    const conversationId = String(result.ConversationID || result.OriginatorConversationID || "");
+    if (conversationId) {
+      const campaign = await CommunityAssistance.findOne({ $or: [{ payoutConversationId: conversationId }, { payoutOriginatorConversationId: conversationId }] });
+      if (campaign && campaign.payoutStatus === "pending") {
+        campaign.payoutStatus = "failed";
+        campaign.status = campaign.enabled ? (Number(campaign.raisedAmount) >= Number(campaign.targetAmount) ? "target_reached" : "open") : "closed";
+        await campaign.save();
+      }
+    }
+  } catch (error) { console.error("B2C timeout callback error:", error); }
+  res.json({ ResultCode: 0, ResultDesc: "Accepted" });
+};

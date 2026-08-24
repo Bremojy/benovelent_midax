@@ -95,7 +95,8 @@ export default function MpesaPaymentButton({ purpose, referenceId, label = "Pay 
             <form onSubmit={submit} className="mpesa-form">
               <label>Amount (KES)<input type="number" min="1" step="1" value={amount} onChange={(e) => setAmount(e.target.value)} disabled={!configured || status === "sending"} /></label>
               <label>M-PESA number<input type="tel" inputMode="numeric" placeholder="0712345678" value={phone} onChange={(e) => setPhone(e.target.value)} disabled={!configured || status === "sending"} /></label>
-              {configured && <div className="mpesa-account-note">{mpesaConfig.environment === "sandbox" ? "Sandbox" : "Production"} • PayBill <strong>{mpesaConfig.shortCode || "configured shortcode"}</strong>{mpesaConfig.accountReference ? <> • Account <strong>{mpesaConfig.accountReference}</strong></> : null}</div>}
+              <div className="mpesa-account-note">Scheme collection: PayBill <strong>247247</strong> • Account <strong>0650186528835</strong></div>
+              {configured && <div className="mpesa-account-note">{mpesaConfig.environment === "sandbox" ? "Sandbox" : "Production"} STK merchant shortcode <strong>{mpesaConfig.shortCode || "configured"}</strong>{mpesaConfig.accountReference ? <> • Backend reference <strong>{mpesaConfig.accountReference}</strong></> : null}</div>}
               <button className="mpesa-submit" type="submit" disabled={!configured || status === "sending"}>{status === "sending" ? <><Loader2 size={17} className="mpesa-spin" /> Sending STK Push…</> : "Send STK Push"}</button>
               <p className="mpesa-small">Your M-PESA PIN is entered only on the M-PESA prompt. Final payment status is confirmed by the server callback.</p>
             </form>

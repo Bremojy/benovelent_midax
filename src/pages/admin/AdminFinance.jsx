@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { Edit3, Layers3, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { Edit3, Layers3, Plus, RefreshCw, Trash2, ShieldCheck, LockKeyhole, WalletCards } from "lucide-react";
+import { useAuth } from "../../context/AuthContext";
 import DashboardLayout from "../../layouts/DashboardLayout";
 import API from "../../services/api";
 import { buildPrintHeadHtml, printHeadStyles } from "../../utils/printHead";
@@ -21,6 +22,8 @@ const EMPTY_FORM = {
 };
 
 export default function AdminFinance() {
+  const { role } = useAuth();
+  const isSuperAdmin = String(role || "").toLowerCase() === "superadmin";
   const [summary, setSummary] = useState({});
   const [transactions, setTransactions] = useState([]);
   const [contributions, setContributions] = useState([]);
@@ -35,21 +38,28 @@ export default function AdminFinance() {
   const [contributionForm, setContributionForm] = useState({ expectedAmount: "", paidAmount: "", paymentMethod: "M-PESA", receiptNumber: "", mpesaCode: "", paymentDate: today, notes: "" });
   const [bulkForm, setBulkForm] = useState({ month: new Date().getMonth() + 1, year: new Date().getFullYear(), amount: "500", paymentDate: today, recordAsCollected: true, notes: "Monthly payroll deduction" });
   const [bulkSaving, setBulkSaving] = useState(false);
+  const [community, setCommunity] = useState([]);
+  const [mpesaConfig, setMpesaConfig] = useState(null);
+  const [communityBusy, setCommunityBusy] = useState("");
 
   const load = async () => {
     try {
       setLoading(true);
       setError("");
-      const [s, t, c, l] = await Promise.all([
+      const [s, t, c, l, communityRes, mpesaRes] = await Promise.all([
         API.get("/finance/summary/dashboard"),
         API.get("/finance"),
         API.get("/contributions"),
         API.get(`/finance/ledger?year=${new Date().getFullYear()}`),
+        API.get("/payments/community-assistance/admin"),
+        API.get("/payments/config"),
       ]);
       setSummary(s.data?.summary || s.data || {});
       setTransactions(Array.isArray(t.data?.transactions) ? t.data.transactions : []);
       setContributions(Array.isArray(c.data?.contributions) ? c.data.contributions : []);
       setLedger(l.data || null);
+      setCommunity(Array.isArray(communityRes.data?.campaigns) ? communityRes.data.campaigns : []);
+      setMpesaConfig(mpesaRes.data || null);
     } catch (err) {
       setError(err.response?.data?.message || err.message || "Unable to load finance records.");
     } finally {
@@ -197,6 +207,40 @@ export default function AdminFinance() {
     }
   };
 
+  const payoutCommunity = async (campaign) => {
+    if (!isSuperAdmin || !Number(campaign?.raisedAmount)) return;
+    if (!window.confirm(`Disburse ${number(campaign.raisedAmount)} to ${campaign.recipientMember?.fullName || "the registered recipient"}?`)) return;
+    try {
+      setCommunityBusy(`payout-${campaign._id}`);
+      setError("");
+      const { data } = await API.post(`/payments/community-assistance/${campaign._id}/payout`);
+      if (!data?.success) throw new Error(data?.message || "Unable to submit community payout.");
+      setMessage("Community payout submitted to M-PESA for processing. The final status will be updated by the callback.");
+      await load();
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || "Unable to submit community payout.");
+    } finally {
+      setCommunityBusy("");
+    }
+  };
+
+  const closeCommunity = async (campaign) => {
+    if (!isSuperAdmin) return;
+    if (!window.confirm(`Close the M-PESA collection for “${campaign.title}”? No further member contributions will be accepted.`)) return;
+    try {
+      setCommunityBusy(`close-${campaign._id}`);
+      setError("");
+      const { data } = await API.post(`/payments/community-assistance/${campaign._id}/close`);
+      if (!data?.success) throw new Error(data?.message || "Unable to close community request.");
+      setMessage("Community M-PESA collection closed successfully.");
+      await load();
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || "Unable to close community request.");
+    } finally {
+      setCommunityBusy("");
+    }
+  };
+
   const removeTransaction = async (transaction) => {
     if (!window.confirm("Delete this transaction?")) return;
     try {
@@ -230,8 +274,9 @@ export default function AdminFinance() {
   return (
     <DashboardLayout>
       <div className="portal-module">
-        <header className="portal-module-header">
-          <div><span>FINANCIAL CONTROL</span><h1>Accounts</h1><p>Live scheme accounts: contributions, approved transactions, support disbursements and the current ledger.</p></div>
+        <header className="portal-module-header accounts-professional-header">
+          <div><span>{isSuperAdmin ? "SUPERADMIN FINANCIAL CONTROL" : "ADMIN FINANCIAL CONTROL"}</span><h1>Accounts</h1><p>{isSuperAdmin ? "Full scheme financial oversight with M-PESA collection controls, community disbursement controls, ledger management and audit-friendly records." : "Professional scheme accounts view for contributions, approved transactions, support disbursements and the shared ledger."}</p></div>
+          <div className="portal-actions"><span className="portal-badge"><ShieldCheck size={14} /> {isSuperAdmin ? "SuperAdmin authority" : "Admin access"}</span></div>
           <div className="portal-actions">
             <button type="button" className="portal-btn secondary" onClick={startCreate}><Plus size={16} /> New transaction</button>
             <button type="button" className="portal-btn secondary" onClick={printLedger} disabled={!ledger}><span>Print ledger</span></button>
@@ -241,6 +286,36 @@ export default function AdminFinance() {
 
         {message && <div className="portal-alert success">{message}</div>}
         {error && <div className="portal-alert">{error}</div>}
+
+        <section className="portal-panel accounts-trust-panel">
+          <div className="portal-module-header compact-header"><div><span>PAYMENT TRUST CENTRE</span><h2>M-PESA status & collection details</h2><p>Live configuration is read from the secure backend. Secrets are never displayed in the portal.</p></div></div>
+          <div className="portal-stat-grid">
+            <Stat label="STK status" value={mpesaConfig?.configured ? "Ready" : "Not configured"} />
+            <Stat label="B2C payout status" value={mpesaConfig?.b2cConfigured ? "Ready" : "Not configured"} />
+            <Stat label="Collection PayBill" value="247247" />
+            <Stat label="Collection account" value="0650186528835" />
+          </div>
+          <div className={`portal-alert ${mpesaConfig?.configured ? "success" : ""}`}><strong>{mpesaConfig?.configured ? "STK Push is enabled on the backend." : "STK Push is not ready."}</strong> {mpesaConfig?.message || "Complete the production Daraja configuration before processing live payments."}</div>
+        </section>
+
+        <section className="portal-panel community-control-panel">
+          <div className="portal-module-header compact-header"><div><span>COMMUNITY M-PESA CONTROL</span><h2>Collection requests</h2><p>Monitor every verified community collection. Only SuperAdmin can disburse collected funds or close a collection request.</p></div><span className="portal-badge"><LockKeyhole size={14} /> {isSuperAdmin ? "Controls enabled" : "Monitoring only"}</span></div>
+          {community.length === 0 ? <div className="portal-empty">No community M-PESA requests have been created.</div> : <div className="portal-grid two">{community.map((campaign) => {
+            const pct = Math.min(100, Math.round((Number(campaign.raisedAmount || 0) / Math.max(1, Number(campaign.targetAmount || 1))) * 100));
+            const active = ["open", "target_reached"].includes(String(campaign.status));
+            return <article className="portal-panel community-account-card" key={campaign._id}>
+              <div className="claim-card-head"><div><span className="portal-badge">{campaign.referenceModel}</span><h3>{campaign.title}</h3><p>{campaign.recipientMember?.fullName || "Member"} · {campaign.recipientMember?.memberNumber || "—"}</p></div><span className={`portal-badge ${["paid","closed"].includes(campaign.status) ? "approved" : ""}`}>{campaign.status}</span></div>
+              <p>{campaign.description}</p>
+              <div className="portal-stat-grid compact"><Stat label="Target" value={number(campaign.targetAmount)} /><Stat label="Collected" value={number(campaign.raisedAmount)} /><Stat label="Progress" value={`${pct}%`} /></div>
+              <div className="community-progress"><div className="community-progress-track"><span style={{ width: `${pct}%` }} /></div><div className="community-progress-meta"><span>{pct}% funded</span><span>{number(Math.max(0, Number(campaign.targetAmount || 0) - Number(campaign.raisedAmount || 0)))} remaining</span></div></div>
+              <div className="portal-actions">
+                {isSuperAdmin && Number(campaign.raisedAmount) > 0 && active && <button className="portal-btn primary" onClick={() => payoutCommunity(campaign)} disabled={communityBusy === `payout-${campaign._id}`}><WalletCards size={15} />{communityBusy === `payout-${campaign._id}` ? "Submitting…" : "Disburse collected funds"}</button>}
+                {isSuperAdmin && active && <button className="portal-btn danger" onClick={() => closeCommunity(campaign)} disabled={communityBusy === `close-${campaign._id}`}><LockKeyhole size={15} />{communityBusy === `close-${campaign._id}` ? "Closing…" : "Close M-PESA request"}</button>}
+                {!isSuperAdmin && <span className="portal-badge">SuperAdmin action required for disbursement / close</span>}
+              </div>
+            </article>;
+          })}</div>}
+        </section>
 
         <div className="portal-stat-grid">
           <Stat label="Total Income" value={number(first("totalIncome", "income", "totalContributions"))} />

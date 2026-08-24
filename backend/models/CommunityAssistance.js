@@ -21,6 +21,8 @@ const communityAssistanceSchema = new mongoose.Schema(
     payoutOriginatorConversationId: { type: String, default: "" },
     payoutReceipt: { type: String, default: "" },
     payoutStatus: { type: String, enum: ["not_started", "pending", "successful", "failed"], default: "not_started" },
+    closedAt: { type: Date, default: null },
+    closedBy: { type: mongoose.Schema.Types.ObjectId, default: null },
     createdBy: { type: mongoose.Schema.Types.ObjectId, default: null },
   },
   { timestamps: true }

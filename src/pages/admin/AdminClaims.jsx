@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { HeartHandshake, Megaphone, Trash2, Smartphone, WalletCards } from "lucide-react";
+import { HeartHandshake, Megaphone, Trash2, Smartphone, WalletCards, LockKeyhole } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import DashboardLayout from "../../layouts/DashboardLayout";
 import API, { resolveApiUrl } from "../../services/api";
@@ -149,7 +149,8 @@ export default function AdminClaims() {
   };
 
   const payoutCommunity = async (campaign) => {
-    if (!window.confirm(`Disburse ${money(campaign.raisedAmount)} raised for this community case to the recipient's registered M-PESA number?`)) return;
+    if (!isSuperAdmin) return;
+    if (!window.confirm(`Disburse ${money(campaign.raisedAmount)} raised for this community case to the recipient's registered M-PESA number? This sends a real B2C payout when the production credentials are configured.`)) return;
     try {
       setBusy(`payout-${campaign._id}`);
       setError("");
@@ -159,6 +160,23 @@ export default function AdminClaims() {
       await load();
     } catch (e) {
       setError(e.response?.data?.message || e.message || "Unable to submit community payout.");
+    } finally {
+      setBusy("");
+    }
+  };
+
+  const closeCommunity = async (campaign) => {
+    if (!isSuperAdmin) return;
+    if (!window.confirm(`Close ${campaign.title}? Members will no longer be able to contribute through the community M-PESA request.`)) return;
+    try {
+      setBusy(`close-${campaign._id}`);
+      setError("");
+      const { data } = await API.post(`/payments/community-assistance/${campaign._id}/close`);
+      if (!data?.success) throw new Error(data?.message || "Unable to close community request.");
+      setSuccess("Community M-PESA collection request closed.");
+      await load();
+    } catch (e) {
+      setError(e.response?.data?.message || e.message || "Unable to close community request.");
     } finally {
       setBusy("");
     }
@@ -254,7 +272,7 @@ export default function AdminClaims() {
             <div>
               <span>COMMUNITY M-PESA</span>
               <h2>Active assistance cases</h2>
-              <p>Admins and SuperAdmin can publish verified requests and disburse raised funds to the registered recipient M-PESA number.</p>
+              <p>Administrators can monitor verified requests. Only SuperAdmin can disburse collected funds or close an M-PESA collection request.</p>
             </div>
           </div>
           {community.length === 0 ? <div className="portal-empty">No active community assistance cases.</div> : (
@@ -265,8 +283,10 @@ export default function AdminClaims() {
                   <p>{c.description}</p>
                   <div className="portal-stat-grid compact"><div className="portal-stat"><span>Target</span><strong>{money(c.targetAmount)}</strong></div><div className="portal-stat"><span>Raised</span><strong>{money(c.raisedAmount)}</strong></div></div>
                   <div className="portal-actions">
-                    <button className="portal-btn secondary" onClick={() => publishCommunity(c)} disabled={busy === `publish-community-${c._id}`}><Megaphone size={15} />{busy === `publish-community-${c._id}` ? "Publishing…" : "Publish to News"}</button>
-                    {Number(c.raisedAmount) > 0 && !["paid", "payout_pending"].includes(c.status) && <button className="portal-btn primary" onClick={() => payoutCommunity(c)} disabled={busy === `payout-${c._id}`}><WalletCards size={15} />{busy === `payout-${c._id}` ? "Submitting…" : "Disburse raised funds"}</button>}
+                    {!["closed", "paid"].includes(c.status) && <button className="portal-btn secondary" onClick={() => publishCommunity(c)} disabled={busy === `publish-community-${c._id}`}><Megaphone size={15} />{busy === `publish-community-${c._id}` ? "Publishing…" : "Publish to News"}</button>}
+                    {isSuperAdmin && Number(c.raisedAmount) > 0 && ["open", "target_reached"].includes(c.status) && <button className="portal-btn primary" onClick={() => payoutCommunity(c)} disabled={busy === `payout-${c._id}`}><WalletCards size={15} />{busy === `payout-${c._id}` ? "Submitting…" : "Disburse raised funds"}</button>}
+                    {isSuperAdmin && ["open", "target_reached"].includes(c.status) && <button className="portal-btn danger" onClick={() => closeCommunity(c)} disabled={busy === `close-${c._id}`}><LockKeyhole size={15} />{busy === `close-${c._id}` ? "Closing…" : "Close collection"}</button>}
+                    {!isSuperAdmin && <span className="portal-badge">SuperAdmin controls required for payout / close</span>}
                   </div>
                 </article>
               ))}

@@ -187,3 +187,10 @@
 .community-payment-status.pending { background:#fff8e7; color:#7a5200; border-color:#f1df9d; }
 .community-payment-status.success { background:#ecfdf3; color:#146c43; border-color:#b7e4c7; }
 .community-payment-status.error { background:#fff1f1; color:#a4232b; border-color:#f3c3c8; }
+
+/* v19 professional finance/account controls */
+.accounts-professional-header{background:linear-gradient(135deg,#fff,#fff8f0);border:1px solid #eadfd3;box-shadow:0 14px 38px rgba(17,24,39,.06)}
+.accounts-trust-panel,.community-control-panel{border:1px solid #e9e2da;box-shadow:0 10px 28px rgba(17,24,39,.05)}
+.community-account-card{margin:0;border:1px solid #ece7e1;box-shadow:none;background:linear-gradient(180deg,#fff,#fffaf5)}
+.community-account-card .portal-actions{flex-wrap:wrap}
+@media(max-width:760px){.accounts-professional-header{padding:18px}.community-account-card{padding:16px}}

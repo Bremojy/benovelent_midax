@@ -5,7 +5,7 @@ const mpesaTransactionSchema = new mongoose.Schema(
     member: { type: mongoose.Schema.Types.ObjectId, ref: "Member", default: null, index: true },
     purpose: {
       type: String,
-      enum: ["loan_repayment", "community_assistance", "contribution", "other"],
+      enum: ["loan_repayment", "support_repayment", "community_assistance", "contribution", "other"],
       required: true,
       index: true,
     },

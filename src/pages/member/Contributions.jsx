@@ -15,6 +15,8 @@ export default function Contributions() {
   const [error, setError] = useState("");
   const [educationLoans, setEducationLoans] = useState([]);
   const [repayableSupport, setRepayableSupport] = useState([]);
+  const [mpesaTransactions, setMpesaTransactions] = useState([]);
+  const [mpesaReady, setMpesaReady] = useState(false);
   const [loanLoading, setLoanLoading] = useState(true);
   const year = new Date().getFullYear();
 
@@ -22,11 +24,13 @@ export default function Contributions() {
     try {
       setLoading(true);
       setError("");
-      const [response, loanResponse, claimResponse] = await Promise.all([API.get(`/member/accounts?year=${year}`), API.get("/education/my-applications"), API.get("/member/claims")]);
+      const [response, loanResponse, claimResponse, mpesaResponse, mpesaConfigResponse] = await Promise.all([API.get(`/member/accounts?year=${year}`), API.get("/education/my-applications"), API.get("/member/claims"), API.get("/payments/mine"), API.get("/payments/config")]);
       setData(response.data || null);
       setEducationLoans(Array.isArray(loanResponse.data?.applications) ? loanResponse.data.applications : []);
       const allClaims = Array.isArray(claimResponse.data?.claims) ? claimResponse.data.claims : [];
       setRepayableSupport(allClaims.filter((claim) => claim?.supportType && !["medical", "funeral", "Medical", "Funeral"].includes(claim.supportType) && claim.repaymentEnabled && ["Approved", "Disbursement Pending", "Paid"].includes(claim.status) && Number(claim.balance || 0) > 0));
+      setMpesaTransactions(Array.isArray(mpesaResponse.data?.transactions) ? mpesaResponse.data.transactions : []);
+      setMpesaReady(Boolean(mpesaConfigResponse.data?.configured));
     } catch (err) {
       setError(err.response?.data?.message || err.message || "Unable to load scheme accounts.");
     } finally {
@@ -80,6 +84,17 @@ export default function Contributions() {
           <div className="portal-alert success"><strong>Payroll contribution model:</strong> the scheme applies one standard monthly deduction across the membership.</div>
         </section>
 
+        <section className="portal-panel accounts-trust-panel">
+          <div className="portal-module-header compact-header"><div><span>PAYMENT TRANSPARENCY</span><h2>M-PESA collection details</h2><p>Use the scheme payment details shown here and keep every M-PESA confirmation for your records.</p></div><span className={`portal-badge ${mpesaReady ? "approved" : ""}`}>{mpesaReady ? "Online payment ready" : "Online payment unavailable"}</span></div>
+          <div className="portal-stat-grid">
+            <Stat label="PayBill" value="247247" />
+            <Stat label="Account" value="0650186528835" />
+            <Stat label="Payment gateway" value={mpesaReady ? "Daraja STK" : "Manual / pending setup"} />
+            <Stat label="M-PESA records" value={mpesaTransactions.length} />
+          </div>
+          <div className="portal-alert"><strong>Important:</strong> the PayBill 247247 / account 0650186528835 details are the scheme's default collection instructions. The STK Push button uses only the secure Daraja configuration held by the backend.</div>
+        </section>
+
         <section className="portal-panel">
           <div className="portal-module-header"><div><span>EDUCATION POLICY REPAYMENTS</span><h2>My loans</h2><p>Repay any outstanding Education Policy balance securely through an M-PESA STK Push.</p></div></div>
           {loanLoading ? <div className="portal-empty">Loading loan balances…</div> : educationLoans.filter((loan) => Number(loan.balance || 0) > 0 && ["Approved","Disbursed","Defaulted"].includes(loan.status)).length === 0 ? <div className="portal-empty"><h3>No outstanding education loan</h3><p>Approved or disbursed education policy loans will appear here with their live repayment balance.</p></div> : <div className="portal-grid two">{educationLoans.filter((loan) => Number(loan.balance || 0) > 0 && ["Approved","Disbursed","Defaulted"].includes(loan.status)).map((loan) => <article className="portal-panel" key={loan._id} style={{ margin:0 }}><span className="portal-badge">Education Policy</span><h3>{loan.dependentName || "Education loan"}</h3><p>{loan.school || ""}</p><div className="portal-stat-grid"><Stat label="Total repayment" value={money(loan.totalRepayment)} /><Stat label="Paid" value={money(loan.amountPaid)} /><Stat label="Balance" value={money(loan.balance)} /><Stat label="Monthly instalment" value={money(loan.monthlyInstallment)} /></div><MpesaPaymentButton purpose="loan_repayment" referenceId={loan._id} defaultAmount={Math.min(Number(loan.monthlyInstallment || 0), Number(loan.balance || 0))} maxAmount={Number(loan.balance || 0)} label="Repay with M-PESA" /></article>)}</div>}
@@ -120,6 +135,8 @@ export default function Contributions() {
           <article className="portal-panel"><h2>Support summary</h2><div className="portal-stat-grid"><Stat label="All support cases" value={data?.support?.totalCases || 0} /><Stat label="Approved cases" value={data?.support?.approvedCases || 0} /><Stat label="Pending cases" value={data?.support?.pendingCases || 0} /><Stat label="Approved support" value={money(data?.support?.approvedSupportTotal)} /></div></article>
           <article className="portal-panel"><h2>Scheme ledger</h2><div className="portal-stat-grid"><Stat label="Credits" value={money(data?.totals?.ledgerCredits)} /><Stat label="Debits" value={money(data?.totals?.ledgerDebits)} /><Stat label="Closing balance" value={money(data?.totals?.ledgerBalance)} /></div><p className="print-note">This is a shared scheme account view for members.</p></article>
         </section>
+
+        <section className="portal-panel"><div className="portal-module-header compact-header"><div><span>M-PESA PAYMENT HISTORY</span><h2>Recent payment confirmations</h2><p>Server-recorded STK transactions linked to your member account.</p></div><button className="portal-btn secondary" onClick={load}>Refresh</button></div><div className="portal-table-wrap"><table className="portal-table"><thead><tr><th>Date</th><th>Purpose</th><th>Amount</th><th>Status</th><th>Receipt</th></tr></thead><tbody>{mpesaTransactions.slice(0,20).map((x) => <tr key={x._id}><td>{x.createdAt ? new Date(x.createdAt).toLocaleString("en-KE") : "—"}</td><td>{String(x.purpose || "payment").replace(/_/g," ")}</td><td>{money(x.amount)}</td><td><span className="portal-badge">{x.status || "—"}</span></td><td>{x.mpesaReceiptNumber || "Pending"}</td></tr>)}{mpesaTransactions.length===0 && <tr><td colSpan="5">No M-PESA transactions have been recorded for your account.</td></tr>}</tbody></table></div></section>
 
         <section className="portal-panel"><h2>Recent scheme ledger activity</h2><div className="portal-table-wrap"><table className="portal-table"><thead><tr><th>Date</th><th>Type</th><th>Category</th><th>Description</th><th>Debit</th><th>Credit</th><th>Balance</th></tr></thead><tbody>
           {(data?.ledger?.entries || []).slice(0, 40).map((x, i) => <tr key={i}><td>{x.date ? new Date(x.date).toLocaleDateString("en-KE") : "—"}</td><td>{x.type || "—"}</td><td>{x.category || "—"}</td><td>{x.description || "—"}</td><td>{x.debit ? money(x.debit) : "—"}</td><td>{x.credit ? money(x.credit) : "—"}</td><td>{money(x.runningBalance)}</td></tr>)}
