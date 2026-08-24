@@ -17,6 +17,19 @@ const isConfigured = () => {
     env("MPESA_CALLBACK_URL")
   );
 };
+
+const isB2CConfigured = () => {
+  const required = [
+    "MPESA_CONSUMER_KEY",
+    "MPESA_CONSUMER_SECRET",
+    "MPESA_B2C_SHORTCODE",
+    "MPESA_INITIATOR_NAME",
+    "MPESA_SECURITY_CREDENTIAL",
+    "MPESA_B2C_RESULT_URL",
+    "MPESA_B2C_TIMEOUT_URL",
+  ];
+  return env("MPESA_ENABLED", "false").toLowerCase() === "true" && required.every((name) => Boolean(env(name)));
+};
 const baseUrl = () => env("MPESA_ENVIRONMENT", "production").toLowerCase() === "sandbox"
   ? "https://sandbox.safaricom.co.ke"
   : "https://api.safaricom.co.ke";
@@ -83,7 +96,7 @@ async function b2cPayment({ phoneNumber, amount, remarks, occasion }) {
     "MPESA_B2C_RESULT_URL",
     "MPESA_B2C_TIMEOUT_URL",
   ];
-  if (env("MPESA_ENABLED", "false").toLowerCase() !== "true" || required.some((name) => !env(name))) {
+  if (!isB2CConfigured() || required.some((name) => !env(name))) {
     throw new Error("M-PESA B2C payout is not fully configured on the server.");
   }
   const accessToken = await getAccessToken();
@@ -107,4 +120,4 @@ async function b2cPayment({ phoneNumber, amount, remarks, occasion }) {
 
 const idempotencyKey = () => crypto.randomBytes(12).toString("hex");
 
-module.exports = { isConfigured, isDarajaConfigured, normalizePhone, stkPush, b2cPayment, idempotencyKey };
+module.exports = { isConfigured, isB2CConfigured, isDarajaConfigured, normalizePhone, stkPush, b2cPayment, idempotencyKey };

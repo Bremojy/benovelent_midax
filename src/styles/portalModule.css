@@ -177,3 +177,13 @@
   .portal-stat-grid.compact .portal-stat strong { font-size:18px; }
   .portal-form-grid { gap:10px; }
 }
+
+
+.community-progress { margin-top: 12px; }
+.community-progress-track { height: 9px; border-radius: 999px; background: #edf1f4; overflow: hidden; }
+.community-progress-track span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #ff7a00, #0f766e); transition: width .35s ease; }
+.community-progress-meta { display:flex; justify-content:space-between; gap:12px; margin-top:6px; color:#667085; font-size:12px; }
+.community-payment-status { margin-top:12px; padding:11px 12px; border-radius:12px; display:flex; align-items:flex-start; gap:8px; font-size:13px; line-height:1.45; border:1px solid #e6e9ed; }
+.community-payment-status.pending { background:#fff8e7; color:#7a5200; border-color:#f1df9d; }
+.community-payment-status.success { background:#ecfdf3; color:#146c43; border-color:#b7e4c7; }
+.community-payment-status.error { background:#fff1f1; color:#a4232b; border-color:#f3c3c8; }

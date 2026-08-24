@@ -6,7 +6,7 @@ const MedicalSupport = require("../models/MedicalSupport");
 const FuneralSupport = require("../models/FuneralSupport");
 const Member = require("../models/Member");
 const createNotification = require("../utils/createNotification");
-const { stkPush, b2cPayment, normalizePhone, isConfigured, idempotencyKey } = require("../services/mpesaService");
+const { stkPush, b2cPayment, normalizePhone, isConfigured, isB2CConfigured, idempotencyKey } = require("../services/mpesaService");
 
 const modelMap = { SupportRequest, MedicalSupport, FuneralSupport, EducationSupport };
 
@@ -100,9 +100,14 @@ async function applyCommunityContribution(transaction) {
 }
 
 exports.config = async (_req, res) => {
+  const stkConfigured = isConfigured();
+  const b2cConfigured = isB2CConfigured();
   res.json({
     success: true,
-    configured: isConfigured(),
+    configured: stkConfigured,
+    stkConfigured,
+    b2cConfigured,
+    enabled: String(process.env.MPESA_ENABLED || "false").toLowerCase() === "true",
     shortCode: String(process.env.MPESA_SHORTCODE || "247247"),
     accountReference: String(process.env.MPESA_ACCOUNT_REFERENCE || "0650186528835"),
     environment: String(process.env.MPESA_ENVIRONMENT || "production"),
@@ -289,6 +294,9 @@ exports.payoutCommunity = async (req, res) => {
     const phone = normalizePhone(req.body?.phoneNumber || campaign.payoutPhoneNumber || recipient?.mpesaNumber || recipient?.phone);
     if (!/^254\d{9}$/.test(phone)) return res.status(400).json({ success: false, message: "Recipient does not have a valid M-PESA number." });
     const amount = Number(campaign.raisedAmount);
+    if (!isB2CConfigured()) {
+      return res.status(503).json({ success: false, configured: false, message: "M-PESA B2C payout is not configured. Complete the server-side Daraja B2C settings before disbursing community funds." });
+    }
     const result = await b2cPayment({ phoneNumber: phone, amount, remarks: campaign.title, occasion: `CASE-${campaign._id.toString().slice(-8)}` });
     campaign.payoutPhoneNumber = phone;
     campaign.payoutAmount = amount;

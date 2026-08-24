@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 
 import { useEffect, useState } from "react";
+import { dashboardMenus } from "../../config/dashboardMenu";
 import socket from "../../sockets/socket";
 import API, { UPLOAD_URL } from "../../services/api";
 
@@ -31,6 +32,7 @@ function DashboardTopbar({
   const navigate = useNavigate();
   const { logout: authLogout } = useAuth();
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
 
   const [unreadNotifications, setUnreadNotifications] = useState(
     Number(user?.unreadNotifications || 0)
@@ -198,9 +200,24 @@ function DashboardTopbar({
           <Search size={18} />
 
           <input
-            type="text"
-            placeholder="Search members, news, claims..."
-            aria-label="Search"
+            type="search"
+            value={searchTerm}
+            onChange={(event) => setSearchTerm(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key !== "Enter") return;
+              const term = searchTerm.trim().toLowerCase();
+              if (!term) return;
+              const menu = dashboardMenus[normalizedRole] || [];
+              const match = menu.find((item) => item.title.toLowerCase().includes(term));
+              if (match) {
+                setSearchTerm("");
+                navigate(match.path);
+              } else {
+                window.dispatchEvent(new CustomEvent("benovelent:portal-search", { detail: { term } }));
+              }
+            }}
+            placeholder="Jump to a portal section…"
+            aria-label="Search portal sections"
           />
 
         </div>
