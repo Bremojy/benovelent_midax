@@ -69,11 +69,25 @@ export default function Login() {
 
       navigate(validPreviousPath ? from : portal, { replace: true });
     } catch (err) {
-      setError(
-        err.response?.data?.message ||
-          err.message ||
-          "Unable to sign in. Please check your details and try again."
-      );
+      const status = err?.response?.status;
+      const code = err?.response?.data?.code;
+      let message = err?.response?.data?.message || "";
+
+      if (!message) {
+        if (status === 403 && code === "CSRF_INVALID") {
+          message = "Your secure login session needs to be refreshed. Please try again.";
+        } else if (status === 429) {
+          message = "Too many login attempts. Please wait a few minutes and try again.";
+        } else if (status >= 500) {
+          message = "The server is temporarily unavailable. Please try again shortly.";
+        } else if (!err?.response) {
+          message = "Unable to reach Benevolent MIDAX. Check your internet connection and try again.";
+        } else {
+          message = "Unable to sign in. Please check your email and password.";
+        }
+      }
+
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -129,8 +143,9 @@ export default function Login() {
               type="email"
               placeholder="Enter your email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              autoComplete="email"
+              onChange={(e) => setEmail(e.target.value.trimStart())}
+              autoComplete="username"
+              inputMode="email"
               disabled={loading}
               required
             />

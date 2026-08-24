@@ -7,6 +7,22 @@ const migrations = [
   require("../migrations/004_normalize_member_defaults"),
 ];
 
+function normalizeMigration(migration, index) {
+  if (typeof migration === "function") {
+    const id = migration.id || `legacy_migration_${String(index + 1).padStart(3, "0")}`;
+    return { id, run: migration };
+  }
+
+  if (!migration || typeof migration.run !== "function") {
+    throw new TypeError(`Migration ${migration?.id || index + 1} must export a run() function.`);
+  }
+
+  return {
+    ...migration,
+    id: String(migration.id || `migration_${String(index + 1).padStart(3, "0")}`),
+  };
+}
+
 async function runMigrations() {
   const db = mongoose.connection.db;
   if (!db) throw new Error("MongoDB database is not connected.");
@@ -14,14 +30,22 @@ async function runMigrations() {
   await db.createCollection("schema_migrations").catch((error) => {
     if (error?.codeName !== "NamespaceExists") throw error;
   });
+
   const collection = db.collection("schema_migrations");
 
-  for (const migration of migrations) {
+  for (let index = 0; index < migrations.length; index += 1) {
+    const migration = normalizeMigration(migrations[index], index);
     const exists = await collection.findOne({ _id: migration.id });
     if (exists) continue;
-    await migration.run();
-    await collection.insertOne({ _id: migration.id, appliedAt: new Date() });
-    console.log(`[migration] Applied ${migration.id}`);
+
+    try {
+      await migration.run();
+      await collection.insertOne({ _id: migration.id, appliedAt: new Date() });
+      console.log(`[migration] Applied ${migration.id}`);
+    } catch (error) {
+      error.message = `[migration ${migration.id}] ${error.message}`;
+      throw error;
+    }
   }
 }
 

@@ -941,3 +941,28 @@
   .profile-upload-preview img { max-height:240px; }
   .profile-modern-header { align-items:flex-start; }
 }
+
+
+/* v17 professional account system */
+.profile-modern { max-width: 1280px; }
+.profile-modern-header { align-items: stretch; background: linear-gradient(135deg,#ffffff,#fff8f0); border:1px solid #eee3d8; box-shadow:0 14px 40px rgba(32,33,36,.06); }
+.profile-eyebrow { color:#ff7a00; font-size:11px; font-weight:900; letter-spacing:1.5px; }
+.profile-modern-header h1 { font-size:clamp(26px,3vw,38px); }
+.profile-score-card { min-width:240px; display:flex; align-items:center; gap:14px; padding:16px; border-radius:18px; background:#fff; border:1px solid #efe4d8; box-shadow:0 10px 26px rgba(32,33,36,.06); }
+.profile-score-circle { width:68px; height:68px; border-radius:50%; display:grid; place-items:center; flex:0 0 68px; background:conic-gradient(#ff7a00 calc(var(--completion, 0) * 1%), #f0ece8 0); color:#222; font-weight:900; position:relative; }
+.profile-score-circle::after { content:""; position:absolute; inset:7px; border-radius:50%; background:#fff; z-index:0; }
+.profile-score-circle { isolation:isolate; }
+.profile-score-circle::first-letter { position:relative; z-index:2; }
+.profile-score-card strong { display:block; color:#27282b; }
+.profile-score-card div:last-child div { margin-top:4px; color:#777; font-size:12px; }
+.profile-panel { border:1px solid #ece8e4; box-shadow:0 10px 28px rgba(32,33,36,.045); }
+.profile-panel input, .profile-panel select, .profile-panel textarea { min-height:48px; border-radius:12px; }
+.profile-panel input:focus, .profile-panel select:focus, .profile-panel textarea:focus { outline:none; box-shadow:0 0 0 4px rgba(255,122,0,.11); }
+.profile-upload-grid { gap:16px; }
+.profile-upload-grid > * { min-width:0; }
+.profile-modern .portal-alert { border-radius:14px; box-shadow:0 8px 20px rgba(32,33,36,.04); }
+@media (max-width: 760px) {
+  .profile-modern-header { flex-direction:column; }
+  .profile-score-card { width:100%; min-width:0; }
+  .profile-form-grid, .profile-card-grid, .dependents-grid { grid-template-columns:1fr !important; }
+}

@@ -94,6 +94,10 @@
       "destination": "https://benovelent-midax.onrender.com/api/:path*"
     },
     {
+      "source": "/socket.io/:path*",
+      "destination": "https://benovelent-midax.onrender.com/socket.io/:path*"
+    },
+    {
       "source": "/((?!api(?:/|$))(?!assets(?:/|$))(?!.*\\.[^/]+$).*)",
       "destination": "/index.html"
     }

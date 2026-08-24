@@ -1,9 +1,17 @@
 import { io } from "socket.io-client";
 
-const SOCKET_URL = String(
-  import.meta.env.VITE_SOCKET_URL ||
-  import.meta.env.VITE_API_URL ||
-  "https://benovelent-midax.onrender.com"
+const hostname = typeof window !== "undefined"
+  ? String(window.location.hostname || "").toLowerCase()
+  : "";
+const isVercelHost = hostname.endsWith(".vercel.app") || hostname === "vercel.app";
+const configuredSocketUrl = String(import.meta.env.VITE_SOCKET_URL || "").trim();
+
+// Keep Socket.IO same-origin on the Vercel deployment so browser cookies/session
+// semantics stay aligned with the /api proxy. Non-Vercel deployments may opt in
+// to an explicit socket host through VITE_SOCKET_URL.
+const SOCKET_URL = (isVercelHost
+  ? (typeof window !== "undefined" ? window.location.origin : "")
+  : (configuredSocketUrl || import.meta.env.VITE_API_URL || "https://benovelent-midax.onrender.com")
 ).replace(/\/+$/, "");
 
 const socketUpgrade = String(import.meta.env.VITE_SOCKET_UPGRADE || "true").toLowerCase() === "true";
@@ -16,14 +24,13 @@ const socket = io(SOCKET_URL, {
   auth: {},
   upgrade: socketUpgrade,
   reconnection: true,
-  reconnectionAttempts: 10,
+  reconnectionAttempts: Infinity,
   reconnectionDelay: 1000,
-  reconnectionDelayMax: 5000,
+  reconnectionDelayMax: 8000,
   timeout: 10000,
+  closeOnBeforeunload: false,
 });
 
-// Retained as no-op compatibility exports for older components/mobile bridges.
-// Browser authentication now travels only in the HttpOnly cookie.
 export const setSocketToken = () => undefined;
 export const clearSocketAuth = () => undefined;
 
@@ -33,18 +40,14 @@ socket.on("connect_error", (error) => {
   if (message.includes("SESSION_REPLACED") || message.includes("AUTH_REQUIRED") || message.includes("AUTH_INVALID")) {
     try {
       window.dispatchEvent(new CustomEvent("benovelent:session-replaced"));
-    } catch {
-      // Ignore browser event failures.
-    }
+    } catch {}
   }
 });
 
 socket.on("session-replaced", () => {
   try {
     window.dispatchEvent(new CustomEvent("benovelent:session-replaced"));
-  } catch {
-    // Ignore browser event failures.
-  }
+  } catch {}
 });
 
 export default socket;

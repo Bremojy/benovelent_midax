@@ -1,6 +1,6 @@
 /* Benovelent Midax secure login */
 .modern-login-page {
-  min-height: calc(100vh - 80px);
+  min-height: calc(100dvh - 80px);
   position: relative;
   isolation: isolate;
   overflow: hidden;
@@ -228,7 +228,7 @@
 
 @media (max-width: 600px) {
   .modern-login-page {
-    min-height: calc(100vh - 70px);
+    min-height: calc(100dvh - 70px);
     padding: 24px 14px;
   }
   .login-card-shell {
@@ -242,3 +242,17 @@
 
 .modern-login-page.video-failed{background:linear-gradient(135deg,#1b1e22 0%,#5b320d 55%,#ff7a00 140%)}
 .modern-login-page.video-failed::before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 70% 30%,rgba(255,190,100,.2),transparent 35%),linear-gradient(135deg,rgba(255,122,0,.15),transparent 55%);z-index:-2}
+
+
+.login-form .input-group input::placeholder { color: #9aa0a6; opacity: 1; }
+.login-form input, .login-form button { touch-action: manipulation; }
+.login-form .login-button:focus-visible, .password-toggle:focus-visible { outline: 3px solid rgba(255,122,0,.28); outline-offset: 2px; }
+@media (max-width: 420px) {
+  .modern-login-page { padding: 18px 10px; }
+  .login-card-shell { width: 100%; padding: 24px 18px; border-radius: 20px; }
+  .login-card-heading h1 { font-size: 27px; }
+  .login-form .input-group { min-height: 52px; margin-bottom: 16px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .login-spinner, .login-button, .login-form .input-group { animation: none !important; transition: none !important; }
+}
