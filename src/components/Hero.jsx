@@ -11,10 +11,14 @@ import {
 import api, { resolveUploadUrl } from "../services/api";
 
 const FALLBACK_SLIDES = [
-  { _id: "welcome-fallback", imageUrl: "/hero.jpg", title: "Standing Together. Supporting One Another.", description: "A welcoming community built around compassion, dignity and practical support for members and their families.", buttonText: "Discover More", buttonLink: "/about" },
-  { _id: "community-fallback", imageUrl: "/about-welcome.svg", title: "Community, Compassion & Support", description: "Stay connected to the people, services and leadership that keep Benevolent MIDAX moving together.", buttonText: "Explore Services", buttonLink: "/services" },
-  { _id: "news-fallback", imageUrl: "/news-placeholder.svg", title: "Stay Informed", description: "Follow announcements, polls and community updates from Benevolent MIDAX.", buttonText: "Read News", buttonLink: "/news" },
-  { _id: "gallery-fallback", imageUrl: "/gallery-placeholder.svg", title: "Our Community in Focus", description: "Discover the people and moments that make our community stronger.", buttonText: "View Gallery", buttonLink: "/gallery" },
+  {
+    _id: "official-content-pending",
+    imageUrl: "/hero.jpg",
+    title: "Benovelent Midax Fund Scheme",
+    description: "Official carousel updates will appear here when published by the scheme team. Read the Constitution for the current rules and benefits.",
+    buttonText: "Read the Constitution",
+    buttonLink: "/constitution",
+  },
 ];
 
 function Hero() {

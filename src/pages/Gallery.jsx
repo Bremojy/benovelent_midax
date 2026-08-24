@@ -15,19 +15,9 @@ function Gallery() {
       try {
         const { data } = await api.get("/website/gallery");
         const sectionImages = data?.section?.images || data?.gallery || [];
-        if (active) setImages(Array.isArray(sectionImages) && sectionImages.length ? sectionImages : [
-          "/gallery-placeholder.svg",
-          "/gallery-placeholder.svg",
-          "/gallery-placeholder.svg",
-          "/gallery-placeholder.svg",
-        ]);
+        if (active) setImages(Array.isArray(sectionImages) ? sectionImages.filter(Boolean) : []);
       } catch {
-        if (active) setImages([
-          "/gallery-placeholder.svg",
-          "/gallery-placeholder.svg",
-          "/gallery-placeholder.svg",
-          "/gallery-placeholder.svg",
-        ]);
+        if (active) setImages([]);
       } finally {
         if (active) setLoading(false);
       }
@@ -70,7 +60,7 @@ function Gallery() {
         <div className="section-container">
           {loading ? (
             <div className="portal-empty">Loading gallery...</div>
-          ) : (
+          ) : images.length ? (
             images.map((img, index) => (
               <div className="gallery-card" key={index}>
                 <img
@@ -82,6 +72,11 @@ function Gallery() {
                 />
               </div>
             ))
+          ) : (
+            <div className="portal-empty">
+              <h2>No gallery items have been published yet.</h2>
+              <p>Published community images will appear here automatically.</p>
+            </div>
           )}
         </div>
       </section>

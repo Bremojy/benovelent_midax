@@ -2,9 +2,19 @@ import { io } from "socket.io-client";
 
 const hostname = typeof window !== "undefined" ? String(window.location.hostname || "").toLowerCase() : "";
 const isLocalHost = ["localhost", "127.0.0.1", "::1"].includes(hostname);
+const isVercelHost = hostname.endsWith(".vercel.app") || hostname === "vercel.app";
 const configuredSocketUrl = String(import.meta.env.VITE_SOCKET_URL || "").trim();
 const apiUrl = String(import.meta.env.VITE_API_URL || "").trim();
-const SOCKET_URL = (configuredSocketUrl || (isLocalHost ? apiUrl : (typeof window !== "undefined" ? window.location.origin : apiUrl)) || "https://benovelent-midax.onrender.com").replace(/\/+$/, "");
+
+// Production authentication is cookie-based. On Vercel, keep Socket.IO
+// same-origin so the browser can send the same HttpOnly session cookie used
+// by the /api Vercel rewrite. Polling remains the default because it works
+// through the proxy without relying on a WebSocket upgrade at the edge.
+const SOCKET_URL = (
+  isVercelHost
+    ? (typeof window !== "undefined" ? window.location.origin : apiUrl)
+    : (configuredSocketUrl || (isLocalHost ? apiUrl : (typeof window !== "undefined" ? window.location.origin : apiUrl)) || "https://benovelent-midax.onrender.com")
+).replace(/\/+$/, "");
 const socketUpgrade = String(import.meta.env.VITE_SOCKET_UPGRADE || "false").toLowerCase() === "true";
 const socket = io(SOCKET_URL, { autoConnect:false, transports: socketUpgrade ? ["polling","websocket"] : ["polling"], withCredentials: true, auth:{}, upgrade:socketUpgrade, reconnection:true, reconnectionAttempts:Infinity, reconnectionDelay:1000, reconnectionDelayMax:8000, timeout:10000, closeOnBeforeunload:false });
 export const setSocketToken = () => undefined;

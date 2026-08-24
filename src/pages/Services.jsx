@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import API from "../services/api";
 
 import { Link } from "react-router-dom";
-import { Heart, Stethoscope, GraduationCap, BookOpen, ArrowRight, BadgeCheck, ShieldCheck, MessageCircle } from "lucide-react";
+import { Heart, Stethoscope, BookOpen, ArrowRight, BadgeCheck, ShieldCheck, MessageCircle } from "lucide-react";
 import "../styles/public-modern.css";
 
 const heroVideo = "/videos/benevolent-community-loop.mp4";
@@ -22,8 +22,7 @@ export default function Services() {
             <span className="modern-kicker"><BookOpen size={14} /> SERVICES & CONSTITUTION</span>
             <h1>Support that feels modern, warm and family-centred.</h1>
             <p>
-              The Benovelent Constitution guides funeral and medical support, accountability and member communication.
-              Education support is coming soon and remains open for the children of contributors.
+              The Benovelent Constitution guides funeral and medical support, governance, accountability and member communication.
             </p>
             <div className="modern-hero-actions">
               <Link to="/constitution" className="modern-btn">View our Constitution <ArrowRight size={17} /></Link>
@@ -44,7 +43,7 @@ export default function Services() {
         <div className="modern-card-grid">
           <Service icon={Heart} title="Funeral Support" text="Ksh 100,000 per eligible funeral claim for parents, husband/wife and children. The constitution also notes qualifying sibling support at Ksh 30,000." />
           <Service icon={Stethoscope} title="Medical Support" text="Inpatient help follows the constitution's amount bands and claim conditions for eligible family members." />
-          <Service icon={GraduationCap} title="Education Support — Coming Soon" text="Education support is coming soon. The brief asks for benefits for contributors and their children, so the page explains the promise without inventing amounts not listed in the constitution." />
+          <Service icon={BookOpen} title="Constitution-led support" text="Published support benefits and claim conditions are governed by the official Constitution and current scheme records." />
         </div>
       </section>
 
