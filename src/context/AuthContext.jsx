@@ -462,6 +462,9 @@ export function AuthProvider({
 
         try {
           clearLoggedOutMarker();
+          // Prevent the previous Socket.IO session in this same browser tab
+          // from treating our intentional login as a login from another device.
+          window.dispatchEvent(new CustomEvent("benevolent:auth-login-start"));
           const response =
             await loginUser(
               email,
@@ -514,12 +517,14 @@ export function AuthProvider({
           setUser(
             normalizedUser
           );
+          window.dispatchEvent(new CustomEvent("benevolent:auth-login-complete"));
 
           return {
             user: normalizedUser,
           };
 
         } catch (error) {
+          window.dispatchEvent(new CustomEvent("benevolent:auth-login-complete"));
           setAuthError(
             error.response?.data
               ?.message ||
