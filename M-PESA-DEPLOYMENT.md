@@ -48,3 +48,21 @@ A successful B2C callback creates a completed withdrawal in the scheme finance l
 Never place Daraja consumer secrets, passkeys, B2C initiator credentials, B2C security credentials, JWT secrets, database credentials or private VAPID keys in the frontend or commit them to Git.
 
 If production secrets have been exposed outside the deployment environment, rotate them before the next production deployment.
+
+## Production troubleshooting: STK returns HTTP 400/502
+
+The application now preserves Safaricom/Daraja's upstream HTTP status and error message instead of converting every upstream error into a generic HTTP 502.
+
+For a production STK Push:
+- `MPESA_CONSUMER_KEY` and `MPESA_CONSUMER_SECRET` must belong to the Daraja production app being used by this project.
+- `MPESA_SHORTCODE` must be the exact M-PESA business shortcode registered for the STK Push app and paired with the passkey supplied for that shortcode. Do not replace it with the community's manual collection PayBill unless that PayBill is also the registered Daraja STK shortcode.
+- `MPESA_PASSKEY` must be the passkey paired with that exact STK shortcode.
+- `MPESA_TRANSACTION_TYPE=CustomerPayBillOnline` must match the merchant type.
+- `MPESA_CALLBACK_URL` must be a publicly reachable HTTPS callback URL registered/allowed for the production Daraja application.
+- `MPESA_ACCOUNT_REFERENCE` is the member/scheme reference shown with the STK transaction; the manual collection PayBill is separately represented by `MPESA_MANUAL_PAYBILL`.
+
+The frontend displays the actual upstream Daraja error/status after deployment, so a rejected request can be diagnosed without guessing from a generic "Request failed with status code 400" message.
+
+## Socket.IO production authentication
+
+The browser now requests a short-lived `/api/auth/socket-ticket` after authentication and sends that ticket to Socket.IO. Production Socket.IO uses `VITE_SOCKET_URL` (normally the Render API origin) rather than depending on a Vercel rewrite to authenticate the realtime connection.

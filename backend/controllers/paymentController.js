@@ -206,8 +206,18 @@ exports.stk = async (req, res) => {
     await tx.save();
     res.status(200).json({ success: result?.ResponseCode === "0", configured: true, message: result?.CustomerMessage || result?.ResponseDescription || "STK push submitted.", transactionId: tx._id, checkoutRequestId: tx.checkoutRequestId });
   } catch (error) {
-    console.error("M-PESA STK error:", error.response?.data || error);
-    res.status(502).json({ success: false, message: error.response?.data?.errorMessage || error.message || "M-PESA payment request failed." });
+    const upstreamStatus = Number(error.response?.status || 0);
+    const upstreamData = error.response?.data || null;
+    const upstreamMessage = upstreamData?.errorMessage || upstreamData?.message || upstreamData?.ResponseDescription || error.message || "M-PESA payment request failed.";
+    console.error("M-PESA STK error:", { status: upstreamStatus, message: upstreamMessage, data: upstreamData });
+    const clientStatus = [400, 401, 403, 404, 409, 422, 429].includes(upstreamStatus) ? upstreamStatus : 502;
+    return res.status(clientStatus).json({
+      success: false,
+      code: upstreamData?.errorCode || "MPESA_STK_FAILED",
+      upstreamStatus: upstreamStatus || null,
+      message: upstreamMessage,
+      details: process.env.NODE_ENV === "production" ? undefined : upstreamData,
+    });
   }
 };
 

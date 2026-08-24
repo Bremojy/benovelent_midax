@@ -27,6 +27,32 @@ const { setAuthCookies, clearAuthCookies } = require("../utils/authCookies");
 // MEMBER / ADMIN / SUPERADMIN
 // ==========================================
 
+
+
+exports.socketTicket = async (req, res) => {
+  try {
+    const token = jwt.sign(
+      {
+        id: req.user._id.toString(),
+        role: req.user.role,
+        email: req.user.email,
+        sessionVersion: Number(req.user.sessionVersion || 0),
+        purpose: "socket",
+      },
+      process.env.JWT_SECRET,
+      {
+        expiresIn: "10m",
+        issuer: "benevolent-midax",
+        audience: "benevolent-midax-users",
+        subject: req.user._id.toString(),
+      }
+    );
+    return res.json({ success: true, token, expiresIn: 600 });
+  } catch (error) {
+    console.error("Socket ticket error:", error);
+    return res.status(500).json({ success: false, message: "Unable to create a Socket.IO session ticket." });
+  }
+};
 exports.login = async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
   try {

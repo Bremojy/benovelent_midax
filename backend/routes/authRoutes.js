@@ -27,6 +27,7 @@ const {
  * @access  Public
  */
 router.get("/csrf", csrfEndpoint);
+router.get("/socket-ticket", protect, authController.socketTicket);
 
 router.post(
     "/login",

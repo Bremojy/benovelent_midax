@@ -77,7 +77,13 @@ export default function MpesaPaymentButton({ purpose, referenceId, label = "Pay 
       if (!data?.success) throw new Error(data?.message || "M-PESA request could not be submitted.");
       setTransactionId(String(data?.transactionId || ""));
       setStatus("sent"); setMessage(data?.message || "STK Push sent. Check your phone and enter your M-PESA PIN.");
-    } catch (error) { setStatus("error"); setMessage(error.response?.data?.message || error.message || "M-PESA request failed."); }
+    } catch (error) {
+      const statusCode = error.response?.status;
+      const body = error.response?.data || {};
+      const detail = body?.message || error.message || "M-PESA request failed.";
+      setStatus("error");
+      setMessage(statusCode ? `M-PESA request failed (${statusCode}): ${detail}` : detail);
+    }
   };
 
   return (
