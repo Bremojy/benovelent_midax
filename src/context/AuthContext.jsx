@@ -230,7 +230,7 @@ export function AuthProvider({
           await getCsrfToken();
           // When a cached user exists, keep the dashboard rendered while the
           // server verifies the session in the background.
-          if (!user) setLoading(true);
+          if (!getStoredUser()) setLoading(true);
           setAuthError("");
 
           // --------------------------------
@@ -386,7 +386,7 @@ export function AuthProvider({
           setLoading(false);
         }
       },
-      [clearSession, user]
+      [clearSession]
     );
 
   // ======================================

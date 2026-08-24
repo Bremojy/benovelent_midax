@@ -103,7 +103,7 @@ API.interceptors.response.use(
       clearCsrfToken();
     }
 
-    const isSocketTicketRequest = String(config?.url || "").includes("/auth/socket-ticket");
+    const isSocketTicketRequest = String(error?.config?.url || "").includes("/auth/socket-ticket");
     if (
       !isSocketTicketRequest &&
       status === 401 &&
