@@ -2,19 +2,20 @@ const axios = require("axios");
 const crypto = require("crypto");
 
 const env = (name, fallback = "") => String(process.env[name] || fallback).trim();
+const isPlaceholder = (value) => { const v=String(value||"").trim().toUpperCase(); return !v || v.startsWith("YOUR_") || v.includes("YOUR_DARAJA_") || v === "CHANGE_ME" || v === "REPLACE_ME"; };
 const DEFAULT_MPESA_SHORTCODE = "247247";
 const DEFAULT_MPESA_ACCOUNT_REFERENCE = "0650186528835";
 const isDarajaConfigured = () => Boolean(
-  env("MPESA_CONSUMER_KEY") &&
-  env("MPESA_CONSUMER_SECRET")
+  !isPlaceholder(env("MPESA_CONSUMER_KEY")) &&
+  !isPlaceholder(env("MPESA_CONSUMER_SECRET"))
 );
 const isConfigured = () => {
   const enabled = env("MPESA_ENABLED", "false").toLowerCase() === "true";
   return enabled && isDarajaConfigured() && Boolean(
-    env("MPESA_PASSKEY") &&
-    env("MPESA_SHORTCODE") &&
-    env("MPESA_ACCOUNT_REFERENCE") &&
-    env("MPESA_CALLBACK_URL")
+    !isPlaceholder(env("MPESA_PASSKEY")) &&
+    !isPlaceholder(env("MPESA_SHORTCODE")) &&
+    !isPlaceholder(env("MPESA_ACCOUNT_REFERENCE")) &&
+    !isPlaceholder(env("MPESA_CALLBACK_URL"))
   );
 };
 
@@ -28,7 +29,7 @@ const isB2CConfigured = () => {
     "MPESA_B2C_RESULT_URL",
     "MPESA_B2C_TIMEOUT_URL",
   ];
-  return env("MPESA_ENABLED", "false").toLowerCase() === "true" && required.every((name) => Boolean(env(name)));
+  return env("MPESA_ENABLED", "false").toLowerCase() === "true" && required.every((name) => !isPlaceholder(env(name)));
 };
 const baseUrl = () => env("MPESA_ENVIRONMENT", "production").toLowerCase() === "sandbox"
   ? "https://sandbox.safaricom.co.ke"

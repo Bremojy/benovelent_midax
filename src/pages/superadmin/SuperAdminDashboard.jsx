@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import {
   Activity,
   ArrowUpRight,
+  Bell, ClipboardList,
   DatabaseZap,
   Gauge,
   HandHeart,
@@ -147,6 +148,17 @@ export default function SuperAdminDashboard() {
               <ContextCard label="Duplicate carousels" value={overview?.integrity?.duplicateCarouselGroups ?? 0} tone="blue" />
             </div>
           </article>
+        </section>
+              <section className="portal-panel modern-panel" style={{ marginTop: 18 }}>
+          <div className="panel-heading"><div><span className="panel-kicker">OTHER PAGES</span><h2>Supporting controls</h2><p>Less-frequent controls are available here without expanding the primary sidebar.</p></div></div>
+          <div className="quick-action-grid">
+            <Tool href="/superadmin/notifications" icon={<Bell />} title="Notifications" text="Review and manage alerts." />
+            <Tool href="/superadmin/policies" icon={<ShieldCheck />} title="Policies" text="Maintain privacy and terms content." />
+            <Tool href="/superadmin/polls" icon={<ClipboardList />} title="Polls" text="Manage active and archived polls." />
+            <Tool href="/superadmin/feedback" icon={<MessageCircle />} title="Feedback" text="Manage feedback collections." />
+            <Tool href="/superadmin/news" icon={<Newspaper />} title="News" text="Manage website news." />
+            <Tool href="/superadmin/password" icon={<ShieldCheck />} title="Password" text="Change the SuperAdmin password." />
+          </div>
         </section>
       </div>
     </DashboardLayout>

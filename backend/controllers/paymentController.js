@@ -102,15 +102,22 @@ async function applyCommunityContribution(transaction) {
 exports.config = async (_req, res) => {
   const stkConfigured = isConfigured();
   const b2cConfigured = isB2CConfigured();
+  const enabled = String(process.env.MPESA_ENABLED || "false").toLowerCase() === "true";
   res.json({
     success: true,
     configured: stkConfigured,
     stkConfigured,
     b2cConfigured,
-    enabled: String(process.env.MPESA_ENABLED || "false").toLowerCase() === "true",
+    enabled,
+    ready: stkConfigured && b2cConfigured,
     shortCode: String(process.env.MPESA_SHORTCODE || "247247"),
     accountReference: String(process.env.MPESA_ACCOUNT_REFERENCE || "0650186528835"),
     environment: String(process.env.MPESA_ENVIRONMENT || "production"),
+    message: !enabled
+      ? "M-PESA is disabled on the server."
+      : stkConfigured
+        ? (b2cConfigured ? "STK and B2C are configured." : "STK is configured; B2C payout settings are incomplete.")
+        : "STK is not configured. Add the real Daraja consumer key, consumer secret, passkey, shortcode and callback URL.",
   });
 };
 

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   ArrowUpRight,
-  Bell,
+  Bell, BookOpen, Vote, MessageSquarePlus, Settings, ShieldCheck,
   CheckCircle2,
   HandHeart,
   MessageCircle,
@@ -161,6 +161,18 @@ export default function MemberDashboard() {
               <Quick to="/member/notifications" title="Notifications" text="See your latest updates." icon={<Bell />} />
             </div>
           </article>
+        </section>
+
+        <section className="portal-panel modern-panel" style={{ marginBottom: 18 }}>
+          <div className="panel-heading"><div><span className="panel-kicker">OTHER PAGES</span><h2>More from your portal</h2><p>Useful supporting pages stay here so the main navigation remains focused.</p></div></div>
+          <div className="member-quick-grid">
+            <Quick to="/member/benefits" title="Benefits" text="View benefits and eligibility." icon={<ShieldCheck />} />
+            <Quick to="/member/announcements" title="Announcements" text="Read scheme updates and notices." icon={<Bell />} />
+            <Quick to="/member/guide" title="Portal Guide" text="Learn how each member service works." icon={<BookOpen />} />
+            <Quick to="/member/polls" title="Polls" text="Participate in active member polls." icon={<Vote />} />
+            <Quick to="/member/feedback" title="Feedback" text="Share ideas and feedback." icon={<MessageSquarePlus />} />
+            <Quick to="/member/settings" title="Settings" text="Manage preferences and security." icon={<Settings />} />
+          </div>
         </section>
 
         <section className="portal-panel announcements-panel">

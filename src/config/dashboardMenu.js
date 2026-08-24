@@ -1,8 +1,4 @@
-import {
-  LayoutDashboard, Users, Wallet, HandHeart, MessageCircle, UserRound, UserPlus,
-  ShieldCheck, ClipboardList, Headphones, Vote, MessageSquarePlus, Newspaper, Landmark,
-  Bell, Settings, GraduationCap, BookOpen, Megaphone, DatabaseZap, FileText,
-} from "lucide-react";
+import { LayoutDashboard, Users, Wallet, HandHeart, MessageCircle, UserRound, UserPlus, ClipboardList, ShieldCheck, DatabaseZap, Landmark } from "lucide-react";
 
 export const dashboardMenus = {
   member: [
@@ -10,29 +6,16 @@ export const dashboardMenus = {
     { title: "Profile", icon: UserRound, path: "/member/profile" },
     { title: "Dependents", icon: Users, path: "/member/dependents" },
     { title: "Accounts", icon: Wallet, path: "/member/accounts" },
-    { title: "Contributions", icon: Wallet, path: "/member/contributions" },
-    { title: "Benefits", icon: GraduationCap, path: "/member/benefits" },
-    { title: "Support", icon: Headphones, path: "/member/support" },
-    { title: "Claims", icon: HandHeart, path: "/member/claims" },
-    { title: "Announcements", icon: Megaphone, path: "/member/announcements" },
+    { title: "Support", icon: HandHeart, path: "/member/support" },
     { title: "Chat", icon: MessageCircle, path: "/member/messages" },
-    { title: "Notifications", icon: Bell, path: "/member/notifications" },
-    { title: "Polls", icon: Vote, path: "/member/polls" },
-    { title: "Feedback", icon: MessageSquarePlus, path: "/member/feedback" },
-    { title: "Portal Guide", icon: BookOpen, path: "/member/guide" },
-    { title: "Settings", icon: Settings, path: "/member/settings" },
   ],
   admin: [
     { title: "Dashboard", icon: LayoutDashboard, path: "/admin" },
     { title: "Members", icon: Users, path: "/admin/members" },
     { title: "Accounts", icon: Wallet, path: "/admin/accounts" },
     { title: "Claims", icon: HandHeart, path: "/admin/claims" },
-    { title: "Support", icon: Headphones, path: "/admin/support" },
+    { title: "Support", icon: HandHeart, path: "/admin/support" },
     { title: "Chat", icon: MessageCircle, path: "/admin/messages" },
-    { title: "Notifications", icon: Bell, path: "/admin/notifications" },
-    { title: "Polls", icon: Vote, path: "/admin/polls" },
-    { title: "Feedback", icon: MessageSquarePlus, path: "/admin/feedback" },
-    { title: "Settings", icon: Settings, path: "/admin/settings" },
   ],
   superadmin: [
     { title: "Dashboard", icon: LayoutDashboard, path: "/superadmin" },
@@ -42,16 +25,9 @@ export const dashboardMenus = {
     { title: "Audit", icon: ClipboardList, path: "/superadmin/audit" },
     { title: "Data Integrity", icon: DatabaseZap, path: "/superadmin/data-integrity" },
     { title: "System", icon: ShieldCheck, path: "/superadmin/system" },
-    { title: "Constitution", icon: FileText, path: "/superadmin/constitution" },
+    { title: "Constitution", icon: Landmark, path: "/superadmin/constitution" },
     { title: "Claims", icon: HandHeart, path: "/superadmin/claims" },
-    { title: "Support", icon: Headphones, path: "/superadmin/support" },
+    { title: "Support", icon: HandHeart, path: "/superadmin/support" },
     { title: "Chat", icon: MessageCircle, path: "/superadmin/messages" },
-    { title: "Notifications", icon: Bell, path: "/superadmin/notifications" },
-    { title: "Settings", icon: Settings, path: "/superadmin/settings" },
-    { title: "Password", icon: ShieldCheck, path: "/superadmin/password" },
-    { title: "Policies", icon: Landmark, path: "/superadmin/policies" },
-    { title: "Polls", icon: Vote, path: "/superadmin/polls" },
-    { title: "Feedback", icon: MessageSquarePlus, path: "/superadmin/feedback" },
-    { title: "News", icon: Newspaper, path: "/superadmin/news" },
   ],
 };

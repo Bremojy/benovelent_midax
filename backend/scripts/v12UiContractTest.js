@@ -13,7 +13,7 @@ const messageCenter = read("src/components/chat/MessageCenterPage.jsx");
 const dashboardCss = read("src/styles/v12-dashboard-mobile.css");
 const sidebarCss = read("src/styles/sidebar.css");
 
-if (packageJson.version !== "17.0.0") failures.push(`package.json: expected current release 17.0.0, found ${packageJson.version}`);
+if (packageJson.version !== "18.0.0") failures.push(`package.json: expected current release 18.0.0, found ${packageJson.version}`);
 if (!layout.includes("const mobileBottomNav = isMobile;")) failures.push("DashboardLayout: persistent mobile bottom navigation contract missing.");
 if (!layout.includes("showHomeBack={isMobile && !isDashboardHome}")) failures.push("DashboardLayout: mobile subpage dashboard-home navigation contract missing.");
 if (!dashboardCss.includes("width: calc(100% - var(--dashboard-sidebar-width));")) failures.push("Dashboard CSS: desktop width/sidebar constraint missing.");

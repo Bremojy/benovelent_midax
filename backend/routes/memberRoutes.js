@@ -130,7 +130,6 @@ router.get(
 router.get(
   "/benefits",
   protect,
-  profileCompleted,
   getEligibility
 );
 

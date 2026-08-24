@@ -123,6 +123,16 @@ export default function AdminDashboard() {
           <Metric icon={<MessageCircle />} label="Communication" value={stats.feedbackResponses || 0} caption={`${stats.unreadNotifications || 0} unread notifications`} tone="blue" />
         </section>
 
+        <section className="portal-panel modern-panel" style={{ marginBottom: 18 }}>
+          <div className="panel-heading"><div><span className="panel-kicker">OTHER PAGES</span><h2>Supporting administration tools</h2><p>Secondary workspace pages are available here without crowding the primary sidebar.</p></div></div>
+          <div className="quick-action-grid">
+            <Quick href="/admin/notifications" icon={<Bell />} title="Notifications" text="Review alerts and broadcast history." />
+            <Quick href="/admin/polls" icon={<ClipboardList />} title="Polls" text="Manage and review scheme polls." />
+            <Quick href="/admin/feedback" icon={<MessageCircle />} title="Feedback" text="Review collections and responses." />
+            <Quick href="/admin/settings" icon={<ShieldCheck />} title="Settings" text="Manage preferences and security." />
+          </div>
+        </section>
+
         <section className="portal-grid two">
           <article className="portal-panel modern-panel">
             <div className="panel-heading">

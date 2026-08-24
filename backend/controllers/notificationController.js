@@ -318,7 +318,7 @@ exports.markAsRead = exports.markRead;
 exports.markAllAsRead = exports.markAllRead;
 
 
-exports.getPushPublicKey = async (_req,res) => res.json({ success:true, configured:Boolean(getPublicKey()), publicKey:getPublicKey()||null });
+exports.getPushPublicKey = async (_req,res) => { const publicKey=getPublicKey(); return res.json({ success:true, configured:Boolean(publicKey), publicKey:publicKey||null, message: publicKey ? "Browser push is configured." : "Browser push is not configured on the server." }); };
 
 exports.savePushSubscription = async (req,res) => {
   try {
