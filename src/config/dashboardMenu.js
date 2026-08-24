@@ -7,6 +7,7 @@ export const dashboardMenus = {
     { title: "Dependents", icon: Users, path: "/member/dependents" },
     { title: "Accounts", icon: Wallet, path: "/member/accounts" },
     { title: "Support", icon: HandHeart, path: "/member/support" },
+    { title: "Claims & Community Support", icon: HandHeart, path: "/member/claims" },
     { title: "Chat", icon: MessageCircle, path: "/member/messages" },
   ],
   admin: [
