@@ -51,3 +51,8 @@ if (failures.length) {
   process.exit(1);
 }
 console.log("REGRESSION AUDIT PASSED");
+
+const socketSource = read("src/sockets/socket.js");
+if (!socketSource.includes('["websocket","polling"]') || !socketSource.includes('upgrade: true')) {
+  throw new Error("Socket.IO should prefer WebSocket with polling fallback to avoid polling session 400s.");
+}
