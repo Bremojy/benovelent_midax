@@ -5,6 +5,7 @@ const compression = require("compression");
 const cookieParser = require("cookie-parser");
 const mongoose = require("mongoose");
 const path = require("path");
+const redisCache = require("./services/redisCache");
 const fs = require("fs");
 
 require("dotenv").config();

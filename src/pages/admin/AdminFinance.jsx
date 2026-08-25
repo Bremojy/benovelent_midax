@@ -41,25 +41,31 @@ export default function AdminFinance() {
   const [community, setCommunity] = useState([]);
   const [mpesaConfig, setMpesaConfig] = useState(null);
   const [communityBusy, setCommunityBusy] = useState("");
+  const [b2cHistory, setB2cHistory] = useState([]);
+  const [b2cForm, setB2cForm] = useState({ memberNumber: "", phoneNumber: "", amount: "", occasion: "BENEVOLENT", remarks: "" });
+  const [b2cBusy, setB2cBusy] = useState(false);
 
   const load = async () => {
     try {
       setLoading(true);
       setError("");
-      const [s, t, c, l, communityRes, mpesaRes] = await Promise.all([
+      const requests = [
         API.get("/finance/summary/dashboard"),
         API.get("/finance"),
         API.get("/contributions"),
         API.get(`/finance/ledger?year=${new Date().getFullYear()}`),
         API.get("/payments/community-assistance/admin"),
         API.get("/payments/config"),
-      ]);
+        ...(isSuperAdmin ? [API.get("/payments/b2c/history")] : []),
+      ];
+      const [s, t, c, l, communityRes, mpesaRes, b2cRes] = await Promise.all(requests);
       setSummary(s.data?.summary || s.data || {});
       setTransactions(Array.isArray(t.data?.transactions) ? t.data.transactions : []);
       setContributions(Array.isArray(c.data?.contributions) ? c.data.contributions : []);
       setLedger(l.data || null);
       setCommunity(Array.isArray(communityRes.data?.campaigns) ? communityRes.data.campaigns : []);
       setMpesaConfig(mpesaRes.data || null);
+      if (isSuperAdmin) setB2cHistory(Array.isArray(b2cRes?.data?.transactions) ? b2cRes.data.transactions : []);
     } catch (err) {
       setError(err.response?.data?.message || err.message || "Unable to load finance records.");
     } finally {
@@ -224,6 +230,20 @@ export default function AdminFinance() {
     }
   };
 
+  const submitB2C = async (event) => {
+    event.preventDefault();
+    if (!isSuperAdmin) return;
+    try {
+      setB2cBusy(true); setError(""); setMessage("");
+      const { data } = await API.post("/payments/b2c/disburse", { memberNumber: b2cForm.memberNumber.trim() || undefined, phoneNumber: b2cForm.phoneNumber.trim() || undefined, amount: Number(b2cForm.amount), occasion: b2cForm.occasion.trim() || "BENEVOLENT", remarks: b2cForm.remarks.trim() || undefined });
+      if (!data?.success) throw new Error(data?.message || "Unable to submit B2C disbursement.");
+      setMessage("B2C disbursement submitted to M-PESA. The final status will be updated by the Safaricom callback.");
+      setB2cForm({ memberNumber: "", phoneNumber: "", amount: "", occasion: "BENEVOLENT", remarks: "" });
+      await load();
+    } catch (err) { setError(err.response?.data?.message || err.message || "Unable to submit B2C disbursement."); }
+    finally { setB2cBusy(false); }
+  };
+
   const closeCommunity = async (campaign) => {
     if (!isSuperAdmin) return;
     if (!window.confirm(`Close the M-PESA collection for “${campaign.title}”? No further member contributions will be accepted.`)) return;
@@ -297,6 +317,19 @@ export default function AdminFinance() {
           </div>
           <div className={`portal-alert ${mpesaConfig?.configured ? "success" : ""}`}><strong>{mpesaConfig?.configured ? "STK Push is enabled on the backend." : "STK Push is not ready."}</strong> {mpesaConfig?.message || "Complete the production Daraja configuration before processing live payments."}</div>
         </section>
+
+        {isSuperAdmin && <section className="portal-panel">
+          <div className="portal-module-header compact-header"><div><span>SUPERADMIN B2C DISBURSEMENT</span><h2>Send funds to a specific M-PESA account</h2><p>Only SuperAdmin can submit a direct B2C payout. Use a member number to use the saved member M-PESA number, or enter a specific M-PESA account.</p></div><span className="portal-badge"><ShieldCheck size={14} /> SuperAdmin only</span></div>
+          <form onSubmit={submitB2C} className="portal-form-grid">
+            <label className="portal-field"><span>Member number (optional)</span><input value={b2cForm.memberNumber} onChange={(e) => setB2cForm({ ...b2cForm, memberNumber: e.target.value.toUpperCase() })} placeholder="BM001" /></label>
+            <label className="portal-field"><span>M-PESA account</span><input value={b2cForm.phoneNumber} onChange={(e) => setB2cForm({ ...b2cForm, phoneNumber: e.target.value })} placeholder="0712345678 or 254712345678" /></label>
+            <label className="portal-field"><span>Amount (KES)</span><input type="number" min="1" step="0.01" value={b2cForm.amount} onChange={(e) => setB2cForm({ ...b2cForm, amount: e.target.value })} required /></label>
+            <label className="portal-field"><span>Occasion</span><input value={b2cForm.occasion} onChange={(e) => setB2cForm({ ...b2cForm, occasion: e.target.value })} maxLength={100} /></label>
+            <label className="portal-field portal-field-wide"><span>Reason / remarks</span><textarea rows="3" value={b2cForm.remarks} onChange={(e) => setB2cForm({ ...b2cForm, remarks: e.target.value })} placeholder="Approved education, medical, funeral or other scheme disbursement" /></label>
+            <div className="portal-actions"><button className="portal-btn primary" type="submit" disabled={b2cBusy || !mpesaConfig?.b2cConfigured}><WalletCards size={16} />{b2cBusy ? "Submitting…" : "Submit B2C disbursement"}</button><span className="portal-badge">Backend enforced: SuperAdmin only</span></div>
+          </form>
+          <div className="portal-table-wrap" style={{ marginTop: 18 }}><table className="portal-table"><thead><tr><th>Date</th><th>Recipient</th><th>Amount</th><th>Status</th><th>Receipt / conversation</th><th>Remarks</th></tr></thead><tbody>{b2cHistory.length === 0 ? <tr><td colSpan="6">No direct B2C disbursements recorded.</td></tr> : b2cHistory.map((x, i) => <tr key={x._id || i}><td>{date(x.createdAt)}</td><td>{x.member?.fullName || x.phoneNumber}</td><td>{number(x.amount)}</td><td><span className={`portal-badge ${x.status === "successful" ? "approved" : ""}`}>{x.status}</span></td><td>{x.transactionReceipt || x.conversationId || x.originatorConversationId || "Pending callback"}</td><td>{x.remarks || "—"}</td></tr>)}</tbody></table></div>
+        </section>}
 
         <section className="portal-panel community-control-panel">
           <div className="portal-module-header compact-header"><div><span>COMMUNITY M-PESA CONTROL</span><h2>Collection requests</h2><p>Monitor every verified community collection. Only SuperAdmin can disburse collected funds or close a collection request.</p></div><span className="portal-badge"><LockKeyhole size={14} /> {isSuperAdmin ? "Controls enabled" : "Monitoring only"}</span></div>

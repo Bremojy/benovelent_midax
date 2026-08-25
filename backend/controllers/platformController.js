@@ -13,6 +13,8 @@ const Contribution = require("../models/Contribution");
 const AuditLog = require("../models/AuditLog");
 const Event = require("../models/Event");
 const WebsiteContent = require("../models/WebsiteContent");
+const Policy = require("../models/Policy");
+const redisCache = require("../services/redisCache");
 const { documentRoot } = require("../config/uploadConfig");
 const { logActivity } = require("../services/auditService");
 
@@ -245,27 +247,49 @@ const bestKnowledgeAnswer = (question) => {
   return exact?.[2] || null;
 };
 
+
+function assistantConfiguredFaqs(chatbotSection) {
+  const content = chatbotSection?.content || {};
+  if (Array.isArray(content.faqs)) return content.faqs;
+  if (Array.isArray(content.faq)) return content.faq;
+  if (typeof content.body === "string") {
+    try { const parsed = JSON.parse(content.body); if (Array.isArray(parsed?.faqs)) return parsed.faqs; } catch (_) {}
+  }
+  return [];
+}
+
 exports.assistant = async (req, res) => {
   const question = String(req.body?.question || "").trim();
   if (!question) return res.status(400).json({ success: false, message: "Question is required." });
   const role = req.userRole || "public";
-
-  const [news, events, website, resources] = await Promise.all([
-    News.find({ published: true, status: "published" }).sort({ publishDate: -1 }).limit(20).select("title summary category content publishDate").lean(),
-    Event.find({ published: true, startAt: { $gte: new Date(Date.now() - 86400000 * 30) }, ...(role !== "public" ? { audience: role } : {}) }).sort({ startAt: 1 }).limit(20).select("title description type startAt location audience").lean(),
-    WebsiteContent.find({ published: true, section: { $in: ["home", "about", "services", "contact", "footer", "settings", "gallery", "constitution", "privacy-policy", "terms-conditions", "news", "events", "resources", "chatbot"] } }).select("section title subtitle description content").lean(),
-    (async () => {
-      const publicRoot = path.join(__dirname, "..", "..", "public", "documents");
-      try { return fs.readdirSync(publicRoot).filter((name) => /\.(pdf|docx?|xlsx?|pptx?)$/i.test(name)).slice(0, 50); } catch (_) { return []; }
-    })(),
-  ]);
+  const contextKey = `assistant:context:${String(role).toLowerCase()}`;
+  const context = await redisCache.cacheAside(contextKey, async () => {
+    const [news, events, website, policies, resources] = await Promise.all([
+      News.find({ published: true, status: "published" }).sort({ publishDate: -1 }).limit(20).select("title summary category content publishDate").lean(),
+      Event.find({ published: true, startAt: { $gte: new Date(Date.now() - 86400000 * 30) }, ...(role !== "public" ? { audience: role } : {}) }).sort({ startAt: 1 }).limit(20).select("title description type startAt location audience").lean(),
+      WebsiteContent.find({ published: true, section: { $in: ["home", "about", "services", "contact", "footer", "settings", "gallery", "constitution", "privacy-policy", "terms-conditions", "news", "events", "resources", "chatbot"] } }).select("section title subtitle description content").lean(),
+      Policy.find({ enabled: true }).sort({ updatedAt: -1 }).limit(30).select("title summary category updatedAt").lean(),
+      (async () => {
+        const publicRoot = path.join(__dirname, "..", "..", "public", "documents");
+        try { return fs.readdirSync(publicRoot).filter((name) => /\.(pdf|docx?|xlsx?|pptx?)$/i.test(name)).slice(0, 50); } catch (_) { return []; }
+      })(),
+    ]);
+    return { news, events, website, policies, resources, configuredFaqs: assistantConfiguredFaqs(website.find?.((item) => String(item.section || "").toLowerCase() === "chatbot")) };
+  }, 60);
+  const { news, events, website, policies, resources, configuredFaqs } = context;
 
   const normalized = question.toLowerCase();
   const tokens = tokenise(question);
   const publishedMatches = news.filter((item) => tokens.some((token) => `${item.title || ""} ${item.summary || ""} ${item.category || ""} ${item.content || ""}`.toLowerCase().includes(token)));
   const eventMatches = events.filter((item) => tokens.some((token) => `${item.title || ""} ${item.description || ""} ${item.location || ""}`.toLowerCase().includes(token)));
 
-  const knowledgeAnswer = bestKnowledgeAnswer(question);
+  const faqMatch = configuredFaqs.find((item) => {
+    const q = String(item.question || item.q || item.title || "").trim().toLowerCase();
+    return q && (normalized === q || normalized.includes(q));
+  });
+  const knowledgeAnswer = faqMatch
+    ? String(faqMatch.answer || faqMatch.response || faqMatch.body || "")
+    : bestKnowledgeAnswer(question);
   let answer = knowledgeAnswer;
   if (!answer && publishedMatches.length) answer = `A published update that matches your question is “${publishedMatches[0].title}”. ${publishedMatches[0].summary || "Open News for the full update."}`;
   else if (!answer && eventMatches.length) answer = `A matching activity is “${eventMatches[0].title}”${eventMatches[0].location ? ` at ${eventMatches[0].location}` : ""}. It starts ${new Date(eventMatches[0].startAt).toLocaleString()}.`;
@@ -284,12 +308,12 @@ exports.assistant = async (req, res) => {
   const providerModel = String(process.env.ASSISTANT_MODEL || process.env.AI_MODEL || "").trim();
   if (providerUrl && providerKey && providerModel && typeof fetch === "function") {
     try {
-      const context = JSON.stringify({ service: "Benevolent MIDAX", role, website, news, events, resources, applicationGuidance: ASSISTANT_KNOWLEDGE.map(([name, , text]) => ({ name, text })) });
+      const groundedContext = JSON.stringify({ service: "Benevolent MIDAX", role, website, news, events, resources, policies, configuredFaqs, applicationGuidance: ASSISTANT_KNOWLEDGE.map(([name, , text]) => ({ name, text })) });
       const response = await fetch(providerUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${providerKey}` },
         body: JSON.stringify({ model: providerModel, messages: [
-          { role: "system", content: `You are the Benevolent MIDAX website assistant. Answer only from the supplied application context. Respect the portal role. Never reveal private member data. If the answer is not in context, say so and direct the user to the appropriate page. Context: ${context}` },
+          { role: "system", content: `You are the Benevolent MIDAX website assistant. Answer only from the supplied application context. Respect the portal role. Never reveal private member data. If the answer is not in context, say so and direct the user to the appropriate page. Context: ${groundedContext}` },
           { role: "user", content: question },
         ], temperature: 0.1 }),
       });

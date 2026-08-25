@@ -8,6 +8,7 @@ const Member = require("../models/Member");
 const createNotification = require("../utils/createNotification");
 const createAuditLog = require("../utils/createAuditLog");
 const Finance = require("../models/Finance");
+const MpesaB2CTransaction = require("../models/MpesaB2CTransaction");
 const { stkPush, b2cPayment, normalizePhone, isConfigured, isB2CConfigured, idempotencyKey } = require("../services/mpesaService");
 
 const modelMap = { SupportRequest, MedicalSupport, FuneralSupport, EducationSupport };
@@ -336,6 +337,55 @@ exports.payoutCommunity = async (req, res) => {
   } catch (error) { res.status(502).json({ success: false, message: error.response?.data?.errorMessage || error.message }); }
 };
 
+
+exports.b2cHistory = async (req, res) => {
+  try {
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 25));
+    const query = {};
+    const status = String(req.query.status || "").trim().toLowerCase();
+    if (["pending", "successful", "failed", "timeout"].includes(status)) query.status = status;
+    const [total, transactions] = await Promise.all([
+      MpesaB2CTransaction.countDocuments(query),
+      MpesaB2CTransaction.find(query).populate("member", "fullName memberNumber phone mpesaNumber").sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit).lean(),
+    ]);
+    res.json({ success: true, page, limit, total, totalPages: Math.ceil(total / limit), transactions });
+  } catch (error) { res.status(500).json({ success: false, message: error.message }); }
+};
+
+exports.disburseB2C = async (req, res) => {
+  let transaction;
+  try {
+    if (!isB2CConfigured()) return res.status(503).json({ success: false, configured: false, message: "M-PESA B2C payout is not configured. Add the real Safaricom initiator and security credential on the backend before disbursing funds." });
+    const rawAmount = Number(req.body?.amount);
+    if (!Number.isFinite(rawAmount) || rawAmount <= 0) return res.status(400).json({ success: false, message: "Enter a valid positive disbursement amount." });
+    const configuredMax = Number(process.env.MPESA_B2C_MAX_AMOUNT || 0);
+    if (configuredMax > 0 && rawAmount > configuredMax) return res.status(400).json({ success: false, message: `This disbursement exceeds the configured B2C maximum of KSh ${configuredMax.toLocaleString("en-KE")}.` });
+    const amount = Math.round(rawAmount * 100) / 100;
+    let member = null;
+    const memberId = String(req.body?.memberId || "").trim();
+    const memberNumber = String(req.body?.memberNumber || "").trim().toUpperCase();
+    if (memberId) member = await Member.findOne({ _id: memberId, role: "member", isDeleted: false }).select("fullName memberNumber phone mpesaNumber email");
+    if (!member && memberNumber) member = await Member.findOne({ memberNumber, role: "member", isDeleted: false }).select("fullName memberNumber phone mpesaNumber email");
+    if ((memberId || memberNumber) && !member) return res.status(404).json({ success: false, message: "The selected member could not be found or is not an active member record." });
+    const phone = normalizePhone(req.body?.phoneNumber || member?.mpesaNumber || member?.phone);
+    if (!/^254\d{9}$/.test(phone)) return res.status(400).json({ success: false, message: "Enter a valid Kenyan M-PESA number or select a member with a valid M-PESA number." });
+    const remarks = String(req.body?.remarks || (member ? `Benevolent Midax disbursement to ${member.fullName}` : "Benevolent Midax disbursement")).trim().slice(0, 182);
+    const occasion = String(req.body?.occasion || "BENEVOLENT").trim().slice(0, 100);
+    const requestReference = idempotencyKey();
+    transaction = await MpesaB2CTransaction.create({ requestReference, member: member?._id || null, disbursedBy: req.user._id, disbursedByRole: "superadmin", phoneNumber: phone, amount, remarks, occasion, status: "pending" });
+    const result = await b2cPayment({ phoneNumber: phone, amount, remarks, occasion });
+    transaction.conversationId = String(result?.ConversationID || "");
+    transaction.originatorConversationId = String(result?.OriginatorConversationID || "");
+    await transaction.save();
+    await createAuditLog({ user: req.user._id, userRole: req.user.role, action: "B2C_DISBURSEMENT_SUBMITTED", module: "M-PESA", description: `SuperAdmin submitted KSh ${amount.toLocaleString("en-KE")} B2C disbursement to ${phone}.`, req, metadata: { transactionId: transaction._id, requestReference, memberId: member?._id || null, amount, phone, conversationId: transaction.conversationId } });
+    res.status(202).json({ success: true, message: "B2C disbursement submitted to M-PESA for processing.", transaction });
+  } catch (error) {
+    if (transaction?._id) { try { transaction.status = "failed"; transaction.resultDescription = error.response?.data?.errorMessage || error.message || "B2C request failed"; transaction.completedAt = new Date(); await transaction.save(); } catch (_) {} }
+    res.status(error.response?.status && Number(error.response.status) < 500 ? error.response.status : 502).json({ success: false, message: error.response?.data?.errorMessage || error.message || "Unable to submit B2C disbursement." });
+  }
+};
+
 exports.closeCommunity = async (req, res) => {
   try {
     const campaign = await CommunityAssistance.findById(req.params.id);
@@ -357,17 +407,33 @@ exports.b2cResult = async (req, res) => {
   try {
     const result = req.body?.Result || {};
     const conversationId = String(result.ConversationID || result.OriginatorConversationID || "");
+    const resultCode = Number(result.ResultCode);
+    const params = result.ResultParameters?.ResultParameter || [];
+    const receipt = String(params.find?.((x) => x.Key === "TransactionReceipt")?.Value || "");
+    const directTransaction = await MpesaB2CTransaction.findOne({ $or: [{ conversationId }, { originatorConversationId: conversationId }] });
+    if (directTransaction) {
+      directTransaction.status = resultCode === 0 ? "successful" : "failed";
+      directTransaction.resultCode = Number.isFinite(resultCode) ? resultCode : null;
+      directTransaction.resultDescription = String(result.ResultDesc || "");
+      directTransaction.transactionReceipt = receipt;
+      directTransaction.resultPayload = result;
+      directTransaction.completedAt = new Date();
+      await directTransaction.save();
+      if (resultCode === 0) {
+        const exists = await Finance.findOne({ referenceNumber: directTransaction.conversationId, type: "withdrawal" });
+        if (!exists) await Finance.create({ member: directTransaction.member, transactionNumber: `BMX-B2C-${directTransaction._id.toString().slice(-8)}-${Date.now()}`, type: "withdrawal", category: "B2C disbursement", amount: directTransaction.amount, description: directTransaction.remarks, paymentMethod: "M-PESA", referenceNumber: directTransaction.conversationId || directTransaction.requestReference, receiptNumber: receipt, status: "completed", transactionDate: new Date(), notes: `SuperAdmin B2C disbursement confirmed by M-PESA. Request ${directTransaction.requestReference}.` });
+        if (directTransaction.member) await createNotification({ recipient: directTransaction.member, recipientModel: "Member", title: "M-PESA Disbursement Received", message: `KSh ${Number(directTransaction.amount).toLocaleString("en-KE")} has been sent to your M-PESA account. Receipt: ${receipt || "pending"}.`, type: "payment", referenceId: directTransaction._id, referenceModel: "MpesaB2CTransaction", icon: "payments" });
+      } else if (directTransaction.member) await createNotification({ recipient: directTransaction.member, recipientModel: "Member", title: "M-PESA Disbursement Update", message: `Your M-PESA disbursement of KSh ${Number(directTransaction.amount).toLocaleString("en-KE")} was not completed. ${result.ResultDesc || "Please contact the scheme administrator."}`, type: "payment", referenceId: directTransaction._id, referenceModel: "MpesaB2CTransaction", icon: "payments" });
+    }
     const campaign = await CommunityAssistance.findOne({ $or: [{ payoutConversationId: conversationId }, { payoutOriginatorConversationId: conversationId }] });
     if (campaign) {
-      const code = Number(result.ResultCode);
+      const code = resultCode;
       campaign.payoutStatus = code === 0 ? "successful" : "failed";
       campaign.status = code === 0 ? "paid" : (Number(campaign.raisedAmount) >= Number(campaign.targetAmount) ? "target_reached" : (campaign.enabled ? "open" : "closed"));
       await campaign.save();
       if (code === 0) {
         const existing = await Finance.findOne({ referenceNumber: campaign.payoutConversationId, type: "withdrawal" });
-        if (!existing) {
-          await Finance.create({ member: campaign.recipientMember, transactionNumber: `BMX-PAYOUT-${campaign._id.toString().slice(-8)}-${Date.now()}`, type: "withdrawal", category: "Community assistance disbursement", amount: Number(campaign.payoutAmount || 0), description: campaign.title, paymentMethod: "M-PESA", referenceNumber: campaign.payoutConversationId, receiptNumber: String(result.ResultParameters?.ResultParameter?.find?.((x) => x.Key === "TransactionReceipt")?.Value || ""), status: "completed", transactionDate: new Date(), notes: `Community assistance disbursement confirmed by M-PESA. Case ${campaign._id}.` });
-        }
+        if (!existing) await Finance.create({ member: campaign.recipientMember, transactionNumber: `BMX-PAYOUT-${campaign._id.toString().slice(-8)}-${Date.now()}`, type: "withdrawal", category: "Community assistance disbursement", amount: Number(campaign.payoutAmount || 0), description: campaign.title, paymentMethod: "M-PESA", referenceNumber: campaign.payoutConversationId, receiptNumber: receipt, status: "completed", transactionDate: new Date(), notes: `Community assistance disbursement confirmed by M-PESA. Case ${campaign._id}.` });
         await createNotification({ recipient: campaign.recipientMember, recipientModel: "Member", title: "Community Assistance Paid", message: `KSh ${Number(campaign.payoutAmount).toLocaleString("en-KE")} has been sent to your registered M-PESA number.`, type: "claim", referenceId: campaign._id, referenceModel: "CommunityAssistance", icon: "payments" });
       }
     }
@@ -380,6 +446,16 @@ exports.b2cTimeout = async (req, res) => {
     const result = req.body?.Result || {};
     const conversationId = String(result.ConversationID || result.OriginatorConversationID || "");
     if (conversationId) {
+      const directTransaction = await MpesaB2CTransaction.findOne({ $or: [{ conversationId }, { originatorConversationId: conversationId }] });
+      if (directTransaction && directTransaction.status === "pending") {
+        directTransaction.status = "timeout";
+        directTransaction.resultCode = Number.isFinite(Number(result.ResultCode)) ? Number(result.ResultCode) : null;
+        directTransaction.resultDescription = String(result.ResultDesc || "B2C request timed out.");
+        directTransaction.resultPayload = result;
+        directTransaction.completedAt = new Date();
+        await directTransaction.save();
+        if (directTransaction.member) await createNotification({ recipient: directTransaction.member, recipientModel: "Member", title: "M-PESA Disbursement Delayed", message: `Your KSh ${Number(directTransaction.amount).toLocaleString("en-KE")} M-PESA disbursement is unresolved because Safaricom reported a timeout. The scheme administrator will review it.`, type: "payment", referenceId: directTransaction._id, referenceModel: "MpesaB2CTransaction", icon: "payments" });
+      }
       const campaign = await CommunityAssistance.findOne({ $or: [{ payoutConversationId: conversationId }, { payoutOriginatorConversationId: conversationId }] });
       if (campaign && campaign.payoutStatus === "pending") {
         campaign.payoutStatus = "failed";

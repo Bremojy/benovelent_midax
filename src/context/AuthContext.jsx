@@ -93,6 +93,7 @@ export function AuthProvider({
   const [user, setUser] = useState(null);
 
   const [loading, setLoading] = useState(true);
+  const authOperationRef = useRef(0);
 
   const [authError, setAuthError] =
     useState("");
@@ -220,6 +221,7 @@ export function AuthProvider({
   const loadCurrentUser =
     useCallback(
       async () => {
+        const operationId = authOperationRef.current;
         try {
           if (wasExplicitlyLoggedOut()) {
             clearStoredSession();
@@ -228,6 +230,7 @@ export function AuthProvider({
             return null;
           }
           await getCsrfToken();
+          if (operationId !== authOperationRef.current) return null;
           // When a cached user exists, keep the dashboard rendered while the
           // server verifies the session in the background.
           if (!getStoredUser()) setLoading(true);
@@ -340,12 +343,14 @@ export function AuthProvider({
             );
           }
 
+          if (operationId !== authOperationRef.current) return null;
           setUser(currentUser);
           setActiveAccount(currentUser);
 
           return currentUser;
 
         } catch (error) {
+          if (operationId !== authOperationRef.current) return null;
           const status = error?.response?.status;
           const code = error?.response?.data?.code;
           const definitiveAuthFailure =
@@ -383,7 +388,7 @@ export function AuthProvider({
           return null;
 
         } finally {
-          setLoading(false);
+          if (operationId === authOperationRef.current) setLoading(false);
         }
       },
       [clearSession]
@@ -458,6 +463,8 @@ export function AuthProvider({
         email,
         password
       ) => {
+    authOperationRef.current += 1;
+    setLoading(true);
         setAuthError("");
 
         try {
@@ -517,6 +524,7 @@ export function AuthProvider({
           setUser(
             normalizedUser
           );
+          setLoading(false);
           window.dispatchEvent(new CustomEvent("benevolent:auth-login-complete"));
 
           return {
@@ -524,6 +532,7 @@ export function AuthProvider({
           };
 
         } catch (error) {
+          setLoading(false);
           window.dispatchEvent(new CustomEvent("benevolent:auth-login-complete"));
           setAuthError(
             error.response?.data
@@ -545,6 +554,7 @@ export function AuthProvider({
   const logout =
     useCallback(
       async () => {
+    authOperationRef.current += 1;
         markLoggedOut();
         try {
           await logoutUser();

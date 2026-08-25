@@ -89,10 +89,16 @@ export const clearAuthSession = () => {
   clearCsrfToken();
 };
 
+const isAuthBootstrapRequest = (url) => {
+  const path = String(url || "");
+  return path.includes("/auth/me") || path.includes("/auth/csrf");
+};
+
 API.interceptors.response.use(
   (response) => response,
   (error) => {
     const status = error.response?.status;
+    const bootstrapRequest = isAuthBootstrapRequest(error.config?.url);
     const code = error.response?.data?.code;
 
     if (import.meta.env.DEV) {

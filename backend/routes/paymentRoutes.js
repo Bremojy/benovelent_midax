@@ -11,6 +11,8 @@ router.post("/stk", protect, isMember, controller.stk);
 router.post("/callback", controller.callback);
 router.post("/b2c/result", controller.b2cResult);
 router.post("/b2c/timeout", controller.b2cTimeout);
+router.get("/b2c/history", protect, isSuperAdmin, controller.b2cHistory);
+router.post("/b2c/disburse", protect, isSuperAdmin, controller.disburseB2C);
 
 router.get("/community-assistance", protect, isMember, controller.communityCases);
 router.get("/community-assistance/admin", protect, isAdminOrSuperAdmin, controller.communityCases);

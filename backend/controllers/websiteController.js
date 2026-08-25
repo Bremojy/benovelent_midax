@@ -1,6 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const WebsiteContent = require("../models/WebsiteContent");
+const redisCache = require("../services/redisCache");
 const { resolveStoredFileUrl } = require("../utils/uploadUrl");
 
 const DEFAULT_SECTIONS = ["home", "about", "services", "contact", "footer", "settings", "gallery", "constitution", "privacy-policy", "terms-conditions", "news", "events", "resources", "chatbot"];
@@ -327,7 +328,8 @@ exports.deleteSection = async (req, res) => {
             return res.status(404).json({ success: false, message: "Section not found." });
         }
 
-        res.json({ success: true, message: "Section deleted successfully." });
+        await redisCache.invalidateMany(["website:all", "website:settings", "website:gallery", "website:constitution", "assistant:public"]);
+    res.json({ success: true, message: "Section deleted successfully." });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
