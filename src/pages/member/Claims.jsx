@@ -89,7 +89,7 @@ export default function Claims() {
       try {
         ({ data } = await API.post("/payments/stk", payload));
       } catch (primaryError) {
-        if (primaryError?.response?.status !== 404) throw primaryError;
+        if (primaryError?.response?.status !== 404 || primaryError?.response?.data?.code !== "ROUTE_NOT_FOUND") throw primaryError;
         const fallbackBase = String(import.meta.env.VITE_API_URL || "https://benovelent-midax.onrender.com").replace(/\/+$/, "");
         ({ data } = await API.post(`${fallbackBase}/api/payments/stk`, payload, { baseURL: "" }));
       }

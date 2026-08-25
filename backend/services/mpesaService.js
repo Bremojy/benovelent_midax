@@ -21,6 +21,8 @@ const isConfigured = () => {
 };
 
 const isB2CConfigured = () => {
+  const b2cEnabled = env("MPESA_B2C_ENABLED", "true").toLowerCase() === "true";
+  if (!b2cEnabled) return false;
   const required = [
     "MPESA_CONSUMER_KEY",
     "MPESA_CONSUMER_SECRET",
@@ -35,6 +37,18 @@ const isB2CConfigured = () => {
 const baseUrl = () => env("MPESA_ENVIRONMENT", "production").toLowerCase() === "sandbox"
   ? "https://sandbox.safaricom.co.ke"
   : "https://api.safaricom.co.ke";
+
+const endpointSummary = () => ({
+  oauth: `${baseUrl()}/oauth/v1/generate`,
+  stk: `${baseUrl()}/mpesa/stkpush/v1/processrequest`,
+  b2c: `${baseUrl()}/mpesa/b2c/v1/paymentrequest`,
+});
+
+const extractUpstreamError = (error) => ({
+  status: Number(error?.response?.status || 0) || null,
+  code: String(error?.response?.data?.errorCode || error?.code || ""),
+  message: String(error?.response?.data?.errorMessage || error?.response?.data?.message || error?.response?.data?.ResponseDescription || error?.message || "M-PESA upstream request failed."),
+});
 
 const timestamp = () => {
   const d = new Date();
@@ -128,10 +142,11 @@ const getConfigurationSummary = () => ({
   configured: isConfigured(),
   darajaConfigured: isDarajaConfigured(),
   b2cConfigured: isB2CConfigured(),
+  b2cEnabled: env("MPESA_B2C_ENABLED", "true").toLowerCase() === "true",
   shortcode: env("MPESA_SHORTCODE"),
   callbackUrl: env("MPESA_CALLBACK_URL"),
   b2cResultUrl: env("MPESA_B2C_RESULT_URL"),
   b2cTimeoutUrl: env("MPESA_B2C_TIMEOUT_URL"),
 });
 
-module.exports = { isConfigured, isB2CConfigured, isDarajaConfigured, normalizePhone, stkPush, b2cPayment, idempotencyKey, getConfigurationSummary };
+module.exports = { isConfigured, isB2CConfigured, isDarajaConfigured, normalizePhone, stkPush, b2cPayment, idempotencyKey, getConfigurationSummary, endpointSummary, extractUpstreamError };

@@ -4,6 +4,7 @@ const { verifyToken: protect } = require("../middleware/authMiddleware");
 const { isMember, isAdminOrSuperAdmin, isSuperAdmin } = require("../middleware/roleMiddleware");
 const controller = require("../controllers/paymentController");
 
+router.get("/route-status", controller.routeStatus);
 router.get("/config", protect, controller.config);
 router.get("/mine", protect, controller.myTransactions);
 router.get("/transactions/:id", protect, isMember, controller.getTransaction);

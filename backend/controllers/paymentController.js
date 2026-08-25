@@ -9,7 +9,7 @@ const createNotification = require("../utils/createNotification");
 const createAuditLog = require("../utils/createAuditLog");
 const Finance = require("../models/Finance");
 const MpesaB2CTransaction = require("../models/MpesaB2CTransaction");
-const { stkPush, b2cPayment, normalizePhone, isConfigured, isB2CConfigured, getConfigurationSummary, idempotencyKey } = require("../services/mpesaService");
+const { stkPush, b2cPayment, normalizePhone, isConfigured, isB2CConfigured, getConfigurationSummary, idempotencyKey, endpointSummary, extractUpstreamError } = require("../services/mpesaService");
 
 const modelMap = { SupportRequest, MedicalSupport, FuneralSupport, EducationSupport };
 
@@ -126,6 +126,23 @@ exports.config = async (_req, res) => {
   });
 };
 
+exports.routeStatus = async (_req, res) => {
+  res.json({
+    success: true,
+    service: "payments",
+    routes: {
+      stk: "/api/payments/stk",
+      callback: "/api/payments/callback",
+      b2c: "/api/payments/b2c/disburse",
+      b2cResult: "/api/payments/b2c/result",
+      b2cTimeout: "/api/payments/b2c/timeout",
+    },
+    daraja: endpointSummary(),
+    configuration: getConfigurationSummary(),
+    timestamp: new Date().toISOString(),
+  });
+};
+
 exports.myTransactions = async (req, res) => {
   const transactions = await MpesaTransaction.find({ member: req.user._id }).sort({ createdAt: -1 }).limit(100).lean();
   res.json({ success: true, transactions });
@@ -208,20 +225,20 @@ exports.stk = async (req, res) => {
     await tx.save();
     res.status(200).json({ success: result?.ResponseCode === "0", configured: true, message: result?.CustomerMessage || result?.ResponseDescription || "STK push submitted.", transactionId: tx._id, checkoutRequestId: tx.checkoutRequestId });
   } catch (error) {
-    const upstreamStatus = Number(error.response?.status || 0);
-    const upstreamData = error.response?.data || null;
-    const upstreamMessage = upstreamData?.errorMessage || upstreamData?.message || upstreamData?.ResponseDescription || error.message || "M-PESA payment request failed.";
-    console.error("M-PESA STK error:", { status: upstreamStatus, message: upstreamMessage, data: upstreamData });
-    const clientStatus = [400, 401, 403, 404, 409, 422, 429].includes(upstreamStatus) ? upstreamStatus : 502;
-    const paymentStage = upstreamStatus === 404 ? "Daraja endpoint" : upstreamStatus === 401 || upstreamStatus === 403 ? "Daraja authentication" : "M-PESA request";
+    const upstream = extractUpstreamError(error);
+    console.error("M-PESA STK error:", { stage: "daraja", ...upstream });
+    const isUpstream404 = upstream.status === 404;
+    const clientStatus = isUpstream404 ? 502 : ([400, 401, 403, 409, 422, 429].includes(upstream.status || 0) ? upstream.status : 502);
     return res.status(clientStatus).json({
       success: false,
-      code: upstreamData?.errorCode || "MPESA_STK_FAILED",
-      upstreamStatus: upstreamStatus || null,
-      message: upstreamStatus === 404
-        ? `${paymentStage} was not found. Confirm the current backend payment routes are deployed and the Daraja production application is approved/configured.`
-        : upstreamMessage,
-      details: process.env.NODE_ENV === "production" ? undefined : upstreamData,
+      code: isUpstream404 ? "MPESA_DARAJA_404" : (upstream.code || "MPESA_STK_FAILED"),
+      upstreamStatus: upstream.status,
+      paymentStage: "daraja",
+      message: isUpstream404
+        ? "Safaricom returned HTTP 404 for the STK request. The application route exists on this server; verify the Daraja production application, shortcode, environment and credentials."
+        : upstream.message,
+      endpoint: isUpstream404 ? endpointSummary().stk : undefined,
+      details: process.env.NODE_ENV === "production" ? undefined : error.response?.data,
     });
   }
 };

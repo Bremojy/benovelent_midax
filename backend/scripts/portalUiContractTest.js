@@ -18,7 +18,7 @@ const mobileCss = read("src/styles/dashboard-mobile.css");
 const sidebarCss = read("src/styles/sidebar.css");
 const packageJson = JSON.parse(read("package.json"));
 
-if (packageJson.version !== "18.0.0") failures.push(`package.json: expected current release version 18.0.0, found ${packageJson.version}`);
+if (packageJson.version !== "18.1.0") failures.push(`package.json: expected current release version 18.1.0, found ${packageJson.version}`);
 if (!layout.includes("const mobileBottomNav = isMobile;")) failures.push("DashboardLayout: mobile bottom navigation is not persistent across portal pages.");
 if (!layout.includes("showHomeBack={isMobile && !isDashboardHome}")) failures.push("DashboardLayout: mobile portal subpages do not expose dashboard-home navigation.");
 if (!layout.includes("dashboard-mobile-shell")) failures.push("DashboardLayout: mobile shell class is missing.");

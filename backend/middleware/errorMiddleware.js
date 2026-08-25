@@ -5,10 +5,16 @@ const Response = require("../utils/response");
 // =====================================================
 
 const notFound = (req, res, next) => {
-  return Response.notFound(
-    res,
-    `Route '${req.originalUrl}' was not found.`
-  );
+  const message = `Route '${req.originalUrl}' was not found.`;
+  console.warn("404 ROUTE_NOT_FOUND:", req.method, req.originalUrl);
+  return res.status(404).json({
+    success: false,
+    code: "ROUTE_NOT_FOUND",
+    message,
+    path: req.originalUrl,
+    method: req.method,
+    timestamp: new Date().toISOString(),
+  });
 };
 
 // =====================================================
