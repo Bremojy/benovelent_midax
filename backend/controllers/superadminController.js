@@ -14,6 +14,8 @@ const Conversation = require("../models/Conversation");
 const Message = require("../models/Message");
 const Notification = require("../models/Notification");
 const FeedbackCollection = require("../models/FeedbackCollection");
+const MpesaB2CTransaction = require("../models/MpesaB2CTransaction");
+const AuditLog = require("../models/AuditLog");
 const Carousel = require("../models/Carousel");
 const Contribution = require("../models/Contribution");
 const createAuditLog = require("../utils/createAuditLog");
@@ -881,7 +883,7 @@ exports.getPortalOverview = async (req, res) => {
       pendingFuneral, pendingMedical, pendingEducation, pendingGeneral,
       approvedClaims, bookBalance, news, conversations, messages, unreadNotifications,
       activeFeedback, carouselSlides,
-      feedbackResponseAgg, contributionPulse,
+      feedbackResponseAgg, contributionPulse, pendingDisbursements, failedDisbursements, auditEvents,
     ] = await Promise.all([
       Member.countDocuments({ role: "member", isDeleted: false }),
       Member.countDocuments({ role: "member", status: "active", isDeleted: false }),
@@ -906,6 +908,9 @@ exports.getPortalOverview = async (req, res) => {
         { $match: { year: new Date().getFullYear() } },
         { $group: { _id: null, collected: { $sum: "$paidAmount" }, expected: { $sum: "$expectedAmount" }, members: { $addToSet: "$member" } } },
       ]),
+      MpesaB2CTransaction.countDocuments({ status: "pending" }),
+      MpesaB2CTransaction.countDocuments({ status: { $in: ["failed", "timeout"] } }),
+      AuditLog.countDocuments({}),
     ]);
 
     return res.json({
@@ -920,7 +925,10 @@ exports.getPortalOverview = async (req, res) => {
           contributionCollected: Number(contributionPulse?.[0]?.collected || 0),
           contributionExpected: Number(contributionPulse?.[0]?.expected || 0),
           contributionMembersCharged: contributionPulse?.[0]?.members?.length || 0,
+          pendingDisbursements: Number(pendingDisbursements || 0),
+          failedDisbursements: Number(failedDisbursements || 0),
         },
+        audit: { events: Number(auditEvents || 0) },
         communication: { conversations, messages, unreadNotifications },
         content: { publishedNews: news, activeFeedbackCollections: activeFeedback, feedbackResponses: Number(feedbackResponseAgg?.[0]?.count || 0), activeCarouselSlides: carouselSlides },
         generatedAt: new Date().toISOString(),

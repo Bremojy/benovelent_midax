@@ -22,6 +22,8 @@ const AuthContext = createContext(null);
 // ========================================
 
 const INACTIVITY_TIMEOUT = 30 * 60 * 1000;
+const AUTH_VERIFY_INTERVAL = 2 * 60 * 1000;
+const ACCOUNT_CHANNEL_NAME = "benovelent-account-session";
 const ACTIVE_ACCOUNT_KEY = "benovelentMidaxActiveAccount";
 const LOGGED_OUT_KEY = "benovelentMidaxLoggedOut";
 
@@ -34,6 +36,11 @@ const setActiveAccount = (value) => {
   try {
     const identity = normalizeAccountIdentity(value);
     localStorage.setItem(ACTIVE_ACCOUNT_KEY, JSON.stringify({ ...identity, changedAt: Date.now() }));
+    if (typeof BroadcastChannel !== "undefined") {
+      const channel = new BroadcastChannel(ACCOUNT_CHANNEL_NAME);
+      channel.postMessage({ account: identity });
+      channel.close();
+    }
   } catch {}
 };
 
@@ -313,14 +320,12 @@ export function AuthProvider({
           const storedUser =
             getStoredUser();
 
-          if (
-            storedUser?.role &&
-            currentUser.role !==
-              storedUser.role
-          ) {
-            throw new Error(
-              "Account role has changed. Please log in again."
-            );
+          if (storedUser?.id && String(currentUser.id) !== String(storedUser.id)) {
+            throw new Error("The active account changed. Please continue with the newly signed-in account.");
+          }
+
+          if (storedUser?.role && currentUser.role !== storedUser.role) {
+            throw new Error("Account role has changed. Please log in again.");
           }
 
           // --------------------------------
@@ -441,7 +446,7 @@ export function AuthProvider({
   // notices when the account signs in on another device.
   useEffect(() => {
     if (!user) return undefined;
-    const timer = window.setInterval(() => { loadCurrentUser(); }, 60000);
+    const timer = window.setInterval(() => { if (document.visibilityState !== "hidden") loadCurrentUser(); }, AUTH_VERIFY_INTERVAL);
     return () => window.clearInterval(timer);
   }, [user, loadCurrentUser]);
 
@@ -520,6 +525,7 @@ export function AuthProvider({
           // --------------------------------
 
           saveSession(normalizedUser);
+          setActiveAccount(normalizedUser);
 
           setUser(
             normalizedUser

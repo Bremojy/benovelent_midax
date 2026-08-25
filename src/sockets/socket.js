@@ -52,6 +52,12 @@ const socket = io(SOCKET_URL, {
 });
 export const setSocketToken = () => undefined;
 export const clearSocketAuth = () => undefined;
-socket.on("connect_error", (error) => { const message=String(error?.message||error||""); console.debug("Socket.IO connection unavailable:",message); if (message.includes("SESSION_REPLACED")||message.includes("AUTH_REQUIRED")||message.includes("AUTH_INVALID")) { try{window.dispatchEvent(new CustomEvent("benovelent:session-replaced"));}catch{} } });
-socket.on("session-replaced",()=>{try{window.dispatchEvent(new CustomEvent("benovelent:session-replaced"));}catch{}});
+socket.on("connect_error", (error) => {
+  const message = String(error?.message || error || "");
+  console.debug("Socket.IO connection unavailable:", message);
+  // Socket authentication is supplementary. Do not clear the portal session
+  // from a socket-only error; the REST /auth/me endpoint is authoritative.
+  if (/SESSION_REPLACED|AUTH_REQUIRED|AUTH_INVALID/i.test(message)) socket.disconnect();
+});
+socket.on("session-replaced", () => { socket.disconnect(); });
 export default socket;

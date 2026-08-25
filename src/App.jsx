@@ -110,6 +110,8 @@ const AdminClaims = lazy(() => import("./pages/admin/AdminClaims"));
 const AdminSupport = lazy(() => import("./pages/admin/AdminSupport"));
 const AdminMessages = lazy(() => import("./pages/admin/AdminMessages"));
 const AdminNotifications = lazy(() => import("./pages/admin/AdminNotifications"));
+const AdminReports = lazy(() => import("./pages/admin/AdminReports"));
+const AdminWebsite = lazy(() => import("./pages/admin/AdminWebsite"));
 
 
 // =====================================================
@@ -266,7 +268,7 @@ function PageCutTransition() {
     }
 
     setActive(true);
-    const timer = window.setTimeout(() => setActive(false), 2000);
+    const timer = window.setTimeout(() => setActive(false), 500);
     return () => window.clearTimeout(timer);
   }, [location.pathname, location.search]);
 
@@ -480,6 +482,8 @@ function AppContent() {
           <Route path="/admin/settings" element={<ProtectedRoute allowedRoles={["admin"]}><PortalSettings /></ProtectedRoute>} />
           <Route path="/admin/polls" element={<ProtectedRoute allowedRoles={["admin"]}><Polls mode="admin" /></ProtectedRoute>} />
           <Route path="/admin/feedback" element={<ProtectedRoute allowedRoles={["admin"]}><Feedback /></ProtectedRoute>} />
+          <Route path="/admin/reports" element={<ProtectedRoute allowedRoles={["admin"]}><AdminReports /></ProtectedRoute>} />
+          <Route path="/admin/website" element={<ProtectedRoute allowedRoles={["admin"]}><AdminWebsite /></ProtectedRoute>} />
 
 
           {/* =================================================

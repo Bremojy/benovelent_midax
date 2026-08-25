@@ -5,7 +5,7 @@ import { useAuth } from "./AuthContext";
 const SocketContext = createContext(null);
 
 export const SocketProvider = ({ children }) => {
-  const { user, clearSession } = useAuth();
+  const { user } = useAuth();
   const loginInProgressRef = useRef(false);
 
   useEffect(() => {
@@ -43,15 +43,12 @@ export const SocketProvider = ({ children }) => {
     };
 
     const handleSessionReplaced = () => {
-      // A login in this same browser intentionally replaces the old socket
-      // session. Do not turn that expected event into a logout loop.
-      if (loginInProgressRef.current) return;
+      // A socket can briefly hold an old ticket while the browser is switching
+      // accounts. Disconnect it and let REST /auth/me determine whether the
+      // actual portal session is still valid.
       stopPresence();
       socket.disconnect();
-      clearSession?.();
-      window.dispatchEvent(new CustomEvent("benevolent:session-ended", {
-        detail: { message: "Your account was signed in on another device. You have been logged out for security." },
-      }));
+      if (!loginInProgressRef.current) window.setTimeout(() => { if (user && !socket.connected) socket.connect(); }, 250);
     };
 
     const handlePresenceRequired = () => announcePresence();
@@ -80,7 +77,7 @@ export const SocketProvider = ({ children }) => {
       socket.off("connect", announcePresence);
       socket.off("presence-required", handlePresenceRequired);
     };
-  }, [user, clearSession]);
+  }, [user]);
 
   return <SocketContext.Provider value={socket}>{children}</SocketContext.Provider>;
 };

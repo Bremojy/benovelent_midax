@@ -91,14 +91,24 @@ export const clearAuthSession = () => {
 
 const isAuthBootstrapRequest = (url) => {
   const path = String(url || "");
-  return path.includes("/auth/me") || path.includes("/auth/csrf");
+  return /\/auth\/(?:me|csrf)(?:\?|$)/i.test(path);
+};
+
+const pendingGets = new Map();
+const isRetryableGet = (config, error) => {
+  const method = String(config?.method || "get").toLowerCase();
+  if (method !== "get" || config?.skipRetry) return false;
+  if (isAuthBootstrapRequest(config?.url)) return false;
+  const status = error?.response?.status;
+  return !error?.response || status === 408 || status === 429 || status >= 500;
 };
 
 API.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
+    const config = error?.config || {};
     const status = error.response?.status;
-    const bootstrapRequest = isAuthBootstrapRequest(error.config?.url);
+    const bootstrapRequest = isAuthBootstrapRequest(config.url);
     const code = error.response?.data?.code;
 
     if (import.meta.env.DEV) {
@@ -109,21 +119,34 @@ API.interceptors.response.use(
       clearCsrfToken();
     }
 
+    // Never let a stale auth bootstrap request redirect the browser after a
+    // newer login has already completed. AuthContext is the authority for
+    // bootstrap/session state.
     const isSocketTicketRequest = String(error?.config?.url || "").includes("/auth/socket-ticket");
-    if (
-      !isSocketTicketRequest &&
-      status === 401 &&
-      ["TOKEN_EXPIRED", "TOKEN_INVALID", "TOKEN_MISSING", "USER_NOT_FOUND", "AUTH_FAILED", "SESSION_REPLACED"].includes(code)
-    ) {
+    const definitiveCodes = ["TOKEN_EXPIRED", "TOKEN_INVALID", "TOKEN_MISSING", "USER_NOT_FOUND", "AUTH_FAILED"];
+    if (!bootstrapRequest && !isSocketTicketRequest && status === 401 && definitiveCodes.includes(code)) {
       clearAuthSession();
       if (typeof window !== "undefined" && window.location.pathname !== "/login") {
         window.location.href = "/login";
       }
     }
 
+    // One lightweight retry for transient GET failures such as a Render cold
+    // start. Never retry authentication bootstrap requests or mutations.
+    if (isRetryableGet(config, error)) {
+      const key = `${String(config.method || "get").toUpperCase()}:${String(config.baseURL || "")}:${String(config.url || "")}`;
+      const attempts = Number(config.__retryCount || 0);
+      if (attempts < 1) {
+        config.__retryCount = attempts + 1;
+        await new Promise((resolve) => setTimeout(resolve, 450));
+        return API.request(config);
+      }
+    }
+
     return Promise.reject(error);
   }
 );
+
 
 export default API;
 

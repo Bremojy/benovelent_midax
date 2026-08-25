@@ -109,7 +109,7 @@ export default function MemberDashboard() {
           <div className="member-hero-main">
             <div className="member-identity-chip"><div className="member-avatar"><UserRound size={21} /></div><span>MEMBER PORTAL</span></div>
             <span className="portal-kicker"><Sparkles size={14} /> COMMUNITY · COMPASSION · SUPPORT</span>
-            <h1>Welcome home, {firstName}.</h1>
+            <h1>Good morning, {firstName}.</h1>
             <p>Your Benovelent MIDAX space for contributions, support, family information and community communication.</p>
             <div className="portal-hero-actions">
               <Link className="portal-primary-btn member-primary" to="/member/accounts"><WalletCards size={17} /> Open my accounts</Link>
@@ -118,6 +118,48 @@ export default function MemberDashboard() {
             </div>
           </div>
           <div className="member-hero-status"><span>ACCOUNT STATUS</span><strong>{member.status || "Active"}</strong><small>Member Number · {member.memberNumber || "Not assigned"}</small></div>
+        </section>
+
+        <section className="portal-status-card">
+          <div className="portal-status-card__header">
+            <div><span className="portal-section-label"><CheckCircle2 size={13} /> MY BENOVELENT STATUS</span><h2>Everything important about your account, at a glance.</h2></div>
+            <Link className="portal-secondary-btn" to="/member/profile">Open profile <ArrowUpRight size={15} /></Link>
+          </div>
+          <div className="portal-status-grid">
+            <div className="portal-status-item"><span>Membership</span><strong><i className="status-dot" /> {member.status || "Active"}</strong></div>
+            <div className="portal-status-item"><span>Profile</span><strong><i className={`status-dot ${pct < 80 ? "warn" : ""}`} /> {pct}% complete</strong></div>
+            <div className="portal-status-item"><span>Contributions</span><strong><i className="status-dot" /> Up to date</strong></div>
+            <div className="portal-status-item"><span>Support case</span><strong><i className={`status-dot ${(d?.statistics?.pendingSupport?.total || 0) ? "warn" : ""}`} /> {(d?.statistics?.pendingSupport?.total || 0) ? `${d.statistics.pendingSupport.total} active` : "No active case"}</strong></div>
+            <div className="portal-status-item"><span>Dependants</span><strong><i className="status-dot" /> {d?.statistics?.totalDependents || 0} registered</strong></div>
+          </div>
+        </section>
+
+        <section className="portal-kpi-grid">
+          <Kpi label="Contributions" value={money(accounts?.yearSummary?.paidAmount ?? accounts?.totalPaid ?? accounts?.paidAmount ?? 0)} note="Paid this year" icon={<WalletCards size={17} />} />
+          <Kpi label="Dependants" value={d?.statistics?.totalDependents || 0} note={`${d?.statistics?.verifiedDependents || 0} verified`} icon={<Users size={17} />} />
+          <Kpi label="Support & claims" value={d?.statistics?.pendingSupport?.total || 0} note="Awaiting action" icon={<HandHeart size={17} />} />
+          <Kpi label="Notifications" value={d?.statistics?.unreadNotifications || 0} note="Unread updates" icon={<Bell size={17} />} />
+        </section>
+
+        <section className="portal-ops-grid">
+          <article className="portal-table-card">
+            <div className="panel-heading"><div><span className="panel-kicker">RECENT ACTIVITY</span><h2>What has happened lately</h2><p>Important activity from your member space.</p></div></div>
+            <div className="portal-timeline">
+              <TimelineRow icon={<UserRound size={14} />} title="Profile status" text={pct === 100 ? "Your member profile is complete." : "Your profile still has information to complete."} time={pct === 100 ? "Ready" : `${pct}%`} />
+              <TimelineRow icon={<HandHeart size={14} />} title="Support status" text={(d?.statistics?.pendingSupport?.total || 0) ? `${d.statistics.pendingSupport.total} support case(s) need attention.` : "You have no active support case."} time="Now" />
+              <TimelineRow icon={<MessageCircle size={14} />} title="Messages" text={`${d?.statistics?.unreadMessages || 0} unread message(s) in your inbox.`} time="Live" />
+              <TimelineRow icon={<Bell size={14} />} title="Community notices" text={`${(d?.announcements || []).length} recent notice(s) are available.`} time="Live" />
+            </div>
+          </article>
+          <article className="portal-table-card">
+            <div className="panel-heading"><div><span className="panel-kicker">QUICK ACTIONS</span><h2>Do something quickly</h2><p>Your most useful member actions.</p></div></div>
+            <div className="portal-quick-actions">
+              <QuickAction to="/member/profile" icon={<UserRound size={17} />} title="Complete Profile" text="Keep your record ready." />
+              <QuickAction to="/member/dependents" icon={<Users size={17} />} title="Add Dependant" text="Manage family records." />
+              <QuickAction to="/member/claims" icon={<HandHeart size={17} />} title="Apply for Support" text="Start or follow a case." />
+              <QuickAction to="/member/contributions" icon={<WalletCards size={17} />} title="View Contributions" text="See payment history." />
+            </div>
+          </article>
         </section>
 
         {pct < 100 ? (
@@ -186,6 +228,10 @@ export default function MemberDashboard() {
     </DashboardLayout>
   );
 }
+
+function Kpi({ label, value, note, icon }) { return <div className="portal-kpi"><div className="portal-kpi-head"><span>{label}</span><div className="portal-kpi-icon">{icon}</div></div><div className="portal-kpi-value">{value}</div><small className="portal-kpi-note">{note}</small></div>; }
+function TimelineRow({ icon, title, text, time }) { return <div className="portal-timeline-row"><div className="portal-timeline-dot">{icon}</div><div className="portal-timeline-copy"><strong>{title}</strong><span>{text}</span></div><span className="portal-timeline-time">{time}</span></div>; }
+function QuickAction({ to, icon, title, text }) { return <Link className="portal-quick-action" to={to}><div className="portal-quick-icon">{icon}</div><div className="portal-quick-copy"><strong>{title}</strong><span>{text}</span></div><ArrowUpRight size={15} /></Link>; }
 
 function CommunityMetric({ value, label, tone }) { return <div className={`community-metric ${tone}`}><strong>{value}</strong><span>{label}</span></div>; }
 function Quick({ to, icon, title, text }) { return <Link className="member-quick-item" to={to}><div className="member-quick-icon">{icon}</div><div><strong>{title}</strong><span>{text}</span></div><ArrowUpRight size={16} /></Link>; }
