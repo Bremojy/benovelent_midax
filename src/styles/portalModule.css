@@ -194,3 +194,12 @@
 .community-account-card{margin:0;border:1px solid #ece7e1;box-shadow:none;background:linear-gradient(180deg,#fff,#fffaf5)}
 .community-account-card .portal-actions{flex-wrap:wrap}
 @media(max-width:760px){.accounts-professional-header{padding:18px}.community-account-card{padding:16px}}
+
+
+/* V19.2 modern sensitive-form controls: large touch targets, visible focus, safe mobile sizing. */
+.portal-module input:not([type="checkbox"]):not([type="radio"]),.portal-module select,.portal-module textarea,.portal-panel input:not([type="checkbox"]):not([type="radio"]),.portal-panel select,.portal-panel textarea,.portal-field input:not([type="checkbox"]):not([type="radio"]),.portal-field select,.portal-field textarea{width:100%;min-height:46px;box-sizing:border-box;border:1px solid #dbe3ec;border-radius:12px;background:#fff;color:#172033;padding:11px 13px;font:inherit;transition:border-color .18s ease,box-shadow .18s ease,background .18s ease;}
+.portal-module textarea,.portal-panel textarea,.portal-field textarea{min-height:108px;resize:vertical;}
+.portal-module input:focus,.portal-module select:focus,.portal-module textarea:focus,.portal-panel input:focus,.portal-panel select:focus,.portal-panel textarea:focus,.portal-field input:focus,.portal-field select:focus,.portal-field textarea:focus{outline:none;border-color:var(--portal-accent,#ff7a00);box-shadow:0 0 0 4px var(--portal-soft,rgba(255,122,0,.10));}
+.portal-module input:disabled,.portal-panel input:disabled,.portal-field input:disabled,.portal-module select:disabled,.portal-panel select:disabled,.portal-field select:disabled{background:#f8fafc;cursor:not-allowed;opacity:.8;}
+input[type="password"]{font-variant:normal;letter-spacing:.02em;}
+@media (max-width:680px){.portal-module form,.portal-panel form{width:100%;}.portal-module button,.portal-panel button,.portal-field button{min-height:44px;}.portal-table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}}

@@ -441,3 +441,11 @@ html[data-appearance="dark"] .dashboard-sidebar.mobile-bottom-nav .sidebar-more-
   color: var(--portal-accent, #ff7a00);
   background: var(--portal-soft, rgba(255,122,0,.12));
 }
+
+
+/* V19.2 portal navigation finish. */
+.dashboard-sidebar{border-right:1px solid color-mix(in srgb,var(--portal-accent,#ff7a00) 12%,#e2e8f0);}
+.sidebar-link{min-height:46px;border:1px solid transparent;transition:background .18s ease,color .18s ease,transform .18s ease,border-color .18s ease;}
+.sidebar-link:hover{border-color:color-mix(in srgb,var(--portal-accent,#ff7a00) 18%,transparent);}
+.sidebar-link.active{box-shadow:0 7px 18px var(--portal-soft,rgba(255,122,0,.08));}
+@media (max-width:900px){.dashboard-sidebar.mobile-drawer{width:min(88vw,340px);max-width:340px;}}

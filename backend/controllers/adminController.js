@@ -8,8 +8,6 @@ const calculateProfileCompletion = require("../utils/calculateProfileCompletion"
 const Finance = require("../models/Finance");
 const FeedbackCollection = require("../models/FeedbackCollection");
 const Notification = require("../models/Notification");
-const Message = require("../models/Message");
-const MpesaB2CTransaction = require("../models/MpesaB2CTransaction");
 const News = require("../models/News");
 const SupportRequest = require("../models/SupportRequest");
 const EducationSupport = require("../models/EducationSupport");
@@ -39,10 +37,6 @@ exports.getDashboard = async (req, res) => {
       unreadNotifications,
       feedbackCollections,
       feedbackResponses,
-      pendingDisbursements,
-      failedDisbursements,
-      unreadMessages,
-      contributionReceivedAgg,
     ] = await Promise.all([
       Member.find({ role: "member", isDeleted: false })
         .select("fullName memberNumber email status online verified profileCompletion profileCompleted profileImage passportPhoto documents nationalId gender maritalStatus dateOfBirth physicalAddress siteStation customSiteStation acceptedConstitution acceptedPrivacyPolicy acceptedDeclaration emergencyContact nextOfKin phone createdAt")
@@ -59,10 +53,6 @@ exports.getDashboard = async (req, res) => {
       Notification.countDocuments({ recipient: req.user._id, read: false }),
       FeedbackCollection.countDocuments({ status: "active" }),
       FeedbackCollection.aggregate([{ $unwind: "$responses" }, { $count: "count" }]),
-      MpesaB2CTransaction.countDocuments({ status: "pending" }),
-      MpesaB2CTransaction.countDocuments({ status: { $in: ["failed", "timeout"] } }),
-      Message.countDocuments({ recipient: req.user._id, read: false }),
-      Finance.aggregate([{ $match: { status: { $in: ["approved", "completed"] }, type: { $in: ["contribution", "income"] } } }, { $group: { _id: null, total: { $sum: "$amount" } } }]),
     ]);
 
     const hydratedMembers = members.map((member) => {
@@ -105,10 +95,6 @@ exports.getDashboard = async (req, res) => {
         unreadNotifications,
         activeFeedbackCollections: feedbackCollections,
         feedbackResponses: Number(feedbackResponses?.[0]?.count || 0),
-        pendingDisbursements: Number(pendingDisbursements || 0),
-        failedDisbursements: Number(failedDisbursements || 0),
-        unreadMessages: Number(unreadMessages || 0),
-        contributionsReceived: Number(contributionReceivedAgg?.[0]?.total || 0),
         incompleteMembers,
       },
     });

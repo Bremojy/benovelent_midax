@@ -73,7 +73,15 @@ export default function MpesaPaymentButton({ purpose, referenceId, label = "Pay 
     if (!/^254\d{9}$|^0[17]\d{8}$/.test(normalizedPhone)) { setMessage("Enter a valid Kenyan M-PESA number, e.g. 0712345678."); return; }
     try {
       setStatus("sending"); setMessage("");
-      const { data } = await API.post("/payments/stk", { purpose, referenceId, amount: numericAmount, phoneNumber: normalizedPhone });
+      let data;
+      const payload = { purpose, referenceId, amount: numericAmount, phoneNumber: normalizedPhone };
+      try {
+        ({ data } = await API.post("/payments/stk", payload));
+      } catch (primaryError) {
+        if (primaryError?.response?.status !== 404) throw primaryError;
+        const fallbackBase = String(import.meta.env.VITE_API_URL || "https://benovelent-midax.onrender.com").replace(/\/+$/, "");
+        ({ data } = await API.post(`${fallbackBase}/api/payments/stk`, payload, { baseURL: "" }));
+      }
       if (!data?.success) throw new Error(data?.message || "M-PESA request could not be submitted.");
       setTransactionId(String(data?.transactionId || ""));
       setStatus("sent"); setMessage(data?.message || "STK Push sent. Check your phone and enter your M-PESA PIN.");
@@ -82,7 +90,9 @@ export default function MpesaPaymentButton({ purpose, referenceId, label = "Pay 
       const body = error.response?.data || {};
       const detail = body?.message || error.message || "M-PESA request failed.";
       setStatus("error");
-      setMessage(statusCode ? `M-PESA request failed (${statusCode}): ${detail}` : detail);
+      setMessage(statusCode === 404
+        ? "M-PESA endpoint was not found. Redeploy the latest backend/API routes, then try again."
+        : statusCode ? `M-PESA request failed (${statusCode}): ${detail}` : detail);
     }
   };
 

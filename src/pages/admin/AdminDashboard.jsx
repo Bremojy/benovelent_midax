@@ -13,13 +13,11 @@ import {
   Sparkles,
   Users,
   Wallet,
-  Send,
   UserCheck,
   UserX,
   Ban,
 } from "lucide-react";
 import { Link } from "react-router-dom";
-
 import DashboardLayout from "../../layouts/DashboardLayout";
 import {
   getAdminDashboard,
@@ -118,26 +116,6 @@ export default function AdminDashboard() {
 
         {error && <div className="portal-alert">{error}</div>}
 
-        <section className="portal-kpi-grid">
-          <Kpi label="Total members" value={val("totalMembers", "total", "count")} note={`${val("activeMembers", "active")} active`} icon={<Users size={17} />} />
-          <Kpi label="Active members" value={val("activeMembers", "active")} note={`${val("verifiedMembers")} verified`} icon={<UserCheck size={17} />} />
-          <Kpi label="Pending applications" value={val("incompleteProfiles")} note="Profiles requiring action" icon={<ClipboardList size={17} />} />
-          <Kpi label="Pending support" value={stats.pendingSupport?.total || 0} note="Claims / requests" icon={<HandHeart size={17} />} />
-          <Kpi label="Approved support" value={val("approvedClaims")} note="Ready for processing" icon={<CheckCircle2 size={17} />} />
-          <Kpi label="Contributions received" value={money(val("contributionsReceived", "bookBalance"))} note="Scheme finance snapshot" icon={<Wallet size={17} />} />
-          <Kpi label="Pending disbursements" value={val("pendingDisbursements")} note="Awaiting SuperAdmin" icon={<Send size={17} />} />
-          <Kpi label="Unread communications" value={(stats.unreadNotifications || 0) + (stats.unreadMessages || 0)} note={`${stats.unreadNotifications || 0} notifications · ${stats.unreadMessages || 0} messages`} icon={<MessageCircle size={17} />} />
-        </section>
-
-        <section className="portal-table-card">
-          <div className="panel-heading"><div><span className="panel-kicker">SUPPORT / CLAIMS WORKFLOW</span><h2>Move cases from request to completion.</h2><p>The payment stage is deliberately separated from approval so financial control remains clear.</p></div></div>
-          <div className="portal-workflow">
-            <span className="workflow-step active">1 · Pending</span><span className="workflow-step active">2 · Under Review</span><span className="workflow-step active">3 · Approved</span><span className="workflow-step active">4 · Awaiting Disbursement</span><span className="workflow-step">5 · Disbursed</span><span className="workflow-step">6 · Completed</span>
-          </div>
-        </section>
-
-        <section className="portal-info-strip"><MessageCircle size={16} /><strong>Universal search:</strong> use the top-bar search for a member name, member number, claims, finance or portal section. Search results are permission-aware.</section>
-
         <section className="portal-metric-grid four">
           <Metric icon={<Users />} label="Total members" value={val("totalMembers", "total", "count")} caption={`${val("activeMembers", "active")} active`} />
           <Metric icon={<Wallet />} label="Book balance" value={money(val("bookBalance"))} caption={`${val("verifiedMembers")} verified members`} tone="violet" />
@@ -222,8 +200,6 @@ export default function AdminDashboard() {
     </DashboardLayout>
   );
 }
-
-function Kpi({ label, value, note, icon }) { return <div className="portal-kpi"><div className="portal-kpi-head"><span>{label}</span><div className="portal-kpi-icon">{icon}</div></div><div className="portal-kpi-value">{value}</div><small className="portal-kpi-note">{note}</small></div>; }
 
 function Metric({ icon, label, value, caption, tone = "orange" }) {
   return <div className={`portal-metric tone-${tone}`}><div className="metric-icon">{icon}</div><div className="metric-copy"><span>{label}</span><strong>{value}</strong><small>{caption}</small></div></div>;

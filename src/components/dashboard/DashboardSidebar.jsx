@@ -13,10 +13,10 @@ function DashboardSidebar({ role, sidebarOpen, setSidebarOpen, mobileHidden = fa
 
   const mobilePrimaryItems = (() => {
     const preferred = currentRole === "member"
-      ? ["Dashboard", "Contributions", "Support & Claims", "Messages"]
+      ? ["Dashboard", "Accounts", "Support", "Chat"]
       : currentRole === "admin"
-        ? ["Overview", "Members", "Claims / Support", "Communications"]
-        : ["Control Center", "Members", "Financial Control", "Audit Logs"];
+        ? ["Dashboard", "Members", "Accounts", "Chat"]
+        : ["Dashboard", "Members", "Accounts", "Audit"];
     return preferred
       .map((title) => menu.find((item) => item.title === title))
       .filter(Boolean);

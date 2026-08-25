@@ -8,6 +8,9 @@ router.get("/config", protect, controller.config);
 router.get("/mine", protect, controller.myTransactions);
 router.get("/transactions/:id", protect, isMember, controller.getTransaction);
 router.post("/stk", protect, isMember, controller.stk);
+// Backward-compatible aliases for older deployed/mobile clients.
+router.post("/stkpush", protect, isMember, controller.stk);
+router.post("/mpesa-stk", protect, isMember, controller.stk);
 router.post("/callback", controller.callback);
 router.post("/b2c/result", controller.b2cResult);
 router.post("/b2c/timeout", controller.b2cTimeout);

@@ -6,7 +6,6 @@ import { useLocation, useNavigate } from "react-router-dom";
 import "../styles/dashboard.css";
 import "../styles/dashboard-mobile.css";
 import "../styles/final-ui-polish.css";
-import "../styles/portal-redesign.css";
 
 function DashboardLayout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(() => (

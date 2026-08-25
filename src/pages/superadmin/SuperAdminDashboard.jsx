@@ -87,46 +87,6 @@ export default function SuperAdminDashboard() {
 
         {error && <div className="portal-alert"><ShieldAlert size={18} /> {error}</div>}
 
-        <section className="portal-health-grid">
-          <HealthItem label="API" ok={systemOnline !== false} value={systemOnline === null ? "Checking" : systemOnline ? "Operational" : "Attention"} />
-          <HealthItem label="Database" ok={Boolean(overview?.system?.database)} value={overview?.system?.database ? "Connected" : "Checking"} />
-          <HealthItem label="Cloudinary" ok={true} value="Configured" />
-          <HealthItem label="M-PESA" ok={true} value="Enabled" />
-          <HealthItem label="Email" ok={true} value="Configured" />
-          <HealthItem label="SMS" ok={true} value="Configured" />
-          <HealthItem label="Notifications" ok={true} value="Live" />
-        </section>
-
-        <section className="portal-kpi-grid">
-          <Kpi label="Total members" value={overview?.members?.total ?? 0} note={`${overview?.members?.active ?? 0} active`} icon={<Users size={17} />} />
-          <Kpi label="Pending support" value={overview?.support?.pending ?? 0} note="Across all case types" icon={<HandHeart size={17} />} />
-          <Kpi label="Approved support" value={overview?.support?.approvedClaims ?? 0} note="Approved finance claims" icon={<ShieldCheck size={17} />} />
-          <Kpi label="Pending disbursements" value={overview?.finance?.pendingDisbursements ?? 0} note="Awaiting payout" icon={<Wallet size={17} />} />
-          <Kpi label="Contributions received" value={money(overview?.finance?.contributionCollected)} note="Current year" icon={<Wallet size={17} />} />
-          <Kpi label="Failed M-PESA" value={overview?.finance?.failedDisbursements ?? 0} note="Needs reconciliation" icon={<ShieldAlert size={17} />} />
-          <Kpi label="Unread notifications" value={overview?.communication?.unreadNotifications ?? 0} note="For SuperAdmin" icon={<Bell size={17} />} />
-          <Kpi label="Audit events" value={overview?.audit?.events ?? 0} note="Recorded governance events" icon={<ClipboardList size={17} />} />
-        </section>
-
-        <section className="portal-table-card">
-          <div className="panel-heading"><div><span className="panel-kicker">GOVERNANCE</span><h2>Control Center priorities</h2><p>SuperAdmin tools are grouped by financial control, system health, security and website governance.</p></div></div>
-          <div className="portal-quick-actions">
-            <QuickAction href="/superadmin/admins" icon={<UserCog size={17} />} title="Admin management" text="Roles, access and permissions." />
-            <QuickAction href="/superadmin/accounts" icon={<Wallet size={17} />} title="Financial control" text="Disbursements and transactions." />
-            <QuickAction href="/superadmin/audit" icon={<ClipboardList size={17} />} title="Audit logs" text="Who changed what and when." />
-            <QuickAction href="/superadmin/system" icon={<Activity size={17} />} title="System health" text="API, integrations and services." />
-            <QuickAction href="/superadmin/news" icon={<Newspaper size={17} />} title="Website management" text="News, public communications and publishing." />
-            <QuickAction href="/superadmin/data-integrity" icon={<DatabaseZap size={17} />} title="Database integrity" text="Scan, reconcile and clean data." />
-            <QuickAction href="/superadmin/policies" icon={<ShieldCheck size={17} />} title="Policies" text="Manage published platform policy content." />
-            <QuickAction href="/superadmin/settings" icon={<Gauge size={17} />} title="System configuration" text="Portal-wide settings and controls." />
-          </div>
-        </section>
-
-        <section className="portal-table-card">
-          <div className="panel-heading"><div><span className="panel-kicker">DISBURSEMENT GOVERNANCE</span><h2>Financial workflow</h2><p>Only SuperAdmin can move an approved case into actual M-PESA disbursement.</p></div></div>
-          <div className="portal-workflow"><span className="workflow-step active">1 · Pending</span><span className="workflow-step active">2 · Under Review</span><span className="workflow-step active">3 · Approved</span><span className="workflow-step active">4 · Awaiting Disbursement</span><span className="workflow-step active">5 · Disbursed</span><span className="workflow-step">6 · Completed</span></div>
-        </section>
-
         <section className="portal-metric-grid v8-super-metrics">
           <Metric label="Members" value={overview?.members?.total ?? 0} caption="Total scheme members" icon={<Users />} />
           <Metric label="Support cases" value={overview?.support?.pending ?? 0} caption="pending" icon={<HandHeart />} tone="green" />
@@ -204,10 +164,6 @@ export default function SuperAdminDashboard() {
     </DashboardLayout>
   );
 }
-
-function Kpi({ label, value, note, icon }) { return <div className="portal-kpi"><div className="portal-kpi-head"><span>{label}</span><div className="portal-kpi-icon">{icon}</div></div><div className="portal-kpi-value">{value}</div><small className="portal-kpi-note">{note}</small></div>; }
-function HealthItem({ label, ok, value }) { return <div className="portal-health-item"><span>{label}</span><strong><i className={`status-dot ${ok ? "" : "bad"}`} />{value}</strong></div>; }
-function QuickAction({ href, icon, title, text }) { return <a className="portal-quick-action" href={href}><div className="portal-quick-icon">{icon}</div><div className="portal-quick-copy"><strong>{title}</strong><span>{text}</span></div><ArrowUpRight size={15} /></a>; }
 
 function Metric({ icon, label, value, caption, tone = "orange" }) { return <div className={`portal-metric tone-${tone}`}><div className="metric-icon">{icon}</div><div className="metric-copy"><span>{label}</span><strong>{value}</strong><small>{caption}</small></div></div>; }
 function Tool({ href, icon, title, text }) { return <a className="control-tool" href={href}><div className="control-tool-icon">{icon}</div><div><strong>{title}</strong><span>{text}</span></div><ArrowUpRight size={16} /></a>; }

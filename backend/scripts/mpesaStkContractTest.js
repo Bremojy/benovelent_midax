@@ -1,0 +1,18 @@
+const fs=require("fs");
+const route=fs.readFileSync("backend/routes/paymentRoutes.js","utf8");
+const controller=fs.readFileSync("backend/controllers/paymentController.js","utf8");
+const service=fs.readFileSync("backend/services/mpesaService.js","utf8");
+const api=fs.readFileSync("src/components/payments/MpesaPaymentButton.jsx","utf8");
+const assert=(condition,message)=>{if(!condition)throw new Error(message);};
+assert(route.includes('router.post("/stk", protect, isMember, controller.stk);'),"Canonical STK route missing.");
+assert(route.includes('router.post("/stkpush", protect, isMember, controller.stk);'),"STK compatibility alias missing.");
+assert(route.includes('router.post("/mpesa-stk", protect, isMember, controller.stk);'),"M-PESA compatibility alias missing.");
+assert(service.includes('/mpesa/stkpush/v1/processrequest'),"Daraja STK endpoint missing.");
+assert(service.includes('/oauth/v1/generate?grant_type=client_credentials'),"Daraja OAuth endpoint missing.");
+assert(service.includes('CallBackURL: env("MPESA_CALLBACK_URL")'),"STK callback URL not sent.");
+assert(service.includes('BusinessShortCode: shortcode'),"BusinessShortCode payload missing.");
+assert(controller.includes('String(result?.ResponseCode) === "0"'),"STK success response check missing.");
+assert(controller.includes('upstreamStatus === 404'),"Provider 404 diagnostics missing.");
+assert(api.includes('API.post("/payments/stk"'),"Frontend canonical STK request missing.");
+assert(api.includes('primaryError?.response?.status !== 404'),"Frontend 404 fallback missing.");
+console.log("MPESA STK CONTRACT TEST PASSED");

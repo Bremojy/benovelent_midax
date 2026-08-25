@@ -15,7 +15,8 @@ const isConfigured = () => {
     !isPlaceholder(env("MPESA_PASSKEY")) &&
     !isPlaceholder(env("MPESA_SHORTCODE")) &&
     !isPlaceholder(env("MPESA_ACCOUNT_REFERENCE")) &&
-    !isPlaceholder(env("MPESA_CALLBACK_URL"))
+    !isPlaceholder(env("MPESA_CALLBACK_URL")) &&
+    /^https:\/\//i.test(env("MPESA_CALLBACK_URL"))
   );
 };
 
@@ -121,4 +122,16 @@ async function b2cPayment({ phoneNumber, amount, remarks, occasion }) {
 
 const idempotencyKey = () => crypto.randomBytes(12).toString("hex");
 
-module.exports = { isConfigured, isB2CConfigured, isDarajaConfigured, normalizePhone, stkPush, b2cPayment, idempotencyKey };
+const getConfigurationSummary = () => ({
+  enabled: env("MPESA_ENABLED", "false").toLowerCase() === "true",
+  environment: env("MPESA_ENVIRONMENT", "production").toLowerCase(),
+  configured: isConfigured(),
+  darajaConfigured: isDarajaConfigured(),
+  b2cConfigured: isB2CConfigured(),
+  shortcode: env("MPESA_SHORTCODE"),
+  callbackUrl: env("MPESA_CALLBACK_URL"),
+  b2cResultUrl: env("MPESA_B2C_RESULT_URL"),
+  b2cTimeoutUrl: env("MPESA_B2C_TIMEOUT_URL"),
+});
+
+module.exports = { isConfigured, isB2CConfigured, isDarajaConfigured, normalizePhone, stkPush, b2cPayment, idempotencyKey, getConfigurationSummary };

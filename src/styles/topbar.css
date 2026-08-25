@@ -385,3 +385,12 @@ transform:translateY(-2px);
 @media (max-width: 900px) {
   .menu-btn { display: flex; }
 }
+
+
+/* V19.2 professional portal shell: concise, touch-safe, responsive. */
+.dashboard-topbar{min-width:0;border-bottom:1px solid color-mix(in srgb,var(--portal-accent,#ff7a00) 12%,#e2e8f0);}
+.dashboard-topbar .topbar-left,.dashboard-topbar .topbar-right{min-width:0;}
+.dashboard-topbar .search-box{min-width:140px;}
+.dashboard-topbar button,.dashboard-topbar a,.dashboard-sidebar button,.dashboard-sidebar a{-webkit-tap-highlight-color:transparent;touch-action:manipulation;}
+@media (max-width:680px){.dashboard-topbar{height:64px;padding:0 10px;}.dashboard-topbar .topbar-left{flex:1;overflow:hidden;}.dashboard-topbar .topbar-right{flex-shrink:0;}.dashboard-topbar .home-btn{display:none;}.dashboard-topbar .icon-btn{width:40px;height:40px;min-width:40px;}.dashboard-topbar .user-box{max-width:40px;}}
+@media (max-width:420px){.dashboard-topbar .topbar-left{gap:6px;}.dashboard-topbar .topbar-right{gap:4px;}}
