@@ -50,7 +50,11 @@ exports.updateStage = async (req, res) => {
     const reason = String(req.body?.rejectionReason || "").trim();
     if (!STAGES.includes(nextStatus)) return res.status(400).json({ success: false, message: "Invalid claim review stage." });
     const isSuperAdmin = String(req.user?.role || "").toLowerCase() === "superadmin";
-    if (!isSuperAdmin && !validateTransition(String(result.claim.status || "Pending"), nextStatus)) return res.status(409).json({ success: false, message: `Cannot move a ${result.claim.status} claim directly to ${nextStatus}.` });
+    const currentStatus = String(result.claim.status || "Pending");
+    const terminalStatuses = ["Closed", "Rejected", "Cancelled"];
+    const reopenStatuses = ["Pending", "Under Review", "Documents Required", "Eligibility Review", "Approval Review"];
+    const reopening = isSuperAdmin && terminalStatuses.includes(currentStatus) && reopenStatuses.includes(nextStatus);
+    if (!isSuperAdmin && !validateTransition(currentStatus, nextStatus)) return res.status(409).json({ success: false, message: `Cannot move a ${currentStatus} claim directly to ${nextStatus}.` });
     if (nextStatus === "Rejected" && !reason && !remarks) return res.status(400).json({ success: false, message: "A rejection reason is required." });
 
     if (req.body?.approvedAmount !== undefined) result.claim.approvedAmount = Math.max(0, Number(req.body.approvedAmount) || 0);
@@ -66,7 +70,14 @@ exports.updateStage = async (req, res) => {
     }
     if (nextStatus === "Approved") result.claim.approvedAmount = Number(result.claim.approvedAmount || result.claim.requestedAmount || 0);
     result.claim.status = nextStatus;
-    result.claim.rejectionReason = nextStatus === "Rejected" ? (reason || remarks) : (result.claim.rejectionReason || "");
+    if (reopening) {
+      result.claim.rejectionReason = "";
+      result.claim.reviewNotes = remarks || `Case reopened from ${currentStatus} by SuperAdmin.`;
+      result.claim.reopenedAt = new Date();
+      if ("reopenedBy" in result.claim) result.claim.reopenedBy = req.user._id;
+    } else {
+      result.claim.rejectionReason = nextStatus === "Rejected" ? (reason || remarks) : (result.claim.rejectionReason || "");
+    }
     result.claim.remarks = remarks || result.claim.remarks || "";
     result.claim.reviewNotes = remarks || result.claim.reviewNotes || "";
     result.claim.reviewedAt = new Date();
@@ -80,7 +91,7 @@ exports.updateStage = async (req, res) => {
     result.claim.timeline.push({ status: nextStatus, remarks: remarks || reason || `Claim moved to ${nextStatus}.`, updatedBy: req.user._id, date: new Date() });
     await result.claim.save();
 
-    await createNotification({ recipient: result.claim.member, recipientModel: "Member", sender: req.user._id, senderModel: req.user.role === "superadmin" ? "SuperAdmin" : "Admin", title: `${LABEL_MAP[result.key]} claim: ${nextStatus}`, message: remarks || reason || `Your ${LABEL_MAP[result.key].toLowerCase()} claim has moved to ${nextStatus}.`, type: "claim", referenceId: result.claim._id, referenceModel: result.Model.modelName, icon: nextStatus === "Rejected" ? "cancel" : nextStatus === "Approved" ? "check_circle" : "pending" });
+    await createNotification({ recipient: result.claim.member, recipientModel: "Member", sender: req.user._id, senderModel: req.user.role === "superadmin" ? "SuperAdmin" : "Admin", title: `${LABEL_MAP[result.key]} claim: ${nextStatus}`, message: reopening ? (remarks || `Your ${LABEL_MAP[result.key].toLowerCase()} claim has been reopened for further review.`) : (remarks || reason || `Your ${LABEL_MAP[result.key].toLowerCase()} claim has moved to ${nextStatus}.`), type: "claim", referenceId: result.claim._id, referenceModel: result.Model.modelName, icon: reopening ? "history" : nextStatus === "Rejected" ? "cancel" : nextStatus === "Approved" ? "check_circle" : "pending" });
     return res.json({ success: true, claim: result.claim, stages: STAGES });
   } catch (error) { return res.status(error.status || 500).json({ success: false, message: error.message }); }
 };

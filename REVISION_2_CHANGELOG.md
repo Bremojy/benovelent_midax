@@ -24,3 +24,11 @@ This revision addresses the audit findings from the frontend/backend/M-PESA revi
 Run a fresh dependency installation (`npm ci`) in the root project before the Vite production build. Dependencies are deliberately not included in this release ZIP so Windows-native modules cannot contaminate Linux/Vercel builds.
 
 B2C cannot be made genuinely live by source code alone: Safaricom must provide the production InitiatorName and SecurityCredential for the Daraja app/account.
+
+
+## Revision 3 corrective update — 2026-08-25
+- Production frontend honours VITE_API_URL so STK uses the Render backend directly instead of being forced through the Vercel /api proxy.
+- SuperAdmin chat page and chat navigation removed; legacy route redirects to the dashboard.
+- SuperAdmin blocked from chat HTTP APIs, chat contacts, realtime chat/calling, and chat notification links.
+- SuperAdmin can reopen Closed/Rejected/Cancelled claims to Under Review and delete claims.
+- Production CORS env includes Vercel and local development origins.

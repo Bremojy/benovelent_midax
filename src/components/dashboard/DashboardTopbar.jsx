@@ -58,6 +58,7 @@ function DashboardTopbar({
     loadUnread();
     const interval = window.setInterval(loadUnread, 30000);
     const loadUnreadMessages = async () => {
+      if (normalizedRole === "superadmin") return;
       try {
         const { data } = await API.get("/conversations");
         const conversations = Array.isArray(data?.conversations) ? data.conversations : [];
@@ -80,19 +81,23 @@ function DashboardTopbar({
     };
     const onMessage = () => { if (mounted) loadUnreadMessages(); };
 
-    loadUnreadMessages();
-    if (!socket.connected) socket.connect();
+    if (normalizedRole !== "superadmin") {
+      loadUnreadMessages();
+      if (!socket.connected) socket.connect();
+      socket.on("new-message", onMessage);
+      socket.on("message-seen", onMessage);
+    }
     socket.on("new-notification", onNotification);
     socket.on("new-call-notification", onNotification);
-    socket.on("new-message", onMessage);
-    socket.on("message-seen", onMessage);
     return () => {
       mounted = false;
       window.clearInterval(interval);
       socket.off("new-notification", onNotification);
       socket.off("new-call-notification", onNotification);
-      socket.off("new-message", onMessage);
-      socket.off("message-seen", onMessage);
+      if (normalizedRole !== "superadmin") {
+        socket.off("new-message", onMessage);
+        socket.off("message-seen", onMessage);
+      }
     };
   }, [user?.unreadNotifications, normalizedRole]);
 
@@ -123,8 +128,6 @@ function DashboardTopbar({
   const goToMessages = () => {
     if (normalizedRole === "member") navigate("/member/messages");
     else if (normalizedRole === "admin") navigate("/admin/messages");
-    else navigate("/superadmin/messages");
-
   };
 
   const goToNotifications = () => {
@@ -227,25 +230,13 @@ function DashboardTopbar({
       {/* RIGHT */}
       <div className="topbar-right">
 
-        {/* MESSAGES */}
-
-        <button
-          type="button"
-          className="icon-btn"
-          onClick={goToMessages}
-          aria-label="Messages"
-          title="Messages"
-        >
-          <MessageCircle size={20} />
-
-          {unreadMessages > 0 && (
-            <span className="badge">
-              {unreadMessages > 99
-                ? "99+"
-                : unreadMessages}
-            </span>
-          )}
-        </button>
+        {/* MESSAGES — deliberately hidden for SuperAdmin. */}
+        {normalizedRole !== "superadmin" && (
+          <button type="button" className="icon-btn" onClick={goToMessages} aria-label="Messages" title="Messages">
+            <MessageCircle size={20} />
+            {unreadMessages > 0 && <span className="badge">{unreadMessages > 99 ? "99+" : unreadMessages}</span>}
+          </button>
+        )}
 
         {/* NOTIFICATIONS */}
 

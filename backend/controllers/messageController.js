@@ -161,11 +161,7 @@ exports.sendMessage = async (req, res) => {
                   recipientModel: notification.recipientModel,
                   title,
                   message: notificationMessage,
-                  link: notification.recipientModel === "Admin"
-                    ? "/admin/messages"
-                    : notification.recipientModel === "SuperAdmin"
-                      ? "/superadmin/messages"
-                      : "/member/messages",
+                  link: notification.recipientModel === "Admin" ? "/admin/messages" : "/member/messages",
                   data: {
                     type: "message",
                     conversationId: String(conversation._id),

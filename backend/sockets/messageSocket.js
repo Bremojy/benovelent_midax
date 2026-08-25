@@ -8,6 +8,7 @@ const { addUser, removeUser, touchUser, getPresence, cleanupStale, PRESENCE_TIME
 const { sendPushToRecipient } = require("../services/pushService");
 
 const modelsByRole = { member: Member, admin: Admin, superadmin: SuperAdmin };
+const isChatRole = (role) => ["member", "admin"].includes(String(role || "").toLowerCase());
 const activeCalls = new Map();
 const CALL_TIMEOUT_MS = 35_000;
 
@@ -119,7 +120,7 @@ async function deliverCallNotification({ recipient, caller, callType, title, mes
     recipientModel,
     title,
     message,
-    link: recipient.role === "admin" ? "/admin/messages" : recipient.role === "superadmin" ? "/superadmin/messages" : "/member/messages",
+    link: recipient.role === "admin" ? "/admin/messages" : "/member/messages",
     data: {
       type: missed ? "missed_call" : "incoming_call",
       callType,
@@ -213,6 +214,7 @@ module.exports = (io, socket) => {
   socket.on("user-online", async () => {
     try {
       const role = socket.userRole || "member";
+      if (!isChatRole(role)) return;
       const actor = await resolveActor(socket.user?._id, role);
       if (!actor) return;
       socket.data.userId = String(actor.user._id);
@@ -240,15 +242,15 @@ module.exports = (io, socket) => {
     }
   });
 
-  socket.on("join-conversation", (conversationId) => { if (conversationId) socket.join(String(conversationId)); });
+  socket.on("join-conversation", (conversationId) => { if (isChatRole(socket.data?.role) && conversationId) socket.join(String(conversationId)); });
 
 
 
   socket.on("call-user", async ({ to, conversationId, callType, offer, callerUserId, callerName, callerRole }) => {
-    if (!to || !offer) return;
+    if (!isChatRole(socket.data?.role) || !to || !offer) return;
     const recipient = await resolveActor(to);
     const caller = await resolveActor(callerUserId || socket.data.userId, callerRole || socket.data.role);
-    if (!recipient || !caller) return;
+    if (!recipient || !caller || !isChatRole(recipient.role) || !isChatRole(caller.role)) return;
     const normalizedType = callType === "video" ? "video" : "audio";
     if (String(recipient.chatId) === String(caller.chatId)) {
       socket.emit("call-error", { code: "SELF_CALL_BLOCKED", message: "Calling yourself is not available." });
@@ -360,10 +362,11 @@ module.exports = (io, socket) => {
     if (call) clearCall(call.callId);
   });
 
-  socket.on("typing", ({ conversationId, sender }) => { if (conversationId) socket.to(String(conversationId)).emit("typing", sender); });
-  socket.on("stop-typing", ({ conversationId, sender }) => { if (conversationId) socket.to(String(conversationId)).emit("stop-typing", sender); });
+  socket.on("typing", ({ conversationId, sender }) => { if (isChatRole(socket.data?.role) && conversationId) socket.to(String(conversationId)).emit("typing", sender); });
+  socket.on("stop-typing", ({ conversationId, sender }) => { if (isChatRole(socket.data?.role) && conversationId) socket.to(String(conversationId)).emit("stop-typing", sender); });
 
   socket.on("seen-message", async ({ messageId }) => {
+    if (!isChatRole(socket.data?.role)) return;
     try {
       const message = await Message.findById(messageId);
       if (!message) return;

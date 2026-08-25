@@ -29,6 +29,5 @@ export const dashboardMenus = {
     { title: "Constitution", icon: Landmark, path: "/superadmin/constitution" },
     { title: "Claims", icon: HandHeart, path: "/superadmin/claims" },
     { title: "Support", icon: HandHeart, path: "/superadmin/support" },
-    { title: "Chat", icon: MessageCircle, path: "/superadmin/messages" },
   ],
 };

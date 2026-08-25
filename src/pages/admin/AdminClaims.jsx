@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { HeartHandshake, Megaphone, Trash2, Smartphone, WalletCards, LockKeyhole } from "lucide-react";
+import { HeartHandshake, Megaphone, Trash2, Smartphone, WalletCards, LockKeyhole, RefreshCw } from "lucide-react"
 import { useAuth } from "../../context/AuthContext";
 import DashboardLayout from "../../layouts/DashboardLayout";
 import API, { resolveApiUrl } from "../../services/api";
@@ -196,6 +196,16 @@ export default function AdminClaims() {
     }
   };
 
+  const reopenClaim = async (c) => {
+    if (!window.confirm(`Reopen this ${typeLabel(c.supportType)} case and return it to Under Review?`)) return;
+    try {
+      setBusy(`reopen-${c._id}`); setError(""); setSuccess("");
+      const { data } = await API.put(`/claims/${c.sourceType}/${c._id}/stage`, { status: "Under Review", remarks: "Case reopened by SuperAdmin for further review." });
+      if (!data?.success) throw new Error(data?.message || "Unable to reopen case.");
+      setSuccess("Case reopened successfully and returned to Under Review."); await load();
+    } catch (e) { setError(e.response?.data?.message || e.message || "Unable to reopen case."); } finally { setBusy(""); }
+  };
+
   const openDocument = async (claim, url) => {
     if (!url) return;
     window.open(url.startsWith("http") ? url : resolveApiUrl(url), "_blank", "noopener,noreferrer");
@@ -258,6 +268,7 @@ export default function AdminClaims() {
                     )}
                     {alreadyCommunity && <span className="portal-badge approved">Community support enabled</span>}
                     {["Approved", "Paid", "Completed"].includes(c.status) && <button className="portal-btn secondary" onClick={() => publishClaim(c)} disabled={busy === `publish-${c._id}`}><Megaphone size={15} />{busy === `publish-${c._id}` ? "Publishing…" : "Publish approval"}</button>}
+                    {isSuperAdmin && ["Closed", "Rejected", "Cancelled"].includes(String(c.status)) && <button className="portal-btn secondary" onClick={() => reopenClaim(c)} disabled={busy === `reopen-${c._id}`}><RefreshCw size={15} />{busy === `reopen-${c._id}` ? "Reopening…" : "Reopen case"}</button>}
                     {isSuperAdmin && <button className="portal-btn danger" onClick={() => deleteClaim(c)} disabled={busy === `delete-${c._id}`}><Trash2 size={15} />{busy === `delete-${c._id}` ? "Deleting…" : "Delete claim"}</button>}
                   </div>
                   {Array.isArray(c.timeline) && c.timeline.length > 0 && <div className="claim-latest"><strong>Latest review</strong><p>{c.timeline[c.timeline.length - 1]?.status}: {c.timeline[c.timeline.length - 1]?.remarks || "—"}</p></div>}

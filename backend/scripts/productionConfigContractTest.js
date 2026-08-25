@@ -7,7 +7,7 @@ const env = read(".env.example");
 const vercel = read("vercel.json");
 const pkg = JSON.parse(read("package.json"));
 
-if (pkg.version !== "18.1.0") throw new Error(`Expected v17 package, found ${pkg.version}`);
+if (pkg.version !== "18.2.0") throw new Error(`Expected v17 package, found ${pkg.version}`);
 for (const value of ["isVercelHost", "window.location.origin", "/api"]) {
   if (!api.includes(value)) throw new Error(`API configuration missing ${value}`);
 }
