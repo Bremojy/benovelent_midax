@@ -1,5 +1,6 @@
 const { generateMemberNumber, normalizeLegacyMemberNumber } = require("../utils/memberNumber");
 const bcrypt = require("bcryptjs");
+const redisCache = require("../services/redisCache");
 const Member = require("../models/Member");
 const Admin = require("../models/Admin");
 const SuperAdmin = require("../models/SuperAdmin");
@@ -141,6 +142,7 @@ exports.getMembers = async (req, res) => {
     const page = Number(req.query.page) || 1;
     const limit = Number(req.query.limit) || 10;
     const search = req.query.search || "";
+    const siteStation = String(req.query.siteStation || "").trim();
 
     const query = {
       role: "member",
@@ -152,6 +154,9 @@ exports.getMembers = async (req, res) => {
         { phone: { $regex: search, $options: "i" } },
       ],
     };
+    if (siteStation && siteStation !== "all") {
+      query.siteStation = siteStation;
+    }
 
     const total = await Member.countDocuments(query);
 
@@ -532,6 +537,7 @@ exports.createMember = async (req, res) => {
     // SUCCESS
     // ==========================================
 
+    await redisCache.invalidateMany(["public:leadership:current"]);
     return res.status(201).json({
       success: true,
 

@@ -205,6 +205,15 @@ exports.createNews = async (req, res) => {
 exports.getAllNews = async (req, res) => {
 
     try {
+        const isPublicQuery = req.query.published === "true" || (req.query.published === undefined && req.query.category);
+        const publicCacheKey = isPublicQuery ? `public:news:list:${JSON.stringify(req.query || {})}` : null;
+        if (publicCacheKey) {
+            const cached = await redisCache.getJson(publicCacheKey);
+            if (cached !== null) {
+                res.set("Cache-Control", "public, max-age=60, stale-while-revalidate=300");
+                return res.json(cached);
+            }
+        }
 
         const page = Number(req.query.page) || 1;
 
@@ -256,21 +265,12 @@ exports.getAllNews = async (req, res) => {
 
             .lean();
 
-        res.json({
-
-            success: true,
-
-            total,
-
-            page,
-
-            pages: Math.ceil(total / limit),
-
-            count: news.length,
-
-            news
-
-        });
+        const payload = { success: true, total, page, pages: Math.ceil(total / limit), count: news.length, news };
+        if (publicCacheKey) {
+            await redisCache.setJson(publicCacheKey, payload, 60);
+            res.set("Cache-Control", "public, max-age=60, stale-while-revalidate=300");
+        }
+        res.json(payload);
 
     }
 

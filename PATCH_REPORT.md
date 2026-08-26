@@ -32,3 +32,17 @@ Passed:
 Not run:
 
 - Vite production build, because this source archive intentionally does not contain installed `node_modules` and dependency installation is environment-dependent.
+
+
+## v18.2.0 architecture upgrade applied
+- Fixed `MEMBER_STATUS is not defined` in the member eligibility path and corrected active-status comparison.
+- Member generic support requests now require at least two documents from different categories; `Other` requires a label.
+- Members can edit/delete generic support requests only while status is `Under Review`.
+- Financial transaction deletion is SuperAdmin-only at both route and controller layers; Admin UI no longer shows Delete.
+- SuperAdmin Chat route is removed from the portal navigation and legacy `/superadmin/messages` redirects safely to the SuperAdmin dashboard.
+- Member navigation is streamlined so Notifications, Announcements and Benefits remain secondary portal areas rather than main sidebar entries.
+- Added a cached public `/api/leaders/current` endpoint backed by active Admin/SuperAdmin records and rendered it on Home with phone/email/profile details.
+- Added broader public news caching with namespace invalidation.
+- Added Redis invalidation when dependents and administrators change.
+- Updated environment examples to `APP_VERSION=18.2.0` / `VITE_APP_VERSION=18.2.0`.
+- Admin News & Communications entry now explicitly supports picture-based public news creation through the existing multipart news API.

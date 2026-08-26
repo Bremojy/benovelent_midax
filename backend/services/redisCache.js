@@ -42,9 +42,19 @@ async function cacheAside(name, loader, ttlSeconds = 120) {
   return fresh;
 }
 async function invalidateMany(names) { await Promise.all(names.filter(Boolean).map((name) => del(name))); }
+async function scan(match = "*") {
+  if (!enabled()) return [];
+  const result = await command(["SCAN", "0", "MATCH", key(match), "COUNT", "200"]);
+  return Array.isArray(result?.[1]) ? result[1] : [];
+}
+async function invalidatePrefix(prefix) {
+  const keys = await scan(`${String(prefix).replace(/^:+|:+$/g, "")}:*`);
+  if (!keys.length) return;
+  await Promise.all(keys.map((fullKey) => command(["DEL", fullKey])));
+}
 async function health() {
   if (!enabled()) return { enabled: false, connected: false };
   const pong = await command(["PING"]);
   return { enabled: true, connected: pong === "PONG" };
 }
-module.exports = { enabled, get, set, del, getJson, setJson, cacheAside, invalidateMany, health, makeCacheKey };
+module.exports = { enabled, get, set, del, getJson, setJson, cacheAside, invalidateMany, invalidatePrefix, health, makeCacheKey };

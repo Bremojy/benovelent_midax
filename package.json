@@ -27,7 +27,8 @@
     "test:community-mpesa": "node backend/scripts/communityMpesaContractTest.js",
     "test:production-config": "node backend/scripts/productionConfigContractTest.js",
     "test:chat": "node backend/scripts/chatContractTest.js",
-    "test:mpesa-callback": "node backend/scripts/mpesaCallbackContractTest.js"
+    "test:mpesa-callback": "node backend/scripts/mpesaCallbackContractTest.js",
+    "test:upgrade": "node backend/scripts/upgradeContractTest.js"
   },
   "dependencies": {
     "axios": "^1.18.1",

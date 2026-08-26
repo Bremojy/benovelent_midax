@@ -2,6 +2,7 @@ const Dependent = require("../models/Dependent");
 const Member = require("../models/Member");
 const createNotification = require("../utils/createNotification");
 const createAuditLog = require("../utils/createAuditLog");
+const redisCache = require("../services/redisCache");
 
 // ======================================================
 // ADD DEPENDENT
@@ -85,6 +86,7 @@ exports.addDependent = async (req, res) => {
 
         });
 
+        await redisCache.invalidateMany([`member:${member._id}:dashboard`, `member:${member._id}:dependents`]);
         await createAuditLog({
             user: member._id,
             userRole: "member",
@@ -229,6 +231,7 @@ exports.updateDependent = async (req, res) => {
         dependent.verifiedAt = null;
 
         await dependent.save();
+        await redisCache.invalidateMany([`member:${req.user._id}:dashboard`, `member:${req.user._id}:dependents`]);
 
         await createAuditLog({
             user: req.user._id,
@@ -289,6 +292,7 @@ exports.deleteDependent = async (req, res) => {
         dependent.active = false;
 
         await dependent.save();
+        await redisCache.invalidateMany([`member:${req.user._id}:dashboard`, `member:${req.user._id}:dependents`]);
 
         await createAuditLog({
             user: req.user._id,

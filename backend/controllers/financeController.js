@@ -362,6 +362,9 @@ exports.hideTransaction = async (req, res) => {
 
 exports.deleteTransaction = async (req, res) => {
     try {
+        if (String(req.user?.role || "").toLowerCase() !== "superadmin") {
+            return res.status(403).json({ success: false, message: "Only SuperAdmin can permanently delete a financial transaction. Admins may edit records or hide them only when authorised." });
+        }
         const transaction = await Finance.findById(req.params.id);
         if (!transaction) {
             return res.status(404).json({
@@ -764,14 +767,21 @@ exports.getFinanceSummary = async (req, res) => {
 
 
 exports.getMemberAccounts = async (req, res) => {
-    const cacheKey = `member:${req.user?._id}:accounts:${String(req.query?.year || new Date().getFullYear())}`;
+    const year = Number(req.query.year) || new Date().getFullYear();
+    const startParam = String(req.query.startDate || "").trim();
+    const endParam = String(req.query.endDate || "").trim();
+    const startDate = /^\d{4}-\d{2}-\d{2}$/.test(startParam) ? new Date(`${startParam}T00:00:00.000Z`) : new Date(`${year}-01-01T00:00:00.000Z`);
+    const endDate = /^\d{4}-\d{2}-\d{2}$/.test(endParam) ? new Date(`${endParam}T23:59:59.999Z`) : new Date(`${year + 1}-01-01T00:00:00.000Z`);
+    if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime()) || startDate > endDate) {
+      return res.status(400).json({ success: false, message: "The opening date must be on or before the closing date." });
+    }
+    const cacheKey = `member:${req.user?._id}:accounts:${year}:${startDate.toISOString()}:${endDate.toISOString()}`;
     const cached = await redisCache.getJson(cacheKey);
     if (cached !== null) return res.json(cached);
     const __originalJson = res.json.bind(res);
     res.json = (body) => { redisCache.setJson(cacheKey, body, 15).catch(() => {}); return __originalJson(body); };
 
   try {
-    const year = Number(req.query.year) || new Date().getFullYear();
     const yearStart = new Date(`${year}-01-01T00:00:00.000Z`);
     const yearEnd = new Date(`${year + 1}-01-01T00:00:00.000Z`);
     const month = Number(req.query.month) || new Date().getMonth() + 1;
@@ -779,7 +789,7 @@ exports.getMemberAccounts = async (req, res) => {
     const [activeMembers, contributions, transactions, medical, funeral, education] = await Promise.all([
       Member.countDocuments({ role: "member", status: "active", isDeleted: false }),
       Contribution.find({ year }).sort({ year: -1, month: -1, paymentDate: -1, createdAt: -1 }).lean(),
-      Finance.find({ transactionDate: { $gte: yearStart, $lt: yearEnd }, status: { $in: ["approved", "completed"] } })
+      Finance.find({ transactionDate: { $gte: startDate, $lte: endDate }, status: { $in: ["approved", "completed"] } })
         .sort({ transactionDate: -1, createdAt: -1 }).lean(),
       require("../models/MedicalSupport").find({ isDeleted: { $ne: true } }).select("status approvedAmount requestedAmount").lean(),
       require("../models/FuneralSupport").find({}).select("status approvedAmount requestedAmount").lean(),
@@ -861,8 +871,12 @@ exports.getMemberAccounts = async (req, res) => {
         ledgerBalance: balance,
         ledgerCredits: ledgerEntries.reduce((sum, item) => sum + item.credit, 0),
         ledgerDebits: ledgerEntries.reduce((sum, item) => sum + item.debit, 0),
+        moneyIn: ledgerEntries.reduce((sum, item) => sum + item.credit, 0),
+        moneyOut: ledgerEntries.reduce((sum, item) => sum + item.debit, 0),
       },
       ledger: {
+        openingDate: startDate.toISOString(),
+        closingDate: endDate.toISOString(),
         entries: ledgerEntries.slice(0, 100),
         totals: {
           credit: ledgerEntries.reduce((sum, item) => sum + item.credit, 0),
@@ -876,7 +890,9 @@ exports.getMemberAccounts = async (req, res) => {
         pendingCases: pendingSupportTotal,
         approvedSupportTotal,
       },
-      notice: "General scheme account view.",
+      openingDate: startDate.toISOString(),
+      closingDate: endDate.toISOString(),
+      notice: "Money In = contributions, income and refunds. Money Out = assistance, claims, expenses and withdrawals.",
     });
   } catch (error) {
     console.error("Scheme-wide member accounts error:", error);
