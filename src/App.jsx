@@ -111,6 +111,7 @@ const AdminClaims = lazy(() => import("./pages/admin/AdminClaims"));
 const AdminSupport = lazy(() => import("./pages/admin/AdminSupport"));
 const AdminMessages = lazy(() => import("./pages/admin/AdminMessages"));
 const AdminNotifications = lazy(() => import("./pages/admin/AdminNotifications"));
+const AdminAnnouncements = lazy(() => import("./pages/admin/AdminAnnouncements"));
 
 
 // =====================================================
@@ -180,6 +181,7 @@ const Benefits = lazy(
     )
 );
 const Dependents = lazy(() => import("./pages/member/Dependents"));
+const MpesaRecords = lazy(() => import("./pages/member/MpesaRecords"));
 
 const Settings = lazy(
   () =>
@@ -491,6 +493,7 @@ function AppContent() {
           <Route path="/admin/support" element={<ProtectedRoute allowedRoles={["admin", "superadmin"]}><AdminSupport /></ProtectedRoute>} />
           <Route path="/admin/messages" element={<ProtectedRoute allowedRoles={["admin"]}><AdminMessages /></ProtectedRoute>} />
           <Route path="/admin/notifications" element={<ProtectedRoute allowedRoles={["admin"]}><AdminNotifications /></ProtectedRoute>} />
+          <Route path="/admin/announcements" element={<ProtectedRoute allowedRoles={["admin"]}><AdminAnnouncements /></ProtectedRoute>} />
           <Route path="/admin/settings" element={<ProtectedRoute allowedRoles={["admin"]}><PortalSettings /></ProtectedRoute>} />
           <Route path="/admin/polls" element={<ProtectedRoute allowedRoles={["admin"]}><Polls mode="admin" /></ProtectedRoute>} />
           <Route path="/admin/feedback" element={<ProtectedRoute allowedRoles={["admin"]}><Feedback /></ProtectedRoute>} />
@@ -637,6 +640,7 @@ function AppContent() {
           <Route path="/member/dependents" element={<ProtectedRoute allowedRoles={["member"]}><Dependents /></ProtectedRoute>} />
           <Route path="/member/guide" element={<ProtectedRoute allowedRoles={["member"]}><PortalGuide /></ProtectedRoute>} />
           <Route path="/member/polls" element={<ProtectedRoute allowedRoles={["member"]}><Polls mode="member" /></ProtectedRoute>} />
+          <Route path="/member/mpesa-records" element={<ProtectedRoute allowedRoles={["member"]}><MpesaRecords /></ProtectedRoute>} />
           <Route path="/member/feedback" element={<ProtectedRoute allowedRoles={["member"]}><Feedback /></ProtectedRoute>} />
 
 

@@ -46,3 +46,19 @@ Not run:
 - Added Redis invalidation when dependents and administrators change.
 - Updated environment examples to `APP_VERSION=18.2.0` / `VITE_APP_VERSION=18.2.0`.
 - Admin News & Communications entry now explicitly supports picture-based public news creation through the existing multipart news API.
+
+
+## v18.3.0 missing-gap fixes
+
+- Fixed the public current-leadership route crash caused by missing Admin/SuperAdmin model imports.
+- Rebuilt member Accounts cash-flow maths with true opening balance, chronological running balance, contribution inflows, Money In/Money Out totals and privacy-safe assisted-case records.
+- Added a dedicated member M-PESA records page and Accounts link.
+- Added community M-PESA payout timestamps/receipts to the database record and finance views.
+- Added finance update/hide/delete notifications so member account activity is connected to portal notifications.
+- Added a dedicated Admin Announcements workflow with cover/gallery uploads that publishes directly to the public News API.
+- SuperAdmin chat is now blocked at backend chat middleware as well as removed from the portal UI.
+- Removed Notifications/Announcements secondary areas from the portal primary sidebar where applicable; they remain reachable from dashboard/secondary routes.
+- Added the administrator's registered role/permission summary to the Admin Dashboard.
+- Reduced the Home carousel retry behaviour so the first render does not sit in a repeated five-second retry loop; browser/network priority remains on the first hero image.
+
+Validation: route/UI/page/chat/M-PESA/production/upgrade/callback contracts passed; all 161 backend JavaScript files pass `node --check`. A fresh dependency installation and Vite build could not be completed because the execution environment timed out during `npm ci`.

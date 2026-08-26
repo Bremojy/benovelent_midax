@@ -61,7 +61,7 @@ const isAdminOrSuperAdmin = authorize(
   "superadmin"
 );
 
-const isChatUser = authorize("member", "admin", "superadmin");
+const isChatUser = authorize("member", "admin");
 
 module.exports = {
   authorize,

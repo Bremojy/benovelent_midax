@@ -1,7 +1,7 @@
 # Benevolent MIDAX — lastUpdate
 
 ## Release
-Application/backend version remains **18.2.0**. The deliverable archive is named **lastUpdate.zip** as requested.
+Application/backend version remains **18.3.0**. The deliverable archive is named **lastUpdate.zip** as requested.
 
 ## Final upgrade scope
 
@@ -34,15 +34,15 @@ Application/backend version remains **18.2.0**. The deliverable archive is named
 - Legacy `/superadmin/messages` safely redirects to the SuperAdmin dashboard.
 - SuperAdmin Feedback is present in navigation and management UI.
 - Backend-only secrets remain outside frontend source and environment examples.
-- Frontend/backend environment examples are synchronized to release 18.2.0.
+- Frontend/backend environment examples are synchronized to release 18.3.0.
 
 ## Validation completed
 
 - Upgrade contract test: PASS
 - Security contract test: PASS
-- Source quality test: PASS (281 source files)
+- Source quality test: PASS (282 source files)
 - Static integrity test: PASS (161 backend JS files)
-- Route contract test: PASS (296 backend route contracts, 153 frontend API calls)
+- Route contract test: PASS (296 backend route contracts, 152 frontend API calls)
 - Portal UI contract test: PASS
 - Page parity test: PASS
 - Call flow contract test: PASS
@@ -63,3 +63,14 @@ A fresh dependency installation was attempted with `npm ci --ignore-scripts --no
 
 ## Production safety
 Do not place backend secrets in the frontend `.env`. Rotate any production credentials that were exposed during the development conversation before deployment. The ZIP contains no production `.env` files.
+
+
+## v18.3.0 follow-up gaps closed
+- Public leadership runtime imports corrected.
+- Member account opening/closing balance reconciliation corrected.
+- Contribution inflows included in Member Accounts cash flow.
+- Dedicated M-PESA record drill-down page added.
+- Community payout timestamp/receipt captured.
+- Finance lifecycle notifications expanded.
+- Admin public-announcement publishing page added.
+- SuperAdmin chat access removed at authorization middleware level.
