@@ -621,6 +621,7 @@ exports.getLedger = async (req, res) => {
       status: { $in: ["approved", "completed"] },
     };
     if (String(req.user?.role || "").toLowerCase() === "member") filter.member = req.user._id;
+    if (!(String(req.user?.role || "").toLowerCase() === "superadmin" && String(req.query.includeHidden || "false").toLowerCase() === "true")) filter.hidden = { $ne: true };
 
     const rows = await Finance.find(filter)
       .populate("member", "fullName memberNumber")

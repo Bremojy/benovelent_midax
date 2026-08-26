@@ -12,6 +12,7 @@ const {
   getMemberTransactions,
   getFinanceSummary,
   getLedger,
+  hideTransaction,
 } = require("../controllers/financeController");
 
 const { verifyToken: protect } = require("../middleware/authMiddleware");
