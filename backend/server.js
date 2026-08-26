@@ -100,7 +100,19 @@ const allowedOrigins = String(
 
 const allowVercelPreviews = String(
     process.env.ALLOW_VERCEL_PREVIEWS || "true"
-).toLowerCase() === "true";
+).toLowerCase() !== "false";
+
+const isBenevolentVercelOrigin = (origin) => {
+    try {
+        const url = new URL(origin);
+        return (
+            url.protocol === "https:" &&
+            /^(?:benovelent-midax)(?:-[a-z0-9-]+)?\.vercel\.app$/i.test(url.hostname)
+        );
+    } catch {
+        return false;
+    }
+};
 
 const isAllowedCorsOrigin = (origin) => {
     if (!origin) return true;
@@ -108,25 +120,22 @@ const isAllowedCorsOrigin = (origin) => {
     if (!normalizedOrigin) return false;
     if (allowedOrigins.includes(normalizedOrigin)) return true;
 
-    // Only allow preview URLs belonging to THIS Vercel project.
-    if (allowVercelPreviews) {
-        try {
-            const url = new URL(normalizedOrigin);
-            return (
-                url.protocol === "https:" &&
-                /^benovelent-midax(?:-[a-z0-9-]+)?\.vercel\.app$/i.test(url.hostname)
-            );
-        } catch {
-            return false;
-        }
-    }
+    // Always allow the production Benevolent MIDAX Vercel project and its
+    // generated deployment/preview hosts. This is intentionally limited to
+    // the project's hostname prefix and does not allow arbitrary vercel.app
+    // origins. The optional flag can still disable other preview behavior,
+    // but it must never break an actual Benevolent MIDAX deployment URL.
+    if (isBenevolentVercelOrigin(normalizedOrigin)) return true;
 
     return false;
 };
 
+const corsOriginForLogs = (origin) => String(origin || "<none>");
+
 const corsOptions = {
     origin(origin, callback) {
         if (isAllowedCorsOrigin(origin)) return callback(null, true);
+        console.warn(`CORS rejected origin: ${corsOriginForLogs(origin)}`);
         return callback(new Error("Origin not allowed by CORS."));
     },
     credentials: true,

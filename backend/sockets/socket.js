@@ -43,27 +43,19 @@ const initSocket = (server) => {
         .map(normalizeOrigin)
         .filter(Boolean);
 
-    const allowVercelPreviews = String(
-        process.env.ALLOW_VERCEL_PREVIEWS || "true"
-    ).toLowerCase() === "true";
-
     const isAllowedOrigin = (origin) => {
         if (!origin) return true;
         const normalizedOrigin = normalizeOrigin(origin);
         if (!normalizedOrigin) return false;
         if (allowedOrigins.includes(normalizedOrigin)) return true;
 
-        if (allowVercelPreviews) {
-            try {
-                const url = new URL(normalizedOrigin);
-                return (
-                    url.protocol === "https:" &&
-                    /^benovelent-midax(?:-[a-z0-9-]+)?\.vercel\.app$/i.test(url.hostname)
-                );
-            } catch {
-                return false;
-            }
-        }
+        try {
+            const url = new URL(normalizedOrigin);
+            if (
+                url.protocol === "https:" &&
+                /^(?:benovelent-midax)(?:-[a-z0-9-]+)?\.vercel\.app$/i.test(url.hostname)
+            ) return true;
+        } catch {}
 
         return false;
     };
