@@ -5,6 +5,8 @@ import { useAuth } from "../context/AuthContext";
 import "./Login.css";
 
 
+const shouldSkipBackgroundVideo = typeof navigator !== "undefined" && (navigator.connection?.saveData || /2g/.test(navigator.connection?.effectiveType || ""));
+
 function getPortalPath(role) {
   switch ((role || "").toLowerCase()) {
     case "superadmin":

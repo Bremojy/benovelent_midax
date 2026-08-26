@@ -199,8 +199,9 @@ app.get("/", (req, res) => {
     });
 });
 
-app.get("/api/health", (req, res) => {
+app.get("/api/health", async (req, res) => {
     const readyState = mongoose.connection.readyState;
+    const redis = await redisCache.health();
     const database =
         readyState === 1
             ? "connected"
@@ -216,6 +217,7 @@ app.get("/api/health", (req, res) => {
         status: "Running",
         database,
         environment: process.env.NODE_ENV || "development",
+        redis,
         timestamp: new Date().toISOString(),
     });
 });

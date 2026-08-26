@@ -4,12 +4,21 @@ const { verifyToken: protect } = require("../middleware/authMiddleware");
 const { isSuperAdmin } = require("../middleware/roleMiddleware");
 const { uploadSingle, setUploadType } = require("../middleware/upload");
 const { resolveStoredFileUrl } = require("../utils/uploadUrl");
+const redisCache = require("../services/redisCache");
 
 const router = express.Router();
 
 router.get("/", async (req, res) => {
   try {
-    const leaders = await Leader.find().sort({ order: 1, createdAt: -1 });
+    const cacheKey = "public:leaders:all";
+    const cached = await redisCache.getJson(cacheKey);
+    if (cached) {
+      res.set("Cache-Control", "public, max-age=120, stale-while-revalidate=600");
+      return res.json(cached);
+    }
+    const leaders = await Leader.find().sort({ order: 1, createdAt: -1 }).lean();
+    await redisCache.setJson(cacheKey, leaders, 300);
+    res.set("Cache-Control", "public, max-age=120, stale-while-revalidate=600");
     res.json(leaders);
   } catch (error) {
     console.error(error);
@@ -19,7 +28,15 @@ router.get("/", async (req, res) => {
 
 router.get("/active", async (req, res) => {
   try {
-    const leaders = await Leader.find({ isActive: true }).sort({ order: 1, createdAt: -1 });
+    const cacheKey = "public:leaders:active";
+    const cached = await redisCache.getJson(cacheKey);
+    if (cached) {
+      res.set("Cache-Control", "public, max-age=120, stale-while-revalidate=600");
+      return res.json(cached);
+    }
+    const leaders = await Leader.find({ isActive: true }).sort({ order: 1, createdAt: -1 }).lean();
+    await redisCache.setJson(cacheKey, leaders, 300);
+    res.set("Cache-Control", "public, max-age=120, stale-while-revalidate=600");
     res.json(leaders);
   } catch (error) {
     console.error(error);
@@ -43,6 +60,7 @@ router.post("/upload", protect, isSuperAdmin, setUploadType("leaders"), uploadSi
       isActive: true,
     });
 
+    await redisCache.invalidateMany(["public:leaders:all", "public:leaders:active"]);
     res.status(201).json({ message: "Leader added successfully", leader });
   } catch (error) {
     console.error(error);
@@ -65,6 +83,7 @@ router.put("/:id", protect, isSuperAdmin, setUploadType("leaders"), uploadSingle
       return res.status(404).json({ message: "Leader not found" });
     }
 
+    await redisCache.invalidateMany(["public:leaders:all", "public:leaders:active"]);
     res.json({ message: "Leader updated successfully", leader });
   } catch (error) {
     console.error(error);
@@ -79,6 +98,7 @@ router.delete("/:id", protect, isSuperAdmin, async (req, res) => {
       return res.status(404).json({ message: "Leader not found" });
     }
 
+    await redisCache.invalidateMany(["public:leaders:all", "public:leaders:active"]);
     res.json({ message: "Leader deleted successfully" });
   } catch (error) {
     console.error(error);

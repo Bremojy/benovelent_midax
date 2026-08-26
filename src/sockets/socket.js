@@ -5,7 +5,6 @@ const hostname = typeof window !== "undefined" ? String(window.location.hostname
 const isLocalHost = ["localhost", "127.0.0.1", "::1"].includes(hostname);
 const isVercelHost = hostname.endsWith(".vercel.app") || hostname === "vercel.app";
 const configuredSocketUrl = String(import.meta.env.VITE_SOCKET_URL || "").trim();
-const apiUrl = String(import.meta.env.VITE_API_URL || "").trim();
 
 // Production REST authentication is cookie-based through the Vercel /api rewrite.
 // Socket.IO connects to the Render server and receives a short-lived signed
@@ -14,8 +13,7 @@ const apiUrl = String(import.meta.env.VITE_API_URL || "").trim();
 // session affinity problems; polling remains as a fallback.
 const SOCKET_URL = (
   configuredSocketUrl ||
-  apiUrl ||
-  (isLocalHost ? "http://localhost:5000" : (typeof window !== "undefined" ? window.location.origin : "https://benovelent-midax.onrender.com"))
+  (isLocalHost ? "http://localhost:5000" : "https://benovelent-midax.onrender.com")
 ).replace(/\/+$/, "");
 const socketUpgrade = String(import.meta.env.VITE_SOCKET_UPGRADE || "true").toLowerCase() === "true";
 let socketTicketPromise = null;

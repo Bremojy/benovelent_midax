@@ -4,6 +4,8 @@ import "./Gallery.css";
 
 const galleryVideoSources = ["/videos/benevolent-community-loop.mp4"];
 
+const shouldSkipBackgroundVideo = typeof navigator !== "undefined" && (navigator.connection?.saveData || /2g/.test(navigator.connection?.effectiveType || ""));
+
 function Gallery() {
   const [videoFailed, setVideoFailed] = useState(false);
   const [images, setImages] = useState([]);

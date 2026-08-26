@@ -19,10 +19,17 @@ const isVercelHost = hostname.endsWith(".vercel.app") || hostname === "vercel.ap
 // This avoids cross-site authentication/cookie drift between Vercel and Render.
 // A VITE_API_URL may still explicitly override this for a non-Vercel deployment.
 const BASE_URL = normalizeBaseUrl(
-  configuredBaseUrl ||
-  (typeof window !== "undefined"
-    ? (isLocalHost ? DEFAULT_LOCAL_API_URL : (isVercelHost ? DEFAULT_REMOTE_API_URL : window.location.origin))
-    : DEFAULT_REMOTE_API_URL)
+  typeof window !== "undefined"
+    ? (isVercelHost
+        ? window.location.origin
+        : (configuredBaseUrl || (isLocalHost ? DEFAULT_LOCAL_API_URL : window.location.origin)))
+    : (configuredBaseUrl || DEFAULT_REMOTE_API_URL)
+);
+
+const ASSET_BASE_URL = normalizeBaseUrl(
+  typeof window !== "undefined" && isVercelHost
+    ? DEFAULT_REMOTE_API_URL
+    : BASE_URL
 );
 
 export const API_BASE_URL = BASE_URL;
@@ -30,7 +37,9 @@ export const API_BASE_URL = BASE_URL;
 export const resolveApiUrl = (path = "") => {
   if (!path) return BASE_URL;
   if (/^(https?:\/\/|blob:|data:)/i.test(path)) return path;
-  return `${BASE_URL}${path.startsWith("/") ? "" : "/"}${path}`;
+  const raw = String(path);
+  const base = /^\/(?:uploads|documents)\b/i.test(raw) ? ASSET_BASE_URL : BASE_URL;
+  return `${base}${raw.startsWith("/") ? "" : "/"}${raw}`;
 };
 
 let csrfToken = "";
@@ -154,5 +163,5 @@ export const resolveUploadUrl = (value = "") => {
   const raw = String(value || "").trim();
   if (!raw) return "";
   if (/^(https?:\/\/|data:|blob:)/i.test(raw)) return raw;
-  return `${BASE_URL}${raw.startsWith("/") ? "" : "/"}${raw}`;
+  return `${ASSET_BASE_URL}${raw.startsWith("/") ? "" : "/"}${raw}`;
 };

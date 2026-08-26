@@ -2,13 +2,15 @@ import { Link } from "react-router-dom";
 import { MessageCircle, ShieldCheck, HeartHandshake, Sparkles, Phone } from "lucide-react";
 import "../styles/public-modern.css";
 
+const shouldSkipBackgroundVideo = typeof navigator !== "undefined" && (navigator.connection?.saveData || /2g/.test(navigator.connection?.effectiveType || ""));
+
 const aboutVideo = "/videos/benevolent-community-loop.mp4";
 
 export default function About() {
   return (
     <main className="public-modern-page">
       <section className="modern-hero">
-        <video className="modern-hero-video" autoPlay muted loop playsInline preload="metadata" poster="/hero.jpg">
+        <video className="modern-hero-video" autoPlay={!shouldSkipBackgroundVideo} muted loop playsInline preload={shouldSkipBackgroundVideo ? "none" : "metadata"} poster="/hero.jpg">
           <source src={aboutVideo} type="video/mp4" />
         </video>
         <div className="modern-hero-overlay" />

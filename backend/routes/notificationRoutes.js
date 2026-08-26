@@ -28,7 +28,7 @@ router.get("/", protect, getNotifications);
 
 // Unread notification count
 router.get("/unread-count", protect, getUnreadCount);
-router.get("/push/vapid-public-key", protect, getPushPublicKey);
+router.get("/push/vapid-public-key", getPushPublicKey);
 router.post("/push/subscribe", protect, savePushSubscription);
 router.delete("/push/subscribe", protect, removePushSubscription);
 

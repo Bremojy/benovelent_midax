@@ -13,7 +13,7 @@ export default function Services() {
   return (
     <main className="public-modern-page">
       <section className="modern-hero modern-video-hero">
-        <video className="modern-hero-video" autoPlay muted loop playsInline preload="metadata" poster="/hero.jpg">
+        <video className="modern-hero-video" autoPlay={!shouldSkipBackgroundVideo} muted loop playsInline preload={shouldSkipBackgroundVideo ? "none" : "metadata"} poster="/hero.jpg">
           <source src={heroVideo} type="video/mp4" />
         </video>
         <div className="modern-hero-overlay" />
@@ -71,6 +71,8 @@ export default function Services() {
     </main>
   );
 }
+
+const shouldSkipBackgroundVideo = typeof navigator !== "undefined" && (navigator.connection?.saveData || /2g/.test(navigator.connection?.effectiveType || ""));
 
 function Service({ icon: Icon, title, text }) {
   return (

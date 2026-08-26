@@ -3,8 +3,36 @@ const path = require("path");
 const WebsiteContent = require("../models/WebsiteContent");
 const redisCache = require("../services/redisCache");
 const { resolveStoredFileUrl } = require("../utils/uploadUrl");
+const { useCloudinary, cloudinary, getCloudinaryFolder } = require("../config/uploadConfig");
 
 const DEFAULT_SECTIONS = ["home", "about", "services", "contact", "footer", "settings", "gallery", "constitution", "privacy-policy", "terms-conditions", "news", "events", "resources", "chatbot"];
+
+
+async function ensureConstitutionCloudinary(section) {
+    const currentUrl = String(section?.content?.fileUrl || "");
+    if (!useCloudinary || !currentUrl || !/^\/documents\//i.test(currentUrl)) return section;
+    const candidates = [
+        path.join(__dirname, "..", "..", "public", "documents", "benevolent-midax-constitution.pdf"),
+        path.join(__dirname, "..", "uploads", "documents", "benevolent-midax-constitution.pdf"),
+    ];
+    const source = candidates.find((file) => fs.existsSync(file));
+    if (!source) return section;
+    try {
+        const uploaded = await cloudinary.uploader.upload(source, {
+            folder: getCloudinaryFolder("documents"),
+            resource_type: "raw",
+            use_filename: true,
+            unique_filename: true,
+            overwrite: false,
+        });
+        section.content = { ...(section.content || {}), fileUrl: uploaded.secure_url, fileName: "Benevolent Midax Constitution.pdf", updatedAt: new Date().toISOString() };
+        await section.save();
+        await redisCache.invalidateMany(["public:website:content", "public:website:constitution"]);
+    } catch (error) {
+        console.warn("Constitution Cloudinary migration skipped:", error.message);
+    }
+    return section;
+}
 
 const SECTION_DEFAULTS = {
     "news": { title: "Newsroom", subtitle: "News, events and community updates", description: "Public information centre for Benevolent MIDAX.", content: { tabs: ["news", "events", "resources"] } },
@@ -71,15 +99,17 @@ async function findOrCreateSection(section, defaults = {}) {
 
 exports.getWebsiteContent = async (req, res) => {
     try {
-        await Promise.all(
-            DEFAULT_SECTIONS.map((section) =>
-                findOrCreateSection(section)
-            )
-        );
-
+        const cached = await redisCache.getJson("public:website:content");
+        if (cached) {
+            res.set("Cache-Control", "public, max-age=120, stale-while-revalidate=600");
+            return res.json(cached);
+        }
+        await Promise.all(DEFAULT_SECTIONS.map((section) => findOrCreateSection(section)));
         const content = await WebsiteContent.find().sort({ section: 1 }).lean();
-
-        res.json({ success: true, count: content.length, content });
+        const payload = { success: true, count: content.length, content };
+        await redisCache.setJson("public:website:content", payload, 300);
+        res.set("Cache-Control", "public, max-age=120, stale-while-revalidate=600");
+        res.json(payload);
     } catch (error) {
         console.error(error);
         res.status(500).json({ success: false, message: error.message });
@@ -100,7 +130,10 @@ exports.getWebsiteSettings = async (req, res) => {
             images: [],
         });
 
-        res.json({ success: true, section, settings: section.content || {} });
+        const payload = { success: true, section, settings: section.content || {} };
+        await redisCache.setJson("public:website:settings", payload, 300);
+        res.set("Cache-Control", "public, max-age=120, stale-while-revalidate=600");
+        res.json(payload);
     } catch (error) {
         console.error(error);
         res.status(500).json({ success: false, message: error.message });
@@ -121,11 +154,10 @@ exports.getGallery = async (req, res) => {
             images: [],
         });
 
-        res.json({
-            success: true,
-            section,
-            gallery: section.images || [],
-        });
+        const payload = { success: true, section, gallery: section.images || [] };
+        await redisCache.setJson("public:website:gallery", payload, 300);
+        res.set("Cache-Control", "public, max-age=120, stale-while-revalidate=600");
+        res.json(payload);
     } catch (error) {
         console.error(error);
         res.status(500).json({ success: false, message: error.message });
@@ -138,7 +170,7 @@ exports.getGallery = async (req, res) => {
 
 exports.getConstitution = async (req, res) => {
     try {
-        const section = await findOrCreateSection("constitution", {
+        let section = await findOrCreateSection("constitution", {
             title: "Constitution",
             subtitle: "Official governance document",
             description: "The latest Benevolent Midax Constitution file.",
@@ -146,7 +178,11 @@ exports.getConstitution = async (req, res) => {
             images: [],
         });
 
-        res.json({ success: true, section, file: section.content || {} });
+        section = await ensureConstitutionCloudinary(section);
+        const payload = { success: true, section, file: section.content || {} };
+        await redisCache.setJson("public:website:constitution", payload, 300);
+        res.set("Cache-Control", "public, max-age=120, stale-while-revalidate=600");
+        res.json(payload);
     } catch (error) {
         console.error(error);
         res.status(500).json({ success: false, message: error.message });
@@ -229,6 +265,7 @@ exports.uploadGalleryImage = async (req, res) => {
         section.updatedBy = req.user?._id;
 
         await section.save();
+        await redisCache.invalidateMany(["public:website:content", "public:website:gallery"]);
 
         res.status(201).json({
             success: true,
@@ -268,6 +305,7 @@ exports.createSection = async (req, res) => {
         }
 
         const section = await WebsiteContent.create({ ...req.body, updatedBy: req.user._id });
+        await redisCache.invalidateMany(["public:website:content", "public:website:settings", "public:website:gallery", "public:website:constitution"]);
 
         res.status(201).json({ success: true, message: "Section created successfully.", section });
     } catch (error) {
@@ -309,6 +347,7 @@ exports.updateSection = async (req, res) => {
         section.updatedBy = req.user._id;
 
         await section.save();
+        await redisCache.invalidateMany(["public:website:content", "public:website:settings", "public:website:gallery", "public:website:constitution"]);
 
         res.json({ success: true, message: "Website updated successfully.", section });
     } catch (error) {

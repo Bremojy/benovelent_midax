@@ -14,6 +14,8 @@ import {
 const constitutionFile = "/documents/benevolent-midax-constitution.pdf";
 const constitutionVideoSources = ["/videos/benevolent-community-loop.mp4"];
 
+const shouldSkipBackgroundVideo = typeof navigator !== "undefined" && (navigator.connection?.saveData || /2g/.test(navigator.connection?.effectiveType || ""));
+
 function Constitution() {
   const [videoFailed, setVideoFailed] = useState(false);
   const [fileUrl, setFileUrl] = useState(constitutionFile);
@@ -38,11 +40,11 @@ function Constitution() {
       <section className={`constitution-hero constitution-video-hero ${videoFailed ? "video-failed" : ""}`}>
         <video
           className="constitution-background-video"
-          autoPlay
+          autoPlay={!shouldSkipBackgroundVideo}
           muted
           loop
           playsInline
-          preload="metadata"
+          preload={shouldSkipBackgroundVideo ? "none" : "metadata"}
           poster="/hero.jpg"
           onError={() => setVideoFailed(true)}
           aria-hidden="true"

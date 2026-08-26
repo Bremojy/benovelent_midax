@@ -1,4 +1,5 @@
 const News = require("../models/News");
+const redisCache = require("../services/redisCache");
 const Member = require("../models/Member");
 const Notification = require("../models/Notification");
 const { notifyMembers } = require("../services/memberBroadcastService");
@@ -1092,34 +1093,20 @@ exports.getNewsByCategory = async(req,res)=>{
 exports.getLatestNews=async(req,res)=>{
 
     try{
-
-        const news=await News.find({
-
-            published:true,
-
-            status:"published"
-
-        })
-
+        const cached = await redisCache.getJson("public:news:latest");
+        if (cached) {
+            res.set("Cache-Control", "public, max-age=60, stale-while-revalidate=300");
+            return res.json(cached);
+        }
+        const news=await News.find({ published:true, status:"published" })
         .populate("author","fullName profileImage")
-
-        .sort({
-
-            publishDate:-1
-
-        })
-
+        .sort({ publishDate:-1 })
         .limit(10)
-
         .lean();
-
-        res.json({
-
-            success:true,
-
-            news
-
-        });
+        const payload={ success:true, news };
+        await redisCache.setJson("public:news:latest", payload, 120);
+        res.set("Cache-Control", "public, max-age=60, stale-while-revalidate=300");
+        res.json(payload);
 
     }
 

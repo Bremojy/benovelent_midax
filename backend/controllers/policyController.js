@@ -1,4 +1,5 @@
 const Policy = require("../models/Policy");
+const redisCache = require("../services/redisCache");
 
 const DEFAULT_POLICIES = [
   { name: "Education Policy", slug: "education-policy", category: "loan", description: "Education support for eligible dependants with an agreed repayment plan.", enabled: true, maxAmount: 20000, minAmount: 1000, interestRate: 10, repaymentEnabled: true, repaymentMonths: 12, communityAssistanceEnabled: true, applicationPath: "/member/support", order: 10 },
@@ -33,9 +34,17 @@ const clean = (body = {}) => ({
 
 exports.publicList = async (_req, res) => {
   try {
+    const cached = await redisCache.getJson("public:policies:enabled");
+    if (cached) {
+      res.set("Cache-Control", "public, max-age=120, stale-while-revalidate=600");
+      return res.json(cached);
+    }
     await ensureDefaultPolicies();
     const policies = await Policy.find({ enabled: true }).sort({ order: 1, name: 1 }).lean();
-    res.json({ success: true, policies });
+    const payload = { success: true, policies };
+    await redisCache.setJson("public:policies:enabled", payload, 300);
+    res.set("Cache-Control", "public, max-age=120, stale-while-revalidate=600");
+    res.json(payload);
   } catch (error) { res.status(500).json({ success: false, message: error.message }); }
 };
 
@@ -54,6 +63,7 @@ exports.create = async (req, res) => {
     const exists = await Policy.findOne({ slug: payload.slug });
     if (exists) return res.status(409).json({ success: false, message: "A policy with this name/slug already exists." });
     const policy = await Policy.create(payload);
+    await redisCache.del("public:policies:enabled");
     res.status(201).json({ success: true, policy });
   } catch (error) { res.status(500).json({ success: false, message: error.message }); }
 };
@@ -63,6 +73,7 @@ exports.update = async (req, res) => {
     const payload = clean(req.body);
     const policy = await Policy.findByIdAndUpdate(req.params.id, payload, { new: true, runValidators: true });
     if (!policy) return res.status(404).json({ success: false, message: "Policy not found." });
+    await redisCache.del("public:policies:enabled");
     res.json({ success: true, policy });
   } catch (error) { res.status(500).json({ success: false, message: error.message }); }
 };
@@ -71,6 +82,7 @@ exports.remove = async (req, res) => {
   try {
     const policy = await Policy.findByIdAndDelete(req.params.id);
     if (!policy) return res.status(404).json({ success: false, message: "Policy not found." });
+    await redisCache.del("public:policies:enabled");
     res.json({ success: true, message: "Policy deleted." });
   } catch (error) { res.status(500).json({ success: false, message: error.message }); }
 };

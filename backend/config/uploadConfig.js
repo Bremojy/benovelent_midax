@@ -93,9 +93,12 @@ const uploadBufferToCloudinary = async (file, uploadType = "general") => {
 
   const folder = getCloudinaryFolder(uploadType);
   const dataUri = `data:${file.mimetype};base64,${file.buffer.toString("base64")}`;
+  const resourceType = String(file.mimetype || "").startsWith("image/")
+    ? "image"
+    : (String(file.mimetype || "").startsWith("video/") ? "video" : "raw");
   const result = await cloudinary.uploader.upload(dataUri, {
     folder,
-    resource_type: "auto",
+    resource_type: resourceType,
     use_filename: true,
     unique_filename: true,
     overwrite: false,

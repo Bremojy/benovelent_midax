@@ -128,6 +128,17 @@ self.addEventListener("notificationclick", (event) => {
 });
 
 self.addEventListener("fetch", (event) => {
+  const requestUrl = new URL(event.request.url);
+  if (requestUrl.origin === self.location.origin && requestUrl.pathname.startsWith("/videos/")) {
+    event.respondWith(caches.open(VIDEO_CACHE).then(async (cache) => {
+      const cached = await cache.match(event.request);
+      if (cached) return cached;
+      const response = await fetch(event.request);
+      if (response.ok) cache.put(event.request, response.clone());
+      return response;
+    }));
+    return;
+  }
   const request = event.request;
   const url = new URL(request.url);
   if (url.origin !== location.origin || request.method !== "GET") return;

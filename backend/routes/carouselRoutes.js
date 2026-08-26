@@ -4,17 +4,21 @@ const { verifyToken: protect } = require("../middleware/authMiddleware");
 const { isSuperAdmin } = require("../middleware/roleMiddleware");
 const { uploadSingle, setUploadType } = require("../middleware/upload");
 const { resolveStoredFileUrl } = require("../utils/uploadUrl");
+const redisCache = require("../services/redisCache");
 
 const router = express.Router();
 
 router.get("/", async (req, res) => {
   try {
-    res.set({
-      "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
-      "Pragma": "no-cache",
-      "Expires": "0",
-    });
+    const cacheKey = "public:carousel:all";
+    const cached = await redisCache.getJson(cacheKey);
+    if (cached) {
+      res.set("Cache-Control", "public, max-age=60, stale-while-revalidate=300");
+      return res.json(cached);
+    }
     const slides = await Carousel.find().sort({ order: 1, createdAt: -1 }).lean();
+    await redisCache.setJson(cacheKey, slides, 120);
+    res.set("Cache-Control", "public, max-age=60, stale-while-revalidate=300");
     res.json(slides);
   } catch (error) {
     console.error(error);
@@ -24,12 +28,15 @@ router.get("/", async (req, res) => {
 
 router.get("/active", async (req, res) => {
   try {
-    res.set({
-      "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
-      "Pragma": "no-cache",
-      "Expires": "0",
-    });
+    const cacheKey = "public:carousel:active";
+    const cached = await redisCache.getJson(cacheKey);
+    if (cached) {
+      res.set("Cache-Control", "public, max-age=60, stale-while-revalidate=300");
+      return res.json(cached);
+    }
     const slides = await Carousel.find({ isActive: true }).sort({ order: 1, createdAt: -1 }).lean();
+    await redisCache.setJson(cacheKey, slides, 120);
+    res.set("Cache-Control", "public, max-age=60, stale-while-revalidate=300");
     res.json(slides);
   } catch (error) {
     console.error(error);
@@ -76,6 +83,7 @@ router.post("/upload", protect, isSuperAdmin, setUploadType("carousel"), uploadS
       isActive: true,
     });
 
+    await redisCache.invalidateMany(["public:carousel:all", "public:carousel:active"]);
     res.status(201).json({ message: "Carousel image uploaded successfully", slide });
   } catch (error) {
     console.error(error);
@@ -101,6 +109,7 @@ router.post("/", protect, isSuperAdmin, async (req, res) => {
       isActive: true,
     });
 
+    await redisCache.invalidateMany(["public:carousel:all", "public:carousel:active"]);
     res.status(201).json({ message: "Carousel slide created successfully", slide });
   } catch (error) {
     console.error(error);
@@ -123,6 +132,7 @@ router.put("/:id", protect, isSuperAdmin, setUploadType("carousel"), uploadSingl
       return res.status(404).json({ message: "Carousel slide not found" });
     }
 
+    await redisCache.invalidateMany(["public:carousel:all", "public:carousel:active"]);
     res.json({ message: "Carousel updated successfully", slide });
   } catch (error) {
     console.error(error);
@@ -137,6 +147,7 @@ router.delete("/:id", protect, isSuperAdmin, async (req, res) => {
       return res.status(404).json({ message: "Carousel slide not found" });
     }
 
+    await redisCache.invalidateMany(["public:carousel:all", "public:carousel:active"]);
     res.json({ message: "Carousel deleted successfully" });
   } catch (error) {
     console.error(error);
