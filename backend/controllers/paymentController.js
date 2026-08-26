@@ -1,6 +1,7 @@
 const MpesaTransaction = require("../models/MpesaTransaction");
 const EducationSupport = require("../models/EducationSupport");
 const CommunityAssistance = require("../models/CommunityAssistance");
+const Contribution = require("../models/Contribution");
 const SupportRequest = require("../models/SupportRequest");
 const MedicalSupport = require("../models/MedicalSupport");
 const FuneralSupport = require("../models/FuneralSupport");
@@ -117,7 +118,7 @@ exports.config = async (_req, res) => {
     ready: stkConfigured && b2cConfigured,
     shortCode: String(process.env.MPESA_SHORTCODE || "650014"),
     manualPaybill: String(process.env.MPESA_MANUAL_PAYBILL || "247247"),
-    manualAccountNumber: String(process.env.MPESA_MANUAL_ACCOUNT_NUMBER || "0650186528835"),
+    manualAccountNumber: String(process.env.MPESA_MANUAL_ACCOUNT_NUMBER || ""),
     accountReference: normalizeAccountReference(process.env.MPESA_ACCOUNT_REFERENCE || "BENMIDAX"),
     environment: String(process.env.MPESA_ENVIRONMENT || "production"),
     message: !enabled
@@ -161,6 +162,7 @@ exports.getTransaction = async (req, res) => {
 };
 
 exports.stk = async (req, res) => {
+  let tx = null;
   try {
     const purpose = String(req.body?.purpose || "").trim();
     const referenceId = req.body?.referenceId || null;
@@ -191,9 +193,15 @@ exports.stk = async (req, res) => {
       const remaining = Number(campaign.targetAmount) - Number(campaign.raisedAmount || 0);
       if (amount > remaining) return res.status(400).json({ success: false, message: `Maximum remaining contribution is KSh ${remaining.toLocaleString("en-KE")}.` });
       referenceModel = "CommunityAssistance";
+    } else if (purpose === "contribution") {
+      const contribution = await Contribution.findOne({ _id: referenceId, member: req.user._id });
+      if (!contribution) return res.status(404).json({ success: false, message: "Contribution record not found." });
+      if (Number(contribution.balance) <= 0) return res.status(400).json({ success: false, message: "This contribution is already fully paid." });
+      if (amount > Number(contribution.balance)) return res.status(400).json({ success: false, message: "Payment cannot exceed the contribution balance." });
+      referenceModel = "Contribution";
     }
 
-    const tx = await MpesaTransaction.create({
+    tx = await MpesaTransaction.create({
       member: req.user._id,
       purpose,
       referenceId,
@@ -228,28 +236,45 @@ exports.stk = async (req, res) => {
     res.status(200).json({ success: result?.ResponseCode === "0", configured: true, message: result?.CustomerMessage || result?.ResponseDescription || "STK push submitted.", transactionId: tx._id, checkoutRequestId: tx.checkoutRequestId });
   } catch (error) {
     const upstream = extractUpstreamError(error);
-    console.error("M-PESA STK error:", { stage: "daraja", ...upstream });
-    const isUpstream404 = upstream.status === 404;
-    // Any Daraja failure is an upstream payment-service problem, not an
-    // application authentication failure. Keep it in the 5xx family so the
-    // member portal can stay signed in and display a payment-specific message.
+    const paymentStage = upstream.paymentStage === "oauth" ? "oauth" : upstream.paymentStage === "stk" ? "stk" : "unknown";
+    console.error("M-PESA STK error:", { stage: paymentStage, ...upstream });
+
+    if (tx) {
+      tx.status = "failed";
+      tx.resultCode = upstream.status || null;
+      tx.resultDescription = paymentStage === "oauth"
+        ? "Safaricom Daraja authentication failed. Verify the production consumer key and consumer secret."
+        : upstream.message || "M-PESA STK request failed.";
+      try { await tx.save(); } catch (saveError) { console.error("M-PESA transaction failure update:", saveError); }
+    }
+
+    const isOauth404 = paymentStage === "oauth" && upstream.status === 404;
+    const isStk404 = paymentStage === "stk" && upstream.status === 404;
     const clientStatus = 502;
-    const diagnosticMessage = isUpstream404
-      ? "Safaricom returned HTTP 404 for the STK request. Verify the Daraja production application, shortcode, environment and callback configuration."
-      : upstream.status === 400
-        ? "Safaricom rejected the STK request. Verify the production shortcode, passkey, consumer credentials, transaction type and callback URL."
-        : upstream.status === 401
-          ? "Safaricom rejected the Daraja credentials. Verify the production consumer key and consumer secret."
-          : upstream.status === 403
-            ? "Safaricom denied the Daraja request. Verify that the production application and shortcode are enabled for STK Push."
-            : "The M-PESA service could not complete the STK request. Your portal session is unchanged.";
+    const diagnosticMessage = paymentStage === "oauth"
+      ? (upstream.status === 401 || upstream.status === 403
+        ? "M-PESA authentication was rejected by Safaricom. Verify the production consumer key, consumer secret and Daraja application permissions."
+        : isOauth404
+          ? "Safaricom Daraja OAuth endpoint returned 404. Verify that production mode is using the correct Daraja host."
+          : "M-PESA authentication with Safaricom could not be completed. Verify the production consumer credentials.")
+      : isStk404
+        ? "Safaricom returned HTTP 404 for the STK request. Verify the production Daraja application, shortcode and endpoint configuration."
+        : upstream.status === 400
+          ? "Safaricom rejected the STK request. Verify the production shortcode, passkey, consumer credentials, transaction type and callback URL."
+          : upstream.status === 401
+            ? "Safaricom rejected the Daraja credentials. Verify the production consumer key and consumer secret."
+            : upstream.status === 403
+              ? "Safaricom denied the Daraja request. Verify that the production application and shortcode are enabled for STK Push."
+              : "The M-PESA service could not complete the STK request. Your portal session is unchanged.";
+
     return res.status(clientStatus).json({
       success: false,
-      code: isUpstream404 ? "MPESA_DARAJA_404" : "MPESA_STK_FAILED",
+      code: isOauth404 ? "MPESA_OAUTH_404" : isStk404 ? "MPESA_DARAJA_404" : paymentStage === "oauth" ? "MPESA_OAUTH_FAILED" : "MPESA_STK_FAILED",
       upstreamStatus: upstream.status,
-      paymentStage: "daraja",
+      paymentStage,
       message: diagnosticMessage,
-      endpoint: endpointSummary().stk,
+      endpoint: paymentStage === "oauth" ? endpointSummary().oauth : endpointSummary().stk,
+      transactionId: tx?._id || null,
       details: process.env.NODE_ENV === "production" ? undefined : error.response?.data,
     });
   }

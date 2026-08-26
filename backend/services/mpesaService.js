@@ -9,6 +9,8 @@ const isDarajaConfigured = () => Boolean(
   !isPlaceholder(env("MPESA_CONSUMER_KEY")) &&
   !isPlaceholder(env("MPESA_CONSUMER_SECRET"))
 );
+const isValidTransactionType = () => ["CustomerPayBillOnline", "CustomerBuyGoodsOnline"].includes(env("MPESA_TRANSACTION_TYPE", "CustomerPayBillOnline"));
+
 const isConfigured = () => {
   const enabled = env("MPESA_ENABLED", "false").toLowerCase() === "true";
   return enabled && isDarajaConfigured() && Boolean(
@@ -16,7 +18,8 @@ const isConfigured = () => {
     !isPlaceholder(env("MPESA_SHORTCODE")) &&
     !isPlaceholder(env("MPESA_ACCOUNT_REFERENCE")) &&
     !isPlaceholder(env("MPESA_CALLBACK_URL")) &&
-    /^https:\/\//i.test(env("MPESA_CALLBACK_URL"))
+    /^https:\/\//i.test(env("MPESA_CALLBACK_URL")) &&
+    isValidTransactionType()
   );
 };
 
@@ -45,6 +48,7 @@ const endpointSummary = () => ({
 });
 
 const extractUpstreamError = (error) => ({
+  paymentStage: String(error?.paymentStage || "unknown"),
   status: Number(error?.response?.status || 0) || null,
   code: String(error?.response?.data?.errorCode || error?.code || ""),
   message: String(error?.response?.data?.errorMessage || error?.response?.data?.message || error?.response?.data?.ResponseDescription || error?.message || "M-PESA upstream request failed."),
@@ -69,13 +73,19 @@ const normalizePhone = (value) => {
 };
 
 async function getAccessToken() {
-  if (!isDarajaConfigured()) throw new Error("M-PESA Daraja API credentials are not configured on the server.");
+  if (!isDarajaConfigured()) throw Object.assign(new Error("M-PESA Daraja API credentials are not configured on the server."), { paymentStage: "oauth" });
   const token = Buffer.from(`${env("MPESA_CONSUMER_KEY")}:${env("MPESA_CONSUMER_SECRET")}`).toString("base64");
-  const response = await axios.get(`${baseUrl()}/oauth/v1/generate?grant_type=client_credentials`, {
-    headers: { Authorization: `Basic ${token}` },
-    timeout: 15000,
-  });
-  if (!response.data?.access_token) throw new Error("Daraja did not return an access token.");
+  let response;
+  try {
+    response = await axios.get(`${baseUrl()}/oauth/v1/generate?grant_type=client_credentials`, {
+      headers: { Authorization: `Basic ${token}` },
+      timeout: 15000,
+    });
+  } catch (error) {
+    error.paymentStage = "oauth";
+    throw error;
+  }
+  if (!response.data?.access_token) throw Object.assign(new Error("Daraja did not return an access token."), { paymentStage: "oauth" });
   return response.data.access_token;
 }
 
@@ -97,10 +107,16 @@ async function stkPush({ phoneNumber, amount, accountReference, transactionDesc 
     AccountReference: normalizeAccountReference(accountReference || env("MPESA_ACCOUNT_REFERENCE", DEFAULT_MPESA_ACCOUNT_REFERENCE)),
     TransactionDesc: String(transactionDesc || "Benevolent MIDAX payment").slice(0, 20),
   };
-  const response = await axios.post(`${baseUrl()}/mpesa/stkpush/v1/processrequest`, payload, {
-    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
-    timeout: 20000,
-  });
+  let response;
+  try {
+    response = await axios.post(`${baseUrl()}/mpesa/stkpush/v1/processrequest`, payload, {
+      headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+      timeout: 20000,
+    });
+  } catch (error) {
+    error.paymentStage = "stk";
+    throw error;
+  }
   return response.data;
 }
 
@@ -145,11 +161,13 @@ const getConfigurationSummary = () => {
   if (environment === "production" && /^https:\/\/sandbox\./i.test(baseUrl())) warnings.push("Sandbox Daraja endpoint selected while production mode is enabled.");
   if (environment === "production" && !/^https:\/\/api\.safaricom\.co\.ke$/i.test(baseUrl())) warnings.push("Production mode is not using the Safaricom production API host.");
   if (environment === "production" && callbackUrl && !/^https:\/\//i.test(callbackUrl)) warnings.push("Production M-PESA callback URL must use HTTPS.");
+  if (!isValidTransactionType()) warnings.push("MPESA_TRANSACTION_TYPE must be CustomerPayBillOnline or CustomerBuyGoodsOnline.");
   return {
     enabled: env("MPESA_ENABLED", "false").toLowerCase() === "true",
     environment,
     configured: isConfigured(),
     darajaConfigured: isDarajaConfigured(),
+    transactionType: env("MPESA_TRANSACTION_TYPE", "CustomerPayBillOnline"),
     b2cConfigured: isB2CConfigured(),
     b2cEnabled: env("MPESA_B2C_ENABLED", "true").toLowerCase() === "true",
     shortcode: env("MPESA_SHORTCODE"),

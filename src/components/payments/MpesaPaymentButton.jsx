@@ -12,7 +12,10 @@ const mpesaFriendlyError = (error) => {
   const body = error?.response?.data || {};
   const message = String(body?.message || error?.message || "M-PESA request failed.");
   if (status === 404) return "The deployed payment API route is missing (404). Deploy the updated backend so /api/payments/stk is available.";
-  if (body?.code === "MPESA_STK_FAILED" || body?.paymentStage === "daraja") {
+  if (["MPESA_STK_FAILED", "MPESA_DARAJA_404", "MPESA_OAUTH_FAILED", "MPESA_OAUTH_404"].includes(body?.code) || body?.paymentStage) {
+    if (body?.paymentStage === "oauth") return body?.upstreamStatus === 401 || body?.upstreamStatus === 403
+      ? "M-PESA authentication was rejected by Safaricom. Ask the administrator to verify the production consumer key, consumer secret and Daraja application permissions."
+      : "M-PESA could not authenticate with Safaricom. Ask the administrator to verify the production consumer credentials and Daraja environment.";
     if (status === 400 || Number(body?.upstreamStatus) === 400) return "Safaricom rejected the STK request. Check the M-PESA phone number, shortcode, passkey and production Daraja credentials, then try again.";
     if (status === 401 || Number(body?.upstreamStatus) === 401) return "M-PESA authentication was rejected by Safaricom. The Daraja consumer key/secret or environment needs to be checked by the administrator.";
     if (status === 403 || Number(body?.upstreamStatus) === 403) return "Safaricom denied this M-PESA request. Please ask the administrator to verify the production app, shortcode and Daraja permissions.";

@@ -110,9 +110,15 @@ export default function Claims() {
         window.setTimeout(poll, 2000);
       }
     } catch (e) {
-      const status = e?.response?.status;
-      const apiMessage = e?.response?.data?.message || e?.message;
-      toast.error(status && status >= 400 ? `M-PESA payment could not be started. ${apiMessage || "Please check the M-PESA details and try again."}` : (apiMessage || "Unable to start M-PESA payment."));
+      const status = Number(e?.response?.status || 0);
+      const body = e?.response?.data || {};
+      const apiMessage = body?.message || e?.message;
+      const friendly = body?.paymentStage === "oauth"
+        ? "M-PESA authentication with Safaricom failed. Ask the administrator to verify the production consumer credentials."
+        : Number(body?.upstreamStatus) === 400
+          ? "Safaricom rejected the STK request. Ask the administrator to verify the production shortcode, passkey, transaction type and callback URL."
+          : apiMessage || "Unable to start M-PESA payment.";
+      toast.error(status >= 400 ? friendly : apiMessage || friendly);
     } finally {
       setBusy("");
     }

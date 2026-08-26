@@ -12,7 +12,10 @@ assert(service.includes('/oauth/v1/generate?grant_type=client_credentials'),"Dar
 assert(service.includes('CallBackURL: env("MPESA_CALLBACK_URL")'),"STK callback URL not sent.");
 assert(service.includes('BusinessShortCode: shortcode'),"BusinessShortCode payload missing.");
 assert(controller.includes('String(result?.ResponseCode) === "0"'),"STK success response check missing.");
-assert(controller.includes('upstreamStatus === 404'),"Provider 404 diagnostics missing.");
+assert(controller.includes("upstream.status === 404") || controller.includes("upstreamStatus === 404"),"Provider 404 diagnostics missing.");
 assert(api.includes('API.post("/payments/stk"'),"Frontend canonical STK request missing.");
-assert(api.includes('primaryError?.response?.status !== 404'),"Frontend 404 fallback missing.");
+assert(api.includes("status === 404") && api.includes("payment API route is missing"),"Frontend 404 diagnostics missing.");
+assert(service.includes("paymentStage = \"oauth\""),"OAuth failure stage is not tracked.");
+assert(controller.includes("paymentStage === \"oauth\""),"Controller does not distinguish OAuth failures from STK failures.");
+assert(api.includes("paymentStage === \"oauth\""),"Frontend OAuth failure message handling missing.");
 console.log("MPESA STK CONTRACT TEST PASSED");
