@@ -1,3 +1,4 @@
+import toast from "react-hot-toast";
 import { useEffect, useState } from "react";
 import { CheckCircle2, Loader2, Smartphone, XCircle } from "lucide-react";
 import API from "../../services/api";
@@ -5,6 +6,19 @@ import "./MpesaPaymentButton.css";
 
 const normalizePhone = (value) => String(value || "").replace(/\s+/g, "").replace(/^\+/, "");
 const money = (value) => new Intl.NumberFormat("en-KE", { style: "currency", currency: "KES", maximumFractionDigits: 0 }).format(Number(value || 0));
+
+const mpesaFriendlyError = (error) => {
+  const status = Number(error?.response?.status || 0);
+  const body = error?.response?.data || {};
+  const message = String(body?.message || error?.message || "M-PESA request failed.");
+  if (body?.code === "MPESA_STK_FAILED" || body?.paymentStage === "daraja") {
+    if (status === 400 || Number(body?.upstreamStatus) === 400) return "Safaricom rejected the STK request. Check the M-PESA phone number, shortcode, passkey and production Daraja credentials, then try again.";
+    if (status === 401 || Number(body?.upstreamStatus) === 401) return "M-PESA authentication was rejected by Safaricom. The Daraja consumer key/secret or environment needs to be checked by the administrator.";
+    if (status === 403 || Number(body?.upstreamStatus) === 403) return "Safaricom denied this M-PESA request. Please ask the administrator to verify the production app, shortcode and Daraja permissions.";
+    if (status === 502) return "M-PESA service could not be reached correctly. Your account has not been logged out; try the payment again later.";
+  }
+  return message;
+};
 
 export default function MpesaPaymentButton({ purpose, referenceId, label = "Pay with M-PESA", defaultAmount = "", maxAmount = 0, phoneNumber = "", disabled = false, onSuccess }) {
   const [open, setOpen] = useState(false);
@@ -81,11 +95,10 @@ export default function MpesaPaymentButton({ purpose, referenceId, label = "Pay 
     } catch (error) {
       const statusCode = error.response?.status;
       const body = error.response?.data || {};
-      const detail = body?.message || error.message || "M-PESA request failed.";
+      const friendly = mpesaFriendlyError(error);
       setStatus("error");
-      setMessage(statusCode === 404
-        ? "M-PESA endpoint was not found. Redeploy the latest backend/API routes, then try again."
-        : statusCode ? `M-PESA request failed (${statusCode}): ${detail}` : detail);
+      setMessage(friendly);
+      toast.error(friendly);
     }
   };
 

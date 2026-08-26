@@ -1,5 +1,4 @@
-const CACHE = "benevolent-shell-v24-pwa-hardening";
-const VIDEO_CACHE = "benevolent-video-v2";
+const CACHE = "benevolent-shell-v23-pwa-hardening";
 const ASSETS = ["/", "/index.html", "/manifest.webmanifest", "/pwa-icon-192.png", "/pwa-icon-512.png", "/apple-touch-icon.png"];
 const DB_NAME = "benovelent-pwa";
 const DB_STORE = "calls";
@@ -50,7 +49,7 @@ self.addEventListener("install", (event) => {
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((key) => ![CACHE, VIDEO_CACHE].includes(key)).map((key) => caches.delete(key))))
+      .then((keys) => Promise.all(keys.filter((key) => key !== CACHE).map((key) => caches.delete(key))))
       .then(() => self.clients.claim())
   );
 });
@@ -134,14 +133,9 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(caches.open(VIDEO_CACHE).then(async (cache) => {
       const cached = await cache.match(event.request);
       if (cached) return cached;
-      try {
-        const response = await fetch(event.request);
-        if (response.ok) cache.put(event.request, response.clone());
-        return response;
-      } catch (error) {
-        if (cached) return cached;
-        throw error;
-      }
+      const response = await fetch(event.request);
+      if (response.ok) cache.put(event.request, response.clone());
+      return response;
     }));
     return;
   }

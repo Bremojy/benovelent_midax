@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { CheckCircle2, Clock3, HeartHandshake, RefreshCw, Smartphone, ShieldCheck } from "lucide-react";
+import toast from "react-hot-toast";
 import DashboardLayout from "../../layouts/DashboardLayout";
 import API from "../../services/api";
 import "../../styles/portalModule.css";
@@ -28,8 +29,6 @@ export default function Claims() {
   const [loading, setLoading] = useState(true);
   const [paymentConfigured, setPaymentConfigured] = useState(false);
   const [busy, setBusy] = useState("");
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
   const [target, setTarget] = useState({});
   const [phone, setPhone] = useState({});
   const [paymentStatus, setPaymentStatus] = useState({});
@@ -38,7 +37,6 @@ export default function Claims() {
   const load = async () => {
     try {
       setLoading(true);
-      setError("");
       const [claimsRes, casesRes, configRes] = await Promise.all([
         API.get("/member/claims"),
         API.get("/payments/community-assistance"),
@@ -48,7 +46,7 @@ export default function Claims() {
       setCampaigns(Array.isArray(casesRes.data?.campaigns) ? casesRes.data.campaigns : []);
       setPaymentConfigured(Boolean(configRes.data?.configured));
     } catch (e) {
-      setError(e.response?.data?.message || e.message || "Unable to load your claims.");
+      toast.error(e.response?.data?.message || e.message || "Unable to load your claims.");
     } finally {
       setLoading(false);
     }
@@ -63,15 +61,14 @@ export default function Claims() {
   const requestCommunity = async (claim) => {
     try {
       setBusy(`community-${claim._id}`);
-      setError("");
       const t = Number(target[claim._id] || claim.requestedAmount || claim.amount || 0);
       const referenceModel = { medical: "MedicalSupport", funeral: "FuneralSupport", education: "EducationSupport", support: "SupportRequest" }[claim.sourceType];
       const { data } = await API.post("/claims/community/request", { referenceModel, referenceId: claim._id, targetAmount: t });
       if (!data?.success) throw new Error(data?.message || "Unable to create community support request.");
-      setSuccess("Community support request created. It can now receive voluntary M-PESA contributions.");
+      toast.success("Community support request created. It can now receive voluntary M-PESA contributions.");
       await load();
     } catch (e) {
-      setError(e.response?.data?.message || e.message || "Unable to create community support request.");
+      toast.error(e.response?.data?.message || e.message || "Unable to create community support request.");
     } finally {
       setBusy("");
     }
@@ -80,7 +77,6 @@ export default function Claims() {
   const contribute = async (campaign) => {
     try {
       setBusy(`pay-${campaign._id}`);
-      setError("");
       if (!paymentConfigured) throw new Error("M-PESA is not currently configured by the administrator.");
       const a = Number(amount[campaign._id] || 0);
       if (a <= 0) throw new Error("Enter a contribution amount.");
@@ -96,7 +92,7 @@ export default function Claims() {
       if (!data?.success) throw new Error(data?.message || "Unable to start M-PESA payment.");
       const transactionId = String(data?.transactionId || "");
       setPaymentStatus((current) => ({ ...current, [campaign._id]: { status: "pending", transactionId } }));
-      setSuccess(data?.message || "M-PESA payment prompt sent to your phone. Complete the prompt on your phone.");
+      toast.success(data?.message || "M-PESA payment prompt sent to your phone. Complete the prompt on your phone.");
       if (transactionId) {
         let attempts = 0;
         const poll = async () => {
@@ -106,13 +102,13 @@ export default function Claims() {
             const tx = transactionData?.transaction;
             if (tx?.status === "successful") {
               setPaymentStatus((current) => ({ ...current, [campaign._id]: { status: "successful", transactionId, receipt: tx.mpesaReceiptNumber || "recorded" } }));
-              setSuccess(`Community contribution confirmed. M-PESA receipt: ${tx.mpesaReceiptNumber || "recorded"}.`);
+              toast.success(`Community contribution confirmed. M-PESA receipt: ${tx.mpesaReceiptNumber || "recorded"}.`);
               await load();
               return;
             }
             if (tx?.status === "failed") {
               setPaymentStatus((current) => ({ ...current, [campaign._id]: { status: "failed", transactionId } }));
-              setError(tx.resultDescription || "The M-PESA contribution was not completed.");
+              toast.error(tx.resultDescription || "The M-PESA contribution was not completed.");
               return;
             }
           } catch {}
@@ -121,7 +117,9 @@ export default function Claims() {
         window.setTimeout(poll, 2000);
       }
     } catch (e) {
-      setError(e.response?.data?.message || e.message || "Unable to start M-PESA payment.");
+      const status = e?.response?.status;
+      const apiMessage = e?.response?.data?.message || e?.message;
+      toast.error(status && status >= 400 ? `M-PESA payment could not be started. ${apiMessage || "Please check the M-PESA details and try again."}` : (apiMessage || "Unable to start M-PESA payment."));
     } finally {
       setBusy("");
     }
@@ -139,8 +137,6 @@ export default function Claims() {
           <button className="portal-btn" onClick={load} disabled={loading}><RefreshCw size={16} />{loading ? "Refreshing…" : "Refresh"}</button>
         </header>
 
-        {error && <div className="portal-alert">{error}</div>}
-        {success && <div className="portal-alert success" role="status">{success}</div>}
 
         <section className="portal-panel community-member-intro">
           <div className="claim-card-head"><div><span>VERIFIED COMMUNITY SUPPORT</span><h2>Help with a rejected claim</h2><p>Administrators and SuperAdmin can open voluntary assistance for a declined case. Contributions are made through M-PESA and are tracked against a dedicated target.</p></div><ShieldCheck size={30} /></div>

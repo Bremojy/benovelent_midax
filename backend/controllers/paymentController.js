@@ -228,16 +228,26 @@ exports.stk = async (req, res) => {
     const upstream = extractUpstreamError(error);
     console.error("M-PESA STK error:", { stage: "daraja", ...upstream });
     const isUpstream404 = upstream.status === 404;
-    const clientStatus = isUpstream404 ? 502 : ([400, 401, 403, 409, 422, 429].includes(upstream.status || 0) ? upstream.status : 502);
+    // Any Daraja failure is an upstream payment-service problem, not an
+    // application authentication failure. Keep it in the 5xx family so the
+    // member portal can stay signed in and display a payment-specific message.
+    const clientStatus = 502;
+    const diagnosticMessage = isUpstream404
+      ? "Safaricom returned HTTP 404 for the STK request. Verify the Daraja production application, shortcode, environment and callback configuration."
+      : upstream.status === 400
+        ? "Safaricom rejected the STK request. Verify the production shortcode, passkey, consumer credentials, transaction type and callback URL."
+        : upstream.status === 401
+          ? "Safaricom rejected the Daraja credentials. Verify the production consumer key and consumer secret."
+          : upstream.status === 403
+            ? "Safaricom denied the Daraja request. Verify that the production application and shortcode are enabled for STK Push."
+            : "The M-PESA service could not complete the STK request. Your portal session is unchanged.";
     return res.status(clientStatus).json({
       success: false,
-      code: isUpstream404 ? "MPESA_DARAJA_404" : (upstream.code || "MPESA_STK_FAILED"),
+      code: isUpstream404 ? "MPESA_DARAJA_404" : "MPESA_STK_FAILED",
       upstreamStatus: upstream.status,
       paymentStage: "daraja",
-      message: isUpstream404
-        ? "Safaricom returned HTTP 404 for the STK request. The application route exists on this server; verify the Daraja production application, shortcode, environment and credentials."
-        : upstream.message,
-      endpoint: isUpstream404 ? endpointSummary().stk : undefined,
+      message: diagnosticMessage,
+      endpoint: endpointSummary().stk,
       details: process.env.NODE_ENV === "production" ? undefined : error.response?.data,
     });
   }

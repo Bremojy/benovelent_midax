@@ -25,38 +25,27 @@ let io;
 
 const initSocket = (server) => {
 
-    const normalizeOrigin = (value) => {
-        try {
-            const raw = String(value || "").trim();
-            if (!raw) return "";
-            return new URL(raw).origin.toLowerCase();
-        } catch {
-            return "";
-        }
-    };
-
     const allowedOrigins = String(
         process.env.CORS_ORIGINS ||
         "https://benovelent-midax.vercel.app,http://localhost:5173,http://127.0.0.1:5173"
     )
         .split(",")
-        .map(normalizeOrigin)
+        .map((value) => value.trim())
         .filter(Boolean);
+
+    const allowVercelPreviews = String(process.env.ALLOW_VERCEL_PREVIEWS || "false").toLowerCase() === "true";
 
     const isAllowedOrigin = (origin) => {
         if (!origin) return true;
-        const normalizedOrigin = normalizeOrigin(origin);
-        if (!normalizedOrigin) return false;
-        if (allowedOrigins.includes(normalizedOrigin)) return true;
-
-        try {
-            const url = new URL(normalizedOrigin);
-            if (
-                url.protocol === "https:" &&
-                /^(?:benovelent-midax)(?:-[a-z0-9-]+)?\.vercel\.app$/i.test(url.hostname)
-            ) return true;
-        } catch {}
-
+        if (allowedOrigins.includes(origin)) return true;
+        if (allowVercelPreviews) {
+            try {
+                const url = new URL(origin);
+                return url.protocol === "https:" && url.hostname.endsWith(".vercel.app");
+            } catch {
+                return false;
+            }
+        }
         return false;
     };
 
