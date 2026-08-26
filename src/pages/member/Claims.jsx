@@ -85,7 +85,7 @@ export default function Claims() {
       if (!data?.success) throw new Error(data?.message || "Unable to start M-PESA payment.");
       const transactionId = String(data?.transactionId || "");
       setPaymentStatus((current) => ({ ...current, [campaign._id]: { status: "pending", transactionId } }));
-      toast.success(data?.message || "M-PESA payment prompt sent to your phone. Complete the prompt on your phone.");
+      toast.success(data?.message || "Safaricom accepted the STK request. Check the selected M-PESA phone for the payment prompt.");
       if (transactionId) {
         let attempts = 0;
         const poll = async () => {
@@ -105,6 +105,23 @@ export default function Claims() {
               return;
             }
           } catch {}
+          if (attempts % 5 === 0) {
+            try {
+              const { data: queryData } = await API.post("/payments/stk-query", { transactionId });
+              const queried = queryData?.transaction;
+              if (queried?.status === "successful") {
+                setPaymentStatus((current) => ({ ...current, [campaign._id]: { status: "successful", transactionId, receipt: queried.mpesaReceiptNumber || "recorded" } }));
+                toast.success(`Community contribution confirmed. M-PESA receipt: ${queried.mpesaReceiptNumber || "recorded"}.`);
+                await load();
+                return;
+              }
+              if (queried?.status === "failed") {
+                setPaymentStatus((current) => ({ ...current, [campaign._id]: { status: "failed", transactionId } }));
+                toast.error(queried.resultDescription || "The M-PESA contribution was not completed.");
+                return;
+              }
+            } catch {}
+          }
           if (attempts < 30) window.setTimeout(poll, 2000);
         };
         window.setTimeout(poll, 2000);

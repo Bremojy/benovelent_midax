@@ -10,7 +10,7 @@ const createNotification = require("../utils/createNotification");
 const createAuditLog = require("../utils/createAuditLog");
 const Finance = require("../models/Finance");
 const MpesaB2CTransaction = require("../models/MpesaB2CTransaction");
-const { stkPush, b2cPayment, normalizePhone, normalizeAccountReference, isConfigured, isB2CConfigured, getConfigurationSummary, idempotencyKey, endpointSummary, extractUpstreamError } = require("../services/mpesaService");
+const { stkPush, stkQuery, b2cPayment, normalizePhone, normalizeAccountReference, isConfigured, isB2CConfigured, getConfigurationSummary, idempotencyKey, endpointSummary, extractUpstreamError } = require("../services/mpesaService");
 
 const modelMap = { SupportRequest, MedicalSupport, FuneralSupport, EducationSupport };
 
@@ -135,6 +135,7 @@ exports.routeStatus = async (_req, res) => {
     service: "payments",
     routes: {
       stk: "/api/payments/stk",
+      stkQuery: "/api/payments/stk-query",
       callback: "/api/payments/callback",
       b2c: "/api/payments/b2c/disburse",
       b2cResult: "/api/payments/b2c/result",
@@ -265,7 +266,9 @@ exports.stk = async (req, res) => {
             ? "Safaricom rejected the Daraja credentials. Verify the production consumer key and consumer secret."
             : upstream.status === 403
               ? "Safaricom denied the Daraja request. Verify that the production application and shortcode are enabled for STK Push."
-              : "The M-PESA service could not complete the STK request. Your portal session is unchanged.";
+              : /ETIMEDOUT|ECONNABORTED/i.test(String(upstream.code || ""))
+                ? "The M-PESA request timed out before Safaricom returned a response. The transaction may still be processing; check the payment again shortly."
+                : "The M-PESA service could not complete the STK request. Your portal session is unchanged.";
 
     return res.status(clientStatus).json({
       success: false,
@@ -274,8 +277,98 @@ exports.stk = async (req, res) => {
       paymentStage,
       message: diagnosticMessage,
       endpoint: paymentStage === "oauth" ? endpointSummary().oauth : endpointSummary().stk,
+      upstreamCode: upstream.code || null,
       transactionId: tx?._id || null,
       details: process.env.NODE_ENV === "production" ? undefined : error.response?.data,
+    });
+  }
+};
+
+async function reconcileSuccessfulTransaction(transaction) {
+  try {
+    if (transaction.purpose === "loan_repayment") await applyEducationRepayment(transaction);
+    if (transaction.purpose === "support_repayment") await applyGenericSupportRepayment(transaction);
+    else if (transaction.purpose === "community_assistance") await applyCommunityContribution(transaction);
+  } catch (applyError) {
+    transaction.status = "successful";
+    transaction.resultDescription = `Payment received; application reconciliation requires review: ${applyError.message}`;
+    await transaction.save();
+    console.error("M-PESA settlement application failed:", applyError);
+  }
+}
+
+exports.callbackHealth = async (_req, res) => {
+  res.status(405).json({
+    success: false,
+    code: "CALLBACK_POST_ONLY",
+    message: "M-PESA callback endpoint is active. Safaricom must call this endpoint with HTTP POST; a browser GET request is not a valid callback test.",
+    allowedMethod: "POST",
+    route: "/api/payments/callback",
+    callbackConfigured: Boolean(process.env.MPESA_CALLBACK_URL),
+    callbackUrl: process.env.MPESA_CALLBACK_URL || null,
+    timestamp: new Date().toISOString(),
+  });
+};
+
+exports.stkQuery = async (req, res) => {
+  try {
+    const transactionId = String(req.body?.transactionId || req.body?.id || "").trim();
+    const checkoutRequestId = String(req.body?.checkoutRequestId || "").trim();
+    if (!transactionId && !checkoutRequestId) {
+      return res.status(400).json({ success: false, code: "MPESA_QUERY_REFERENCE_REQUIRED", message: "A payment transaction ID or CheckoutRequestID is required." });
+    }
+
+    const transaction = transactionId
+      ? await MpesaTransaction.findOne({ _id: transactionId, member: req.user._id })
+      : await MpesaTransaction.findOne({ checkoutRequestId, member: req.user._id });
+    if (!transaction) return res.status(404).json({ success: false, code: "MPESA_TRANSACTION_NOT_FOUND", message: "Payment transaction not found." });
+
+    if (transaction.status === "successful" || transaction.status === "failed" || transaction.status === "reversed") {
+      return res.json({ success: true, settled: true, source: "database", transaction });
+    }
+    if (!transaction.checkoutRequestId) {
+      return res.status(409).json({ success: false, code: "MPESA_CHECKOUT_REQUEST_PENDING", settled: false, message: "Safaricom has not returned a CheckoutRequestID yet.", transaction });
+    }
+    if (!isConfigured()) {
+      return res.status(503).json({ success: false, code: "MPESA_NOT_CONFIGURED", settled: false, message: "M-PESA production credentials are not configured on the server." });
+    }
+
+    const result = await stkQuery({ checkoutRequestId: transaction.checkoutRequestId });
+    const resultCode = result?.ResultCode != null ? Number(result.ResultCode) : null;
+    transaction.resultCode = resultCode;
+    transaction.resultDescription = String(result?.ResultDesc || result?.ResponseDescription || transaction.resultDescription || "M-PESA status query completed.");
+
+    if (resultCode === 0) {
+      transaction.status = "successful";
+      transaction.completedAt = transaction.completedAt || new Date();
+      await transaction.save();
+      await reconcileSuccessfulTransaction(transaction);
+      return res.json({ success: true, settled: true, source: "safaricom-query", message: transaction.resultDescription, transaction });
+    }
+
+    if (resultCode != null && resultCode !== 0) {
+      transaction.status = "failed";
+      transaction.completedAt = transaction.completedAt || new Date();
+      await transaction.save();
+      return res.json({ success: true, settled: true, source: "safaricom-query", message: transaction.resultDescription || "M-PESA payment was not completed.", transaction });
+    }
+
+    await transaction.save();
+    return res.json({ success: true, settled: false, source: "safaricom-query", message: transaction.resultDescription || "M-PESA payment is still being processed.", transaction });
+  } catch (error) {
+    const upstream = extractUpstreamError(error);
+    console.error("M-PESA STK query error:", upstream);
+    return res.status(502).json({
+      success: false,
+      code: upstream.paymentStage === "oauth" ? "MPESA_OAUTH_FAILED" : "MPESA_STK_QUERY_FAILED",
+      upstreamStatus: upstream.status,
+      paymentStage: upstream.paymentStage,
+      message: upstream.paymentStage === "oauth"
+        ? "M-PESA authentication failed while checking the STK request. Verify the production Daraja consumer credentials."
+        : upstream.status === 400
+          ? "Safaricom rejected the STK status query. The original request may still be pending or may have expired."
+          : "Unable to confirm the M-PESA transaction status from Safaricom.",
+      endpoint: upstream.paymentStage === "oauth" ? endpointSummary().oauth : endpointSummary().stkQuery,
     });
   }
 };
@@ -288,40 +381,29 @@ exports.callback = async (req, res) => {
     const transaction = await MpesaTransaction.findOne({ checkoutRequestId });
     if (!transaction) return res.json({ ResultCode: 0, ResultDesc: "Accepted" });
 
-    // Daraja can retry callbacks. Never settle the same transaction twice.
-    if (transaction.status === "successful" && transaction.completedAt) {
-      return res.json({ ResultCode: 0, ResultDesc: "Already processed" });
-    }
-
     transaction.callbackPayload = req.body;
     transaction.resultCode = Number(callback.ResultCode ?? 1);
-    transaction.resultDescription = String(callback.ResultDesc || "");
-    transaction.completedAt = new Date();
+    transaction.resultDescription = String(callback.ResultDesc || transaction.resultDescription || "");
+
+    const items = Array.isArray(callback.CallbackMetadata?.Item) ? callback.CallbackMetadata.Item : [];
+    const getItem = (name) => items.find((item) => item.Name === name)?.Value;
+    const receipt = String(getItem("MpesaReceiptNumber") || "");
+    if (receipt) transaction.mpesaReceiptNumber = receipt;
 
     if (Number(callback.ResultCode) === 0) {
-      const items = Array.isArray(callback.CallbackMetadata?.Item) ? callback.CallbackMetadata.Item : [];
-      const getItem = (name) => items.find((item) => item.Name === name)?.Value;
-      transaction.mpesaReceiptNumber = String(getItem("MpesaReceiptNumber") || "");
+      const wasSuccessful = transaction.status === "successful";
       transaction.status = "successful";
+      transaction.completedAt = transaction.completedAt || new Date();
       await transaction.save();
-      try {
-        if (transaction.purpose === "loan_repayment") await applyEducationRepayment(transaction);
-        if (transaction.purpose === "support_repayment") await applyGenericSupportRepayment(transaction);
-        else if (transaction.purpose === "community_assistance") await applyCommunityContribution(transaction);
-      } catch (applyError) {
-        // Safaricom has already confirmed receipt. Never mark a paid transaction as failed
-        // merely because our secondary application reconciliation failed. Keep the money
-        // record successful and surface the reconciliation issue for admin review.
-        transaction.status = "successful";
-        transaction.resultDescription = `Payment received; application reconciliation requires review: ${applyError.message}`;
-        await transaction.save();
-        console.error("M-PESA settlement application failed:", applyError);
-      }
+      if (!wasSuccessful) await reconcileSuccessfulTransaction(transaction);
     } else {
       transaction.status = "failed";
+      transaction.completedAt = transaction.completedAt || new Date();
       await transaction.save();
     }
-  } catch (error) { console.error("M-PESA callback error:", error); }
+  } catch (error) {
+    console.error("M-PESA callback error:", error);
+  }
   return res.json({ ResultCode: 0, ResultDesc: "Accepted" });
 };
 

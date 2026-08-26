@@ -1,37 +1,34 @@
-# Benevolent MIDAX Patch Report
+# Benevolent MIDAX – M-PESA / Callback Diagnostic Update
 
-## Fixed
+## Included fixes
 
-1. **Invalid Admin/SuperAdmin chat member numbers**
-   - Removed generation of `AD...` / `SA...` identifiers inside `Member.memberNumber`.
-   - New portal chat profiles now receive valid `BM###` numbers through the existing member-number sequence allocator.
-   - Existing legacy chat profiles with invalid immutable numbers are repaired to a valid `BM###` number before synchronization.
+1. Added a dedicated `POST /api/payments/stk-query` endpoint that uses Safaricom STK Push Query with the transaction `CheckoutRequestID`.
+2. Added a shared successful-payment reconciliation path so callback settlement and STK Query settlement cannot double-apply the same transaction.
+3. Added `GET /api/payments/callback` diagnostics. The endpoint now explicitly returns `405 CALLBACK_POST_ONLY` instead of falling through to the generic `ROUTE_NOT_FOUND` handler. Safaricom remains expected to call the callback with `POST`.
+4. Added the STK Query endpoint to the payment route-status payload.
+5. Improved M-PESA diagnostics for OAuth, STK, STK Query, 404/401/403, timeout, and upstream error-code cases without exposing secrets.
+6. Added STK Query fallback polling to the reusable M-PESA payment component and the Member Claims community-assistance contribution flow.
+7. Changed the UI wording from claiming that a prompt was definitely displayed to the more accurate state that Safaricom accepted the STK request and the phone should be checked.
+8. Added stable `id`, `name`, `htmlFor`, and `autocomplete` attributes to the reusable M-PESA amount and phone fields, resolving the browser autofill warning for those fields.
+9. Updated the M-PESA contract test and added a dedicated callback/query contract test.
 
-2. **M-PESA STK/OAuth diagnostics**
-   - Daraja OAuth failures are explicitly tagged as `paymentStage: "oauth"`.
-   - STK request failures are explicitly tagged as `paymentStage: "stk"`.
-   - The API no longer mislabels OAuth failures as Safaricom STK rejections.
-   - Failed pending transactions are marked `failed` and their failure description is persisted.
-   - Frontend payment messages distinguish authentication failures from STK failures.
+## Important behavior
 
-3. **M-PESA configuration hardening**
-   - STK configuration now validates the transaction type against supported Daraja values.
-   - Removed the misleading hard-coded manual account-number fallback from the payment config response.
+- Opening `https://benovelent-midax.onrender.com/api/payments/callback` in a browser sends `GET`. That is not Safaricom's callback method. The updated backend responds with a clear 405 diagnostic instead of a generic route-not-found response.
+- The real Safaricom callback remains `POST /api/payments/callback`.
+- STK Query is used as a fallback while a transaction remains pending; it does not replace Safaricom's callback.
+- No production `.env` files were modified or included.
 
-4. **Contribution payment validation**
-   - `purpose=contribution` now requires a real contribution record belonging to the authenticated member.
-   - Payment cannot exceed the outstanding contribution balance.
+## Validation
 
-5. **M-PESA contract test**
-   - Updated stale source-pattern assertions to match the current implementation.
-   - Added checks for explicit OAuth/STK error-stage handling.
+Passed:
 
-## Verification
+- `npm test` – all configured project contract/regression suites passed.
+- `node --check` on all changed backend JavaScript files.
+- M-PESA STK contract test.
+- M-PESA callback/query contract test.
+- Static integrity, route, source-quality, UI, community M-PESA, and production-configuration contract tests.
 
-`npm test` PASSED all configured project regression/contract gates.
+Not run:
 
-The dedicated `mpesaStkContractTest.js` also PASSED.
-
-A Vite production build could not be executed because the uploaded source package does not contain installed `node_modules` and dependency installation was not available within the execution window.
-
-No real `.env`, `.env.local`, or `.env.production` files are included in the patched package.
+- Vite production build, because this source archive intentionally does not contain installed `node_modules` and dependency installation is environment-dependent.

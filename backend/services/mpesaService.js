@@ -44,6 +44,7 @@ const baseUrl = () => env("MPESA_ENVIRONMENT", "production").toLowerCase() === "
 const endpointSummary = () => ({
   oauth: `${baseUrl()}/oauth/v1/generate`,
   stk: `${baseUrl()}/mpesa/stkpush/v1/processrequest`,
+  stkQuery: `${baseUrl()}/mpesa/stkpushquery/v1/query`,
   b2c: `${baseUrl()}/mpesa/b2c/v1/paymentrequest`,
 });
 
@@ -120,6 +121,30 @@ async function stkPush({ phoneNumber, amount, accountReference, transactionDesc 
   return response.data;
 }
 
+async function stkQuery({ checkoutRequestId }) {
+  const accessToken = await getAccessToken();
+  const timestampValue = timestamp();
+  const shortcode = env("MPESA_SHORTCODE", DEFAULT_MPESA_SHORTCODE);
+  const password = Buffer.from(`${shortcode}${env("MPESA_PASSKEY")}${timestampValue}`).toString("base64");
+  const payload = {
+    BusinessShortCode: shortcode,
+    Password: password,
+    Timestamp: timestampValue,
+    CheckoutRequestID: String(checkoutRequestId || ""),
+  };
+  let response;
+  try {
+    response = await axios.post(`${baseUrl()}/mpesa/stkpushquery/v1/query`, payload, {
+      headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+      timeout: 20000,
+    });
+  } catch (error) {
+    error.paymentStage = "stk_query";
+    throw error;
+  }
+  return response.data;
+}
+
 async function b2cPayment({ phoneNumber, amount, remarks, occasion }) {
   const required = [
     "MPESA_CONSUMER_KEY",
@@ -178,4 +203,4 @@ const getConfigurationSummary = () => {
   };
 };
 
-module.exports = { isConfigured, isB2CConfigured, isDarajaConfigured, normalizePhone, normalizeAccountReference, stkPush, b2cPayment, idempotencyKey, getConfigurationSummary, endpointSummary, extractUpstreamError };
+module.exports = { isConfigured, isB2CConfigured, isDarajaConfigured, normalizePhone, normalizeAccountReference, stkPush, stkQuery, b2cPayment, idempotencyKey, getConfigurationSummary, endpointSummary, extractUpstreamError };

@@ -1,6 +1,6 @@
 import toast from "react-hot-toast";
 import { useEffect, useState } from "react";
-import { CheckCircle2, Loader2, Smartphone, XCircle } from "lucide-react";
+import { CheckCircle2, Clock3, Loader2, Smartphone, XCircle } from "lucide-react";
 import API from "../../services/api";
 import "./MpesaPaymentButton.css";
 
@@ -57,8 +57,25 @@ export default function MpesaPaymentButton({ purpose, referenceId, label = "Pay 
           return;
         }
         attempts += 1;
+        if (attempts % 5 === 0 && transactionId) {
+          try {
+            const query = await API.post("/payments/stk-query", { transactionId });
+            const refreshed = query.data?.transaction;
+            if (refreshed?.status === "successful") {
+              setStatus("success");
+              setMessage(`Payment confirmed. M-PESA receipt: ${refreshed.mpesaReceiptNumber || "recorded"}.`);
+              onSuccess?.({ transaction: refreshed });
+              return;
+            }
+            if (refreshed?.status === "failed") {
+              setStatus("error");
+              setMessage(refreshed.resultDescription || "M-PESA payment was not completed.");
+              return;
+            }
+          } catch {}
+        }
         if (attempts >= 30) {
-          setMessage("The STK request is still pending. You can close this window; the server will record the final M-PESA callback automatically.");
+          setMessage("The STK request is still pending. The server will continue accepting the Safaricom callback; you can safely close this window.");
           return;
         }
         window.setTimeout(poll, 2000);
@@ -109,7 +126,7 @@ export default function MpesaPaymentButton({ purpose, referenceId, label = "Pay 
       const { data } = await API.post("/payments/stk", payload);
       if (!data?.success) throw new Error(data?.message || "M-PESA request could not be submitted.");
       setTransactionId(String(data?.transactionId || ""));
-      setStatus("sent"); setMessage(data?.message || "STK Push sent. Check your phone and enter your M-PESA PIN.");
+      setStatus("sent"); setMessage(data?.message || "Safaricom accepted the STK request. Check your phone for the M-PESA prompt and enter your PIN.");
     } catch (error) {
       const statusCode = error.response?.status;
       const body = error.response?.data || {};
@@ -131,10 +148,10 @@ export default function MpesaPaymentButton({ purpose, referenceId, label = "Pay 
           <section className="mpesa-modal" role="dialog" aria-modal="true" aria-label="M-PESA payment">
             <div className="mpesa-modal-head"><div><span>M-PESA PAYMENT</span><h2>Secure payment request</h2></div><button type="button" className="mpesa-close" onClick={() => setOpen(false)} aria-label="Close">×</button></div>
             {!configured && <div className="mpesa-alert warning">M-PESA production credentials are not configured yet. Add Daraja credentials to the backend before collecting live money.</div>}
-            {message && <div className={`mpesa-alert ${["error"].includes(status) ? "error" : ["sent", "success"].includes(status) ? "success" : "warning"}`}>{["sent", "success"].includes(status) ? <CheckCircle2 size={17} /> : status === "error" ? <XCircle size={17} /> : null}<span>{message}</span></div>}
-            <form onSubmit={submit} className="mpesa-form">
-              <label>Amount (KES)<input type="number" min="1" step="1" value={amount} onChange={(e) => setAmount(e.target.value)} disabled={!configured || status === "sending"} /></label>
-              <label>M-PESA number<input type="tel" inputMode="numeric" placeholder="0712345678" value={phone} onChange={(e) => setPhone(e.target.value)} disabled={!configured || status === "sending"} /></label>
+            {message && <div className={`mpesa-alert ${["error"].includes(status) ? "error" : ["sent", "success"].includes(status) ? "success" : "warning"}`}>{["sent", "success"].includes(status) ? <CheckCircle2 size={17} /> : status === "error" ? <XCircle size={17} /> : status === "checking" ? <Clock3 size={17} /> : null}<span>{message}</span></div>}
+            <form onSubmit={submit} className="mpesa-form" aria-label="M-PESA payment form">
+              <label htmlFor="mpesa-payment-amount">Amount (KES)<input id="mpesa-payment-amount" name="amount" type="number" autoComplete="transaction-amount" min="1" step="1" value={amount} onChange={(e) => setAmount(e.target.value)} disabled={!configured || status === "sending"} /></label>
+              <label htmlFor="mpesa-payment-phone">M-PESA number<input id="mpesa-payment-phone" name="phoneNumber" type="tel" inputMode="numeric" autoComplete="tel" placeholder="0712345678" value={phone} onChange={(e) => setPhone(e.target.value)} disabled={!configured || status === "sending"} /></label>
               <div className="mpesa-account-note">Scheme collection: PayBill <strong>{mpesaConfig.manualPaybill || "247247"}</strong>{mpesaConfig.manualAccountNumber ? <> • Manual Account <strong>{mpesaConfig.manualAccountNumber}</strong></> : null}</div>
               {configured && <div className="mpesa-account-note">{mpesaConfig.environment === "sandbox" ? "Sandbox" : "Production"} STK merchant shortcode <strong>{mpesaConfig.shortCode || "configured"}</strong>{mpesaConfig.accountReference ? <> • Backend reference <strong>{mpesaConfig.accountReference}</strong></> : null}</div>}
               <button className="mpesa-submit" type="submit" disabled={!configured || status === "sending"}>{status === "sending" ? <><Loader2 size={17} className="mpesa-spin" /> Sending STK Push…</> : "Send STK Push"}</button>

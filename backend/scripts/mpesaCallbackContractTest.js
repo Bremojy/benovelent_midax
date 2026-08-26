@@ -1,0 +1,23 @@
+const fs = require("fs");
+const path = require("path");
+const root = path.resolve(__dirname, "../..");
+const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
+const route = read("backend/routes/paymentRoutes.js");
+const controller = read("backend/controllers/paymentController.js");
+const service = read("backend/services/mpesaService.js");
+const button = read("src/components/payments/MpesaPaymentButton.jsx");
+const claims = read("src/pages/member/Claims.jsx");
+
+const assert = (condition, message) => { if (!condition) throw new Error(message); };
+assert(route.includes('router.get("/callback", controller.callbackHealth);'), "Callback GET diagnostic route missing.");
+assert(route.includes('router.post("/callback", controller.callback);'), "Callback POST route missing.");
+assert(route.includes('router.post("/stk-query", protect, isMember, controller.stkQuery);'), "STK query route missing.");
+assert(controller.includes('exports.callbackHealth = async'), "Callback health handler missing.");
+assert(controller.includes('exports.stkQuery = async'), "STK query handler missing.");
+assert(controller.includes('reconcileSuccessfulTransaction'), "Shared successful-payment reconciliation missing.");
+assert(service.includes('/mpesa/stkpushquery/v1/query'), "Safaricom STK query endpoint missing.");
+assert(button.includes('id="mpesa-payment-amount"') && button.includes('name="amount"'), "M-PESA amount field accessibility attributes missing.");
+assert(button.includes('id="mpesa-payment-phone"') && button.includes('name="phoneNumber"'), "M-PESA phone field accessibility attributes missing.");
+assert(button.includes('API.post("/payments/stk-query"'), "Generic M-PESA button does not use STK query fallback.");
+assert(claims.includes('API.post("/payments/stk-query"'), "Claims community flow does not use STK query fallback.");
+console.log("MPESA callback/query contract test: PASS");
