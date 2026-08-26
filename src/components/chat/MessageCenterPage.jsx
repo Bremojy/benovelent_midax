@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { ArrowLeft, RefreshCw, SlidersHorizontal, X } from "lucide-react";
+import toast from "react-hot-toast";
 import socketClient from "../../sockets/socket";
 import DashboardLayout from "../../layouts/DashboardLayout";
 import ChatSidebar from "./ChatSidebar";
@@ -116,11 +117,9 @@ function MessageCenterPage({
         role: currentUser?.role || authUser?.role || "member",
       });
       activeSocket.emit("presence-heartbeat");
-      setBanner((current) =>
-        current === "Chat is reconnecting. Messaging stays available; calls will work once the secure call connection is ready."
-          ? ""
-          : current
-      );
+      if (typeof window !== "undefined") {
+        toast.dismiss("call-connect");
+      }
     };
 
     const handleCallNotification = (payload) => {
@@ -337,7 +336,7 @@ function MessageCenterPage({
   const selectConversation = (conversation) => {
     if (!conversation?._id) return;
     if (conversation.partner && isSameUser(normalizeContact(conversation.partner, conversation.partner?.role || "member"), actor)) {
-      setBanner("You cannot open a chat with yourself.");
+      toast.error("You cannot open a chat with yourself.");
       return;
     }
     const opened = { ...conversation, unreadCount: 0 };
@@ -351,7 +350,7 @@ function MessageCenterPage({
     try {
       if (!person?._id) return;
       if (isSameUser(person, actor)) {
-        setBanner("You cannot chat with yourself.");
+        toast.error("You cannot chat with yourself.");
         return;
       }
       const existingConversation =
@@ -367,13 +366,19 @@ function MessageCenterPage({
       }
 
       if (person.conversationId) {
-        const response = await API.get(`/conversations/${person.conversationId}`);
-        const conversation = normalizeConversation(response.data?.conversation || response.data, actor.id);
-        if (conversation) {
-          setConversations((previous) => [conversation, ...previous.filter((item) => String(item._id) !== String(conversation._id))]);
-          setSelectedConversation(conversation);
-          setMobileChatOpen(isMobile);
-          return;
+        try {
+          const response = await API.get(`/conversations/${person.conversationId}`);
+          const conversation = normalizeConversation(response.data?.conversation || response.data, actor.id);
+          if (conversation) {
+            setConversations((previous) => [conversation, ...previous.filter((item) => String(item._id) !== String(conversation._id))]);
+            setSelectedConversation(conversation);
+            setMobileChatOpen(isMobile);
+            return;
+          }
+        } catch (error) {
+          // A stale conversationId must not make "Choose a chat" appear broken.
+          // Fall through and let the canonical create endpoint resolve/recreate it.
+          console.warn("Stale conversationId; creating/resolving conversation:", error?.response?.status || error?.message || error);
         }
       }
 
@@ -385,17 +390,17 @@ function MessageCenterPage({
         setMobileChatOpen(isMobile);
       }
     } catch (error) {
-      setBanner(error.response?.data?.message || error.message || "Unable to start conversation.");
+      toast.error(error.response?.data?.message || error.message || "Unable to start conversation.");
     }
   };
 
   const refreshChat = async () => {
     try {
-      setBanner(onRefreshHint || "Messages refreshed.");
+      toast.success(onRefreshHint || "Messages refreshed.");
       await loadChatData();
     } catch (error) {
       console.error("Refresh chat error:", error);
-      setBanner(error?.message || "Unable to refresh conversations.");
+      toast.error(error?.message || "Unable to refresh conversations.");
     }
   };
 
@@ -414,11 +419,11 @@ function MessageCenterPage({
   const startCall = async (type) => {
     const partner = selectedConversation?.partner;
     if (!partner?._id) {
-      setBanner("Select a member before starting a call.");
+      toast.error("Select a member before starting a call.");
       return;
     }
     if (isSameUser(normalizeContact(partner, partner?.role || "member"), actor)) {
-      setBanner("Calling yourself is not available.");
+      toast.error("Calling yourself is not available.");
       setSelectedConversation(null);
       setMobileChatOpen(false);
       return;
@@ -428,12 +433,12 @@ function MessageCenterPage({
     try {
       await ensureCallNotifications();
       if (!activeSocket.connected) {
-        setBanner("Connecting to secure calling…");
+        toast.loading("Connecting to secure calling…", { id: "call-connect" });
         if (activeSocket.connect) activeSocket.connect();
         await waitForSocketConnection(activeSocket, 9000);
       }
 
-      setBanner("");
+      toast.dismiss("call-connect");
       setCall({
         direction: "outgoing",
         callType: type === "video" ? "video" : "audio",
@@ -443,7 +448,7 @@ function MessageCenterPage({
       });
     } catch (error) {
       console.warn("Unable to start call:", error);
-      setBanner("Secure calling is temporarily unavailable. Check your connection and try again.");
+      toast.error("Secure calling is temporarily unavailable. Check your connection and try again.");
     }
   };
 

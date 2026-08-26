@@ -4,6 +4,7 @@ import MessageBubble from "./MessageBubble";
 import MessageInput from "./MessageInput";
 import TypingIndicator from "./TypingIndicator";
 import API from "../../services/api";
+import toast from "react-hot-toast";
 import "./ChatWindow.css";
 
 function ChatWindow({ conversation, socket, currentUser, onBack, onAudioCall, onVideoCall }) {
@@ -51,7 +52,11 @@ function ChatWindow({ conversation, socket, currentUser, onBack, onAudioCall, on
         try { await API.put(`/conversations/${conversation._id}/read`); } catch (_) {}
       } catch (error) {
         console.error(error);
-        if (!cancelled) setChatError(error.response?.data?.message || error.message || "Unable to load this conversation.");
+        if (!cancelled) {
+          const message = error.response?.data?.message || error.message || "Unable to load this conversation.";
+          setChatError(message);
+          toast.error(message);
+        }
       } finally {
         if (!cancelled) setLoadingMessages(false);
       }
@@ -168,7 +173,9 @@ function ChatWindow({ conversation, socket, currentUser, onBack, onAudioCall, on
     } catch (error) {
       console.error(error);
       setMessages((previous) => previous.filter((item) => String(item._id) !== tempId));
-      setChatError(error.response?.data?.message || error.message || "Message could not be sent. Check your connection and try again.");
+      const message = error.response?.data?.message || error.message || "Message could not be sent. Check your connection and try again.";
+      setChatError(message);
+      toast.error(message);
       throw error;
     } finally {
       sendLockRef.current = false;
