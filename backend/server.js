@@ -80,22 +80,47 @@ const claimWorkflowRoutes = require("./routes/claimWorkflowRoutes");
 app.disable("x-powered-by");
 try { app.use(require("helmet")({ contentSecurityPolicy: false, crossOriginEmbedderPolicy: false })); } catch (_) { /* helmet optional during constrained builds */ }
 
-const allowedOrigins = String(process.env.CORS_ORIGINS || "https://benovelent-midax.vercel.app,http://localhost:5173,http://127.0.0.1:5173")
+const normalizeOrigin = (value) => {
+    try {
+        const raw = String(value || "").trim();
+        if (!raw) return "";
+        return new URL(raw).origin.toLowerCase();
+    } catch {
+        return "";
+    }
+};
+
+const allowedOrigins = String(
+    process.env.CORS_ORIGINS ||
+    "https://benovelent-midax.vercel.app,http://localhost:5173,http://127.0.0.1:5173"
+)
     .split(",")
-    .map((origin) => origin.trim())
+    .map(normalizeOrigin)
     .filter(Boolean);
-const allowVercelPreviews = String(process.env.ALLOW_VERCEL_PREVIEWS || "false").toLowerCase() === "true";
+
+const allowVercelPreviews = String(
+    process.env.ALLOW_VERCEL_PREVIEWS || "true"
+).toLowerCase() === "true";
 
 const isAllowedCorsOrigin = (origin) => {
-    if (!origin || allowedOrigins.includes(origin)) return true;
+    if (!origin) return true;
+    const normalizedOrigin = normalizeOrigin(origin);
+    if (!normalizedOrigin) return false;
+    if (allowedOrigins.includes(normalizedOrigin)) return true;
+
+    // Only allow preview URLs belonging to THIS Vercel project.
     if (allowVercelPreviews) {
         try {
-            const url = new URL(origin);
-            return url.protocol === "https:" && url.hostname.endsWith(".vercel.app");
+            const url = new URL(normalizedOrigin);
+            return (
+                url.protocol === "https:" &&
+                /^benovelent-midax(?:-[a-z0-9-]+)?\.vercel\.app$/i.test(url.hostname)
+            );
         } catch {
             return false;
         }
     }
+
     return false;
 };
 
