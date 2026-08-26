@@ -675,7 +675,7 @@ function AppContent() {
           />
 
           <Route path="/superadmin/platform" element={<ProtectedRoute allowedRoles={["superadmin"]}><Navigate to="/superadmin" replace /></ProtectedRoute>} />
-          <Route path="/superadmin/messages" element={<ProtectedRoute allowedRoles={["superadmin"]}><Navigate to="/superadmin" replace /></ProtectedRoute>} />
+          <Route path="/superadmin/messages" element={<ProtectedRoute allowedRoles={["superadmin"]}><AdminMessages /></ProtectedRoute>} />
           <Route path="/superadmin/members" element={<ProtectedRoute allowedRoles={["superadmin"]}><AdminMembers /></ProtectedRoute>} />
           <Route path="/superadmin/accounts" element={<ProtectedRoute allowedRoles={["superadmin"]}><AdminFinance /></ProtectedRoute>} />
           <Route path="/superadmin/finance" element={<Navigate to="/superadmin/accounts" replace />} />

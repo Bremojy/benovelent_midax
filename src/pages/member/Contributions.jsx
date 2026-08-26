@@ -89,12 +89,12 @@ export default function Contributions() {
         <section className="portal-panel accounts-trust-panel">
           <div className="portal-module-header compact-header"><div><span>PAYMENT TRANSPARENCY</span><h2>M-PESA collection details</h2><p>Use the scheme payment details shown here and keep every M-PESA confirmation for your records.</p></div><span className={`portal-badge ${mpesaReady ? "approved" : ""}`}>{mpesaReady ? "Online payment ready" : "Online payment unavailable"}</span></div>
           <div className="portal-stat-grid">
-            <Stat label="PayBill" value={mpesaConfig.shortCode || "650014"} />
-            <Stat label="Account" value={mpesaConfig.accountReference || "BENMIDAX"} />
+            <Stat label="PayBill" value={mpesaConfig.manualPaybill || "247247"} />
+            <Stat label="Account Number" value={mpesaConfig.manualAccountNumber || "0650186528835"} />
             <Stat label="Payment gateway" value={mpesaReady ? "Daraja STK" : "Manual / pending setup"} />
             <Stat label="M-PESA records" value={mpesaTransactions.length} />
           </div>
-          <div className="portal-alert"><strong>Important:</strong> use the collection PayBill and account reference shown above. The STK Push button uses only the secure Daraja configuration held by the backend.</div>
+          <div className="portal-alert"><strong>Important:</strong> use the collection PayBill and account number shown above. The STK Push button uses only the secure Daraja configuration held by the backend.</div>
         </section>
 
         <section className="portal-panel">

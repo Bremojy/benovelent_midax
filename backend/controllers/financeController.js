@@ -2,6 +2,7 @@ const Finance = require("../models/Finance");
 const Member = require("../models/Member");
 const Notification = require("../models/Notification");
 const Contribution = require("../models/Contribution");
+const redisCache = require("../services/redisCache");
 
 /* =====================================================
    GENERATE TRANSACTION NUMBER
@@ -73,6 +74,12 @@ exports.createTransaction = async (req, res) => {
 ===================================================== */
 
 exports.getTransactions = async (req, res) => {
+    const cacheKey = `finance:list:${String(req.user?.role || "user")}:${JSON.stringify(req.query || {})}`;
+    const cached = await redisCache.getJson(cacheKey);
+    if (cached !== null) return res.json(cached);
+    const __originalJson = res.json.bind(res);
+    res.json = (body) => { redisCache.setJson(cacheKey, body, 15).catch(() => {}); return __originalJson(body); };
+
 
     try {
 
@@ -611,6 +618,12 @@ exports.getMemberTransactions = async (req, res) => {
 ===================================================== */
 
 exports.getLedger = async (req, res) => {
+    const cacheKey = `finance:ledger:${String(req.user?._id || "all")}:${String(req.query?.year || new Date().getFullYear())}`;
+    const cached = await redisCache.getJson(cacheKey);
+    if (cached !== null) return res.json(cached);
+    const __originalJson = res.json.bind(res);
+    res.json = (body) => { redisCache.setJson(cacheKey, body, 20).catch(() => {}); return __originalJson(body); };
+
   try {
     const year = Number(req.query.year) || new Date().getFullYear();
     const filter = {
@@ -664,6 +677,12 @@ exports.getLedger = async (req, res) => {
 ===================================================== */
 
 exports.getFinanceSummary = async (req, res) => {
+    const cacheKey = `finance:summary:${String(req.user?.role || "user")}`;
+    const cached = await redisCache.getJson(cacheKey);
+    if (cached !== null) return res.json(cached);
+    const __originalJson = res.json.bind(res);
+    res.json = (body) => { redisCache.setJson(cacheKey, body, 20).catch(() => {}); return __originalJson(body); };
+
 
     try {
 
@@ -745,6 +764,12 @@ exports.getFinanceSummary = async (req, res) => {
 
 
 exports.getMemberAccounts = async (req, res) => {
+    const cacheKey = `member:${req.user?._id}:accounts:${String(req.query?.year || new Date().getFullYear())}`;
+    const cached = await redisCache.getJson(cacheKey);
+    if (cached !== null) return res.json(cached);
+    const __originalJson = res.json.bind(res);
+    res.json = (body) => { redisCache.setJson(cacheKey, body, 15).catch(() => {}); return __originalJson(body); };
+
   try {
     const year = Number(req.query.year) || new Date().getFullYear();
     const yearStart = new Date(`${year}-01-01T00:00:00.000Z`);

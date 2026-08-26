@@ -3,6 +3,7 @@ const REDIS_URL = process.env.UPSTASH_REDIS_REST_URL || process.env.REDIS_REST_U
 const REDIS_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN || process.env.REDIS_REST_TOKEN || "";
 
 function key(name) { return `${PREFIX}:${String(name).replace(/^:+/, "")}`; }
+function makeCacheKey(scope, parts = {}) { return `${scope}:${Object.entries(parts).sort(([a],[b]) => a.localeCompare(b)).map(([k,v]) => `${k}=${encodeURIComponent(String(v ?? ""))}`).join("&")}`; }
 function enabled() { return Boolean(REDIS_URL && REDIS_TOKEN && typeof fetch === "function"); }
 
 async function command(parts) {
@@ -46,4 +47,4 @@ async function health() {
   const pong = await command(["PING"]);
   return { enabled: true, connected: pong === "PONG" };
 }
-module.exports = { enabled, get, set, del, getJson, setJson, cacheAside, invalidateMany, health };
+module.exports = { enabled, get, set, del, getJson, setJson, cacheAside, invalidateMany, health, makeCacheKey };

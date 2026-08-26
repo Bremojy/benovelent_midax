@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, Wallet, HandHeart, MessageCircle, UserRound, UserPlus, ClipboardList, ShieldCheck, DatabaseZap, Landmark } from "lucide-react";
+import { LayoutDashboard, Users, Wallet, HandHeart, MessageCircle, UserRound, UserPlus, ClipboardList, ShieldCheck, DatabaseZap, Landmark, Bell, Settings, Newspaper, Vote, FileText, Megaphone } from "lucide-react";
 
 export const dashboardMenus = {
   member: [
@@ -9,6 +9,11 @@ export const dashboardMenus = {
     { title: "Support", icon: HandHeart, path: "/member/support" },
     { title: "Claims & Community Support", icon: HandHeart, path: "/member/claims" },
     { title: "Chat", icon: MessageCircle, path: "/member/messages" },
+    { title: "Notifications", icon: Bell, path: "/member/notifications" },
+    { title: "Announcements", icon: Megaphone, path: "/member/announcements" },
+    { title: "Benefits", icon: FileText, path: "/member/benefits" },
+    { title: "Polls", icon: Vote, path: "/member/polls" },
+    { title: "Settings", icon: Settings, path: "/member/settings" },
   ],
   admin: [
     { title: "Dashboard", icon: LayoutDashboard, path: "/admin" },
@@ -17,17 +22,27 @@ export const dashboardMenus = {
     { title: "Claims", icon: HandHeart, path: "/admin/claims" },
     { title: "Support", icon: HandHeart, path: "/admin/support" },
     { title: "Chat", icon: MessageCircle, path: "/admin/messages" },
+    { title: "Notifications", icon: Bell, path: "/admin/notifications" },
+    { title: "Polls", icon: Vote, path: "/admin/polls" },
+    { title: "Feedback", icon: FileText, path: "/admin/feedback" },
+    { title: "Settings", icon: Settings, path: "/admin/settings" },
   ],
   superadmin: [
     { title: "Dashboard", icon: LayoutDashboard, path: "/superadmin" },
     { title: "Administrators", icon: UserPlus, path: "/superadmin/admins" },
     { title: "Members", icon: Users, path: "/superadmin/members" },
     { title: "Accounts", icon: Wallet, path: "/superadmin/accounts" },
+    { title: "Claims", icon: HandHeart, path: "/superadmin/claims" },
+    { title: "Support", icon: HandHeart, path: "/superadmin/support" },
+    { title: "Chat", icon: MessageCircle, path: "/superadmin/messages" },
+    { title: "Notifications", icon: Bell, path: "/superadmin/notifications" },
+    { title: "News", icon: Newspaper, path: "/superadmin/news" },
+    { title: "Policies", icon: FileText, path: "/superadmin/policies" },
+    { title: "Polls", icon: Vote, path: "/superadmin/polls" },
     { title: "Audit", icon: ClipboardList, path: "/superadmin/audit" },
     { title: "Data Integrity", icon: DatabaseZap, path: "/superadmin/data-integrity" },
     { title: "System", icon: ShieldCheck, path: "/superadmin/system" },
     { title: "Constitution", icon: Landmark, path: "/superadmin/constitution" },
-    { title: "Claims", icon: HandHeart, path: "/superadmin/claims" },
-    { title: "Support", icon: HandHeart, path: "/superadmin/support" },
+    { title: "Settings", icon: Settings, path: "/superadmin/settings" },
   ],
 };

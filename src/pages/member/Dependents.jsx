@@ -1,3 +1,4 @@
+import { confirmAction } from "../../utils/modernDialog";
 import { useEffect, useState } from "react";
 import DashboardLayout from "../../layouts/DashboardLayout";
 import API from "../../services/api";
@@ -49,7 +50,7 @@ export default function Dependents() {
   };
 
   const remove = async (id) => {
-    if (!window.confirm("Remove this dependent from your active list?")) return;
+    if (!await confirmAction("Remove this dependent from your active list?")) return;
     try {
       const { data } = await API.delete(`/dependents/${id}`);
       if (!data?.success) throw new Error(data?.message || "Unable to remove dependent.");

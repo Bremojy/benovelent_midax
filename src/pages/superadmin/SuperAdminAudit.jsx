@@ -1,3 +1,4 @@
+import { confirmAction } from "../../utils/modernDialog";
 import { useEffect, useMemo, useState } from "react";
 import DashboardLayout from "../../layouts/DashboardLayout";
 import API from "../../services/api";
@@ -44,7 +45,7 @@ export default function SuperAdminAudit() {
   }, [coverage, query, role]);
 
   const deleteLog = async (id) => {
-    if (!window.confirm("Delete this audit record?")) return;
+    if (!await confirmAction("Delete this audit record?")) return;
     try {
       await API.delete(`/audit-logs/${id}`);
       await load();

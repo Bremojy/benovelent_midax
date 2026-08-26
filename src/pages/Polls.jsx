@@ -1,3 +1,4 @@
+import { confirmAction } from "../utils/modernDialog";
 
 import { useEffect, useMemo, useState } from "react";
 import { BarChart3, CheckCircle2, FileDown, Plus, RefreshCw, Trash2, Vote } from "lucide-react";
@@ -96,7 +97,7 @@ export default function Polls({ mode = "member" }) {
   };
 
   const deletePoll = async (pollId) => {
-    if (!window.confirm("Delete this poll?")) return;
+    if (!await confirmAction("Delete this poll?")) return;
     try {
       setError("");
       await API.delete(`/polls/${pollId}`);

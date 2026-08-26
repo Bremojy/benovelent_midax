@@ -1,3 +1,4 @@
+import { confirmAction } from "../../utils/modernDialog";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
@@ -207,7 +208,7 @@ export default function SuperAdminDataIntegrity() {
   };
 
   const deleteDuplicateMember = async (memberId, memberName) => {
-    const confirmed = window.confirm(`Permanently delete duplicate member "${memberName || memberId}"? This is only allowed for a non-canonical duplicate with no linked records.`);
+    const confirmed = await confirmAction(`Permanently delete duplicate member "${memberName || memberId}"? This is only allowed for a non-canonical duplicate with no linked records.`);
     if (!confirmed) return;
     try {
       setDeletingId(memberId);
@@ -239,7 +240,7 @@ export default function SuperAdminDataIntegrity() {
   };
 
   const deepScanCarousels = async () => {
-    if (!window.confirm("Run a deep carousel scan? The backend will inspect Cloudinary/public image URLs, refresh SHA-256 hashes, then remove only confirmed duplicate slides while keeping the newest copy.")) return;
+    if (!await confirmAction("Run a deep carousel scan? The backend will inspect Cloudinary/public image URLs, refresh SHA-256 hashes, then remove only confirmed duplicate slides while keeping the newest copy.")) return;
     try {
       setCleaningCarousels(true); setError(""); setMessage("");
       const { data } = await API.post("/superadmin/data-integrity/cleanup/carousels/deep");
@@ -251,7 +252,7 @@ export default function SuperAdminDataIntegrity() {
   };
 
   const cleanCarouselDuplicates = async () => {
-    const confirmed = window.confirm(
+    const confirmed = await confirmAction(
       "Remove only duplicate carousel slides? The newest matching slide will be kept. Other member, finance and chat records will not be changed."
     );
     if (!confirmed) return;
@@ -271,7 +272,7 @@ export default function SuperAdminDataIntegrity() {
   };
 
   const runCleanup = async () => {
-    const confirmed = window.confirm(
+    const confirmed = await confirmAction(
       "Run SAFE cleanup? Duplicate accounts will be archived, duplicate conversations will be merged, orphaned chat data will be removed, and duplicate carousel slides will be removed. Financial and support records are preserved."
     );
     if (!confirmed) return;
@@ -291,7 +292,7 @@ export default function SuperAdminDataIntegrity() {
   };
 
   const runDirectAction = async (path, confirmText, successFallback) => {
-    if (!window.confirm(confirmText)) return;
+    if (!await confirmAction(confirmText)) return;
     try {
       setCleaning(true); setError(""); setMessage("");
       const { data } = await API.post(path);

@@ -11,6 +11,7 @@ const mpesaFriendlyError = (error) => {
   const status = Number(error?.response?.status || 0);
   const body = error?.response?.data || {};
   const message = String(body?.message || error?.message || "M-PESA request failed.");
+  if (status === 404) return "The deployed payment API route is missing (404). Deploy the updated backend so /api/payments/stk is available.";
   if (body?.code === "MPESA_STK_FAILED" || body?.paymentStage === "daraja") {
     if (status === 400 || Number(body?.upstreamStatus) === 400) return "Safaricom rejected the STK request. Check the M-PESA phone number, shortcode, passkey and production Daraja credentials, then try again.";
     if (status === 401 || Number(body?.upstreamStatus) === 401) return "M-PESA authentication was rejected by Safaricom. The Daraja consumer key/secret or environment needs to be checked by the administrator.";
@@ -67,15 +68,29 @@ export default function MpesaPaymentButton({ purpose, referenceId, label = "Pay 
   const openPayment = async () => {
     setStatus("checking"); setMessage("");
     try {
-      const { data } = await API.get("/payments/config");
-      setConfigured(Boolean(data?.configured));
+      const [configResponse, routeResponse] = await Promise.all([
+        API.get("/payments/config"),
+        API.get("/payments/route-status"),
+      ]);
+      const data = configResponse.data || {};
+      const route = routeResponse.data || {};
+      setConfigured(Boolean(data?.enabled && data?.configured && route?.routes?.stk));
       setMpesaConfig({
         shortCode: String(data?.shortCode || ""),
+        manualPaybill: String(data?.manualPaybill || "247247"),
+        manualAccountNumber: String(data?.manualAccountNumber || "0650186528835"),
         accountReference: String(data?.accountReference || ""),
         environment: String(data?.environment || "production"),
+        routeAvailable: Boolean(route?.routes?.stk),
       });
       setStatus("idle"); setOpen(true);
-    } catch { setConfigured(false); setMpesaConfig({ shortCode: "", accountReference: "", environment: "production" }); setStatus("idle"); setOpen(true); }
+    } catch (error) {
+      setConfigured(false);
+      setMpesaConfig({ shortCode: "", manualPaybill: "247247", manualAccountNumber: "0650186528835", accountReference: "", environment: "production", routeAvailable: false });
+      setStatus("idle");
+      setOpen(true);
+      if (Number(error?.response?.status) === 404) setMessage("The payment API route is missing from the deployed backend. Deploy the current backend before using STK Push.");
+    }
   };
 
   const submit = async (event) => {
@@ -117,7 +132,7 @@ export default function MpesaPaymentButton({ purpose, referenceId, label = "Pay 
             <form onSubmit={submit} className="mpesa-form">
               <label>Amount (KES)<input type="number" min="1" step="1" value={amount} onChange={(e) => setAmount(e.target.value)} disabled={!configured || status === "sending"} /></label>
               <label>M-PESA number<input type="tel" inputMode="numeric" placeholder="0712345678" value={phone} onChange={(e) => setPhone(e.target.value)} disabled={!configured || status === "sending"} /></label>
-              <div className="mpesa-account-note">Scheme collection: PayBill <strong>{mpesaConfig.shortCode || "650014"}</strong>{mpesaConfig.accountReference ? <> • Account <strong>{mpesaConfig.accountReference}</strong></> : null}</div>
+              <div className="mpesa-account-note">Scheme collection: PayBill <strong>{mpesaConfig.manualPaybill || "247247"}</strong>{mpesaConfig.manualAccountNumber ? <> • Manual Account <strong>{mpesaConfig.manualAccountNumber}</strong></> : null}</div>
               {configured && <div className="mpesa-account-note">{mpesaConfig.environment === "sandbox" ? "Sandbox" : "Production"} STK merchant shortcode <strong>{mpesaConfig.shortCode || "configured"}</strong>{mpesaConfig.accountReference ? <> • Backend reference <strong>{mpesaConfig.accountReference}</strong></> : null}</div>}
               <button className="mpesa-submit" type="submit" disabled={!configured || status === "sending"}>{status === "sending" ? <><Loader2 size={17} className="mpesa-spin" /> Sending STK Push…</> : "Send STK Push"}</button>
               <p className="mpesa-small">Your M-PESA PIN is entered only on the M-PESA prompt. Final payment status is confirmed by the server callback.</p>

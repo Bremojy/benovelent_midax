@@ -1,3 +1,4 @@
+import { confirmAction } from "../../utils/modernDialog";
 import { useEffect, useMemo, useState } from "react";
 import {
   Check,
@@ -308,7 +309,7 @@ export default function SuperAdminSettings() {
   };
 
   const deleteSlide = async (slideId) => {
-    if (!window.confirm("Delete this carousel slide?")) return;
+    if (!await confirmAction("Delete this carousel slide?")) return;
     try {
       setError("");
       await API.delete(`/carousel/${slideId}`);
@@ -400,7 +401,7 @@ export default function SuperAdminSettings() {
   };
 
   const deleteLeader = async (leaderId) => {
-    if (!window.confirm("Delete this leader?")) return;
+    if (!await confirmAction("Delete this leader?")) return;
     try {
       setError("");
       await API.delete(`/leaders/${leaderId}`);

@@ -1,3 +1,4 @@
+import { confirmAction } from "../../utils/modernDialog";
 import { useEffect, useMemo, useState } from "react";
 import { Edit3, Layers3, Plus, RefreshCw, Trash2, ShieldCheck, LockKeyhole, WalletCards } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
@@ -215,7 +216,7 @@ export default function AdminFinance() {
 
   const payoutCommunity = async (campaign) => {
     if (!isSuperAdmin || !Number(campaign?.raisedAmount)) return;
-    if (!window.confirm(`Disburse ${number(campaign.raisedAmount)} to ${campaign.recipientMember?.fullName || "the registered recipient"}?`)) return;
+    if (!await confirmAction(`Disburse ${number(campaign.raisedAmount)} to ${campaign.recipientMember?.fullName || "the registered recipient"}?`)) return;
     try {
       setCommunityBusy(`payout-${campaign._id}`);
       setError("");
@@ -246,7 +247,7 @@ export default function AdminFinance() {
 
   const closeCommunity = async (campaign) => {
     if (!isSuperAdmin) return;
-    if (!window.confirm(`Close the M-PESA collection for “${campaign.title}”? No further member contributions will be accepted.`)) return;
+    if (!await confirmAction(`Close the M-PESA collection for “${campaign.title}”? No further member contributions will be accepted.`)) return;
     try {
       setCommunityBusy(`close-${campaign._id}`);
       setError("");
@@ -262,7 +263,7 @@ export default function AdminFinance() {
   };
 
   const removeTransaction = async (transaction) => {
-    if (!window.confirm("Delete this transaction permanently?")) return;
+    if (!await confirmAction("Delete this transaction permanently?")) return;
     try {
       setSaving(true);
       await API.delete(`/finance/${transaction._id}`);
@@ -278,7 +279,7 @@ export default function AdminFinance() {
   const toggleTransactionVisibility = async (transaction) => {
     if (!isSuperAdmin) return;
     const nextHidden = !Boolean(transaction.hidden);
-    if (!window.confirm(nextHidden ? "Hide this transaction from the community ledger?" : "Restore this transaction to the community ledger?")) return;
+    if (!await confirmAction(nextHidden ? "Hide this transaction from the community ledger?" : "Restore this transaction to the community ledger?")) return;
     try {
       setSaving(true);
       const { data } = await API.patch(`/finance/${transaction._id}/visibility`, { hidden: nextHidden });
@@ -329,8 +330,9 @@ export default function AdminFinance() {
           <div className="portal-stat-grid">
             <Stat label="STK status" value={mpesaConfig?.configured ? "Ready" : "Not configured"} />
             <Stat label="B2C payout status" value={mpesaConfig?.b2cConfigured ? "Ready" : "Not configured"} />
-            <Stat label="Collection PayBill" value={mpesaConfig?.shortCode || "650014"} />
-            <Stat label="Collection account" value={mpesaConfig?.accountReference || "BENMIDAX"} />
+            <Stat label="Daraja shortcode" value={mpesaConfig?.shortCode || "650014"} />
+            <Stat label="Manual account" value={mpesaConfig?.manualAccountNumber || "0650186528835"} />
+            <Stat label="Manual PayBill" value={mpesaConfig?.manualPaybill || "247247"} />
           </div>
           <div className={`portal-alert ${mpesaConfig?.configured ? "success" : ""}`}><strong>{mpesaConfig?.configured ? "STK Push is enabled on the backend." : "STK Push is not ready."}</strong> {mpesaConfig?.message || "Complete the production Daraja configuration before processing live payments."}</div>
         </section>

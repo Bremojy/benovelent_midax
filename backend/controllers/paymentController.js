@@ -116,6 +116,8 @@ exports.config = async (_req, res) => {
     enabled,
     ready: stkConfigured && b2cConfigured,
     shortCode: String(process.env.MPESA_SHORTCODE || "650014"),
+    manualPaybill: String(process.env.MPESA_MANUAL_PAYBILL || "247247"),
+    manualAccountNumber: String(process.env.MPESA_MANUAL_ACCOUNT_NUMBER || "0650186528835"),
     accountReference: normalizeAccountReference(process.env.MPESA_ACCOUNT_REFERENCE || "BENMIDAX"),
     environment: String(process.env.MPESA_ENVIRONMENT || "production"),
     message: !enabled

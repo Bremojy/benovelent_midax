@@ -1,3 +1,4 @@
+import { confirmAction, messageDialog } from "../../utils/modernDialog";
 import {
   useEffect,
   useMemo,
@@ -247,7 +248,7 @@ function AdminMembers() { const { role }=useAuth(); const isSuperAdmin=role==="s
     if (!memberId) return;
 
     const confirmed =
-      window.confirm(
+      await confirmAction(
         `PERMANENT DELETION\n\n${member.fullName || "This member"} and the member's profile, dependents, support records, contribution/finance records, notifications and chat messages/conversations will be permanently deleted. This cannot be undone.\n\nMake sure a backup has been downloaded from Data Integrity first. Continue?`
       );
 
@@ -325,7 +326,7 @@ function AdminMembers() { const { role }=useAuth(); const isSuperAdmin=role==="s
         : "suspend";
 
     const confirmed =
-      window.confirm(
+      await confirmAction(
         `Are you sure you want to ${action} ${
           member.fullName ||
           "this member"
@@ -382,7 +383,7 @@ function AdminMembers() { const { role }=useAuth(); const isSuperAdmin=role==="s
       setError("The member must complete the profile to 100% before verification.");
       return;
     }
-    const confirmed = window.confirm(`Verify ${member.fullName || "this member"}? After verification, the member can add dependents and submit support requests.`);
+    const confirmed = await confirmAction(`Verify ${member.fullName || "this member"}? After verification, the member can add dependents and submit support requests.`);
     if (!confirmed) return;
     try {
       setVerifyingId(memberId);
@@ -412,7 +413,7 @@ function AdminMembers() { const { role }=useAuth(); const isSuperAdmin=role==="s
     if (!memberId) return;
 
     const confirmed =
-      window.confirm(
+      await confirmAction(
         `Reset the password for ${
           member.fullName ||
           "this member"
@@ -1736,13 +1737,9 @@ Temporary Password: ${
         text
       );
 
-      window.alert(
-        "Credentials copied."
-      );
+      await messageDialog("Credentials copied.", { title: "Credentials copied" });
     } catch {
-      window.alert(
-        "Unable to copy credentials."
-      );
+      await messageDialog("Unable to copy credentials.", { title: "Copy failed" });
     }
   };
 

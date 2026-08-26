@@ -6,6 +6,7 @@ const PushSubscription = require("../models/PushSubscription");
 const { getPublicKey } = require("../services/pushService");
 const { getIO } = require("../sockets/socket");
 const { sendPushForNotification } = require("../services/pushService");
+const redisCache = require("../services/redisCache");
 
 function senderModelFromUser(user = {}) {
   const role = String(user.role || "").toLowerCase();
@@ -19,6 +20,12 @@ GET MY NOTIFICATIONS
 ===================================================== */
 
 exports.getNotifications = async (req, res) => {
+    const cacheKey = `notifications:${req.user._id}:${JSON.stringify(req.query || {})}`;
+    const cached = await redisCache.getJson(cacheKey);
+    if (cached !== null) return res.json(cached);
+    const __originalJson = res.json.bind(res);
+    res.json = (body) => { redisCache.setJson(cacheKey, body, 10).catch(() => {}); return __originalJson(body); };
+
   try {
     const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
     const limit = Math.min(100, Math.max(1, Number.parseInt(req.query.limit, 10) || 50));
@@ -56,6 +63,12 @@ UNREAD COUNT
 ===================================================== */
 
 exports.getUnreadCount = async (req, res) => {
+    const cacheKey = `notifications:${req.user._id}:unread`;
+    const cached = await redisCache.getJson(cacheKey);
+    if (cached !== null) return res.json(cached);
+    const __originalJson = res.json.bind(res);
+    res.json = (body) => { redisCache.setJson(cacheKey, body, 5).catch(() => {}); return __originalJson(body); };
+
   try {
     const unread = await Notification.countDocuments({
       recipient: req.user._id,

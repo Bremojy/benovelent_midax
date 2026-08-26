@@ -3,6 +3,7 @@ const Member = require("../models/Member");
 const Admin = require("../models/Admin");
 const SuperAdmin = require("../models/SuperAdmin");
 const { ensureChatProfile } = require("../utils/chatProfile");
+const redisCache = require("../services/redisCache");
 
 const resolveChatActor = async (id) => {
     const chatId = String(id || "").trim();
@@ -120,6 +121,12 @@ GET MY CONVERSATIONS
 ===================================================== */
 
 exports.getMyConversations=async(req,res)=>{
+    const cacheKey = `chat:${req.auth?.chatId || req.user._id}:conversations`;
+    const cached = await redisCache.getJson(cacheKey);
+    if (cached !== null) return res.json(cached);
+    const __originalJson = res.json.bind(res);
+    res.json = (body) => { redisCache.setJson(cacheKey, body, 10).catch(() => {}); return __originalJson(body); };
+
 
 try{
 

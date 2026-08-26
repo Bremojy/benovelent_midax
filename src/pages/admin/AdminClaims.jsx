@@ -1,3 +1,4 @@
+import { confirmAction } from "../../utils/modernDialog";
 import { useEffect, useMemo, useState } from "react";
 import { HeartHandshake, Megaphone, Trash2, Smartphone, WalletCards, LockKeyhole, RefreshCw } from "lucide-react"
 import { useAuth } from "../../context/AuthContext";
@@ -150,7 +151,7 @@ export default function AdminClaims() {
 
   const payoutCommunity = async (campaign) => {
     if (!isSuperAdmin) return;
-    if (!window.confirm(`Disburse ${money(campaign.raisedAmount)} raised for this community case to the recipient's registered M-PESA number? This sends a real B2C payout when the production credentials are configured.`)) return;
+    if (!await confirmAction(`Disburse ${money(campaign.raisedAmount)} raised for this community case to the recipient's registered M-PESA number? This sends a real B2C payout when the production credentials are configured.`)) return;
     try {
       setBusy(`payout-${campaign._id}`);
       setError("");
@@ -167,7 +168,7 @@ export default function AdminClaims() {
 
   const closeCommunity = async (campaign) => {
     if (!isSuperAdmin) return;
-    if (!window.confirm(`Close ${campaign.title}? Members will no longer be able to contribute through the community M-PESA request.`)) return;
+    if (!await confirmAction(`Close ${campaign.title}? Members will no longer be able to contribute through the community M-PESA request.`)) return;
     try {
       setBusy(`close-${campaign._id}`);
       setError("");
@@ -183,7 +184,7 @@ export default function AdminClaims() {
   };
 
   const deleteClaim = async (c) => {
-    if (!isSuperAdmin || !window.confirm("Delete this claim permanently? This cannot be undone.")) return;
+    if (!isSuperAdmin || !await confirmAction("Delete this claim permanently? This cannot be undone.")) return;
     try {
       setBusy(`delete-${c._id}`);
       await API.delete(`/claims/${c.sourceType}/${c._id}`);
@@ -197,7 +198,7 @@ export default function AdminClaims() {
   };
 
   const reopenClaim = async (c) => {
-    if (!window.confirm(`Reopen this ${typeLabel(c.supportType)} case and return it to Under Review?`)) return;
+    if (!await confirmAction(`Reopen this ${typeLabel(c.supportType)} case and return it to Under Review?`)) return;
     try {
       setBusy(`reopen-${c._id}`); setError(""); setSuccess("");
       const { data } = await API.put(`/claims/${c.sourceType}/${c._id}/stage`, { status: "Under Review", remarks: "Case reopened by SuperAdmin for further review." });

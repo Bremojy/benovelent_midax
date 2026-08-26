@@ -1,3 +1,4 @@
+import { confirmAction } from "../../utils/modernDialog";
 
 import { useEffect, useState } from "react";
 import { BellRing, Mail, Phone, UserPlus } from "lucide-react";
@@ -105,7 +106,7 @@ export default function AdminSupport() {
 
   const deleteContactMessage = async (id) => {
     if (!id) return;
-    if (!window.confirm("Delete this contact submission?")) return;
+    if (!await confirmAction("Delete this contact submission?")) return;
     try {
       setError("");
       setSuccess("");
@@ -119,7 +120,7 @@ export default function AdminSupport() {
 
   const deleteSupportRequest = async (id) => {
     if (!id) return;
-    if (!window.confirm("Delete this support request permanently?")) return;
+    if (!await confirmAction("Delete this support request permanently?")) return;
     try {
       setError("");
       setSuccess("");

@@ -1,3 +1,4 @@
+import { confirmAction } from "../../utils/modernDialog";
 import { useEffect, useState } from "react";
 import { Edit3, Plus, Save, Trash2, X } from "lucide-react";
 import DashboardLayout from "../../layouts/DashboardLayout";
@@ -35,7 +36,7 @@ export default function SuperAdminPolicies() {
   };
   const edit = (policy) => { setEditing(policy._id); setForm({ ...blank, ...policy }); setMessage(""); setError(""); window.scrollTo({ top: 0, behavior: "smooth" }); };
   const remove = async (id) => {
-    if (!window.confirm("Delete this policy? Existing records are retained, but the policy will no longer be available for new applications.")) return;
+    if (!await confirmAction("Delete this policy? Existing records are retained, but the policy will no longer be available for new applications.")) return;
     try { setBusy(true); await API.delete(`/policies/${id}`); setPolicies((current) => current.filter((item) => item._id !== id)); setMessage("Policy deleted."); }
     catch (err) { setError(err.response?.data?.message || err.message || "Unable to delete policy."); }
     finally { setBusy(false); }
