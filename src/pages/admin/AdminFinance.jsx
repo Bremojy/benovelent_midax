@@ -329,8 +329,8 @@ export default function AdminFinance() {
           <div className="portal-stat-grid">
             <Stat label="STK status" value={mpesaConfig?.configured ? "Ready" : "Not configured"} />
             <Stat label="B2C payout status" value={mpesaConfig?.b2cConfigured ? "Ready" : "Not configured"} />
-            <Stat label="Collection PayBill" value="247247" />
-            <Stat label="Collection account" value="0650186528835" />
+            <Stat label="Collection PayBill" value={mpesaConfig?.shortCode || "650014"} />
+            <Stat label="Collection account" value={mpesaConfig?.accountReference || "BENMIDAX"} />
           </div>
           <div className={`portal-alert ${mpesaConfig?.configured ? "success" : ""}`}><strong>{mpesaConfig?.configured ? "STK Push is enabled on the backend." : "STK Push is not ready."}</strong> {mpesaConfig?.message || "Complete the production Daraja configuration before processing live payments."}</div>
         </section>

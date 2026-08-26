@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { ArrowLeft, RefreshCw, SlidersHorizontal, X } from "lucide-react";
-import toast from "react-hot-toast";
 import socketClient from "../../sockets/socket";
 import DashboardLayout from "../../layouts/DashboardLayout";
 import ChatSidebar from "./ChatSidebar";
 import ChatWindow from "./ChatWindow";
 import CallOverlay from "./CallOverlay";
 import API from "../../services/api";
+import toast from "react-hot-toast";
 import { getPendingCall, removePendingCall } from "../../utils/pushCallStore";
 import { startNativeIncomingCall } from "../../utils/nativeCallBridge";
 import { useAuth } from "../../context/AuthContext";
@@ -117,15 +117,17 @@ function MessageCenterPage({
         role: currentUser?.role || authUser?.role || "member",
       });
       activeSocket.emit("presence-heartbeat");
-      if (typeof window !== "undefined") {
-        toast.dismiss("call-connect");
-      }
+      setBanner((current) =>
+        current === "Chat is reconnecting. Messaging stays available; calls will work once the secure call connection is ready."
+          ? ""
+          : current
+      );
     };
 
     const handleCallNotification = (payload) => {
       const title = payload?.title || "Incoming call";
       const body = payload?.message || "Someone is calling you.";
-      setBanner(`${title}: ${body}`);
+      toast(`${title}: ${body}`, { icon: "📞", duration: 5500, id: "incoming-call-notice" });
       if (typeof document !== "undefined" && document.visibilityState !== "visible" && typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
         try { new Notification(title, { body, tag: `call-${payload?.callerUserId || Date.now()}` }); } catch {}
       }
@@ -187,7 +189,7 @@ function MessageCenterPage({
     const handleMissedCall = (payload) => {
       const title = payload?.callType === "video" ? "Missed video call" : "Missed audio call";
       const body = `${payload?.callerName || "A member"} tried to call you.`;
-      setBanner(`${title}: ${body}`);
+      toast(`${title}: ${body}`, { icon: "☎️", duration: 5000, id: `missed-call-${payload?.callId || "latest"}` });
       if (typeof document !== "undefined" && document.visibilityState !== "visible" && typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
         try { new Notification(title, { body, tag: `missed-call-${payload?.callId || Date.now()}` }); } catch {}
       }
@@ -198,7 +200,7 @@ function MessageCenterPage({
       const message = code === "SELF_CALL_BLOCKED"
         ? "You cannot call yourself. Choose another member."
         : payload?.message || "The call could not be started.";
-      setBanner(message);
+      toast.error(message, { id: "call-error", duration: 5000 });
       setCall(null);
     };
 
@@ -375,10 +377,10 @@ function MessageCenterPage({
             setMobileChatOpen(isMobile);
             return;
           }
-        } catch (error) {
-          // A stale conversationId must not make "Choose a chat" appear broken.
-          // Fall through and let the canonical create endpoint resolve/recreate it.
-          console.warn("Stale conversationId; creating/resolving conversation:", error?.response?.status || error?.message || error);
+        } catch (staleConversationError) {
+          // A contact can carry an old conversation id after database cleanup.
+          // Do not make the chat button appear dead; resolve/create the current thread below.
+          console.warn("Stale conversation id; resolving current chat:", staleConversationError?.response?.status || staleConversationError?.message);
         }
       }
 
@@ -433,12 +435,12 @@ function MessageCenterPage({
     try {
       await ensureCallNotifications();
       if (!activeSocket.connected) {
-        toast.loading("Connecting to secure calling…", { id: "call-connect" });
+        toast("Connecting to secure calling…", { icon: "🔒", duration: 2500, id: "secure-call-connect" });
         if (activeSocket.connect) activeSocket.connect();
         await waitForSocketConnection(activeSocket, 9000);
       }
 
-      toast.dismiss("call-connect");
+      setBanner("");
       setCall({
         direction: "outgoing",
         callType: type === "video" ? "video" : "audio",
@@ -448,7 +450,7 @@ function MessageCenterPage({
       });
     } catch (error) {
       console.warn("Unable to start call:", error);
-      toast.error("Secure calling is temporarily unavailable. Check your connection and try again.");
+      toast.error("Secure calling is temporarily unavailable. Check your connection and try again.", { id: "secure-call-error", duration: 5000 });
     }
   };
 

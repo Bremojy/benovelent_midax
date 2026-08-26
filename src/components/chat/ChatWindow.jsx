@@ -55,7 +55,7 @@ function ChatWindow({ conversation, socket, currentUser, onBack, onAudioCall, on
         if (!cancelled) {
           const message = error.response?.data?.message || error.message || "Unable to load this conversation.";
           setChatError(message);
-          toast.error(message);
+          toast.error(message, { id: `chat-load-${conversation._id}` });
         }
       } finally {
         if (!cancelled) setLoadingMessages(false);
@@ -175,7 +175,7 @@ function ChatWindow({ conversation, socket, currentUser, onBack, onAudioCall, on
       setMessages((previous) => previous.filter((item) => String(item._id) !== tempId));
       const message = error.response?.data?.message || error.message || "Message could not be sent. Check your connection and try again.";
       setChatError(message);
-      toast.error(message);
+      toast.error(message, { id: `chat-send-${conversation._id}` });
       throw error;
     } finally {
       sendLockRef.current = false;

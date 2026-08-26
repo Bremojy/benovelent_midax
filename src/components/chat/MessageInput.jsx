@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from "react";
 import { Camera, Image, MapPin, Mic, Paperclip, Plus, Send, Smile, Square, X } from "lucide-react";
 import API from "../../services/api";
+import toast from "react-hot-toast";
 import "./MessageInput.css";
 
 const EMOJIS = ["😊", "😂", "❤️", "🙏", "👍", "🎉", "😎", "😢", "🔥", "🥰", "🤝", "✨"];
@@ -50,14 +51,21 @@ export default function MessageInput({ onSend, socket, conversation, currentUser
       formData.append("file", file);
       const { data } = await API.post("/messages/upload", formData, { headers: { "Content-Type": "multipart/form-data" } });
       const url = data.fileUrl || data.imageUrl || data.assetUrl || "";
+      if (!url) throw new Error("The attachment could not be uploaded. Please try again.");
       const type = getMessageType(file);
       if (autoSend) {
         await onSend("", url, type);
+        toast.success("Voice note sent.", { id: "chat-voice-sent", duration: 2200 });
       } else {
         setAttachment(url);
         setAttachmentPreview(type === "image" ? URL.createObjectURL(file) : "");
         setMessageType(type);
+        toast.success("Attachment ready to send.", { id: "chat-attachment-ready", duration: 2200 });
       }
+    } catch (error) {
+      const message = error?.response?.data?.message || error?.message || "Attachment upload failed. Please try again.";
+      toast.error(message, { id: "chat-upload-error", duration: 4500 });
+      throw error;
     } finally {
       sendingRef.current = false;
       setBusy(false);
@@ -117,7 +125,7 @@ export default function MessageInput({ onSend, socket, conversation, currentUser
           await uploadFile(file, true);
         } catch (err) {
           console.error(err);
-          alert(err.message || "Could not send voice note.");
+          toast.error(err.message || "Could not send voice note.", { id: "chat-voice-error" });
         } finally { setRecording(false); }
       };
       recorder.start();
@@ -125,13 +133,13 @@ export default function MessageInput({ onSend, socket, conversation, currentUser
       setShowEmoji(false);
       setShowMore(false);
     } catch (error) {
-      alert(error.message || "Microphone access is required for voice notes.");
+      toast.error(error.message || "Microphone access is required for voice notes.", { id: "chat-mic-error", duration: 4500 });
     }
   };
 
   const shareLocation = () => {
     if (!navigator.geolocation) {
-      alert("Location sharing is not supported on this device/browser.");
+      toast.error("Location sharing is not supported on this device or browser.", { id: "chat-location-error" });
       return;
     }
     navigator.geolocation.getCurrentPosition(
@@ -142,7 +150,7 @@ export default function MessageInput({ onSend, socket, conversation, currentUser
         textareaRef.current?.focus?.();
       },
       (error) => {
-        alert(error.message || "Could not access your location.");
+        toast.error(error.message || "Could not access your location.", { id: "chat-location-error", duration: 4500 });
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
     );

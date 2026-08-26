@@ -3,10 +3,8 @@ const crypto = require("crypto");
 
 const env = (name, fallback = "") => String(process.env[name] || fallback).trim();
 const isPlaceholder = (value) => { const v=String(value||"").trim().toUpperCase(); return !v || v.startsWith("YOUR_") || v.includes("YOUR_DARAJA_") || v === "CHANGE_ME" || v === "REPLACE_ME"; };
-const DEFAULT_MPESA_SHORTCODE = "247247";
-const DEFAULT_MPESA_ACCOUNT_REFERENCE = "BENEVOLENT";
-const MAX_ACCOUNT_REFERENCE_LENGTH = 12;
-const normalizeAccountReference = (value) => String(value || DEFAULT_MPESA_ACCOUNT_REFERENCE).replace(/[^A-Za-z0-9_.-]/g, "").slice(0, MAX_ACCOUNT_REFERENCE_LENGTH) || DEFAULT_MPESA_ACCOUNT_REFERENCE;
+const DEFAULT_MPESA_SHORTCODE = "650014";
+const DEFAULT_MPESA_ACCOUNT_REFERENCE = "BENMIDAX";
 const isDarajaConfigured = () => Boolean(
   !isPlaceholder(env("MPESA_CONSUMER_KEY")) &&
   !isPlaceholder(env("MPESA_CONSUMER_SECRET"))
@@ -58,6 +56,8 @@ const timestamp = () => {
   return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
 };
 
+const normalizeAccountReference = (value) => String(value || DEFAULT_MPESA_ACCOUNT_REFERENCE).trim().replace(/[^A-Za-z0-9._-]/g, "").slice(0, 13) || DEFAULT_MPESA_ACCOUNT_REFERENCE;
+
 const normalizePhone = (value) => {
   const raw = String(value || "").replace(/\s+/g, "").replace(/^\+/, "");
   if (/^2547\d{8}$/.test(raw)) return raw;
@@ -95,7 +95,7 @@ async function stkPush({ phoneNumber, amount, accountReference, transactionDesc 
     PhoneNumber: normalizePhone(phoneNumber),
     CallBackURL: env("MPESA_CALLBACK_URL"),
     AccountReference: normalizeAccountReference(accountReference || env("MPESA_ACCOUNT_REFERENCE", DEFAULT_MPESA_ACCOUNT_REFERENCE)),
-    TransactionDesc: String(transactionDesc || "Benevolent MIDAX payment").slice(0, 13),
+    TransactionDesc: String(transactionDesc || "Benevolent MIDAX payment").slice(0, 20),
   };
   const response = await axios.post(`${baseUrl()}/mpesa/stkpush/v1/processrequest`, payload, {
     headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
@@ -138,35 +138,26 @@ async function b2cPayment({ phoneNumber, amount, remarks, occasion }) {
 
 const idempotencyKey = () => crypto.randomBytes(12).toString("hex");
 
-const getConfigurationIssues = () => {
-  const issues = [];
-  const enabled = env("MPESA_ENABLED", "false").toLowerCase() === "true";
-  if (!enabled) issues.push("MPESA_ENABLED is false.");
-  if (isPlaceholder(env("MPESA_CONSUMER_KEY"))) issues.push("MPESA_CONSUMER_KEY is missing or still a placeholder.");
-  if (isPlaceholder(env("MPESA_CONSUMER_SECRET"))) issues.push("MPESA_CONSUMER_SECRET is missing or still a placeholder.");
-  if (isPlaceholder(env("MPESA_PASSKEY"))) issues.push("MPESA_PASSKEY is missing or still a placeholder.");
-  const shortcode = env("MPESA_SHORTCODE");
-  if (!/^\d{4,7}$/.test(shortcode)) issues.push("MPESA_SHORTCODE must be the live PayBill/Till shortcode provisioned for the Daraja app.");
-  const reference = normalizeAccountReference(env("MPESA_ACCOUNT_REFERENCE"));
-  if (reference.length > MAX_ACCOUNT_REFERENCE_LENGTH) issues.push("MPESA_ACCOUNT_REFERENCE must be 12 characters or fewer.");
-  const callback = env("MPESA_CALLBACK_URL");
-  if (!/^https:\/\//i.test(callback)) issues.push("MPESA_CALLBACK_URL must be a public HTTPS callback URL.");
-  const txType = env("MPESA_TRANSACTION_TYPE", "CustomerPayBillOnline");
-  if (txType !== "CustomerPayBillOnline" && txType !== "CustomerBuyGoodsOnline") issues.push("MPESA_TRANSACTION_TYPE must match the shortcode type.");
-  return issues;
+const getConfigurationSummary = () => {
+  const environment = env("MPESA_ENVIRONMENT", "production").toLowerCase();
+  const callbackUrl = env("MPESA_CALLBACK_URL");
+  const warnings = [];
+  if (environment === "production" && /^https:\/\/sandbox\./i.test(baseUrl())) warnings.push("Sandbox Daraja endpoint selected while production mode is enabled.");
+  if (environment === "production" && !/^https:\/\/api\.safaricom\.co\.ke$/i.test(baseUrl())) warnings.push("Production mode is not using the Safaricom production API host.");
+  if (environment === "production" && callbackUrl && !/^https:\/\//i.test(callbackUrl)) warnings.push("Production M-PESA callback URL must use HTTPS.");
+  return {
+    enabled: env("MPESA_ENABLED", "false").toLowerCase() === "true",
+    environment,
+    configured: isConfigured(),
+    darajaConfigured: isDarajaConfigured(),
+    b2cConfigured: isB2CConfigured(),
+    b2cEnabled: env("MPESA_B2C_ENABLED", "true").toLowerCase() === "true",
+    shortcode: env("MPESA_SHORTCODE"),
+    callbackUrl,
+    b2cResultUrl: env("MPESA_B2C_RESULT_URL"),
+    b2cTimeoutUrl: env("MPESA_B2C_TIMEOUT_URL"),
+    warnings,
+  };
 };
 
-const getConfigurationSummary = () => ({
-  enabled: env("MPESA_ENABLED", "false").toLowerCase() === "true",
-  environment: env("MPESA_ENVIRONMENT", "production").toLowerCase(),
-  configured: isConfigured(),
-  darajaConfigured: isDarajaConfigured(),
-  b2cConfigured: isB2CConfigured(),
-  b2cEnabled: env("MPESA_B2C_ENABLED", "true").toLowerCase() === "true",
-  shortcode: env("MPESA_SHORTCODE"),
-  callbackUrl: env("MPESA_CALLBACK_URL"),
-  b2cResultUrl: env("MPESA_B2C_RESULT_URL"),
-  b2cTimeoutUrl: env("MPESA_B2C_TIMEOUT_URL"),
-});
-
-module.exports = { isConfigured, isB2CConfigured, isDarajaConfigured, normalizePhone, normalizeAccountReference, stkPush, b2cPayment, idempotencyKey, getConfigurationSummary, getConfigurationIssues, endpointSummary, extractUpstreamError };
+module.exports = { isConfigured, isB2CConfigured, isDarajaConfigured, normalizePhone, normalizeAccountReference, stkPush, b2cPayment, idempotencyKey, getConfigurationSummary, endpointSummary, extractUpstreamError };

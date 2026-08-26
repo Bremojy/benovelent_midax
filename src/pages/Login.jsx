@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Mail, Lock, Eye, EyeOff, Loader2, ShieldCheck } from "lucide-react";
+import toast from "react-hot-toast";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import "./Login.css";
@@ -47,12 +48,16 @@ export default function Login() {
     const cleanEmail = email.trim().toLowerCase();
 
     if (!cleanEmail) {
-      setError("Please enter your email address.");
+      const message = "Please enter your email address.";
+      setError(message);
+      toast.error(message, { id: "login-validation" });
       return;
     }
 
     if (!password) {
-      setError("Please enter your password.");
+      const message = "Please enter your password.";
+      setError(message);
+      toast.error(message, { id: "login-validation" });
       return;
     }
 

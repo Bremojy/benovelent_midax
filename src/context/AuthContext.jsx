@@ -8,6 +8,8 @@ import {
   useState,
 } from "react";
 
+import toast from "react-hot-toast";
+
 import {
   getCsrfToken,
   getCurrentUser,
@@ -414,8 +416,10 @@ export function AuthProvider({
         if (!current.id || !incoming?.id) return;
         if (current.id !== String(incoming.id) || current.role !== String(incoming.role || "").toLowerCase()) {
           clearSession();
-          setAuthError("Another account was signed in on this device. You have been logged out from this portal.");
-          window.dispatchEvent(new CustomEvent("benevolent:session-ended", { detail: { message: "Another account was signed in on this device." } }));
+          const mismatchMessage = "Another account was signed in on this device. This portal session was safely signed out to prevent account data mixing.";
+          setAuthError(mismatchMessage);
+          toast.error(mismatchMessage, { id: "account-mismatch", duration: 6000 });
+          window.dispatchEvent(new CustomEvent("benevolent:session-ended", { detail: { message: mismatchMessage } }));
         }
       } catch {}
     };
@@ -532,6 +536,10 @@ export function AuthProvider({
           );
           setLoading(false);
           window.dispatchEvent(new CustomEvent("benevolent:auth-login-complete"));
+          toast.success(`Welcome back, ${normalizedUser.fullName || normalizedUser.name || "Benevolent member"}. You are signed in successfully.`, {
+            id: "login-success",
+            duration: 3200,
+          });
 
           return {
             user: normalizedUser,
@@ -540,12 +548,18 @@ export function AuthProvider({
         } catch (error) {
           setLoading(false);
           window.dispatchEvent(new CustomEvent("benevolent:auth-login-complete"));
-          setAuthError(
-            error.response?.data
-              ?.message ||
-              error.message ||
-              "Login failed."
-          );
+          const responseCode = String(error?.response?.data?.code || "").toUpperCase();
+          const status = error?.response?.status;
+          let message = error.response?.data?.message || error.message || "Login failed.";
+          if (["INVALID_CREDENTIALS", "AUTH_FAILED"].includes(responseCode) || status === 401) {
+            message = "The email or password does not match our records. Check your details and try again.";
+          } else if (["ROLE_MISMATCH", "USER_TYPE_MISMATCH"].includes(responseCode) || status === 403) {
+            message = "Your account details do not match the portal assigned to this account. Please sign in again or contact the administrator.";
+          } else if (status >= 500) {
+            message = "Benevolent MIDAX is temporarily unavailable. Your account has not been changed. Please try again shortly.";
+          }
+          setAuthError(message);
+          toast.error(message, { id: "login-error", duration: 5000 });
 
           throw error;
         }
@@ -571,8 +585,8 @@ export function AuthProvider({
           );
         } finally {
           clearSession();
-
-            }
+          toast.success("You have been logged out successfully.", { id: "logout-success", duration: 3000 });
+        }
       },
       [
         clearSession,
@@ -665,8 +679,10 @@ export function AuthProvider({
         if (!current.id || !incoming?.id) return;
         if (current.id !== String(incoming.id) || current.role !== String(incoming.role || "").toLowerCase()) {
           clearSession();
-          setAuthError("Another account was signed in on this device. You have been logged out from this portal.");
-          window.dispatchEvent(new CustomEvent("benevolent:session-ended", { detail: { message: "Another account was signed in on this device." } }));
+          const mismatchMessage = "Another account was signed in on this device. This portal session was safely signed out to prevent account data mixing.";
+          setAuthError(mismatchMessage);
+          toast.error(mismatchMessage, { id: "account-mismatch", duration: 6000 });
+          window.dispatchEvent(new CustomEvent("benevolent:session-ended", { detail: { message: mismatchMessage } }));
         }
       } catch {}
     };
@@ -686,7 +702,9 @@ export function AuthProvider({
   useEffect(() => {
     const handleSessionReplaced = () => {
       clearSession();
-      setAuthError("Your account was signed in on another device. You have been logged out for security.");
+      const message = "Your account was signed in on another device. This session was logged out for your security.";
+      setAuthError(message);
+      toast.error(message, { id: "session-replaced", duration: 6000 });
       try { window.dispatchEvent(new CustomEvent("benovelent:session-replaced-ui")); } catch {}
     };
     window.addEventListener("benovelent:session-replaced", handleSessionReplaced);

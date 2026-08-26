@@ -1370,9 +1370,6 @@ exports.getClaims = async (req, res) => {
 exports.getChatMembers = async (req, res) => {
     try {
         const callerRole = String(req.user?.role || req.auth?.role || "").toLowerCase();
-        if (callerRole === "superadmin") {
-            return res.json({ success: true, count: 0, members: [], filterOptions: {}, conversations: [], message: "SuperAdmin accounts do not participate in private chat." });
-        }
         const currentUserId = String(req.auth?.chatId || req.user?.chatMemberId || req.user?._id || req.user?.id || "").trim();
         const keyword = String(req.query.search || "").trim().toLowerCase();
         const limit = Math.min(Math.max(Number(req.query.limit || 500), 1), 1000);

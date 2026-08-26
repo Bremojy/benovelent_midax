@@ -17,6 +17,7 @@ export default function Contributions() {
   const [repayableSupport, setRepayableSupport] = useState([]);
   const [mpesaTransactions, setMpesaTransactions] = useState([]);
   const [mpesaReady, setMpesaReady] = useState(false);
+  const [mpesaConfig, setMpesaConfig] = useState({ shortCode: "", accountReference: "", environment: "production" });
   const [loanLoading, setLoanLoading] = useState(true);
   const year = new Date().getFullYear();
 
@@ -31,6 +32,7 @@ export default function Contributions() {
       setRepayableSupport(allClaims.filter((claim) => claim?.supportType && !["medical", "funeral", "Medical", "Funeral"].includes(claim.supportType) && claim.repaymentEnabled && ["Approved", "Disbursement Pending", "Paid"].includes(claim.status) && Number(claim.balance || 0) > 0));
       setMpesaTransactions(Array.isArray(mpesaResponse.data?.transactions) ? mpesaResponse.data.transactions : []);
       setMpesaReady(Boolean(mpesaConfigResponse.data?.configured));
+      setMpesaConfig(mpesaConfigResponse.data || {});
     } catch (err) {
       setError(err.response?.data?.message || err.message || "Unable to load scheme accounts.");
     } finally {
@@ -87,12 +89,12 @@ export default function Contributions() {
         <section className="portal-panel accounts-trust-panel">
           <div className="portal-module-header compact-header"><div><span>PAYMENT TRANSPARENCY</span><h2>M-PESA collection details</h2><p>Use the scheme payment details shown here and keep every M-PESA confirmation for your records.</p></div><span className={`portal-badge ${mpesaReady ? "approved" : ""}`}>{mpesaReady ? "Online payment ready" : "Online payment unavailable"}</span></div>
           <div className="portal-stat-grid">
-            <Stat label="PayBill" value="247247" />
-            <Stat label="Account" value="0650186528835" />
+            <Stat label="PayBill" value={mpesaConfig.shortCode || "650014"} />
+            <Stat label="Account" value={mpesaConfig.accountReference || "BENMIDAX"} />
             <Stat label="Payment gateway" value={mpesaReady ? "Daraja STK" : "Manual / pending setup"} />
             <Stat label="M-PESA records" value={mpesaTransactions.length} />
           </div>
-          <div className="portal-alert"><strong>Important:</strong> the PayBill 247247 / account 0650186528835 details are the scheme's default collection instructions. The STK Push button uses only the secure Daraja configuration held by the backend.</div>
+          <div className="portal-alert"><strong>Important:</strong> use the collection PayBill and account reference shown above. The STK Push button uses only the secure Daraja configuration held by the backend.</div>
         </section>
 
         <section className="portal-panel">

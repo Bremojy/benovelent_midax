@@ -9,7 +9,7 @@ const createNotification = require("../utils/createNotification");
 const createAuditLog = require("../utils/createAuditLog");
 const Finance = require("../models/Finance");
 const MpesaB2CTransaction = require("../models/MpesaB2CTransaction");
-const { stkPush, b2cPayment, normalizePhone, isConfigured, isB2CConfigured, getConfigurationSummary, idempotencyKey, endpointSummary, extractUpstreamError, normalizeAccountReference, getConfigurationIssues } = require("../services/mpesaService");
+const { stkPush, b2cPayment, normalizePhone, normalizeAccountReference, isConfigured, isB2CConfigured, getConfigurationSummary, idempotencyKey, endpointSummary, extractUpstreamError } = require("../services/mpesaService");
 
 const modelMap = { SupportRequest, MedicalSupport, FuneralSupport, EducationSupport };
 
@@ -115,9 +115,8 @@ exports.config = async (_req, res) => {
     b2cConfigured,
     enabled,
     ready: stkConfigured && b2cConfigured,
-    configurationIssues: getConfigurationIssues(),
-    shortCode: String(process.env.MPESA_SHORTCODE || "247247"),
-    accountReference: normalizeAccountReference(process.env.MPESA_ACCOUNT_REFERENCE || "BENEVOLENT"),
+    shortCode: String(process.env.MPESA_SHORTCODE || "650014"),
+    accountReference: normalizeAccountReference(process.env.MPESA_ACCOUNT_REFERENCE || "BENMIDAX"),
     environment: String(process.env.MPESA_ENVIRONMENT || "production"),
     message: !enabled
       ? "M-PESA is disabled on the server."
@@ -199,8 +198,8 @@ exports.stk = async (req, res) => {
       referenceModel,
       phoneNumber,
       amount: Math.round(amount),
-      businessShortCode: String(process.env.MPESA_SHORTCODE || "247247"),
-      accountReference: normalizeAccountReference(process.env.MPESA_ACCOUNT_REFERENCE || "BENEVOLENT"),
+      businessShortCode: String(process.env.MPESA_SHORTCODE || "650014"),
+      accountReference: normalizeAccountReference(process.env.MPESA_ACCOUNT_REFERENCE || "BENMIDAX"),
       status: "pending",
     });
 
@@ -236,7 +235,7 @@ exports.stk = async (req, res) => {
     const diagnosticMessage = isUpstream404
       ? "Safaricom returned HTTP 404 for the STK request. Verify the Daraja production application, shortcode, environment and callback configuration."
       : upstream.status === 400
-        ? "Safaricom rejected the STK request. Check that the production shortcode and Lipa Na M-PESA passkey belong to the same Daraja app, the transaction type matches the shortcode (CustomerPayBillOnline for PayBill), the callback URL is registered/accessible, and the production consumer credentials are active."
+        ? "Safaricom rejected the STK request. Verify the production shortcode, passkey, consumer credentials, transaction type and callback URL."
         : upstream.status === 401
           ? "Safaricom rejected the Daraja credentials. Verify the production consumer key and consumer secret."
           : upstream.status === 403
