@@ -15,20 +15,23 @@ const hostname = typeof window !== "undefined" ? String(window.location.hostname
 const isLocalHost = ["localhost", "127.0.0.1", "::1"].includes(hostname);
 const isVercelHost = hostname.endsWith(".vercel.app") || hostname === "vercel.app";
 
-// Production browsers use the Vercel same-origin /api proxy by default.
-// This avoids cross-site authentication/cookie drift between Vercel and Render.
-// A VITE_API_URL may still explicitly override this for a non-Vercel deployment.
+// Production browsers use the deployment's same-origin /api proxy by default.
+// This keeps authentication cookies on the browser origin and works for both
+// *.vercel.app and custom Vercel domains. A fully-qualified VITE_API_URL can
+// still explicitly override this behavior for non-proxy deployments.
+const isAbsoluteConfiguredUrl = /^https?:\/\//i.test(configuredBaseUrl);
 const BASE_URL = normalizeBaseUrl(
   typeof window !== "undefined"
-    ? (isVercelHost
-        ? window.location.origin
-        : (configuredBaseUrl || (isLocalHost ? DEFAULT_LOCAL_API_URL : window.location.origin)))
+    ? (isLocalHost
+        ? (isAbsoluteConfiguredUrl ? configuredBaseUrl : DEFAULT_LOCAL_API_URL)
+        : (isAbsoluteConfiguredUrl ? configuredBaseUrl : window.location.origin))
     : (configuredBaseUrl || DEFAULT_REMOTE_API_URL)
 );
 
+// User-uploaded media is served from the durable Render backend.
 const ASSET_BASE_URL = normalizeBaseUrl(
-  typeof window !== "undefined" && isVercelHost
-    ? DEFAULT_REMOTE_API_URL
+  typeof window !== "undefined" && !isLocalHost
+    ? (isAbsoluteConfiguredUrl ? configuredBaseUrl : DEFAULT_REMOTE_API_URL)
     : BASE_URL
 );
 

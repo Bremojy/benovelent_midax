@@ -331,7 +331,7 @@ export default function AdminFinance() {
             <Stat label="STK status" value={mpesaConfig?.configured ? "Ready" : "Not configured"} />
             <Stat label="B2C payout status" value={mpesaConfig?.b2cConfigured ? "Ready" : "Not configured"} />
             <Stat label="Daraja shortcode" value={mpesaConfig?.shortCode || "650014"} />
-            <Stat label="Manual account" value={mpesaConfig?.manualAccountNumber || "0650186528835"} />
+            <Stat label="Manual account" value={mpesaConfig?.manualAccountNumber || "Not configured"} />
             <Stat label="Manual PayBill" value={mpesaConfig?.manualPaybill || "247247"} />
           </div>
           <div className={`portal-alert ${mpesaConfig?.configured ? "success" : ""}`}><strong>{mpesaConfig?.configured ? "STK Push is enabled on the backend." : "STK Push is not ready."}</strong> {mpesaConfig?.message || "Complete the production Daraja configuration before processing live payments."}</div>

@@ -80,15 +80,8 @@ export default function Claims() {
       if (!paymentConfigured) throw new Error("M-PESA is not currently configured by the administrator.");
       const a = Number(amount[campaign._id] || 0);
       if (a <= 0) throw new Error("Enter a contribution amount.");
-      let data;
       const payload = { purpose: "community_assistance", referenceId: campaign._id, amount: a, phoneNumber: phone[campaign._id] || undefined };
-      try {
-        ({ data } = await API.post("/payments/stk", payload));
-      } catch (primaryError) {
-        if (primaryError?.response?.status !== 404 || primaryError?.response?.data?.code !== "ROUTE_NOT_FOUND") throw primaryError;
-        const fallbackBase = String(import.meta.env.VITE_API_URL || "https://benovelent-midax.onrender.com").replace(/\/+$/, "");
-        ({ data } = await API.post(`${fallbackBase}/api/payments/stk`, payload, { baseURL: "" }));
-      }
+      const { data } = await API.post("/payments/stk", payload);
       if (!data?.success) throw new Error(data?.message || "Unable to start M-PESA payment.");
       const transactionId = String(data?.transactionId || "");
       setPaymentStatus((current) => ({ ...current, [campaign._id]: { status: "pending", transactionId } }));

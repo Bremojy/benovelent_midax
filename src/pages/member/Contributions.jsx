@@ -90,7 +90,7 @@ export default function Contributions() {
           <div className="portal-module-header compact-header"><div><span>PAYMENT TRANSPARENCY</span><h2>M-PESA collection details</h2><p>Use the scheme payment details shown here and keep every M-PESA confirmation for your records.</p></div><span className={`portal-badge ${mpesaReady ? "approved" : ""}`}>{mpesaReady ? "Online payment ready" : "Online payment unavailable"}</span></div>
           <div className="portal-stat-grid">
             <Stat label="PayBill" value={mpesaConfig.manualPaybill || "247247"} />
-            <Stat label="Account Number" value={mpesaConfig.manualAccountNumber || "0650186528835"} />
+            <Stat label="Account Number" value={mpesaConfig.manualAccountNumber || "Not configured"} />
             <Stat label="Payment gateway" value={mpesaReady ? "Daraja STK" : "Manual / pending setup"} />
             <Stat label="M-PESA records" value={mpesaTransactions.length} />
           </div>

@@ -78,7 +78,7 @@ export default function MpesaPaymentButton({ purpose, referenceId, label = "Pay 
       setMpesaConfig({
         shortCode: String(data?.shortCode || ""),
         manualPaybill: String(data?.manualPaybill || "247247"),
-        manualAccountNumber: String(data?.manualAccountNumber || "0650186528835"),
+        manualAccountNumber: String(data?.manualAccountNumber || ""),
         accountReference: String(data?.accountReference || ""),
         environment: String(data?.environment || "production"),
         routeAvailable: Boolean(route?.routes?.stk),
@@ -86,7 +86,7 @@ export default function MpesaPaymentButton({ purpose, referenceId, label = "Pay 
       setStatus("idle"); setOpen(true);
     } catch (error) {
       setConfigured(false);
-      setMpesaConfig({ shortCode: "", manualPaybill: "247247", manualAccountNumber: "0650186528835", accountReference: "", environment: "production", routeAvailable: false });
+      setMpesaConfig({ shortCode: "", manualPaybill: "", manualAccountNumber: "", accountReference: "", environment: "production", routeAvailable: false });
       setStatus("idle");
       setOpen(true);
       if (Number(error?.response?.status) === 404) setMessage("The payment API route is missing from the deployed backend. Deploy the current backend before using STK Push.");
