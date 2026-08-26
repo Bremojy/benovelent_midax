@@ -36,7 +36,7 @@ function Hero() {
     const run = async () => {
       try {
         setLoading(true);
-        const response = await api.get("/carousel/active", { params: { _ts: Date.now(), attempt: fetchAttempt } });
+        const response = await api.get("/carousel/active", { params: fetchAttempt ? { attempt: fetchAttempt } : undefined });
         if (cancelled) return;
         const freshSlides = Array.isArray(response.data) ? response.data.filter((slide) => slide?.imageUrl && slide?.isActive !== false) : [];
         setSlides(freshSlides);
@@ -55,7 +55,7 @@ function Hero() {
   }, [fetchAttempt]);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => setFetchAttempt((value) => value + 1), 2500);
+    const timer = window.setTimeout(() => setFetchAttempt((value) => value + 1), 5000);
     return () => window.clearTimeout(timer);
   }, []);
 

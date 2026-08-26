@@ -164,12 +164,29 @@ exports.publishCommunityToNews = async (req, res) => {
 
 exports.requestCommunityAssistance = async (req, res) => {
   try {
-    const { referenceModel, referenceId, targetAmount } = req.body || {};
-    const meta = modelFor(referenceModel === "EducationSupport" ? "education" : referenceModel === "FuneralSupport" ? "funeral" : referenceModel === "MedicalSupport" ? "medical" : "support");
-    if (!meta) return res.status(400).json({ success:false, message:"Unsupported claim type." });
-    const claim = await meta.Model.findById(referenceId);
-    if (!claim || String(claim.member) !== String(req.user._id)) return res.status(404).json({ success:false, message:"Claim not found." });
-    if (String(claim.status) !== "Rejected") return res.status(400).json({ success:false, message:"Community assistance is available after a declined claim." });
+    const { referenceModel, referenceId, targetAmount, supportType } = req.body || {};
+    const normalizedReferenceModel = String(referenceModel || "").trim();
+    const normalizedSupportType = String(supportType || "").trim().toLowerCase();
+    const aliases = {
+      medicalsupport: "medical", medical: "medical",
+      funeralsupport: "funeral", funeral: "funeral",
+      educationsupport: "education", education: "education",
+      supportrequest: "support", support: "support",
+    };
+    const requestedKey = aliases[normalizedReferenceModel.replace(/[^a-z]/gi, "").toLowerCase()] || aliases[normalizedSupportType];
+    const orderedKeys = requestedKey ? [requestedKey, ...Object.keys(MODEL_MAP).filter((key) => key !== requestedKey)] : Object.keys(MODEL_MAP);
+    if (!referenceId) return res.status(400).json({ success:false, message:"A claim reference is required." });
+
+    // Resolve by the member-owned claim id even when an older/stale frontend sends
+    // a mismatched sourceType. The member ownership check remains mandatory.
+    let meta = null;
+    let claim = null;
+    for (const key of orderedKeys) {
+      const candidate = await MODEL_MAP[key].findOne({ _id: referenceId, member: req.user._id });
+      if (candidate) { meta = { key, Model: MODEL_MAP[key] }; claim = candidate; break; }
+    }
+    if (!meta || !claim) return res.status(404).json({ success:false, code:"CLAIM_NOT_FOUND", message:"We could not find that support claim in your account. Refresh your Claims page and try again." });
+    if (String(claim.status || "").trim().toLowerCase() !== "rejected") return res.status(400).json({ success:false, message:"Community assistance is available after a declined claim." });
     let campaign = await CommunityAssistance.findOne({ referenceModel: meta.Model.modelName, referenceId: claim._id });
     const member = await Member.findById(req.user._id).select("fullName phone mpesaNumber");
     const target = Number(targetAmount || claim.requestedAmount || claim.approvedAmount || 0);

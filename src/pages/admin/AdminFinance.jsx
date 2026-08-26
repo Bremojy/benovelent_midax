@@ -262,7 +262,7 @@ export default function AdminFinance() {
   };
 
   const removeTransaction = async (transaction) => {
-    if (!window.confirm("Delete this transaction?")) return;
+    if (!window.confirm("Delete this transaction permanently?")) return;
     try {
       setSaving(true);
       await API.delete(`/finance/${transaction._id}`);
@@ -270,6 +270,23 @@ export default function AdminFinance() {
       await load();
     } catch (err) {
       setError(err.response?.data?.message || err.message || "Unable to delete transaction.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const toggleTransactionVisibility = async (transaction) => {
+    if (!isSuperAdmin) return;
+    const nextHidden = !Boolean(transaction.hidden);
+    if (!window.confirm(nextHidden ? "Hide this transaction from the community ledger?" : "Restore this transaction to the community ledger?")) return;
+    try {
+      setSaving(true);
+      const { data } = await API.patch(`/finance/${transaction._id}/visibility`, { hidden: nextHidden });
+      if (!data?.success) throw new Error(data?.message || "Unable to update transaction visibility.");
+      setMessage(nextHidden ? "Transaction hidden from the community ledger." : "Transaction restored to the community ledger.");
+      await load();
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || "Unable to update transaction visibility.");
     } finally {
       setSaving(false);
     }
@@ -430,7 +447,7 @@ export default function AdminFinance() {
           <h2>Recent Transactions</h2>
           {sortedTransactions.length === 0 ? <div className="portal-empty">No finance transactions returned.</div> :
             <div className="portal-table-wrap"><table className="portal-table"><thead><tr><th>Date</th><th>Type</th><th>Description</th><th>Amount</th><th>Status</th><th>Actions</th></tr></thead><tbody>
-              {sortedTransactions.slice(0, 30).map((x, i) => <tr key={x._id || i}><td>{date(x.transactionDate || x.createdAt)}</td><td>{x.type || "—"}</td><td>{x.description || x.reference || "—"}</td><td>{number(x.amount)}</td><td><span className="portal-badge">{x.status || "Recorded"}</span></td><td><div className="portal-actions"><button type="button" className="portal-btn secondary" onClick={() => startEdit(x)}><Edit3 size={14} /> Edit</button><button type="button" className="portal-btn danger" onClick={() => removeTransaction(x)}><Trash2 size={14} /> Delete</button></div></td></tr>)}
+              {sortedTransactions.slice(0, 30).map((x, i) => <tr key={x._id || i}><td>{date(x.transactionDate || x.createdAt)}</td><td>{x.type || "—"}</td><td>{x.description || x.reference || "—"}</td><td>{number(x.amount)}</td><td><span className="portal-badge">{x.status || "Recorded"}</span></td><td><div className="portal-actions"><button type="button" className="portal-btn secondary" onClick={() => startEdit(x)}><Edit3 size={14} /> Edit</button>{isSuperAdmin && <button type="button" className="portal-btn secondary" onClick={() => toggleTransactionVisibility(x)}>{x.hidden ? "Show" : "Hide"}</button>}<button type="button" className="portal-btn danger" onClick={() => removeTransaction(x)}><Trash2 size={14} /> Delete</button></div></td></tr>)}
             </tbody></table></div>}
         </section>
 

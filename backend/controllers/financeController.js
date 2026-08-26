@@ -83,6 +83,7 @@ exports.getTransactions = async (req, res) => {
         const skip = (page - 1) * limit;
 
         const filter = {};
+        if (String(req.query.includeHidden || "false").toLowerCase() !== "true") filter.hidden = { $ne: true };
 
         if (req.query.type)
             filter.type = req.query.type;
@@ -326,6 +327,27 @@ exports.updateTransaction = async (req, res) => {
 };
 
 
+
+/* =====================================================
+   HIDE TRANSACTION (SUPERADMIN)
+===================================================== */
+
+exports.hideTransaction = async (req, res) => {
+    try {
+        if (String(req.user?.role || "").toLowerCase() !== "superadmin") {
+            return res.status(403).json({ success: false, message: "Only SuperAdmin can hide a transaction." });
+        }
+        const transaction = await Finance.findById(req.params.id);
+        if (!transaction) return res.status(404).json({ success: false, message: "Transaction not found." });
+        transaction.hidden = req.body?.hidden !== false;
+        transaction.hiddenAt = transaction.hidden ? new Date() : null;
+        transaction.hiddenBy = transaction.hidden ? req.user._id : null;
+        await transaction.save();
+        return res.json({ success: true, hidden: transaction.hidden, message: transaction.hidden ? "Transaction hidden from the community ledger." : "Transaction restored to the community ledger.", transaction });
+    } catch (error) {
+        return res.status(500).json({ success: false, message: error.message });
+    }
+};
 
 /* =====================================================
    DELETE TRANSACTION

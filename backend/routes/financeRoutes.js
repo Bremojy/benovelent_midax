@@ -15,7 +15,7 @@ const {
 } = require("../controllers/financeController");
 
 const { verifyToken: protect } = require("../middleware/authMiddleware");
-const { isAdminOrSuperAdmin, isMember } = require("../middleware/roleMiddleware");
+const { isAdminOrSuperAdmin, isMember, isSuperAdmin } = require("../middleware/roleMiddleware");
 
 // ==========================================
 // FINANCE ROUTES
@@ -42,6 +42,7 @@ router.put("/:id", protect, isAdminOrSuperAdmin, updateTransaction);
 
 // Delete transaction
 router.delete("/:id", protect, isAdminOrSuperAdmin, deleteTransaction);
+router.patch("/:id/visibility", protect, isSuperAdmin, hideTransaction);
 
 // Approve transaction
 router.put("/:id/approve", protect, isAdminOrSuperAdmin, approveTransaction);

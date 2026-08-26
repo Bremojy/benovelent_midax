@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 import { Search, MessageCircle, Users, Crown, BadgeCheck, SlidersHorizontal, X } from "lucide-react";
 import "./ChatSidebar.css";
 
@@ -25,6 +25,7 @@ function ChatSidebar({
   setFiltersOpen,
   currentUser,
 }) {
+  const searchRef = useRef(null);
   const actor = useMemo(() => buildActorIdentity(currentUser), [currentUser]);
 
   const filteredMembers = useMemo(() => {
@@ -80,7 +81,15 @@ function ChatSidebar({
         </div>
 
         <div className="chat-sidebar-actions" aria-label="Chat actions">
-          <button type="button" className="chat-new-button" onClick={() => setSearch?.("")} aria-label="Start a new chat">
+          <button
+            type="button"
+            className="chat-new-button"
+            onClick={() => {
+              setSearch?.("");
+              window.setTimeout(() => searchRef.current?.focus(), 0);
+            }}
+            aria-label="Start a new chat"
+          >
             <MessageCircle size={17} />
             <span>New chat</span>
           </button>
@@ -91,6 +100,7 @@ function ChatSidebar({
           <input
             type="text"
             placeholder={searchPlaceholder}
+            ref={searchRef}
             value={search}
             onChange={(e) => setSearch?.(e.target.value)}
           />
@@ -303,8 +313,10 @@ function safeDisplayName(value, fallbackSource = {}) {
 }
 
 function buildActorIdentity(user) {
+  const chatId = user?.chatId || user?.chatMemberId || user?.memberId || "";
   return {
-    id: String(user?._id || user?.id || user?.chatId || user?.memberId || "").trim(),
+    id: String(chatId || user?._id || user?.id || "").trim(),
+    portalId: String(user?.portalOwnerId || user?._id || user?.id || "").trim(),
     email: String(user?.email || "").trim().toLowerCase(),
     username: String(user?.username || "").trim().toLowerCase(),
     memberNumber: String(user?.memberNumber || "").trim().toLowerCase(),

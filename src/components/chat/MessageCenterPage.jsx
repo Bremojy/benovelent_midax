@@ -543,8 +543,9 @@ function MessageCenterPage({
                     id="chat-person-picker"
                     value={selectedConversation?.partner?._id || ""}
                     onChange={(e) => {
-                      const conversation = normalizedConversations.find((item) => String(item.partner?._id) === String(e.target.value));
-                      const person = normalizedPeople.find((x) => String(x._id) === String(e.target.value));
+                      const value = String(e.target.value || "");
+                      const conversation = normalizedConversations.find((item) => String(item.partner?._id || "") === value || String(item._id || "") === value);
+                      const person = normalizedPeople.find((x) => String(x._id) === value);
                       if (conversation) selectConversation(conversation);
                       else if (person) startConversation(person);
                     }}

@@ -9,6 +9,7 @@ import {
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { HeartPulse } from "lucide-react";
+import { Toaster } from "react-hot-toast";
 import { unlockCallAudio } from "./utils/callTone";
 
 import ScrollToTop from "./components/ScrollToTop";
@@ -328,6 +329,20 @@ function AppContent() {
     <>
       <PageCutTransition />
       <ThemeBootstrap />
+      <Toaster
+        position="top-right"
+        gutter={10}
+        toastOptions={{
+          duration: 4200,
+          style: {
+            borderRadius: "16px",
+            padding: "14px 16px",
+            fontWeight: 600,
+            boxShadow: "0 18px 45px rgba(15, 23, 42, 0.16)",
+            maxWidth: "min(420px, calc(100vw - 28px))",
+          },
+        }}
+      />
       <GlobalMotion />
       <PublicNavbar />
       <CookieConsent />

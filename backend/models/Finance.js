@@ -96,6 +96,20 @@ const financeSchema = new mongoose.Schema({
     notes: {
         type: String,
         default: ""
+    },
+
+    hidden: {
+        type: Boolean,
+        default: false,
+        index: true
+    },
+    hiddenAt: {
+        type: Date,
+        default: null
+    },
+    hiddenBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        default: null
     }
 
 },
