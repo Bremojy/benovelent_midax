@@ -1,0 +1,11 @@
+const fs = require("fs");
+const assert = require("assert");
+const controller = fs.readFileSync("backend/controllers/paymentController.js", "utf8");
+const api = fs.readFileSync("src/services/api.js", "utf8");
+const button = fs.readFileSync("src/components/payments/MpesaPaymentButton.jsx", "utf8");
+const server = fs.readFileSync("backend/server.js", "utf8");
+assert(/requestId/.test(controller), "payment controller must correlate STK requests");
+assert(/X-Request-ID/.test(server) && /payment-request.*STK request received/.test(server), "server must log and correlate STK requests");
+assert(/X-Request-ID/.test(api), "frontend API client must send request IDs");
+assert(/The payment server could not be reached|payment gateway/.test(button), "frontend must classify network/proxy failures");
+console.log("Payment diagnostic contract test passed.");

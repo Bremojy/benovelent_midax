@@ -196,6 +196,7 @@ exports.getTransaction = async (req, res) => {
 
 exports.stk = async (req, res) => {
   let tx = null;
+  const requestId = String(req.requestId || req.get("X-Request-ID") || "unknown");
   try {
     const purpose = String(req.body?.purpose || "").trim();
     const referenceId = req.body?.referenceId || null;
@@ -270,7 +271,7 @@ exports.stk = async (req, res) => {
   } catch (error) {
     const upstream = extractUpstreamError(error);
     const paymentStage = upstream.paymentStage === "oauth" ? "oauth" : upstream.paymentStage === "stk" ? "stk" : "unknown";
-    console.error("M-PESA STK error:", { stage: paymentStage, ...upstream });
+    console.error("M-PESA STK error:", { requestId, stage: paymentStage, ...upstream });
 
     if (tx) {
       tx.status = "failed";
@@ -281,9 +282,10 @@ exports.stk = async (req, res) => {
       try { await tx.save(); } catch (saveError) { console.error("M-PESA transaction failure update:", saveError); }
     }
 
+    const isDatabaseError = String(upstream.code || "").toUpperCase().startsWith("E11000") || /Mongo|Mongoose|duplicate key/i.test(String(upstream.message || ""));
     const isOauth404 = paymentStage === "oauth" && upstream.status === 404;
     const isStk404 = paymentStage === "stk" && upstream.status === 404;
-    const clientStatus = 502;
+    const clientStatus = isDatabaseError ? 500 : (upstream.status && upstream.status >= 500 ? 502 : 502);
     const diagnosticMessage = paymentStage === "oauth"
       ? (upstream.status === 401 || upstream.status === 403
         ? "M-PESA authentication was rejected by Safaricom. Verify the production consumer key, consumer secret and Daraja application permissions."
@@ -300,7 +302,9 @@ exports.stk = async (req, res) => {
               ? "Safaricom denied the Daraja request. Verify that the production application and shortcode are enabled for STK Push."
               : /ETIMEDOUT|ECONNABORTED/i.test(String(upstream.code || ""))
                 ? "The M-PESA request timed out before Safaricom returned a response. The transaction may still be processing; check the payment again shortly."
-                : "The M-PESA service could not complete the STK request. Your portal session is unchanged.";
+                : isDatabaseError
+        ? "The payment record could not be prepared safely. Your payment was not sent to Safaricom. Please retry once, and contact an administrator if it continues."
+        : "The M-PESA service could not complete the STK request. Your portal session is unchanged.";
 
     return res.status(clientStatus).json({
       success: false,
@@ -311,6 +315,7 @@ exports.stk = async (req, res) => {
       endpoint: paymentStage === "oauth" ? endpointSummary().oauth : endpointSummary().stk,
       upstreamCode: upstream.code || null,
       transactionId: tx?._id || null,
+      requestId,
       details: process.env.NODE_ENV === "production" ? undefined : error.response?.data,
     });
   }

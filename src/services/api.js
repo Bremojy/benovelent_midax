@@ -1,5 +1,13 @@
 import axios from "axios";
 
+const CLIENT_APP_VERSION = String(import.meta.env.VITE_APP_VERSION || "18.4.0").trim();
+const createRequestId = () => {
+  try {
+    if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") return crypto.randomUUID();
+  } catch {}
+  return `midax-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+};
+
 const DEFAULT_REMOTE_API_URL = "https://benovelent-midax.onrender.com";
 const DEFAULT_LOCAL_API_URL = "http://localhost:5000";
 
@@ -83,6 +91,9 @@ const API = axios.create({
 const isMutating = (method) => !["get", "head", "options"].includes(String(method || "get").toLowerCase());
 
 API.interceptors.request.use(async (config) => {
+  config.headers = config.headers || {};
+  config.headers["X-Client-App-Version"] = CLIENT_APP_VERSION;
+  config.headers["X-Request-ID"] = config.headers["X-Request-ID"] || createRequestId();
   if (isMutating(config.method) && !config.skipCsrf) {
     const token = await getCsrfToken();
     if (token) {
@@ -118,6 +129,8 @@ API.interceptors.response.use(
   async (error) => {
     const config = error?.config || {};
     const status = error.response?.status;
+    const requestId = error.response?.headers?.["x-request-id"] || error.config?.headers?.["X-Request-ID"] || "";
+    if (requestId) error.requestId = String(requestId);
     const bootstrapRequest = isAuthBootstrapRequest(config.url);
     const code = error.response?.data?.code;
 

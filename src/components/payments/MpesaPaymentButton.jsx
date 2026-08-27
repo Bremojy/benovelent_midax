@@ -10,16 +10,26 @@ const money = (value) => new Intl.NumberFormat("en-KE", { style: "currency", cur
 const mpesaFriendlyError = (error) => {
   const status = Number(error?.response?.status || 0);
   const body = error?.response?.data || {};
-  const message = String(body?.message || error?.message || "M-PESA request failed.");
-  if (status === 404) return "The deployed payment API route is missing. Deploy the updated backend before retrying this payment.";
+  const requestId = String(body?.requestId || error?.requestId || "").trim();
+  const bodyMessage = String(body?.message || "").trim();
+  const networkCode = String(error?.code || "").trim();
+  if (!error?.response) {
+    if (networkCode === "ECONNABORTED" || networkCode === "ETIMEDOUT") return `The payment request timed out before the server responded.${requestId ? ` Reference: ${requestId}` : ""} Please retry.`;
+    return `The payment server could not be reached. Check your connection and retry.${requestId ? ` Reference: ${requestId}` : ""}`;
+  }
   if (body?.paymentStage === "oauth") return body?.upstreamStatus === 401 || body?.upstreamStatus === 403
-    ? "M-PESA authentication was rejected by Safaricom. Ask the administrator to verify the production consumer credentials and Daraja permissions."
-    : "M-PESA could not authenticate with Safaricom. Ask the administrator to verify the production Daraja environment and credentials.";
-  if (status === 400 || Number(body?.upstreamStatus) === 400) return "Safaricom rejected the STK request. Check the M-PESA number and ask the administrator to verify the production shortcode, passkey and Daraja configuration.";
-  if (status === 401 || Number(body?.upstreamStatus) === 401) return "M-PESA authentication was rejected by Safaricom. The backend production Daraja credentials need to be checked by an administrator.";
-  if (status === 403 || Number(body?.upstreamStatus) === 403) return "Safaricom denied this request. Ask the administrator to verify that the production application and shortcode are provisioned for STK Push.";
-  if (status === 502) return "The M-PESA service could not complete the request. Your portal session is unchanged; you can retry later.";
-  return message;
+    ? `M-PESA authentication was rejected by Safaricom. Ask the administrator to verify the production consumer credentials and Daraja permissions.${requestId ? ` Reference: ${requestId}` : ""}`
+    : body?.code === "MPESA_OAUTH_404"
+      ? `Safaricom's production authentication endpoint could not be reached correctly. Verify the production Daraja host and environment.${requestId ? ` Reference: ${requestId}` : ""}`
+      : `M-PESA could not authenticate with Safaricom. Ask the administrator to verify the production Daraja environment and credentials.${requestId ? ` Reference: ${requestId}` : ""}`;
+  if (status === 404) return `The deployed payment API route is missing. Deploy the updated backend before retrying this payment.${requestId ? ` Reference: ${requestId}` : ""}`;
+  if (body?.code === "API_REQUEST_FAILED") return `${bodyMessage || "The server could not complete the payment request."}${requestId ? ` Reference: ${requestId}` : ""}`;
+  if (body?.code === "MPESA_DATABASE_FAILED") return `${bodyMessage || "The payment record could not be prepared safely."}${requestId ? ` Reference: ${requestId}` : ""}`;
+  if (status === 400 || Number(body?.upstreamStatus) === 400) return `Safaricom rejected the STK request. Check the M-PESA number and ask the administrator to verify the production shortcode, passkey and Daraja configuration.${requestId ? ` Reference: ${requestId}` : ""}`;
+  if (status === 401 || Number(body?.upstreamStatus) === 401) return `M-PESA authentication was rejected by Safaricom. The backend production Daraja credentials need to be checked by an administrator.${requestId ? ` Reference: ${requestId}` : ""}`;
+  if (status === 403 || Number(body?.upstreamStatus) === 403) return `Safaricom denied this request. Ask the administrator to verify that the production application and shortcode are provisioned for STK Push.${requestId ? ` Reference: ${requestId}` : ""}`;
+  if (status === 502) return `${bodyMessage || "The payment gateway or deployment proxy could not complete the request."}${requestId ? ` Reference: ${requestId}` : ""}`;
+  return `${bodyMessage || error?.message || "M-PESA request failed."}${requestId ? ` Reference: ${requestId}` : ""}`;
 };
 
 export default function MpesaPaymentButton({ purpose, referenceId, label = "Pay with M-PESA", defaultAmount = "", maxAmount = 0, phoneNumber = "", disabled = false, onSuccess }) {
