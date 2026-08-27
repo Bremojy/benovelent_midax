@@ -16,7 +16,7 @@ const env = read("backend/.env.example");
 const frontendEnv = read(".env.example");
 
 for (const expected of [
-  'router.post("/manual", protect, isContributionUser, controller.manualPayment);',
+  'router.post("/manual", protect, isMember, controller.manualPayment);',
   'router.get("/manual/admin", protect, isAdminOrSuperAdmin, controller.manualPaymentsAdmin);',
   'router.post("/manual/:id/verify", protect, isAdminOrSuperAdmin, controller.manualVerify);',
   'router.post("/manual/:id/reject", protect, isAdminOrSuperAdmin, controller.manualReject);',

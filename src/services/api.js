@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const CLIENT_APP_VERSION = String(import.meta.env.VITE_APP_VERSION || "18.5.0").trim();
+const CLIENT_APP_VERSION = String(import.meta.env.VITE_APP_VERSION || "18.4.0").trim();
 const createRequestId = () => {
   try {
     if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") return crypto.randomUUID();
