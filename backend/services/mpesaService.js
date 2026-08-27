@@ -48,6 +48,20 @@ const endpointSummary = () => ({
   b2c: `${baseUrl()}/mpesa/b2c/v1/paymentrequest`,
 });
 
+const maskPhone = (value) => {
+  const phone = String(value || "").replace(/\s+/g, "");
+  if (/^\d{12}$/.test(phone)) return `${phone.slice(0, 5)}*******${phone.slice(-2)}`;
+  return "invalid";
+};
+
+const logMpesa = (event, details = {}) => {
+  try {
+    console.info(`[mpesa][${event}]`, details);
+  } catch (_) {
+    // Logging must never interrupt a payment attempt.
+  }
+};
+
 const extractUpstreamError = (error) => ({
   paymentStage: String(error?.paymentStage || "unknown"),
   status: Number(error?.response?.status || 0) || null,
@@ -78,7 +92,7 @@ const normalizeAccountReference = (value) => String(value || DEFAULT_MPESA_ACCOU
 
 const normalizePhone = (value) => {
   const raw = String(value || "").replace(/\s+/g, "").replace(/^\+/, "");
-  if (/^2547\d{8}$/.test(raw)) return raw;
+  if (/^254[17]\d{8}$/.test(raw)) return raw;
   if (/^07\d{8}$/.test(raw)) return `254${raw.slice(1)}`;
   if (/^01\d{8}$/.test(raw)) return `254${raw.slice(1)}`;
   if (/^7\d{8}$/.test(raw)) return `254${raw}`;
@@ -88,6 +102,10 @@ const normalizePhone = (value) => {
 
 async function getAccessToken() {
   if (!isDarajaConfigured()) throw Object.assign(new Error("M-PESA Daraja API credentials are not configured on the server."), { paymentStage: "oauth" });
+  logMpesa("oauth:init", {
+    endpoint: endpointSummary().oauth,
+    credentialsPresent: true,
+  });
   const token = Buffer.from(`${env("MPESA_CONSUMER_KEY")}:${env("MPESA_CONSUMER_SECRET")}`).toString("base64");
   let response;
   try {
@@ -97,8 +115,17 @@ async function getAccessToken() {
     });
   } catch (error) {
     error.paymentStage = "oauth";
+    logMpesa("oauth:error", {
+      httpStatus: error?.response?.status || null,
+      code: error?.response?.data?.errorCode || error?.code || null,
+    });
     throw error;
   }
+  logMpesa("oauth:response", {
+    httpStatus: response.status,
+    tokenReceived: Boolean(response.data?.access_token),
+    expiresIn: response.data?.expires_in ?? null,
+  });
   if (!response.data?.access_token) throw Object.assign(new Error("Daraja did not return an access token."), { paymentStage: "oauth" });
   return response.data.access_token;
 }
@@ -107,20 +134,33 @@ async function stkPush({ phoneNumber, amount, accountReference, transactionDesc 
   const accessToken = await getAccessToken();
   const timestampValue = timestamp();
   const shortcode = env("MPESA_SHORTCODE", DEFAULT_MPESA_SHORTCODE);
+  const transactionType = env("MPESA_TRANSACTION_TYPE", "CustomerPayBillOnline");
+  const normalizedPhone = normalizePhone(phoneNumber);
+  const callbackUrl = env("MPESA_CALLBACK_URL");
   const password = Buffer.from(`${shortcode}${env("MPESA_PASSKEY")}${timestampValue}`).toString("base64");
   const payload = {
     BusinessShortCode: shortcode,
     Password: password,
     Timestamp: timestampValue,
-    TransactionType: env("MPESA_TRANSACTION_TYPE", "CustomerPayBillOnline"),
+    TransactionType: transactionType,
     Amount: Math.max(1, Math.round(Number(amount))),
-    PartyA: normalizePhone(phoneNumber),
+    PartyA: normalizedPhone,
     PartyB: shortcode,
-    PhoneNumber: normalizePhone(phoneNumber),
-    CallBackURL: env("MPESA_CALLBACK_URL"),
+    PhoneNumber: normalizedPhone,
+    CallBackURL: callbackUrl,
     AccountReference: normalizeAccountReference(accountReference || env("MPESA_ACCOUNT_REFERENCE", DEFAULT_MPESA_ACCOUNT_REFERENCE)),
     TransactionDesc: String(transactionDesc || "Benevolent MIDAX payment").slice(0, 20),
   };
+  logMpesa("stk:init", {
+    endpoint: endpointSummary().stk,
+    environment: env("MPESA_ENVIRONMENT", "production"),
+    shortcode,
+    transactionType,
+    phone: maskPhone(normalizedPhone),
+    amount: payload.Amount,
+    callbackConfigured: Boolean(callbackUrl),
+    passkeyPresent: !isPlaceholder(env("MPESA_PASSKEY")),
+  });
   let response;
   try {
     response = await axios.post(`${baseUrl()}/mpesa/stkpush/v1/processrequest`, payload, {
@@ -129,8 +169,22 @@ async function stkPush({ phoneNumber, amount, accountReference, transactionDesc 
     });
   } catch (error) {
     error.paymentStage = "stk";
+    logMpesa("stk:error", {
+      httpStatus: error?.response?.status || null,
+      code: error?.response?.data?.errorCode || error?.code || null,
+      responseCode: error?.response?.data?.ResponseCode ?? null,
+      responseDescription: error?.response?.data?.ResponseDescription ?? null,
+    });
     throw error;
   }
+  logMpesa("stk:response", {
+    httpStatus: response.status,
+    responseCode: response.data?.ResponseCode ?? null,
+    responseDescription: response.data?.ResponseDescription ?? null,
+    customerMessage: response.data?.CustomerMessage ?? null,
+    merchantRequestId: response.data?.MerchantRequestID || null,
+    checkoutRequestId: response.data?.CheckoutRequestID || null,
+  });
   return response.data;
 }
 

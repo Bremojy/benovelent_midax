@@ -683,6 +683,13 @@ exports.stkQuery = async (req, res) => {
         { returnDocument: "after" }
       );
       const settled = claimed || await MpesaTransaction.findById(transaction._id);
+      console.info("[mpesa][callback:success]", {
+        requestId: req.requestId || null,
+        transactionId: transaction._id,
+        checkoutRequestId,
+        resultCode: transaction.resultCode,
+        mpesaReceiptPresent: Boolean(transaction.mpesaReceiptNumber),
+      });
       if (settled && !settled.reconciled) await reconcileSuccessfulTransaction(settled);
       return res.json({ success: true, settled: true, source: "safaricom-query", message: settled?.resultDescription || transaction.resultDescription, transaction: settled });
     }
@@ -718,11 +725,26 @@ exports.stkQuery = async (req, res) => {
 
 exports.callback = async (req, res) => {
   const callback = req.body?.Body?.stkCallback || req.body?.stkCallback;
-  if (!callback) return res.json({ ResultCode: 0, ResultDesc: "Accepted" });
+  if (!callback) {
+    console.warn("[mpesa][callback:invalid]", { requestId: req.requestId || null });
+    return res.json({ ResultCode: 0, ResultDesc: "Accepted" });
+  }
   try {
     const checkoutRequestId = String(callback.CheckoutRequestID || "");
+    console.info("[mpesa][callback:received]", {
+      requestId: req.requestId || null,
+      checkoutRequestId: checkoutRequestId || null,
+      resultCode: callback.ResultCode ?? null,
+      resultDescription: String(callback.ResultDesc || "").slice(0, 300),
+    });
     const transaction = await MpesaTransaction.findOne({ checkoutRequestId });
-    if (!transaction) return res.json({ ResultCode: 0, ResultDesc: "Accepted" });
+    if (!transaction) {
+      console.warn("[mpesa][callback:unmatched]", {
+        requestId: req.requestId || null,
+        checkoutRequestId: checkoutRequestId || null,
+      });
+      return res.json({ ResultCode: 0, ResultDesc: "Accepted" });
+    }
 
     transaction.callbackPayload = req.body;
     transaction.resultCode = Number(callback.ResultCode ?? 1);
@@ -740,6 +762,13 @@ exports.callback = async (req, res) => {
         { returnDocument: "after" }
       );
       const settled = claimed || await MpesaTransaction.findById(transaction._id);
+      console.info("[mpesa][callback:success]", {
+        requestId: req.requestId || null,
+        transactionId: transaction._id,
+        checkoutRequestId,
+        resultCode: transaction.resultCode,
+        mpesaReceiptPresent: Boolean(transaction.mpesaReceiptNumber),
+      });
       if (settled && !settled.reconciled) await reconcileSuccessfulTransaction(settled);
     } else {
       const failed = await MpesaTransaction.findOneAndUpdate(
@@ -747,12 +776,19 @@ exports.callback = async (req, res) => {
         { $set: { status: "failed", completedAt: transaction.completedAt || new Date(), callbackPayload: req.body, resultCode: transaction.resultCode, resultDescription: transaction.resultDescription, mpesaReceiptNumber: transaction.mpesaReceiptNumber } },
         { returnDocument: "after" }
       );
+      console.warn("[mpesa][callback:failed]", {
+        requestId: req.requestId || null,
+        transactionId: transaction._id,
+        checkoutRequestId,
+        resultCode: transaction.resultCode,
+        resultDescription: transaction.resultDescription,
+      });
       if (failed?.member) {
         await createNotification({
           recipient: transaction.member,
           recipientModel: "Member",
           title: "M-PESA Payment Update",
-          message: `Your M-PESA payment was not completed. ${transaction.resultDescription || "Please retry or contact the scheme administrator."}`,
+          message: `Your M-PESA payment was not completed. ${/unresolved reason type/i.test(String(transaction.resultDescription || "")) ? "Safaricom returned a non-specific STK failure. Please verify the production shortcode, passkey, transaction type and customer number." : (transaction.resultDescription || "Please retry or contact the scheme administrator.")}`,
           type: "payment",
           referenceId: transaction._id,
           referenceModel: "MpesaTransaction",
