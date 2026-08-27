@@ -104,6 +104,11 @@ async function applyCommunityContribution(transaction) {
   return campaign;
 }
 
+exports.publicConfig = async (_req, res) => {
+  res.set("Cache-Control", "public, max-age=300, stale-while-revalidate=900");
+  return res.json({ success:true, enabled:env("MPESA_ENABLED","false").toLowerCase()==="true", configured:isConfigured(), environment:env("MPESA_ENVIRONMENT","production"), shortCode:env("MPESA_SHORTCODE",DEFAULT_MPESA_SHORTCODE), accountReference:normalizeAccountReference(env("MPESA_ACCOUNT_REFERENCE",DEFAULT_MPESA_ACCOUNT_REFERENCE)), manualPaybill:env("MPESA_MANUAL_PAYBILL","247247"), manualAccountNumber:env("MPESA_MANUAL_ACCOUNT_NUMBER",""), transactionType:env("MPESA_TRANSACTION_TYPE","CustomerPayBillOnline") });
+};
+
 exports.config = async (_req, res) => {
   const stkConfigured = isConfigured();
   const b2cConfigured = isB2CConfigured();
@@ -397,9 +402,23 @@ exports.callback = async (req, res) => {
       await transaction.save();
       if (!wasSuccessful) await reconcileSuccessfulTransaction(transaction);
     } else {
+      const wasPending = transaction.status === "pending";
       transaction.status = "failed";
       transaction.completedAt = transaction.completedAt || new Date();
       await transaction.save();
+      if (wasPending && transaction.member) {
+        await createNotification({
+          recipient: transaction.member,
+          recipientModel: "Member",
+          title: "M-PESA Payment Update",
+          message: `Your M-PESA payment was not completed. ${transaction.resultDescription || "Please retry or contact the scheme administrator."}`,
+          type: "payment",
+          referenceId: transaction._id,
+          referenceModel: "MpesaTransaction",
+          link: "/member/mpesa-records",
+          icon: "payments",
+        });
+      }
     }
   } catch (error) {
     console.error("M-PESA callback error:", error);

@@ -98,6 +98,17 @@ const newsSchema = new mongoose.Schema(
         default:0
     },
 
+    comments: [
+        {
+            author: { type: mongoose.Schema.Types.ObjectId, required: true },
+            authorModel: { type: String, enum: ["Member", "Admin", "SuperAdmin"], required: true },
+            authorName: { type: String, trim: true, default: "Member" },
+            profileImage: { type: String, default: "" },
+            text: { type: String, trim: true, maxlength: 2000, required: true },
+            createdAt: { type: Date, default: Date.now }
+        }
+    ],
+
     views:{
         type:Number,
         default:0

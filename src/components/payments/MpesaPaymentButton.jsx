@@ -2,6 +2,7 @@ import toast from "react-hot-toast";
 import { useEffect, useState } from "react";
 import { CheckCircle2, Clock3, Loader2, Smartphone, XCircle } from "lucide-react";
 import API from "../../services/api";
+import { getRuntimeConfig } from "../../services/runtimeConfig";
 import "./MpesaPaymentButton.css";
 
 const normalizePhone = (value) => String(value || "").replace(/\s+/g, "").replace(/^\+/, "");
@@ -88,11 +89,11 @@ export default function MpesaPaymentButton({ purpose, referenceId, label = "Pay 
   const openPayment = async () => {
     setStatus("checking"); setMessage("");
     try {
-      const [configResponse, routeResponse] = await Promise.all([
-        API.get("/payments/config"),
+      const [runtime, routeResponse] = await Promise.all([
+        getRuntimeConfig(),
         API.get("/payments/route-status"),
       ]);
-      const data = configResponse.data || {};
+      const data = runtime?.mpesa || {};
       const route = routeResponse.data || {};
       setConfigured(Boolean(data?.enabled && data?.configured && route?.routes?.stk));
       setMpesaConfig({

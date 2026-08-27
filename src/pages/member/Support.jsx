@@ -42,6 +42,7 @@ const newAttachment = () => ({
   id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
   category: "Other",
   label: "",
+  customCategory: "",
   file: null,
 });
 
@@ -109,15 +110,18 @@ export default function Support() {
   const attachFiles = (formData) => {
     const documentCategories = [];
     const documentLabels = [];
+    const documentCustomCategories = [];
 
     activeAttachments.forEach((item) => {
       formData.append("documents", item.file);
       documentCategories.push(item.category || "Other");
       documentLabels.push(item.label || item.file?.name || "Document");
+      documentCustomCategories.push(item.customCategory || "");
     });
 
     formData.append("documentCategories", JSON.stringify(documentCategories));
     formData.append("documentLabels", JSON.stringify(documentLabels));
+    formData.append("documentCustomCategories", JSON.stringify(documentCustomCategories));
   };
 
   const openRequestEditor = (claim) => {
@@ -129,6 +133,7 @@ export default function Support() {
     const docs = (Array.isArray(claim.documents) ? claim.documents : []).map((doc) => ({
       ...doc,
       category: doc?.category || "Other",
+      customCategory: doc?.customCategory || "",
       label: doc?.label || doc?.fileName || "Document",
     }));
     setEditingRequest(claim);
@@ -144,7 +149,7 @@ export default function Support() {
     const docs = editDraft.documents || [];
     if (docs.length < 2) { setError("At least two supporting documents are required."); return; }
     if (new Set(docs.map((d) => String(d.category || "Other").toLowerCase())).size < 2) { setError("Use at least two different document categories."); return; }
-    if (docs.some((d) => String(d.category || "").toLowerCase() === "other" && !String(d.label || "").trim())) { setError("Documents marked Other need a clear label."); return; }
+    if (docs.some((d) => String(d.category || "").toLowerCase() === "other" && !String(d.customCategory || "").trim())) { setError("Documents marked Other need a custom category name."); return; }
     try {
       setEditBusy(true); setError(""); setSuccess("");
       const { data } = await API.put(`/member/support-requests/mine/${editingRequest._id}`, {
@@ -187,8 +192,8 @@ export default function Support() {
       if (activeAttachments.length < 2) throw new Error("Please upload at least two supporting documents.");
       const categories = new Set(activeAttachments.map((item) => String(item.category || "Other").trim().toLowerCase()));
       if (categories.size < 2) throw new Error("Please use at least two different document categories.");
-      const invalidOther = activeAttachments.some((item) => String(item.category || "").toLowerCase() === "other" && !String(item.label || "").trim());
-      if (invalidOther) throw new Error("For documents marked Other, provide a clear document label.");
+      const invalidOther = activeAttachments.some((item) => String(item.category || "").toLowerCase() === "other" && !String(item.customCategory || "").trim());
+      if (invalidOther) throw new Error("For documents marked Other, provide a custom category name.");
       setSubmitting(true);
 
       let endpoint;
@@ -412,6 +417,12 @@ export default function Support() {
                             placeholder="Receipt, report, letter..."
                           />
                         </label>
+                        {item.category === "Other" && (
+                          <label>
+                            <span>Custom category</span>
+                            <input value={item.customCategory} onChange={(e) => updateAttachment(item.id, { customCategory: e.target.value })} placeholder="e.g. Employer letter" maxLength={120} required />
+                          </label>
+                        )}
                         <label>
                           <span>File</span>
                           <input
@@ -513,6 +524,9 @@ export default function Support() {
                     <div className="support-attachment-fields">
                       <label><span>Category</span><select value={doc.category || "Other"} onChange={(e) => updateEditDocument(index, "category", e.target.value)}>{DOCUMENT_CATEGORIES.map((category) => <option key={category}>{category}</option>)}</select></label>
                       <label><span>Label</span><input value={doc.label || ""} onChange={(e) => updateEditDocument(index, "label", e.target.value)} /></label>
+                      {String(doc.category || "").toLowerCase() === "other" && (
+                        <label><span>Custom category</span><input value={doc.customCategory || ""} onChange={(e) => updateEditDocument(index, "customCategory", e.target.value)} placeholder="Custom category name" maxLength={120} required /></label>
+                      )}
                     </div>
                   </div>
                 ))}

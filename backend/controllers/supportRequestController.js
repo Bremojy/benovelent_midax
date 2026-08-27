@@ -22,6 +22,7 @@ const buildAttachmentList = (req) => {
   const files = Array.isArray(req.files) ? req.files : [];
   const categories = safeParse(req.body.documentCategories, []);
   const labels = safeParse(req.body.documentLabels, []);
+  const customCategories = safeParse(req.body.documentCustomCategories, []);
 
   return files
     .map((file, index) => {
@@ -29,11 +30,13 @@ const buildAttachmentList = (req) => {
       if (!fileUrl) return null;
 
       const category = asText(categories[index], "General") || "General";
+      const customCategory = asText(customCategories[index], "");
       const label = asText(labels[index], file.originalname || `Document ${index + 1}`);
       const fileName = asText(file.originalname || file.filename || label, label);
 
       return {
         category,
+        customCategory,
         label,
         fileName,
         fileUrl,
@@ -60,6 +63,7 @@ const normalizeDocuments = (documents = []) =>
       if (!fileUrl) return null;
       return {
         category: asText(document.category, "General") || "General",
+        customCategory: asText(document.customCategory, ""),
         label: asText(document.label, ""),
         fileName: asText(document.fileName, document.label || ""),
         fileUrl,
@@ -84,10 +88,13 @@ const validateMemberEditable = (item, memberId) => {
 const validateMinimumDocuments = (documents) => {
   const normalized = normalizeDocuments(documents);
   if (normalized.length < 2) return "At least two supporting documents are required.";
-  const categories = new Set(normalized.map((item) => String(item.category || "General").trim().toLowerCase()));
+  const categories = new Set(normalized.map((item) => {
+    const category = String(item.category || "General").trim();
+    return category.toLowerCase() === "other" && item.customCategory ? item.customCategory.trim().toLowerCase() : category.toLowerCase();
+  }));
   if (categories.size < 2) return "Please upload documents from at least two different categories.";
-  if (normalized.some((item) => String(item.category || "").trim().toLowerCase() === "other" && !String(item.label || "").trim())) {
-    return "When a document category is Other, provide a clear document label.";
+  if (normalized.some((item) => String(item.category || "").trim().toLowerCase() === "other" && !String(item.customCategory || "").trim())) {
+    return "When a document category is Other, provide a custom category name.";
   }
   return null;
 };

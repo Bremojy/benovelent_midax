@@ -224,7 +224,18 @@ exports.updateDependent = async (req, res) => {
 
         }
 
-        Object.assign(dependent, req.body);
+        const allowedFields = [
+            "fullName", "relationship", "gender", "dateOfBirth", "nationalId",
+            "birthCertificateNumber", "phone", "email", "county", "address",
+            "school", "admissionNumber", "educationLevel", "occupation", "employer",
+            "medicalConditions", "isNextOfKin"
+        ];
+        for (const field of allowedFields) {
+            if (req.body[field] !== undefined) dependent[field] = req.body[field];
+        }
+        if (!String(dependent.fullName || "").trim()) return res.status(400).json({ success: false, message: "Dependent full name is required." });
+        if (!dependent.relationship || !dependent.gender || !dependent.dateOfBirth) return res.status(400).json({ success: false, message: "Relationship, gender and date of birth are required." });
+        if (new Date(dependent.dateOfBirth).getTime() > Date.now()) return res.status(400).json({ success: false, message: "Date of birth cannot be in the future." });
 
         dependent.verified = false;
         dependent.verifiedBy = null;

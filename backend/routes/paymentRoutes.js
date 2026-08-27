@@ -5,6 +5,7 @@ const { isMember, isAdminOrSuperAdmin, isSuperAdmin } = require("../middleware/r
 const controller = require("../controllers/paymentController");
 
 router.get("/route-status", controller.routeStatus);
+router.get("/public-config", controller.publicConfig);
 router.get("/config", protect, controller.config);
 router.get("/mine", protect, controller.myTransactions);
 router.get("/transactions/:id", protect, isMember, controller.getTransaction);
