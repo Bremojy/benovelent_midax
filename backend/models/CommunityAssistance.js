@@ -13,6 +13,7 @@ const communityAssistanceSchema = new mongoose.Schema(
     description: { type: String, default: "", trim: true, maxlength: 2000 },
     targetAmount: { type: Number, required: true, min: 1 },
     raisedAmount: { type: Number, default: 0, min: 0 },
+    contributionTransactionIds: [{ type: mongoose.Schema.Types.ObjectId, ref: "MpesaTransaction" }],
     enabled: { type: Boolean, default: true },
     status: { type: String, enum: ["open", "target_reached", "paused", "closed", "payout_pending", "paid"], default: "open", index: true },
     payoutPhoneNumber: { type: String, default: "" },

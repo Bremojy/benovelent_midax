@@ -19,5 +19,5 @@ assert(service.includes('/mpesa/stkpushquery/v1/query'), "Safaricom STK query en
 assert(button.includes('id="mpesa-payment-amount"') && button.includes('name="amount"'), "M-PESA amount field accessibility attributes missing.");
 assert(button.includes('id="mpesa-payment-phone"') && button.includes('name="phoneNumber"'), "M-PESA phone field accessibility attributes missing.");
 assert(button.includes('API.post("/payments/stk-query"'), "Generic M-PESA button does not use STK query fallback.");
-assert(claims.includes('API.post("/payments/stk-query"'), "Claims community flow does not use STK query fallback.");
+assert(claims.includes('MpesaPaymentButton'), "Claims community flow is missing the shared payment component.");
 console.log("MPESA callback/query contract test: PASS");

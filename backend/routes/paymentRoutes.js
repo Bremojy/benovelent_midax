@@ -11,6 +11,10 @@ router.get("/mine", protect, controller.myTransactions);
 router.get("/transactions/:id", protect, isMember, controller.getTransaction);
 router.post("/stk", protect, isMember, controller.stk);
 router.post("/stk-query", protect, isMember, controller.stkQuery);
+router.post("/manual", protect, isMember, controller.manualPayment);
+router.get("/manual/admin", protect, isAdminOrSuperAdmin, controller.manualPaymentsAdmin);
+router.post("/manual/:id/verify", protect, isAdminOrSuperAdmin, controller.manualVerify);
+router.post("/manual/:id/reject", protect, isAdminOrSuperAdmin, controller.manualReject);
 // Backward-compatible aliases for older deployed/mobile clients.
 router.post("/stkpush", protect, isMember, controller.stk);
 router.post("/mpesa-stk", protect, isMember, controller.stk);

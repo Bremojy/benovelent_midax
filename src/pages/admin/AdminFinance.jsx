@@ -40,6 +40,7 @@ export default function AdminFinance() {
   const [bulkForm, setBulkForm] = useState({ month: new Date().getMonth() + 1, year: new Date().getFullYear(), amount: "500", paymentDate: today, recordAsCollected: true, notes: "Monthly payroll deduction" });
   const [bulkSaving, setBulkSaving] = useState(false);
   const [community, setCommunity] = useState([]);
+  const [manualMpesa, setManualMpesa] = useState([]);
   const [mpesaConfig, setMpesaConfig] = useState(null);
   const [communityBusy, setCommunityBusy] = useState("");
   const [b2cHistory, setB2cHistory] = useState([]);
@@ -56,15 +57,17 @@ export default function AdminFinance() {
         API.get("/contributions"),
         API.get(`/finance/ledger?year=${new Date().getFullYear()}`),
         API.get("/payments/community-assistance/admin"),
+        API.get("/payments/manual/admin"),
         API.get("/payments/config"),
         ...(isSuperAdmin ? [API.get("/payments/b2c/history")] : []),
       ];
-      const [s, t, c, l, communityRes, mpesaRes, b2cRes] = await Promise.all(requests);
+      const [s, t, c, l, communityRes, manualRes, mpesaRes, b2cRes] = await Promise.all(requests);
       setSummary(s.data?.summary || s.data || {});
       setTransactions(Array.isArray(t.data?.transactions) ? t.data.transactions : []);
       setContributions(Array.isArray(c.data?.contributions) ? c.data.contributions : []);
       setLedger(l.data || null);
       setCommunity(Array.isArray(communityRes.data?.campaigns) ? communityRes.data.campaigns : []);
+      setManualMpesa(Array.isArray(manualRes?.data?.transactions) ? manualRes.data.transactions : []);
       setMpesaConfig(mpesaRes.data || null);
       if (isSuperAdmin) setB2cHistory(Array.isArray(b2cRes?.data?.transactions) ? b2cRes.data.transactions : []);
     } catch (err) {
@@ -245,6 +248,29 @@ export default function AdminFinance() {
     finally { setB2cBusy(false); }
   };
 
+  const reviewManualPayment = async (transaction, action) => {
+    if (!transaction?._id || !["verify", "reject"].includes(action)) return;
+    const question = action === "verify"
+      ? "Verify this M-PESA PayBill transaction? Only do this after checking the official M-PESA statement/confirmation."
+      : "Reject this manual M-PESA transaction?";
+    if (!await confirmAction(question)) return;
+    try {
+      setCommunityBusy(`manual-${transaction._id}`);
+      setError("");
+      const path = action === "verify" ? `/payments/manual/${transaction._id}/verify` : `/payments/manual/${transaction._id}/reject`;
+      const { data } = action === "reject"
+        ? await API.post(path, { reason: "M-PESA transaction could not be verified from the authorised payment records." })
+        : await API.post(path);
+      if (!data?.success) throw new Error(data?.message || "Unable to update the manual M-PESA transaction.");
+      setMessage(data.message || (action === "verify" ? "Manual M-PESA payment verified." : "Manual M-PESA payment rejected."));
+      await load();
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || "Unable to update the manual M-PESA transaction.");
+    } finally {
+      setCommunityBusy("");
+    }
+  };
+
   const closeCommunity = async (campaign) => {
     if (!isSuperAdmin) return;
     if (!await confirmAction(`Close the M-PESA collection for “${campaign.title}”? No further member contributions will be accepted.`)) return;
@@ -353,6 +379,15 @@ export default function AdminFinance() {
           </form>
           <div className="portal-table-wrap" style={{ marginTop: 18 }}><table className="portal-table"><thead><tr><th>Date</th><th>Recipient</th><th>Amount</th><th>Status</th><th>Receipt / conversation</th><th>Remarks</th></tr></thead><tbody>{b2cHistory.length === 0 ? <tr><td colSpan="6">No direct B2C disbursements recorded.</td></tr> : b2cHistory.map((x, i) => <tr key={x._id || i}><td>{date(x.createdAt)}</td><td>{x.member?.fullName || x.phoneNumber}</td><td>{number(x.amount)}</td><td><span className={`portal-badge ${x.status === "successful" ? "approved" : ""}`}>{x.status}</span></td><td>{x.transactionReceipt || x.conversationId || x.originatorConversationId || "Pending callback"}</td><td>{x.remarks || "—"}</td></tr>)}</tbody></table></div>
         </section>}
+
+        <section className="portal-panel">
+          <div className="portal-module-header compact-header"><div><span>MANUAL M-PESA VERIFICATION</span><h2>Equity PayBill 247247 submissions</h2><p>Verify the transaction code against the authorised payment records before approving. Submitted payments remain pending until an administrator verifies them.</p></div><span className="portal-badge">PayBill {mpesaConfig?.manualPaybill || "247247"} · Account {mpesaConfig?.manualAccountNumber || "0650186528835"}</span></div>
+          {manualMpesa.length === 0 ? <div className="portal-empty">No manual M-PESA PayBill submissions are waiting for review.</div> : <div className="portal-table-wrap"><table className="portal-table"><thead><tr><th>Date</th><th>Member</th><th>Amount</th><th>Transaction code</th><th>Status</th><th>Reconciliation</th><th>Action</th></tr></thead><tbody>{manualMpesa.map((x) => {
+            const pending = x.status === "pending";
+            const needsReview = x.status === "successful" && !x.reconciled;
+            return <tr key={x._id}><td>{date(x.createdAt)}</td><td>{x.member?.fullName || "—"}<br /><small>{x.member?.memberNumber || x.member?.email || ""}</small></td><td>{number(x.amount)}</td><td><strong>{x.manualTransactionCode || "—"}</strong></td><td><span className={`portal-badge ${x.status === "successful" ? "approved" : x.status === "failed" ? "rejected" : ""}`}>{x.status}</span></td><td>{x.reconciled ? "Reconciled" : x.status === "successful" ? "Finance review" : "Pending verification"}</td><td><div className="portal-actions">{(pending || needsReview) && <button className="portal-btn primary" onClick={() => reviewManualPayment(x, "verify")} disabled={communityBusy === `manual-${x._id}`}>{needsReview ? "Reconcile" : "Verify"}</button>}{pending && <button className="portal-btn danger" onClick={() => reviewManualPayment(x, "reject")} disabled={communityBusy === `manual-${x._id}`}>Reject</button>}</div></td></tr>;
+          })}</tbody></table></div>}
+        </section>
 
         <section className="portal-panel community-control-panel">
           <div className="portal-module-header compact-header"><div><span>COMMUNITY M-PESA CONTROL</span><h2>Collection requests</h2><p>Monitor every verified community collection. Only SuperAdmin can disburse collected funds or close a collection request.</p></div><span className="portal-badge"><LockKeyhole size={14} /> {isSuperAdmin ? "Controls enabled" : "Monitoring only"}</span></div>

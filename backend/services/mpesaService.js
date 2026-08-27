@@ -24,7 +24,7 @@ const isConfigured = () => {
 };
 
 const isB2CConfigured = () => {
-  const b2cEnabled = env("MPESA_B2C_ENABLED", "true").toLowerCase() === "true";
+  const b2cEnabled = env("MPESA_B2C_ENABLED", "false").toLowerCase() === "true";
   if (!b2cEnabled) return false;
   const required = [
     "MPESA_CONSUMER_KEY",
@@ -207,7 +207,7 @@ const getConfigurationSummary = () => {
     darajaConfigured: isDarajaConfigured(),
     transactionType: env("MPESA_TRANSACTION_TYPE", "CustomerPayBillOnline"),
     b2cConfigured: isB2CConfigured(),
-    b2cEnabled: env("MPESA_B2C_ENABLED", "true").toLowerCase() === "true",
+    b2cEnabled: env("MPESA_B2C_ENABLED", "false").toLowerCase() === "true",
     shortcode: env("MPESA_SHORTCODE"),
     callbackUrl,
     b2cResultUrl: env("MPESA_B2C_RESULT_URL"),

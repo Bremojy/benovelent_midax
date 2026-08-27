@@ -11,7 +11,7 @@ if (pkg.version !== "18.3.0") throw new Error(`Expected current release package,
 for (const value of ["isVercelHost", "window.location.origin", "/api"]) {
   if (!api.includes(value)) throw new Error(`API configuration missing ${value}`);
 }
-if (!env.includes("VITE_API_URL=\n")) throw new Error("Frontend env example should leave VITE_API_URL blank for Vercel same-origin API proxying.");
+if (!env.includes("VITE_API_URL=/api")) throw new Error("Frontend env example should use the Vercel same-origin /api proxy.");
 if (!env.includes("VITE_SOCKET_UPGRADE=true")) throw new Error("Frontend env example should enable Socket.IO WebSocket upgrade with polling fallback.");
 if (!vercel.includes('"source": "/api/:path*"') || !vercel.includes('"destination": "https://benovelent-midax.onrender.com/api/:path*"')) throw new Error("Vercel API rewrite is missing.");
 console.log("Production configuration contract test: PASS");
