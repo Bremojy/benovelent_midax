@@ -15,7 +15,7 @@ const mpesaTransactionSchema = new mongoose.Schema(
     paymentMethod: { type: String, enum: ["stk", "manual_paybill"], default: "stk", index: true },
     manualPaybill: { type: String, default: "", trim: true },
     manualAccountNumber: { type: String, default: "", trim: true },
-    manualTransactionCode: { type: String, default: "", trim: true, uppercase: true },
+    manualTransactionCode: { type: String, default: undefined, trim: true, uppercase: true },
     reconciled: { type: Boolean, default: false, index: true },
     reconciledAt: { type: Date, default: null },
     amount: { type: Number, required: true, min: 1 },

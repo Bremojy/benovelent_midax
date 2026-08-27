@@ -6,6 +6,7 @@ const migrations = [
   require("../migrations/003_seed_policies"),
   require("../migrations/004_normalize_member_defaults"),
   require("../migrations/005_align_policies_to_constitution"),
+  require("../migrations/006_cleanup_blank_manual_transaction_codes"),
 ];
 
 function normalizeMigration(migration, index) {
