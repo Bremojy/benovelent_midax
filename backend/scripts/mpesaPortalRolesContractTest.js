@@ -1,0 +1,20 @@
+const fs = require("fs");
+const assert = require("assert");
+const read = (file) => fs.readFileSync(file, "utf8");
+const roles = read("backend/middleware/roleMiddleware.js");
+const routes = read("backend/routes/paymentRoutes.js");
+const controller = read("backend/controllers/paymentController.js");
+const finance = read("src/pages/admin/AdminFinance.jsx");
+
+assert(roles.includes('const isContributionUser = authorize("member", "admin", "superadmin");'), "Contribution role middleware missing.");
+assert(routes.includes('router.post("/stk", protect, isContributionUser, controller.stk);'), "Admin/SuperAdmin STK route is not enabled through contribution role middleware.");
+assert(routes.includes('router.post("/manual", protect, isContributionUser, controller.manualPayment);'), "Admin/SuperAdmin manual PayBill route is not enabled through contribution role middleware.");
+assert(routes.includes('router.get("/transactions", protect, isAdminOrSuperAdmin, controller.allTransactions);'), "Admin/SuperAdmin M-PESA transaction list route missing.");
+assert(routes.includes('router.delete("/transactions/:id", protect, isSuperAdmin, controller.deleteTransaction);'), "SuperAdmin M-PESA delete route missing.");
+assert(controller.includes('ensureContributionForPayment'), "Admin/SuperAdmin personal contribution provisioning missing.");
+assert(controller.includes('Administrators may use M-PESA here only for their own Benevolent MIDAX contribution.'), "Administrator payment scope guard missing.");
+assert(controller.includes('SETTLED_TRANSACTION_PROTECTED'), "Settled M-PESA deletion protection missing.");
+assert(finance.includes('MpesaPaymentButton'), "Accounts page does not expose the personal M-PESA contribution control.");
+assert(finance.includes('API.get("/payments/transactions")'), "SuperAdmin Accounts page does not load all M-PESA transactions.");
+assert(finance.includes('API.delete(`/payments/transactions/${transaction._id}`)'), "SuperAdmin Accounts page does not provide M-PESA deletion control.");
+console.log("M-PESA PORTAL ROLES CONTRACT TEST PASSED");

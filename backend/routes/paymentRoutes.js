@@ -1,17 +1,19 @@
 const express = require("express");
 const router = express.Router();
 const { verifyToken: protect } = require("../middleware/authMiddleware");
-const { isMember, isAdminOrSuperAdmin, isSuperAdmin } = require("../middleware/roleMiddleware");
+const { isMember, isContributionUser, isAdminOrSuperAdmin, isSuperAdmin } = require("../middleware/roleMiddleware");
 const controller = require("../controllers/paymentController");
 
 router.get("/route-status", controller.routeStatus);
 router.get("/public-config", controller.publicConfig);
 router.get("/config", protect, controller.config);
 router.get("/mine", protect, controller.myTransactions);
-router.get("/transactions/:id", protect, isMember, controller.getTransaction);
-router.post("/stk", protect, isMember, controller.stk);
-router.post("/stk-query", protect, isMember, controller.stkQuery);
-router.post("/manual", protect, isMember, controller.manualPayment);
+router.get("/transactions", protect, isAdminOrSuperAdmin, controller.allTransactions);
+router.get("/transactions/:id", protect, isContributionUser, controller.getTransaction);
+router.delete("/transactions/:id", protect, isSuperAdmin, controller.deleteTransaction);
+router.post("/stk", protect, isContributionUser, controller.stk);
+router.post("/stk-query", protect, isContributionUser, controller.stkQuery);
+router.post("/manual", protect, isContributionUser, controller.manualPayment);
 router.get("/manual/admin", protect, isAdminOrSuperAdmin, controller.manualPaymentsAdmin);
 router.post("/manual/:id/verify", protect, isAdminOrSuperAdmin, controller.manualVerify);
 router.post("/manual/:id/reject", protect, isAdminOrSuperAdmin, controller.manualReject);
