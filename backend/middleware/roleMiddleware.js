@@ -40,6 +40,11 @@ const authorize = (...roles) => {
 
 const isMember = authorize("member");
 
+// Accounts that are allowed to make their own Benevolent MIDAX contribution.
+// Admins and SuperAdmins remain fully privileged administrators; this role
+// group is only used for self-payment/contribution flows.
+const isContributionUser = authorize("member", "admin", "superadmin");
+
 // ==========================================
 // ADMIN ONLY
 // ==========================================
@@ -66,6 +71,7 @@ const isChatUser = authorize("member", "admin");
 module.exports = {
   authorize,
   isMember,
+  isContributionUser,
   isAdmin,
   isSuperAdmin,
   isAdminOrSuperAdmin,

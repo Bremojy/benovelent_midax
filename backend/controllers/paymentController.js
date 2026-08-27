@@ -10,6 +10,7 @@ const createNotification = require("../utils/createNotification");
 const createAuditLog = require("../utils/createAuditLog");
 const Finance = require("../models/Finance");
 const MpesaB2CTransaction = require("../models/MpesaB2CTransaction");
+const { ensureChatProfile } = require("../utils/chatProfile");
 const { stkPush, stkQuery, b2cPayment, normalizePhone, normalizeAccountReference, isConfigured, isB2CConfigured, getConfigurationSummary, idempotencyKey, endpointSummary, extractUpstreamError } = require("../services/mpesaService");
 
 const env = (name, fallback = "") => String(process.env[name] ?? fallback).trim();
@@ -126,6 +127,57 @@ async function applyCommunityContribution(transaction) {
   return updated;
 }
 
+async function resolvePaymentMember(req) {
+  const role = String(req.user?.role || req.userRole || "").toLowerCase();
+  if (role === "member") return req.user;
+  if (["admin", "superadmin"].includes(role)) {
+    const profile = await ensureChatProfile(req.user);
+    if (!profile?._id) throw new Error("Your portal contribution profile could not be prepared.");
+    return profile;
+  }
+  throw new Error("This account is not allowed to make a contribution.");
+}
+
+async function ensureContributionForPayment(paymentMember, referenceId, amount) {
+  if (referenceId) {
+    const existing = await Contribution.findOne({ _id: referenceId, member: paymentMember._id });
+    if (!existing) throw new Error("Contribution record not found for this account.");
+    if (Number(existing.balance) <= 0) throw new Error("This contribution is already fully paid.");
+    if (Number(amount) > Number(existing.balance)) throw new Error("Payment cannot exceed the current contribution balance.");
+    return existing;
+  }
+
+  const month = new Date().getMonth() + 1;
+  const year = new Date().getFullYear();
+  let contribution = await Contribution.findOne({ member: paymentMember._id, month, year });
+  if (!contribution) {
+    try {
+      contribution = await Contribution.create({
+        member: paymentMember._id,
+        month,
+        year,
+        expectedAmount: Math.max(1, Number(amount)),
+        paidAmount: 0,
+        paymentMethod: "M-PESA",
+        notes: "Self-service contribution created from portal M-PESA payment.",
+      });
+    } catch (error) {
+      if (error?.code !== 11000) throw error;
+      contribution = await Contribution.findOne({ member: paymentMember._id, month, year });
+    }
+  }
+  if (!contribution) throw new Error("Unable to prepare your current contribution record.");
+  if (Number(contribution.balance) <= 0) {
+    // A fully paid current-month record should not block a new top-up.
+    // Create the next payment as an additional contribution only when the
+    // current record is already complete is undesirable because of the unique
+    // monthly index, so direct additional payment requires the existing balance.
+    throw new Error("Your current monthly contribution is already fully paid.");
+  }
+  if (Number(amount) > Number(contribution.balance)) throw new Error("Payment cannot exceed the current contribution balance.");
+  return contribution;
+}
+
 exports.publicConfig = async (_req, res) => {
   res.set("Cache-Control", "public, max-age=300, stale-while-revalidate=900");
   return res.json({ success:true, enabled:env("MPESA_ENABLED","false").toLowerCase()==="true", configured:isConfigured(), environment:env("MPESA_ENVIRONMENT","production"), shortCode:env("MPESA_SHORTCODE",DEFAULT_MPESA_SHORTCODE), accountReference:normalizeAccountReference(env("MPESA_ACCOUNT_REFERENCE",DEFAULT_MPESA_ACCOUNT_REFERENCE)), manualPaybill:env("MPESA_MANUAL_PAYBILL","247247"), manualAccountNumber:MANUAL_ACCOUNT(), transactionType:env("MPESA_TRANSACTION_TYPE","CustomerPayBillOnline") });
@@ -180,17 +232,62 @@ exports.routeStatus = async (_req, res) => {
 };
 
 exports.myTransactions = async (req, res) => {
-  const transactions = await MpesaTransaction.find({ member: req.user._id }).sort({ createdAt: -1 }).limit(100).lean();
-  res.json({ success: true, transactions });
+  try {
+    const paymentMember = await resolvePaymentMember(req);
+    const transactions = await MpesaTransaction.find({ member: paymentMember._id }).sort({ createdAt: -1 }).limit(100).lean();
+    res.json({ success: true, transactions });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message || "Unable to load your M-PESA transactions." });
+  }
 };
 
 exports.getTransaction = async (req, res) => {
   try {
-    const transaction = await MpesaTransaction.findOne({ _id: req.params.id, member: req.user._id }).lean();
+    const paymentMember = await resolvePaymentMember(req);
+    const transaction = await MpesaTransaction.findOne({ _id: req.params.id, member: paymentMember._id }).lean();
     if (!transaction) return res.status(404).json({ success: false, message: "Payment transaction not found." });
     res.json({ success: true, transaction });
   } catch (error) {
     res.status(400).json({ success: false, message: "Invalid payment transaction reference." });
+  }
+};
+
+exports.allTransactions = async (req, res) => {
+  try {
+    const limit = Math.min(Math.max(Number(req.query?.limit) || 100, 1), 500);
+    const transactions = await MpesaTransaction.find({})
+      .populate("member", "fullName memberNumber email phone role portalOwnerId portalOwnerRole")
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .lean();
+    res.json({ success: true, count: transactions.length, transactions });
+  } catch (error) {
+    console.error("M-PESA transaction list error:", error);
+    res.status(500).json({ success: false, message: "Unable to load M-PESA transactions." });
+  }
+};
+
+exports.deleteTransaction = async (req, res) => {
+  try {
+    const transaction = await MpesaTransaction.findById(req.params.id);
+    if (!transaction) return res.status(404).json({ success: false, message: "M-PESA transaction not found." });
+    if (transaction.reconciled || transaction.status === "successful") {
+      return res.status(409).json({ success: false, code: "SETTLED_TRANSACTION_PROTECTED", message: "Settled M-PESA transactions cannot be permanently deleted. Use the finance audit/visibility controls instead so the contribution and ledger remain traceable." });
+    }
+    await MpesaTransaction.deleteOne({ _id: transaction._id });
+    await createAuditLog({
+      user: req.user._id,
+      userRole: req.user.role,
+      action: "MPESA_TRANSACTION_DELETED",
+      module: "M-PESA",
+      description: `SuperAdmin deleted an unsettled M-PESA transaction ${transaction._id}.`,
+      req,
+      metadata: { transactionId: transaction._id, status: transaction.status, purpose: transaction.purpose, amount: transaction.amount, paymentMethod: transaction.paymentMethod },
+    });
+    res.json({ success: true, message: "Unsettled M-PESA transaction deleted successfully." });
+  } catch (error) {
+    console.error("M-PESA transaction delete error:", error);
+    res.status(500).json({ success: false, message: "Unable to delete the M-PESA transaction." });
   }
 };
 
@@ -201,7 +298,12 @@ exports.stk = async (req, res) => {
     const purpose = String(req.body?.purpose || "").trim();
     const referenceId = req.body?.referenceId || null;
     const amount = Number(req.body?.amount);
-    const phoneNumber = normalizePhone(req.body?.phoneNumber || req.user?.phone || req.user?.mpesaNumber);
+    const paymentMember = await resolvePaymentMember(req);
+    const role = String(req.user?.role || req.userRole || "").toLowerCase();
+    if (role !== "member" && purpose !== "contribution") {
+      return res.status(403).json({ success: false, message: "Administrators may use M-PESA here only for their own Benevolent MIDAX contribution." });
+    }
+    const phoneNumber = normalizePhone(req.body?.phoneNumber || paymentMember?.phone || paymentMember?.mpesaNumber || req.user?.phone);
     if (!amount || amount <= 0) return res.status(400).json({ success: false, message: "Enter a valid M-PESA amount." });
     if (!phoneNumber || !/^254\d{9}$/.test(phoneNumber)) return res.status(400).json({ success: false, message: "Enter a valid Kenyan M-PESA number." });
     if (!["loan_repayment", "support_repayment", "community_assistance", "contribution", "other"].includes(purpose)) return res.status(400).json({ success: false, message: "Unsupported payment purpose." });
@@ -228,17 +330,15 @@ exports.stk = async (req, res) => {
       if (amount > remaining) return res.status(400).json({ success: false, message: `Maximum remaining contribution is KSh ${remaining.toLocaleString("en-KE")}.` });
       referenceModel = "CommunityAssistance";
     } else if (purpose === "contribution") {
-      const contribution = await Contribution.findOne({ _id: referenceId, member: req.user._id });
-      if (!contribution) return res.status(404).json({ success: false, message: "Contribution record not found." });
-      if (Number(contribution.balance) <= 0) return res.status(400).json({ success: false, message: "This contribution is already fully paid." });
-      if (amount > Number(contribution.balance)) return res.status(400).json({ success: false, message: "Payment cannot exceed the contribution balance." });
+      const contribution = await ensureContributionForPayment(paymentMember, referenceId, amount);
       referenceModel = "Contribution";
+      if (!referenceId) req.body.referenceId = String(contribution._id);
     }
 
     tx = await MpesaTransaction.create({
-      member: req.user._id,
+      member: paymentMember._id,
       purpose,
-      referenceId,
+      referenceId: purpose === "contribution" ? (req.body.referenceId || referenceId) : referenceId,
       referenceModel,
       phoneNumber,
       amount: Math.round(amount),
@@ -384,6 +484,9 @@ exports.manualPayment = async (req, res) => {
     const amount = Number(req.body?.amount);
     const purpose = String(req.body?.purpose || "").trim();
     const referenceId = req.body?.referenceId || null;
+    const paymentMember = await resolvePaymentMember(req);
+    const role = String(req.user?.role || req.userRole || "").toLowerCase();
+    if (role !== "member" && purpose !== "contribution") return res.status(403).json({ success: false, message: "Administrators may use M-PESA here only for their own Benevolent MIDAX contribution." });
     const manualTransactionCode = normalizeManualCode(req.body?.transactionCode || req.body?.manualTransactionCode);
     const suppliedPhone = req.body?.phoneNumber ? normalizePhone(req.body.phoneNumber) : "";
     if (!amount || amount <= 0) return res.status(400).json({ success: false, message: "Enter a valid M-PESA amount." });
@@ -403,10 +506,8 @@ exports.manualPayment = async (req, res) => {
       const remaining = Number(campaign.targetAmount) - Number(campaign.raisedAmount || 0);
       if (amount > remaining) return res.status(400).json({ success: false, message: `Maximum remaining contribution is KSh ${remaining.toLocaleString("en-KE")}.` });
     } else if (purpose === "contribution") {
-      const contribution = await Contribution.findOne({ _id: referenceId, member: req.user._id });
-      if (!contribution) return res.status(404).json({ success: false, message: "Contribution record not found." });
-      if (Number(contribution.balance) <= 0) return res.status(400).json({ success: false, message: "This contribution is already fully paid." });
-      if (amount > Number(contribution.balance)) return res.status(400).json({ success: false, message: "Payment cannot exceed the contribution balance." });
+      const contribution = await ensureContributionForPayment(paymentMember, referenceId, amount);
+      req.body.referenceId = String(contribution._id);
     }
     const existing = await MpesaTransaction.findOne({ manualTransactionCode }).lean();
     if (existing) {
@@ -414,9 +515,9 @@ exports.manualPayment = async (req, res) => {
       return res.json({ success: true, duplicate: true, transaction: existing, message: "This M-PESA transaction is already recorded and is awaiting verification." });
     }
     const tx = await MpesaTransaction.create({
-      member: req.user._id,
+      member: paymentMember._id,
       purpose,
-      referenceId,
+      referenceId: purpose === "contribution" ? (req.body.referenceId || referenceId) : referenceId,
       referenceModel: purpose === "contribution" ? "Contribution" : purpose === "community_assistance" ? "CommunityAssistance" : purpose === "loan_repayment" ? "EducationSupport" : purpose === "support_repayment" ? "SupportRequest" : "",
       phoneNumber: suppliedPhone,
       amount: Math.round(amount),
