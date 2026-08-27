@@ -11,7 +11,7 @@ const claims = read("src/pages/member/Claims.jsx");
 const assert = (condition, message) => { if (!condition) throw new Error(message); };
 assert(route.includes('router.get("/callback", controller.callbackHealth);'), "Callback GET diagnostic route missing.");
 assert(route.includes('router.post("/callback", controller.callback);'), "Callback POST route missing.");
-assert(route.includes('router.post("/stk-query", protect, isMember, controller.stkQuery);'), "STK query route missing.");
+assert(route.includes('router.post("/stk-query", protect, isContributionUser, controller.stkQuery);'), "STK query route missing.");
 assert(controller.includes('exports.callbackHealth = async'), "Callback health handler missing.");
 assert(controller.includes('exports.stkQuery = async'), "STK query handler missing.");
 assert(controller.includes('reconcileSuccessfulTransaction'), "Shared successful-payment reconciliation missing.");

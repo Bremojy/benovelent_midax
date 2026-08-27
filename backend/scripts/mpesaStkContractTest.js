@@ -5,7 +5,7 @@ const service=fs.readFileSync("backend/services/mpesaService.js","utf8");
 const api=fs.readFileSync("src/components/payments/MpesaPaymentButton.jsx","utf8");
 const assert=(condition,message)=>{if(!condition)throw new Error(message);};
 assert(route.includes('router.post("/stk", protect, isContributionUser, controller.stk);'),"Canonical STK route missing.");
-assert(route.includes('router.post("/stk-query", protect, isMember, controller.stkQuery);'),"STK query route missing.");
+assert(route.includes('router.post("/stk-query", protect, isContributionUser, controller.stkQuery);'),"STK query route missing.");
 assert(route.includes('router.post("/stkpush", protect, isMember, controller.stk);'),"STK compatibility alias missing.");
 assert(route.includes('router.post("/mpesa-stk", protect, isMember, controller.stk);'),"M-PESA compatibility alias missing.");
 assert(service.includes('/mpesa/stkpush/v1/processrequest'),"Daraja STK endpoint missing.");

@@ -1,5 +1,6 @@
 const Member = require('../models/Member');
 const { generateMemberNumber } = require('./memberNumber');
+const generateTemporaryPassword = require('./generateTemporaryPassword');
 
 const VALID_MEMBER_NUMBER = /^BM\d{3,}$/i;
 
@@ -89,7 +90,7 @@ async function ensureChatProfile(user) {
     username: `${role}-${String(user._id).slice(-6)}`.toLowerCase(),
     phone: payload.phone || `000${String(user._id).slice(-6)}`,
     email: payload.email,
-    password: user.password || 'PortalChatOnly123!',
+    password: user.password || generateTemporaryPassword('MIDAX@Chat-'),
     role: payload.role,
     portalOwnerId: user._id,
     portalOwnerRole: role,

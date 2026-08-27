@@ -608,9 +608,10 @@ exports.stkQuery = async (req, res) => {
       return res.status(400).json({ success: false, code: "MPESA_QUERY_REFERENCE_REQUIRED", message: "A payment transaction ID or CheckoutRequestID is required." });
     }
 
+    const paymentMember = await resolvePaymentMember(req);
     const transaction = transactionId
-      ? await MpesaTransaction.findOne({ _id: transactionId, member: req.user._id })
-      : await MpesaTransaction.findOne({ checkoutRequestId, member: req.user._id });
+      ? await MpesaTransaction.findOne({ _id: transactionId, member: paymentMember._id })
+      : await MpesaTransaction.findOne({ checkoutRequestId, member: paymentMember._id });
     if (!transaction) return res.status(404).json({ success: false, code: "MPESA_TRANSACTION_NOT_FOUND", message: "Payment transaction not found." });
 
     if (transaction.status === "successful" || transaction.status === "failed" || transaction.status === "reversed") {
