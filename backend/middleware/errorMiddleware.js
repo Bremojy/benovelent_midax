@@ -25,6 +25,7 @@ const errorHandler = (err, req, res, next) => {
   console.error("\n====================================");
   console.error("ERROR:", err.message);
   console.error("URL:", req.originalUrl);
+  console.error("REQUEST ID:", req.requestId || req.get("X-Request-ID") || "unknown");
   console.error("METHOD:", req.method);
   console.error("TIME:", new Date().toISOString());
 

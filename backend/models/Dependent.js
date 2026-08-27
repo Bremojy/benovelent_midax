@@ -35,7 +35,8 @@ const dependentSchema = new mongoose.Schema(
         type:String,
         enum:[
             "Male",
-            "Female"
+            "Female",
+            "Other"
         ],
         required:true
     },

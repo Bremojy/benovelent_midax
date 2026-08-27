@@ -1,10 +1,11 @@
 import { confirmAction } from "../../utils/modernDialog";
 import { useEffect, useMemo, useState } from "react";
-import { Edit3, Layers3, Plus, RefreshCw, Trash2, ShieldCheck, LockKeyhole, WalletCards } from "lucide-react";
+import { Edit3, Layers3, Plus, RefreshCw, Trash2, ShieldCheck, LockKeyhole, WalletCards, Smartphone, Eye, UserRound } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import DashboardLayout from "../../layouts/DashboardLayout";
 import API from "../../services/api";
 import { buildPrintHeadHtml, printHeadStyles } from "../../utils/printHead";
+import MpesaPaymentButton from "../../components/payments/MpesaPaymentButton";
 import "../../styles/portalModule.css";
 
 const today = new Date().toISOString().slice(0, 10);
@@ -40,11 +41,15 @@ export default function AdminFinance() {
   const [bulkForm, setBulkForm] = useState({ month: new Date().getMonth() + 1, year: new Date().getFullYear(), amount: "500", paymentDate: today, recordAsCollected: true, notes: "Monthly payroll deduction" });
   const [bulkSaving, setBulkSaving] = useState(false);
   const [community, setCommunity] = useState([]);
+  const [manualMpesa, setManualMpesa] = useState([]);
   const [mpesaConfig, setMpesaConfig] = useState(null);
   const [communityBusy, setCommunityBusy] = useState("");
   const [b2cHistory, setB2cHistory] = useState([]);
   const [b2cForm, setB2cForm] = useState({ memberNumber: "", phoneNumber: "", amount: "", occasion: "BENEVOLENT", remarks: "" });
   const [b2cBusy, setB2cBusy] = useState(false);
+  const [allMpesa, setAllMpesa] = useState([]);
+  const [mpesaDeleteBusy, setMpesaDeleteBusy] = useState("");
+  const [selectedMpesa, setSelectedMpesa] = useState(null);
 
   const load = async () => {
     try {
@@ -56,17 +61,22 @@ export default function AdminFinance() {
         API.get("/contributions"),
         API.get(`/finance/ledger?year=${new Date().getFullYear()}`),
         API.get("/payments/community-assistance/admin"),
+        API.get("/payments/manual/admin"),
         API.get("/payments/config"),
-        ...(isSuperAdmin ? [API.get("/payments/b2c/history")] : []),
+        ...(isSuperAdmin ? [API.get("/payments/b2c/history"), API.get("/payments/transactions")] : []),
       ];
-      const [s, t, c, l, communityRes, mpesaRes, b2cRes] = await Promise.all(requests);
+      const [s, t, c, l, communityRes, manualRes, mpesaRes, b2cRes, mpesaListRes] = await Promise.all(requests);
       setSummary(s.data?.summary || s.data || {});
       setTransactions(Array.isArray(t.data?.transactions) ? t.data.transactions : []);
       setContributions(Array.isArray(c.data?.contributions) ? c.data.contributions : []);
       setLedger(l.data || null);
       setCommunity(Array.isArray(communityRes.data?.campaigns) ? communityRes.data.campaigns : []);
+      setManualMpesa(Array.isArray(manualRes?.data?.transactions) ? manualRes.data.transactions : []);
       setMpesaConfig(mpesaRes.data || null);
-      if (isSuperAdmin) setB2cHistory(Array.isArray(b2cRes?.data?.transactions) ? b2cRes.data.transactions : []);
+      if (isSuperAdmin) {
+        setB2cHistory(Array.isArray(b2cRes?.data?.transactions) ? b2cRes.data.transactions : []);
+        setAllMpesa(Array.isArray(mpesaListRes?.data?.transactions) ? mpesaListRes.data.transactions : []);
+      }
     } catch (err) {
       setError(err.response?.data?.message || err.message || "Unable to load finance records.");
     } finally {
@@ -245,6 +255,29 @@ export default function AdminFinance() {
     finally { setB2cBusy(false); }
   };
 
+  const reviewManualPayment = async (transaction, action) => {
+    if (!transaction?._id || !["verify", "reject"].includes(action)) return;
+    const question = action === "verify"
+      ? "Verify this M-PESA PayBill transaction? Only do this after checking the official M-PESA statement/confirmation."
+      : "Reject this manual M-PESA transaction?";
+    if (!await confirmAction(question)) return;
+    try {
+      setCommunityBusy(`manual-${transaction._id}`);
+      setError("");
+      const path = action === "verify" ? `/payments/manual/${transaction._id}/verify` : `/payments/manual/${transaction._id}/reject`;
+      const { data } = action === "reject"
+        ? await API.post(path, { reason: "M-PESA transaction could not be verified from the authorised payment records." })
+        : await API.post(path);
+      if (!data?.success) throw new Error(data?.message || "Unable to update the manual M-PESA transaction.");
+      setMessage(data.message || (action === "verify" ? "Manual M-PESA payment verified." : "Manual M-PESA payment rejected."));
+      await load();
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || "Unable to update the manual M-PESA transaction.");
+    } finally {
+      setCommunityBusy("");
+    }
+  };
+
   const closeCommunity = async (campaign) => {
     if (!isSuperAdmin) return;
     if (!await confirmAction(`Close the M-PESA collection for “${campaign.title}”? No further member contributions will be accepted.`)) return;
@@ -263,6 +296,10 @@ export default function AdminFinance() {
   };
 
   const removeTransaction = async (transaction) => {
+    if (!isSuperAdmin) {
+      setError("Permanent deletion is reserved for SuperAdmin. You can edit transactions; visibility controls are restricted to SuperAdmin.");
+      return;
+    }
     if (!await confirmAction("Delete this transaction permanently?")) return;
     try {
       setSaving(true);
@@ -273,6 +310,28 @@ export default function AdminFinance() {
       setError(err.response?.data?.message || err.message || "Unable to delete transaction.");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const deleteMpesaTransaction = async (transaction) => {
+    if (!isSuperAdmin || !transaction?._id) return;
+    if (!["initiated", "pending", "failed", "reversed"].includes(String(transaction.status || ""))) {
+      setError("Settled M-PESA transactions are protected from permanent deletion so contributions and the fund ledger remain traceable.");
+      return;
+    }
+    if (!await confirmAction("Delete this unsettled M-PESA transaction permanently?")) return;
+    try {
+      setMpesaDeleteBusy(String(transaction._id));
+      setError("");
+      const { data } = await API.delete(`/payments/transactions/${transaction._id}`);
+      if (!data?.success) throw new Error(data?.message || "Unable to delete the M-PESA transaction.");
+      setAllMpesa((rows) => rows.filter((row) => String(row._id) !== String(transaction._id)));
+      setManualMpesa((rows) => rows.filter((row) => String(row._id) !== String(transaction._id)));
+      setMessage(data.message || "M-PESA transaction deleted.");
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || "Unable to delete the M-PESA transaction.");
+    } finally {
+      setMpesaDeleteBusy("");
     }
   };
 
@@ -332,7 +391,7 @@ export default function AdminFinance() {
             <Stat label="B2C payout status" value={mpesaConfig?.b2cConfigured ? "Ready" : "Not configured"} />
             <Stat label="Daraja shortcode" value={mpesaConfig?.shortCode || "650014"} />
             <Stat label="Manual account" value={mpesaConfig?.manualAccountNumber || "Not configured"} />
-            <Stat label="Manual PayBill" value={mpesaConfig?.manualPaybill || "Not configured"} />
+            <Stat label="Manual PayBill" value={mpesaConfig?.manualPaybill || "247247"} />
           </div>
           <div className={`portal-alert ${mpesaConfig?.configured ? "success" : ""}`}><strong>{mpesaConfig?.configured ? "STK Push is enabled on the backend." : "STK Push is not ready."}</strong> {mpesaConfig?.message || "Complete the production Daraja configuration before processing live payments."}</div>
         </section>
@@ -349,6 +408,15 @@ export default function AdminFinance() {
           </form>
           <div className="portal-table-wrap" style={{ marginTop: 18 }}><table className="portal-table"><thead><tr><th>Date</th><th>Recipient</th><th>Amount</th><th>Status</th><th>Receipt / conversation</th><th>Remarks</th></tr></thead><tbody>{b2cHistory.length === 0 ? <tr><td colSpan="6">No direct B2C disbursements recorded.</td></tr> : b2cHistory.map((x, i) => <tr key={x._id || i}><td>{date(x.createdAt)}</td><td>{x.member?.fullName || x.phoneNumber}</td><td>{number(x.amount)}</td><td><span className={`portal-badge ${x.status === "successful" ? "approved" : ""}`}>{x.status}</span></td><td>{x.transactionReceipt || x.conversationId || x.originatorConversationId || "Pending callback"}</td><td>{x.remarks || "—"}</td></tr>)}</tbody></table></div>
         </section>}
+
+        <section className="portal-panel">
+          <div className="portal-module-header compact-header"><div><span>MANUAL M-PESA VERIFICATION</span><h2>Equity PayBill 247247 submissions</h2><p>Verify the transaction code against the authorised payment records before approving. Submitted payments remain pending until an administrator verifies them.</p></div><span className="portal-badge">PayBill {mpesaConfig?.manualPaybill || "247247"} · Account {mpesaConfig?.manualAccountNumber || "0650186528835"}</span></div>
+          {manualMpesa.length === 0 ? <div className="portal-empty">No manual M-PESA PayBill submissions are waiting for review.</div> : <div className="portal-table-wrap"><table className="portal-table"><thead><tr><th>Date</th><th>Member</th><th>Amount</th><th>Transaction code</th><th>Status</th><th>Reconciliation</th><th>Action</th></tr></thead><tbody>{manualMpesa.map((x) => {
+            const pending = x.status === "pending";
+            const needsReview = x.status === "successful" && !x.reconciled;
+            return <tr key={x._id}><td>{date(x.createdAt)}</td><td>{x.member?.fullName || "—"}<br /><small>{x.member?.memberNumber || x.member?.email || ""}</small></td><td>{number(x.amount)}</td><td><strong>{x.manualTransactionCode || "—"}</strong></td><td><span className={`portal-badge ${x.status === "successful" ? "approved" : x.status === "failed" ? "rejected" : ""}`}>{x.status}</span></td><td>{x.reconciled ? "Reconciled" : x.status === "successful" ? "Finance review" : "Pending verification"}</td><td><div className="portal-actions">{(pending || needsReview) && <button className="portal-btn primary" onClick={() => reviewManualPayment(x, "verify")} disabled={communityBusy === `manual-${x._id}`}>{needsReview ? "Reconcile" : "Verify"}</button>}{pending && <button className="portal-btn danger" onClick={() => reviewManualPayment(x, "reject")} disabled={communityBusy === `manual-${x._id}`}>Reject</button>}</div></td></tr>;
+          })}</tbody></table></div>}
+        </section>
 
         <section className="portal-panel community-control-panel">
           <div className="portal-module-header compact-header"><div><span>COMMUNITY M-PESA CONTROL</span><h2>Collection requests</h2><p>Monitor every verified community collection. Only SuperAdmin can disburse collected funds or close a collection request.</p></div><span className="portal-badge"><LockKeyhole size={14} /> {isSuperAdmin ? "Controls enabled" : "Monitoring only"}</span></div>
@@ -426,6 +494,16 @@ export default function AdminFinance() {
           </tbody></table></div>
         </section>
 
+        {isSuperAdmin && (
+          <section className="portal-panel">
+            <div className="portal-module-header compact-header"><div><span>SUPERADMIN M-PESA CONTROL</span><h2>All M-PESA transactions</h2><p>View every STK and manual PayBill collection record. Settled transactions remain protected; unsettled records can be permanently deleted with an audit trail.</p></div><span className="portal-badge"><Eye size={14} /> Full view</span></div>
+            {allMpesa.length === 0 ? <div className="portal-empty">No M-PESA transactions returned.</div> : <div className="portal-table-wrap"><table className="portal-table"><thead><tr><th>Date</th><th>Account</th><th>Method</th><th>Purpose</th><th>Amount</th><th>Status</th><th>Receipt / Code</th><th>Actions</th></tr></thead><tbody>
+              {allMpesa.slice(0, 200).map((x) => { const settled = Boolean(x.reconciled || x.status === "successful"); return <tr key={x._id}><td>{date(x.createdAt || x.initiatedAt)}</td><td>{x.member?.fullName || x.member?.memberNumber || "—"}<br /><small>{x.member?.email || ""}</small></td><td>{x.paymentMethod === "manual_paybill" ? `PayBill ${x.manualPaybill || mpesaConfig?.manualPaybill || "247247"}` : "STK Push"}</td><td>{x.purpose || "—"}</td><td>{number(x.amount)}</td><td><span className={`portal-badge ${settled ? "approved" : x.status === "failed" ? "rejected" : ""}`}>{x.status}</span></td><td>{x.mpesaReceiptNumber || x.manualTransactionCode || x.checkoutRequestId || "—"}</td><td><div className="portal-actions"><button type="button" className="portal-btn secondary" onClick={() => setSelectedMpesa(x)}><Eye size={14} /> View</button><button type="button" className="portal-btn danger" disabled={mpesaDeleteBusy === String(x._id) || settled} title={settled ? "Settled transactions are protected" : "Delete transaction"} onClick={() => deleteMpesaTransaction(x)}><Trash2 size={14} /> {mpesaDeleteBusy === String(x._id) ? "Deleting…" : "Delete"}</button></div></td></tr>; })}
+            </tbody></table></div>}
+            {selectedMpesa && <div className="portal-panel" style={{ marginTop: 16, boxShadow: "none" }}><div className="portal-module-header compact-header"><div><span>TRANSACTION DETAILS</span><h3>M-PESA transaction</h3><p>{selectedMpesa.member?.fullName || selectedMpesa.member?.memberNumber || "Portal account"} · {date(selectedMpesa.createdAt || selectedMpesa.initiatedAt)}</p></div><button type="button" className="portal-btn secondary" onClick={() => setSelectedMpesa(null)}>Close</button></div><div className="portal-stat-grid"><Stat label="Status" value={selectedMpesa.status || "—"} /><Stat label="Amount" value={number(selectedMpesa.amount)} /><Stat label="Method" value={selectedMpesa.paymentMethod === "manual_paybill" ? "PayBill 247247" : "STK Push"} /><Stat label="Receipt / Code" value={selectedMpesa.mpesaReceiptNumber || selectedMpesa.manualTransactionCode || "Pending"} /></div><div className="portal-info-strip"><strong>Request:</strong> {selectedMpesa.merchantRequestId || selectedMpesa.checkoutRequestId || "Not assigned"} · <strong>Purpose:</strong> {selectedMpesa.purpose || "—"} · <strong>Reconciled:</strong> {selectedMpesa.reconciled ? "Yes" : "No"}</div></div>}
+          </section>
+        )}
+
         {editingContribution && (
           <section id="finance-editor" className="portal-panel contribution-editor-panel">
             <div className="portal-module-header">
@@ -449,7 +527,7 @@ export default function AdminFinance() {
           <h2>Recent Transactions</h2>
           {sortedTransactions.length === 0 ? <div className="portal-empty">No finance transactions returned.</div> :
             <div className="portal-table-wrap"><table className="portal-table"><thead><tr><th>Date</th><th>Type</th><th>Description</th><th>Amount</th><th>Status</th><th>Actions</th></tr></thead><tbody>
-              {sortedTransactions.slice(0, 30).map((x, i) => <tr key={x._id || i}><td>{date(x.transactionDate || x.createdAt)}</td><td>{x.type || "—"}</td><td>{x.description || x.reference || "—"}</td><td>{number(x.amount)}</td><td><span className="portal-badge">{x.status || "Recorded"}</span></td><td><div className="portal-actions"><button type="button" className="portal-btn secondary" onClick={() => startEdit(x)}><Edit3 size={14} /> Edit</button>{isSuperAdmin && <button type="button" className="portal-btn secondary" onClick={() => toggleTransactionVisibility(x)}>{x.hidden ? "Show" : "Hide"}</button>}<button type="button" className="portal-btn danger" onClick={() => removeTransaction(x)}><Trash2 size={14} /> Delete</button></div></td></tr>)}
+              {sortedTransactions.slice(0, 30).map((x, i) => <tr key={x._id || i}><td>{date(x.transactionDate || x.createdAt)}</td><td>{x.type || "—"}</td><td>{x.description || x.reference || "—"}</td><td>{number(x.amount)}</td><td><span className="portal-badge">{x.status || "Recorded"}</span></td><td><div className="portal-actions"><button type="button" className="portal-btn secondary" onClick={() => startEdit(x)}><Edit3 size={14} /> Edit</button>{isSuperAdmin && <button type="button" className="portal-btn secondary" onClick={() => toggleTransactionVisibility(x)}>{x.hidden ? "Show" : "Hide"}</button>}{isSuperAdmin && <button type="button" className="portal-btn danger" onClick={() => removeTransaction(x)}><Trash2 size={14} /> Delete</button>}</div></td></tr>)}
             </tbody></table></div>}
         </section>
 

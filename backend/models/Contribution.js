@@ -35,6 +35,10 @@ const contributionSchema = new mongoose.Schema({
         type:Number,
         default:0
     },
+    paymentTransactionIds:[{
+        type:mongoose.Schema.Types.ObjectId,
+        ref:"MpesaTransaction"
+    }],
 
     balance:{
         type:Number,

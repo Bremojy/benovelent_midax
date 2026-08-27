@@ -1,4 +1,4 @@
-const CACHE = "benevolent-shell-v24-pwa-hardening";
+const CACHE = "benevolent-shell-v26-contributions-18-5-0";
 const VIDEO_CACHE = "benevolent-midax-videos-v2";
 const ASSETS = ["/", "/index.html", "/manifest.webmanifest", "/pwa-icon-192.png", "/pwa-icon-512.png", "/apple-touch-icon.png"];
 const DB_NAME = "benovelent-pwa";

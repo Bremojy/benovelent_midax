@@ -12,6 +12,12 @@ const supportAttachmentSchema = new mongoose.Schema(
       trim: true,
       default: "",
     },
+    customCategory: {
+      type: String,
+      trim: true,
+      default: "",
+      maxlength: 120,
+    },
     fileName: {
       type: String,
       trim: true,

@@ -1,5 +1,7 @@
 const express = require("express");
 const Leader = require("../models/Leader");
+const Admin = require("../models/Admin");
+const SuperAdmin = require("../models/SuperAdmin");
 const { verifyToken: protect } = require("../middleware/authMiddleware");
 const { isSuperAdmin } = require("../middleware/roleMiddleware");
 const { uploadSingle, setUploadType } = require("../middleware/upload");
@@ -23,6 +25,41 @@ router.get("/", async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Failed to fetch leaders", error: error.message });
+  }
+});
+
+router.get("/current", async (_req, res) => {
+  try {
+    const cacheKey = "public:leadership:current";
+    const cached = await redisCache.getJson(cacheKey);
+    if (cached) {
+      res.set("Cache-Control", "public, max-age=120, stale-while-revalidate=600");
+      return res.json(cached);
+    }
+
+    const [admins, superadmins] = await Promise.all([
+      Admin.find({ status: "active", deletedAt: null }).select("fullName name email phone role profileImage permissions createdAt").sort({ createdAt: 1 }).lean(),
+      SuperAdmin.find({ status: "active" }).select("name email role profileImage createdAt").sort({ createdAt: 1 }).lean(),
+    ]);
+
+    const payload = {
+      success: true,
+      leaders: [...superadmins, ...admins].map((person) => ({
+        _id: person._id,
+        name: person.fullName || person.name || "Benevolent MIDAX Administrator",
+        role: String(person.role || "admin").toLowerCase(),
+        roleLabel: String(person.role || "admin").toLowerCase() === "superadmin" ? "SuperAdmin / General Scheme Manager" : (person.permissions?.join(" • ") || "Scheme Administrator"),
+        email: person.email || "",
+        phone: person.phone || "",
+        profileImage: person.profileImage || "",
+      })),
+    };
+    await redisCache.setJson(cacheKey, payload, 180);
+    res.set("Cache-Control", "public, max-age=120, stale-while-revalidate=600");
+    return res.json(payload);
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ success: false, message: "Unable to load current scheme leadership." });
   }
 });
 

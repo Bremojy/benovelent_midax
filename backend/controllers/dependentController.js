@@ -2,6 +2,7 @@ const Dependent = require("../models/Dependent");
 const Member = require("../models/Member");
 const createNotification = require("../utils/createNotification");
 const createAuditLog = require("../utils/createAuditLog");
+const redisCache = require("../services/redisCache");
 
 // ======================================================
 // ADD DEPENDENT
@@ -85,6 +86,7 @@ exports.addDependent = async (req, res) => {
 
         });
 
+        await redisCache.invalidateMany([`member:${member._id}:dashboard`, `member:${member._id}:dependents`]);
         await createAuditLog({
             user: member._id,
             userRole: "member",
@@ -222,13 +224,25 @@ exports.updateDependent = async (req, res) => {
 
         }
 
-        Object.assign(dependent, req.body);
+        const allowedFields = [
+            "fullName", "relationship", "gender", "dateOfBirth", "nationalId",
+            "birthCertificateNumber", "phone", "email", "county", "address",
+            "school", "admissionNumber", "educationLevel", "occupation", "employer",
+            "medicalConditions", "isNextOfKin"
+        ];
+        for (const field of allowedFields) {
+            if (req.body[field] !== undefined) dependent[field] = req.body[field];
+        }
+        if (!String(dependent.fullName || "").trim()) return res.status(400).json({ success: false, message: "Dependent full name is required." });
+        if (!dependent.relationship || !dependent.gender || !dependent.dateOfBirth) return res.status(400).json({ success: false, message: "Relationship, gender and date of birth are required." });
+        if (new Date(dependent.dateOfBirth).getTime() > Date.now()) return res.status(400).json({ success: false, message: "Date of birth cannot be in the future." });
 
         dependent.verified = false;
         dependent.verifiedBy = null;
         dependent.verifiedAt = null;
 
         await dependent.save();
+        await redisCache.invalidateMany([`member:${req.user._id}:dashboard`, `member:${req.user._id}:dependents`]);
 
         await createAuditLog({
             user: req.user._id,
@@ -289,6 +303,7 @@ exports.deleteDependent = async (req, res) => {
         dependent.active = false;
 
         await dependent.save();
+        await redisCache.invalidateMany([`member:${req.user._id}:dashboard`, `member:${req.user._id}:dependents`]);
 
         await createAuditLog({
             user: req.user._id,

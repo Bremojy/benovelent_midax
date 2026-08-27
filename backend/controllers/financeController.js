@@ -288,6 +288,17 @@ exports.updateTransaction = async (req, res) => {
         }
 
         await transaction.save();
+        if (transaction.member) {
+            await Notification.create({
+                recipient: transaction.member,
+                recipientModel: "Member",
+                sender: req.user._id,
+                senderModel: String(req.user.role || "admin") === "superadmin" ? "SuperAdmin" : "Admin",
+                title: "Finance Record Updated",
+                message: `Your linked ${transaction.type} account record was updated to KSh ${Number(transaction.amount || 0).toLocaleString("en-KE")}.`,
+                type: "finance", referenceId: transaction._id, referenceModel: "Finance"
+            });
+        }
 
         // A contribution finance transaction and its Contribution record are one accounting event.
         if (transaction.type === "contribution") {
@@ -350,6 +361,17 @@ exports.hideTransaction = async (req, res) => {
         transaction.hiddenAt = transaction.hidden ? new Date() : null;
         transaction.hiddenBy = transaction.hidden ? req.user._id : null;
         await transaction.save();
+        if (transaction.member) {
+            await Notification.create({
+                recipient: transaction.member,
+                recipientModel: "Member",
+                sender: req.user._id,
+                senderModel: "SuperAdmin",
+                title: transaction.hidden ? "Finance Record Hidden" : "Finance Record Restored",
+                message: transaction.hidden ? "A financial record linked to your account has been hidden from the community ledger." : "A financial record linked to your account has been restored to the community ledger.",
+                type: "finance", referenceId: transaction._id, referenceModel: "Finance"
+            });
+        }
         return res.json({ success: true, hidden: transaction.hidden, message: transaction.hidden ? "Transaction hidden from the community ledger." : "Transaction restored to the community ledger.", transaction });
     } catch (error) {
         return res.status(500).json({ success: false, message: error.message });
@@ -362,6 +384,9 @@ exports.hideTransaction = async (req, res) => {
 
 exports.deleteTransaction = async (req, res) => {
     try {
+        if (String(req.user?.role || "").toLowerCase() !== "superadmin") {
+            return res.status(403).json({ success: false, message: "Only SuperAdmin can permanently delete a financial transaction. Admins may edit records or hide them only when authorised." });
+        }
         const transaction = await Finance.findById(req.params.id);
         if (!transaction) {
             return res.status(404).json({
@@ -379,7 +404,19 @@ exports.deleteTransaction = async (req, res) => {
             });
         }
 
+        const affectedMember = transaction.member;
         await transaction.deleteOne();
+        if (affectedMember) {
+            await Notification.create({
+                recipient: affectedMember,
+                recipientModel: "Member",
+                sender: req.user._id,
+                senderModel: "SuperAdmin",
+                title: "Finance Record Removed",
+                message: "A financial record linked to your account was permanently removed by SuperAdmin.",
+                type: "finance", referenceId: transaction._id, referenceModel: "Finance"
+            });
+        }
         return res.json({
             success: true,
             message: "Transaction deleted successfully.",
@@ -764,26 +801,31 @@ exports.getFinanceSummary = async (req, res) => {
 
 
 exports.getMemberAccounts = async (req, res) => {
-    const cacheKey = `member:${req.user?._id}:accounts:${String(req.query?.year || new Date().getFullYear())}`;
-    const cached = await redisCache.getJson(cacheKey);
-    if (cached !== null) return res.json(cached);
-    const __originalJson = res.json.bind(res);
-    res.json = (body) => { redisCache.setJson(cacheKey, body, 15).catch(() => {}); return __originalJson(body); };
+  const year = Number(req.query.year) || new Date().getFullYear();
+  const startParam = String(req.query.startDate || "").trim();
+  const endParam = String(req.query.endDate || "").trim();
+  const startDate = /^\d{4}-\d{2}-\d{2}$/.test(startParam) ? new Date(`${startParam}T00:00:00.000Z`) : new Date(`${year}-01-01T00:00:00.000Z`);
+  const endDate = /^\d{4}-\d{2}-\d{2}$/.test(endParam) ? new Date(`${endParam}T23:59:59.999Z`) : new Date(`${year + 1}-01-01T00:00:00.000Z`);
+  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime()) || startDate > endDate) {
+    return res.status(400).json({ success: false, message: "The opening date must be on or before the closing date." });
+  }
+  const cacheKey = `member:${req.user?._id}:accounts:${year}:${startDate.toISOString()}:${endDate.toISOString()}`;
+  const cached = await redisCache.getJson(cacheKey);
+  if (cached !== null) return res.json(cached);
 
   try {
-    const year = Number(req.query.year) || new Date().getFullYear();
     const yearStart = new Date(`${year}-01-01T00:00:00.000Z`);
     const yearEnd = new Date(`${year + 1}-01-01T00:00:00.000Z`);
     const month = Number(req.query.month) || new Date().getMonth() + 1;
 
-    const [activeMembers, contributions, transactions, medical, funeral, education] = await Promise.all([
+    const [activeMembers, contributions, allFinance, medical, funeral, education, community] = await Promise.all([
       Member.countDocuments({ role: "member", status: "active", isDeleted: false }),
-      Contribution.find({ year }).sort({ year: -1, month: -1, paymentDate: -1, createdAt: -1 }).lean(),
-      Finance.find({ transactionDate: { $gte: yearStart, $lt: yearEnd }, status: { $in: ["approved", "completed"] } })
-        .sort({ transactionDate: -1, createdAt: -1 }).lean(),
-      require("../models/MedicalSupport").find({ isDeleted: { $ne: true } }).select("status approvedAmount requestedAmount").lean(),
-      require("../models/FuneralSupport").find({}).select("status approvedAmount requestedAmount").lean(),
-      require("../models/EducationSupport").find({}).select("status approvedAmount requestedAmount").lean(),
+      Contribution.find().sort({ paymentDate: -1, createdAt: -1 }).lean(),
+      Finance.find({ status: { $in: ["approved", "completed"] } }).sort({ transactionDate: 1, createdAt: 1 }).lean(),
+      require("../models/MedicalSupport").find({ isDeleted: { $ne: true } }).select("status approvedAmount requestedAmount createdAt paymentDate updatedAt dependent member").lean(),
+      require("../models/FuneralSupport").find({}).select("status approvedAmount requestedAmount createdAt paymentDate applicationDate closedDate member deceasedType").lean(),
+      require("../models/EducationSupport").find({}).select("status approvedAmount requestedAmount createdAt disbursementDate applicationDate completionDate member dependentName").lean(),
+      require("../models/CommunityAssistance").find({}).select("title description targetAmount raisedAmount status payoutAmount payoutStatus payoutReceipt payoutDate createdAt recipientMember referenceModel").lean(),
     ]);
 
     const schemeContributions = contributions.filter((item) => Number(item.year) === year);
@@ -806,44 +848,91 @@ exports.getMemberAccounts = async (req, res) => {
     const deductionCounts = currentMonthRows.reduce((map, item) => { const value = Number(item.expectedAmount || 0); if (value > 0) map.set(value, (map.get(value) || 0) + 1); return map; }, new Map());
     const standardMonthlyDeduction = [...deductionCounts.entries()].sort((a, b) => b[1] - a[1] || b[0] - a[0])[0]?.[0] || 500;
 
-    const creditTypes = new Set(["contribution", "income", "refund"]);
-    const groupedLedger = new Map();
-    for (const row of transactions) {
-      const dateValue = row.transactionDate || row.createdAt;
-      const day = dateValue ? new Date(dateValue).toISOString().slice(0, 10) : "unknown";
-      const type = String(row.type || "other");
-      const category = String(row.category || "scheme activity");
-      const key = `${day}|${type}|${category}`;
-      const amount = Number(row.amount || 0);
-      const existing = groupedLedger.get(key) || { date: dateValue, type, category, totalAmount: 0, count: 0 };
-      existing.totalAmount += amount;
-      existing.count += 1;
-      groupedLedger.set(key, existing);
-    }
-    let balance = 0;
-    const ledgerEntries = [...groupedLedger.values()].sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0)).map((row) => {
-      const credit = creditTypes.has(row.type) ? row.totalAmount : 0;
-      const debit = credit ? 0 : row.totalAmount;
-      balance += credit - debit;
-      return {
-        date: row.date,
-        type: row.type,
-        category: row.category,
-        description: `Scheme ${row.type} activity (${row.count} record${row.count === 1 ? "" : "s"})`,
-        amount: row.totalAmount,
-        debit,
-        credit,
-        runningBalance: balance,
-      };
-    });
+    const credits = (row) => ["contribution", "income", "refund"].includes(String(row.type || "").toLowerCase());
+    const financeRows = allFinance.filter((row) => String(row.type || "").toLowerCase() !== "contribution");
+    const contributionRows = contributions.filter((row) => Number(row.paidAmount || 0) > 0 && row.paymentDate);
 
-    const supportRows = [...medical, ...funeral, ...education];
+    // Build a real cash ledger: chronological entries with an opening balance
+    // from every approved/completed record before the selected range.
+    let openingBalance = 0;
+    for (const row of financeRows) {
+      const date = new Date(row.transactionDate || row.createdAt || 0);
+      if (date < startDate) openingBalance += credits(row) ? Number(row.amount || 0) : -Number(row.amount || 0);
+    }
+    for (const row of contributionRows) {
+      const date = new Date(row.paymentDate || row.createdAt || 0);
+      if (date < startDate) openingBalance += Number(row.paidAmount || 0);
+    }
+
+    const rangeEntries = [];
+    for (const row of financeRows) {
+      const date = new Date(row.transactionDate || row.createdAt || 0);
+      if (date < startDate || date > endDate) continue;
+      const amount = Number(row.amount || 0);
+      rangeEntries.push({
+        date: row.transactionDate || row.createdAt,
+        type: row.type || "other",
+        category: row.category || "scheme activity",
+        description: row.description || row.category || row.type || "Scheme activity",
+        amount,
+        debit: credits(row) ? 0 : amount,
+        credit: credits(row) ? amount : 0,
+        source: "finance",
+        reference: row.receiptNumber || row.referenceNumber || row.transactionNumber || "",
+      });
+    }
+    for (const row of contributionRows) {
+      const date = new Date(row.paymentDate || row.createdAt || 0);
+      if (date < startDate || date > endDate) continue;
+      const amount = Number(row.paidAmount || 0);
+      if (!amount) continue;
+      rangeEntries.push({
+        date: row.paymentDate || row.createdAt,
+        type: "contribution",
+        category: "Member contribution",
+        description: `Contribution for ${String(row.month).padStart(2, "0")}/${row.year}`,
+        amount,
+        debit: 0,
+        credit: amount,
+        source: "contribution",
+        reference: row.mpesaCode || row.receiptNumber || "",
+      });
+    }
+    rangeEntries.sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
+    let runningBalance = openingBalance;
+    for (const entry of rangeEntries) {
+      runningBalance += Number(entry.credit || 0) - Number(entry.debit || 0);
+      entry.runningBalance = runningBalance;
+    }
+
+    const assistanceCases = [
+      ...medical.filter((x) => ["Approved", "Paid", "Completed", "Closed"].includes(x.status)).map((x) => ({
+        sourceType: "Medical Support", status: x.status, date: x.paymentDate || x.updatedAt || x.createdAt,
+        amount: Number(x.approvedAmount || 0), referenceId: x._id, privacyLabel: "Assisted member / dependent protected",
+      })),
+      ...funeral.filter((x) => ["Approved", "Paid", "Completed", "Closed"].includes(x.status)).map((x) => ({
+        sourceType: "Benovelent Scheme Support", status: x.status, date: x.paymentDate || x.closedDate || x.createdAt,
+        amount: Number(x.approvedAmount || 0), referenceId: x._id, privacyLabel: "Assisted member identity protected",
+      })),
+      ...education.filter((x) => ["Approved", "Disbursed", "Completed"].includes(x.status)).map((x) => ({
+        sourceType: "Education Policy", status: x.status, date: x.disbursementDate || x.completionDate || x.createdAt,
+        amount: Number(x.approvedAmount || 0), referenceId: x._id, privacyLabel: "Assisted member / dependent protected",
+      })),
+      ...community.filter((x) => Number(x.payoutAmount || 0) > 0 || x.payoutStatus === "successful").map((x) => ({
+        sourceType: "Community M-PESA Support", status: x.payoutStatus || x.status, date: x.payoutDate || x.createdAt,
+        amount: Number(x.payoutAmount || 0), referenceId: x._id, receipt: x.payoutReceipt || "",
+        privacyLabel: "Assisted member identity protected",
+      })),
+    ].sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+
+    const approvedSupportRows = [...medical, ...funeral, ...education];
     const approvedStatuses = new Set(["Approved", "Paid", "Disbursed", "Completed", "Closed"]);
     const pendingStatuses = new Set(["Pending", "Under Review"]);
-    const approvedSupportTotal = supportRows.reduce((sum, item) => sum + (approvedStatuses.has(item.status) ? Number(item.approvedAmount || 0) : 0), 0);
-    const pendingSupportTotal = supportRows.filter((item) => pendingStatuses.has(item.status)).length;
+    const approvedSupportTotal = approvedSupportRows.reduce((sum, item) => sum + (approvedStatuses.has(item.status) ? Number(item.approvedAmount || 0) : 0), 0);
+    const pendingSupportTotal = approvedSupportRows.filter((item) => pendingStatuses.has(item.status)).length;
+    const closingBalance = runningBalance;
 
-    return res.json({
+    const payload = {
       success: true,
       scope: "scheme-wide",
       year,
@@ -858,29 +947,39 @@ exports.getMemberAccounts = async (req, res) => {
         membersCharged: new Set(schemeContributions.map((item) => String(item.member))).size,
         approvedSupportTotal,
         pendingSupportCases: pendingSupportTotal,
-        ledgerBalance: balance,
-        ledgerCredits: ledgerEntries.reduce((sum, item) => sum + item.credit, 0),
-        ledgerDebits: ledgerEntries.reduce((sum, item) => sum + item.debit, 0),
+        ledgerBalance: closingBalance,
+        ledgerCredits: rangeEntries.reduce((sum, item) => sum + item.credit, 0),
+        ledgerDebits: rangeEntries.reduce((sum, item) => sum + item.debit, 0),
+        moneyIn: rangeEntries.reduce((sum, item) => sum + item.credit, 0),
+        moneyOut: rangeEntries.reduce((sum, item) => sum + item.debit, 0),
       },
       ledger: {
-        entries: ledgerEntries.slice(0, 100),
+        openingDate: startDate.toISOString(),
+        closingDate: endDate.toISOString(),
+        openingBalance,
+        closingBalance,
+        entries: rangeEntries.slice(0, 200),
         totals: {
-          credit: ledgerEntries.reduce((sum, item) => sum + item.credit, 0),
-          debit: ledgerEntries.reduce((sum, item) => sum + item.debit, 0),
-          balance,
+          credit: rangeEntries.reduce((sum, item) => sum + item.credit, 0),
+          debit: rangeEntries.reduce((sum, item) => sum + item.debit, 0),
+          balance: closingBalance,
         },
       },
+      assistanceCases,
       support: {
-        totalCases: supportRows.length,
-        approvedCases: supportRows.filter((item) => approvedStatuses.has(item.status)).length,
+        totalCases: approvedSupportRows.length,
+        approvedCases: approvedSupportRows.filter((item) => approvedStatuses.has(item.status)).length,
         pendingCases: pendingSupportTotal,
         approvedSupportTotal,
       },
-      notice: "General scheme account view.",
-    });
+      openingDate: startDate.toISOString(),
+      closingDate: endDate.toISOString(),
+      notice: "Money In = member contributions, income and refunds. Money Out = assistance, claims, expenses and withdrawals. Assisted case identities are privacy-protected.",
+    };
+    await redisCache.setJson(cacheKey, payload, 15);
+    return res.json(payload);
   } catch (error) {
     console.error("Scheme-wide member accounts error:", error);
     res.status(500).json({ success: false, message: error.message || "Unable to load scheme accounts." });
   }
 };
-

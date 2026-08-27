@@ -102,6 +102,7 @@ export const getAdminMembers = async ({
   page = 1,
   limit = 10,
   search = "",
+  siteStation = "",
 } = {}) => {
   const { data } = await API.get(
     "/admin/members",
@@ -110,6 +111,7 @@ export const getAdminMembers = async ({
         page,
         limit,
         search,
+        siteStation,
       },
     }
   );

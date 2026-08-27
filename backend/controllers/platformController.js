@@ -1,3 +1,8 @@
+exports.runtimeConfig = async (_req, res) => {
+  res.set("Cache-Control", "public, max-age=300, stale-while-revalidate=900");
+  return res.json({ success:true, appVersion:process.env.APP_VERSION||"18.5.0", mpesa:{ enabled:String(process.env.MPESA_ENABLED||"false").toLowerCase()==="true", environment:process.env.MPESA_ENVIRONMENT||"production", shortCode:process.env.MPESA_SHORTCODE||"650014", accountReference:process.env.MPESA_ACCOUNT_REFERENCE||"BENMIDAX", manualPaybill:process.env.MPESA_MANUAL_PAYBILL||"247247", manualAccountNumber:process.env.MPESA_MANUAL_ACCOUNT_NUMBER||"" }, publicWebUrl:process.env.PUBLIC_WEB_URL||"" });
+};
+
 const path = require("path");
 const fs = require("fs");
 const jwt = require("jsonwebtoken");

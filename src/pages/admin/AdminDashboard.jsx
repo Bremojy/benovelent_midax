@@ -116,6 +116,8 @@ export default function AdminDashboard() {
 
         {error && <div className="portal-alert">{error}</div>}
 
+        {stats.adminProfile && <section className="portal-panel modern-panel admin-role-card" style={{ marginBottom: 18 }}><div className="panel-heading"><div><span className="panel-kicker">CONSTITUTION LEADERSHIP ROLE</span><h2>Registered role</h2><p>This is the role assigned to your administrator account by SuperAdmin.</p></div><ShieldCheck size={22} /></div><div className="admin-role-highlight"><strong>{stats.adminProfile.registeredRole || "Administrator"}</strong><span>{stats.adminProfile.name || "Administrator"} · {String(stats.adminProfile.role || "admin").toUpperCase()}</span></div></section>}
+
         <section className="portal-metric-grid four">
           <Metric icon={<Users />} label="Total members" value={val("totalMembers", "total", "count")} caption={`${val("activeMembers", "active")} active`} />
           <Metric icon={<Wallet />} label="Book balance" value={money(val("bookBalance"))} caption={`${val("verifiedMembers")} verified members`} tone="violet" />
@@ -127,6 +129,7 @@ export default function AdminDashboard() {
           <div className="panel-heading"><div><span className="panel-kicker">OTHER PAGES</span><h2>Supporting administration tools</h2><p>Secondary workspace pages are available here without crowding the primary sidebar.</p></div></div>
           <div className="quick-action-grid">
             <Quick href="/admin/notifications" icon={<Bell />} title="Notifications" text="Review alerts and broadcast history." />
+            <Quick href="/admin/announcements" icon={<Newspaper />} title="Announcements" text="Publish public news and picture updates directly to the News page." />
             <Quick href="/admin/polls" icon={<ClipboardList />} title="Polls" text="Manage and review scheme polls." />
             <Quick href="/admin/feedback" icon={<MessageCircle />} title="Feedback" text="Review collections and responses." />
             <Quick href="/admin/settings" icon={<ShieldCheck />} title="Settings" text="Manage preferences and security." />

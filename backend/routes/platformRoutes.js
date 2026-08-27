@@ -4,6 +4,7 @@ const controller = require("../controllers/platformController");
 const { verifyToken: protect } = require("../middleware/authMiddleware");
 const { isAdminOrSuperAdmin } = require("../middleware/roleMiddleware");
 
+router.get("/runtime-config", controller.runtimeConfig);
 router.post("/assistant", protect, controller.assistant);
 router.post("/public/assistant", controller.assistant);
 router.get("/activity", protect, controller.activityCenter);

@@ -71,7 +71,7 @@ exports.create = async (req, res) => {
 exports.update = async (req, res) => {
   try {
     const payload = clean(req.body);
-    const policy = await Policy.findByIdAndUpdate(req.params.id, payload, { new: true, runValidators: true });
+    const policy = await Policy.findByIdAndUpdate(req.params.id, payload, { returnDocument: "after", runValidators: true });
     if (!policy) return res.status(404).json({ success: false, message: "Policy not found." });
     await redisCache.del("public:policies:enabled");
     res.json({ success: true, policy });

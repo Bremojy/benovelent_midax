@@ -32,7 +32,8 @@ module.exports = (io, socket) => {
   socket.on("get-notification-count", async () => {
     try {
       if (!socket.user?._id) return;
-      const count = await Notification.countDocuments({ recipient: socket.user._id, read: false });
+      const recipientModel = String(socket.userRole || "member").toLowerCase() === "superadmin" ? "SuperAdmin" : String(socket.userRole || "member").toLowerCase() === "admin" ? "Admin" : "Member";
+      const count = await Notification.countDocuments({ recipient: socket.user._id, recipientModel, read: false });
       socket.emit("notification-count", count);
     } catch (error) { console.warn("Notification count failed:", error.message); }
   });

@@ -1,6 +1,7 @@
 const MpesaTransaction = require("../models/MpesaTransaction");
 const EducationSupport = require("../models/EducationSupport");
 const CommunityAssistance = require("../models/CommunityAssistance");
+const Contribution = require("../models/Contribution");
 const SupportRequest = require("../models/SupportRequest");
 const MedicalSupport = require("../models/MedicalSupport");
 const FuneralSupport = require("../models/FuneralSupport");
@@ -9,8 +10,15 @@ const createNotification = require("../utils/createNotification");
 const createAuditLog = require("../utils/createAuditLog");
 const Finance = require("../models/Finance");
 const MpesaB2CTransaction = require("../models/MpesaB2CTransaction");
-const { stkPush, b2cPayment, normalizePhone, normalizeAccountReference, isConfigured, isB2CConfigured, getConfigurationSummary, idempotencyKey, endpointSummary, extractUpstreamError } = require("../services/mpesaService");
-const { getStkCallback, getCheckoutRequestId, toResultCode, classifyResultCode, parseMetadata } = require("../services/mpesaCallback");
+const { ensureChatProfile } = require("../utils/chatProfile");
+const { stkPush, stkQuery, b2cPayment, normalizePhone, normalizeAccountReference, isConfigured, isB2CConfigured, getConfigurationSummary, idempotencyKey, endpointSummary, extractUpstreamError } = require("../services/mpesaService");
+
+const env = (name, fallback = "") => String(process.env[name] ?? fallback).trim();
+const DEFAULT_MPESA_SHORTCODE = "650014";
+const DEFAULT_MPESA_ACCOUNT_REFERENCE = "BENMIDAX";
+const MANUAL_PAYBILL = () => env("MPESA_MANUAL_PAYBILL", "247247");
+const MANUAL_ACCOUNT = () => env("MPESA_MANUAL_ACCOUNT_NUMBER", "0650186528835");
+const normalizeManualCode = (value) => String(value || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 32);
 
 const modelMap = { SupportRequest, MedicalSupport, FuneralSupport, EducationSupport };
 
@@ -68,41 +76,112 @@ async function applyGenericSupportRepayment(transaction) {
   if (!application) throw new Error("Support repayment record was not found.");
   if (String(application.member) !== String(transaction.member)) throw new Error("Support repayment ownership validation failed.");
   if (!application.repaymentEnabled) throw new Error("This support request is not repayable.");
+  if (!Array.isArray(application.timeline)) application.timeline = [];
+  const existing = application.timeline.find((entry) => String(entry.paymentTransactionId || "") === String(transaction._id));
+  if (existing) return application;
   const amount = Math.min(Number(transaction.amount), Number(application.balance || 0));
   if (amount <= 0) return application;
   application.amountPaid = Number(application.amountPaid || 0) + amount;
   application.balance = Math.max(0, Number(application.balance || 0) - amount);
   if (application.balance === 0) application.status = "Completed";
-  if (!Array.isArray(application.timeline)) application.timeline = [];
-  application.timeline.push({ status: application.status, remarks: `M-PESA repayment of KSh ${amount.toLocaleString("en-KE")} recorded.`, updatedBy: transaction.member, date: new Date() });
+  application.timeline.push({ status: application.status, remarks: `M-PESA repayment of KSh ${amount.toLocaleString("en-KE")} recorded.`, updatedBy: transaction.member, paymentTransactionId: transaction._id, date: new Date() });
   await application.save();
   await createNotification({ recipient: application.member, recipientModel: "Member", title: "Support Repayment Received", message: `M-PESA repayment of KSh ${amount.toLocaleString("en-KE")} received. Remaining balance: KSh ${Number(application.balance).toLocaleString("en-KE")}. Receipt: ${transaction.mpesaReceiptNumber || "pending"}.`, type: "payment", referenceId: application._id, referenceModel: "SupportRequest", icon: "payments" });
   return application;
 }
 
 async function applyCommunityContribution(transaction) {
-  const campaign = await CommunityAssistance.findById(transaction.referenceId);
+  const campaign = await CommunityAssistance.findById(transaction.referenceId).lean();
   if (!campaign) throw new Error("Community assistance case was not found.");
   const closedBeforePayment = campaign.status === "closed" && campaign.closedAt && transaction.initiatedAt && new Date(transaction.initiatedAt) <= new Date(campaign.closedAt);
   if (!campaign.enabled && !closedBeforePayment) throw new Error("This community assistance case is closed.");
   if (!["open", "target_reached", "closed"].includes(String(campaign.status))) throw new Error("This community assistance case is not accepting this payment settlement.");
   const amount = Number(transaction.amount);
   if (!amount || amount <= 0) throw new Error("Invalid community contribution amount.");
-  campaign.raisedAmount = Number(campaign.raisedAmount || 0) + amount;
-  if (campaign.raisedAmount >= campaign.targetAmount && campaign.status !== "closed") campaign.status = "target_reached";
-  await campaign.save();
+  const remaining = Math.max(0, Number(campaign.targetAmount || 0) - Number(campaign.raisedAmount || 0));
+  if (amount > remaining) throw new Error("The contribution exceeds the remaining assistance target and needs finance review.");
+  const updated = await CommunityAssistance.findOneAndUpdate(
+    { _id: campaign._id, enabled: campaign.enabled, status: campaign.status, contributionTransactionIds: { $ne: transaction._id }, raisedAmount: { $lte: Math.max(0, Number(campaign.targetAmount || 0) - amount) } },
+    { $inc: { raisedAmount: amount }, $addToSet: { contributionTransactionIds: transaction._id } },
+    { returnDocument: "after" }
+  );
+  if (!updated) {
+    const alreadyApplied = await CommunityAssistance.findOne({ _id: campaign._id, contributionTransactionIds: transaction._id }).lean();
+    if (alreadyApplied) return alreadyApplied;
+    throw new Error("The community contribution could not be reconciled safely. Finance review is required.");
+  }
+  if (updated.raisedAmount >= updated.targetAmount && updated.status !== "closed") {
+    await CommunityAssistance.updateOne({ _id: updated._id }, { $set: { status: "target_reached" } });
+    updated.status = "target_reached";
+  }
   await createNotification({
-    recipient: campaign.recipientMember,
+    recipient: updated.recipientMember,
     recipientModel: "Member",
     title: "Community Assistance Contribution Received",
     message: `A verified M-PESA contribution of KSh ${amount.toLocaleString("en-KE")} has been received toward your assistance case.`,
     type: "claim",
-    referenceId: campaign._id,
+    referenceId: updated._id,
     referenceModel: "CommunityAssistance",
     icon: "heart",
   });
-  return campaign;
+  return updated;
 }
+
+async function resolvePaymentMember(req) {
+  const role = String(req.user?.role || req.userRole || "").toLowerCase();
+  if (role === "member") return req.user;
+  if (["admin", "superadmin"].includes(role)) {
+    const profile = await ensureChatProfile(req.user);
+    if (!profile?._id) throw new Error("Your portal contribution profile could not be prepared.");
+    return profile;
+  }
+  throw new Error("This account is not allowed to make a contribution.");
+}
+
+async function ensureContributionForPayment(paymentMember, referenceId, amount) {
+  if (referenceId) {
+    const existing = await Contribution.findOne({ _id: referenceId, member: paymentMember._id });
+    if (!existing) throw new Error("Contribution record not found for this account.");
+    if (Number(existing.balance) <= 0) throw new Error("This contribution is already fully paid.");
+    if (Number(amount) > Number(existing.balance)) throw new Error("Payment cannot exceed the current contribution balance.");
+    return existing;
+  }
+
+  const month = new Date().getMonth() + 1;
+  const year = new Date().getFullYear();
+  let contribution = await Contribution.findOne({ member: paymentMember._id, month, year });
+  if (!contribution) {
+    try {
+      contribution = await Contribution.create({
+        member: paymentMember._id,
+        month,
+        year,
+        expectedAmount: Math.max(1, Number(amount)),
+        paidAmount: 0,
+        paymentMethod: "M-PESA",
+        notes: "Self-service contribution created from portal M-PESA payment.",
+      });
+    } catch (error) {
+      if (error?.code !== 11000) throw error;
+      contribution = await Contribution.findOne({ member: paymentMember._id, month, year });
+    }
+  }
+  if (!contribution) throw new Error("Unable to prepare your current contribution record.");
+  if (Number(contribution.balance) <= 0) {
+    // A fully paid current-month record should not block a new top-up.
+    // Create the next payment as an additional contribution only when the
+    // current record is already complete is undesirable because of the unique
+    // monthly index, so direct additional payment requires the existing balance.
+    throw new Error("Your current monthly contribution is already fully paid.");
+  }
+  if (Number(amount) > Number(contribution.balance)) throw new Error("Payment cannot exceed the current contribution balance.");
+  return contribution;
+}
+
+exports.publicConfig = async (_req, res) => {
+  res.set("Cache-Control", "public, max-age=300, stale-while-revalidate=900");
+  return res.json({ success:true, enabled:env("MPESA_ENABLED","false").toLowerCase()==="true", configured:isConfigured(), environment:env("MPESA_ENVIRONMENT","production"), shortCode:env("MPESA_SHORTCODE",DEFAULT_MPESA_SHORTCODE), accountReference:normalizeAccountReference(env("MPESA_ACCOUNT_REFERENCE",DEFAULT_MPESA_ACCOUNT_REFERENCE)), manualPaybill:env("MPESA_MANUAL_PAYBILL","247247"), manualAccountNumber:MANUAL_ACCOUNT(), transactionType:env("MPESA_TRANSACTION_TYPE","CustomerPayBillOnline") });
+};
 
 exports.config = async (_req, res) => {
   const stkConfigured = isConfigured();
@@ -115,10 +194,11 @@ exports.config = async (_req, res) => {
     stkConfigured,
     b2cConfigured,
     enabled,
-    ready: stkConfigured && b2cConfigured,
+    ready: Boolean(stkConfigured || MANUAL_PAYBILL()),
+    manualCollectionReady: Boolean(MANUAL_PAYBILL() && MANUAL_ACCOUNT()),
     shortCode: String(process.env.MPESA_SHORTCODE || "650014"),
     manualPaybill: String(process.env.MPESA_MANUAL_PAYBILL || "247247"),
-    manualAccountNumber: String(process.env.MPESA_MANUAL_ACCOUNT_NUMBER || "0650186528835"),
+    manualAccountNumber: MANUAL_ACCOUNT(),
     accountReference: normalizeAccountReference(process.env.MPESA_ACCOUNT_REFERENCE || "BENMIDAX"),
     environment: String(process.env.MPESA_ENVIRONMENT || "production"),
     message: !enabled
@@ -135,10 +215,15 @@ exports.routeStatus = async (_req, res) => {
     service: "payments",
     routes: {
       stk: "/api/payments/stk",
+      stkQuery: "/api/payments/stk-query",
       callback: "/api/payments/callback",
       b2c: "/api/payments/b2c/disburse",
       b2cResult: "/api/payments/b2c/result",
       b2cTimeout: "/api/payments/b2c/timeout",
+      manual: "/api/payments/manual",
+      manualAdmin: "/api/payments/manual/admin",
+      manualVerify: "/api/payments/manual/:id/verify",
+      manualReject: "/api/payments/manual/:id/reject",
     },
     daraja: endpointSummary(),
     configuration: getConfigurationSummary(),
@@ -147,13 +232,19 @@ exports.routeStatus = async (_req, res) => {
 };
 
 exports.myTransactions = async (req, res) => {
-  const transactions = await MpesaTransaction.find({ member: req.user._id }).sort({ createdAt: -1 }).limit(100).lean();
-  res.json({ success: true, transactions });
+  try {
+    const paymentMember = await resolvePaymentMember(req);
+    const transactions = await MpesaTransaction.find({ member: paymentMember._id }).sort({ createdAt: -1 }).limit(100).lean();
+    res.json({ success: true, transactions });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message || "Unable to load your M-PESA transactions." });
+  }
 };
 
 exports.getTransaction = async (req, res) => {
   try {
-    const transaction = await MpesaTransaction.findOne({ _id: req.params.id, member: req.user._id }).lean();
+    const paymentMember = await resolvePaymentMember(req);
+    const transaction = await MpesaTransaction.findOne({ _id: req.params.id, member: paymentMember._id }).lean();
     if (!transaction) return res.status(404).json({ success: false, message: "Payment transaction not found." });
     res.json({ success: true, transaction });
   } catch (error) {
@@ -161,12 +252,58 @@ exports.getTransaction = async (req, res) => {
   }
 };
 
+exports.allTransactions = async (req, res) => {
+  try {
+    const limit = Math.min(Math.max(Number(req.query?.limit) || 100, 1), 500);
+    const transactions = await MpesaTransaction.find({})
+      .populate("member", "fullName memberNumber email phone role portalOwnerId portalOwnerRole")
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .lean();
+    res.json({ success: true, count: transactions.length, transactions });
+  } catch (error) {
+    console.error("M-PESA transaction list error:", error);
+    res.status(500).json({ success: false, message: "Unable to load M-PESA transactions." });
+  }
+};
+
+exports.deleteTransaction = async (req, res) => {
+  try {
+    const transaction = await MpesaTransaction.findById(req.params.id);
+    if (!transaction) return res.status(404).json({ success: false, message: "M-PESA transaction not found." });
+    if (transaction.reconciled || transaction.status === "successful") {
+      return res.status(409).json({ success: false, code: "SETTLED_TRANSACTION_PROTECTED", message: "Settled M-PESA transactions cannot be permanently deleted. Use the finance audit/visibility controls instead so the contribution and ledger remain traceable." });
+    }
+    await MpesaTransaction.deleteOne({ _id: transaction._id });
+    await createAuditLog({
+      user: req.user._id,
+      userRole: req.user.role,
+      action: "MPESA_TRANSACTION_DELETED",
+      module: "M-PESA",
+      description: `SuperAdmin deleted an unsettled M-PESA transaction ${transaction._id}.`,
+      req,
+      metadata: { transactionId: transaction._id, status: transaction.status, purpose: transaction.purpose, amount: transaction.amount, paymentMethod: transaction.paymentMethod },
+    });
+    res.json({ success: true, message: "Unsettled M-PESA transaction deleted successfully." });
+  } catch (error) {
+    console.error("M-PESA transaction delete error:", error);
+    res.status(500).json({ success: false, message: "Unable to delete the M-PESA transaction." });
+  }
+};
+
 exports.stk = async (req, res) => {
+  let tx = null;
+  const requestId = String(req.requestId || req.get("X-Request-ID") || "unknown");
   try {
     const purpose = String(req.body?.purpose || "").trim();
     const referenceId = req.body?.referenceId || null;
     const amount = Number(req.body?.amount);
-    const phoneNumber = normalizePhone(req.body?.phoneNumber || req.user?.phone || req.user?.mpesaNumber);
+    const paymentMember = await resolvePaymentMember(req);
+    const role = String(req.user?.role || req.userRole || "").toLowerCase();
+    if (role !== "member" && purpose !== "contribution") {
+      return res.status(403).json({ success: false, message: "Administrators may use M-PESA here only for their own Benevolent MIDAX contribution." });
+    }
+    const phoneNumber = normalizePhone(req.body?.phoneNumber || paymentMember?.phone || paymentMember?.mpesaNumber || req.user?.phone);
     if (!amount || amount <= 0) return res.status(400).json({ success: false, message: "Enter a valid M-PESA amount." });
     if (!phoneNumber || !/^254\d{9}$/.test(phoneNumber)) return res.status(400).json({ success: false, message: "Enter a valid Kenyan M-PESA number." });
     if (!["loan_repayment", "support_repayment", "community_assistance", "contribution", "other"].includes(purpose)) return res.status(400).json({ success: false, message: "Unsupported payment purpose." });
@@ -192,19 +329,22 @@ exports.stk = async (req, res) => {
       const remaining = Number(campaign.targetAmount) - Number(campaign.raisedAmount || 0);
       if (amount > remaining) return res.status(400).json({ success: false, message: `Maximum remaining contribution is KSh ${remaining.toLocaleString("en-KE")}.` });
       referenceModel = "CommunityAssistance";
+    } else if (purpose === "contribution") {
+      const contribution = await ensureContributionForPayment(paymentMember, referenceId, amount);
+      referenceModel = "Contribution";
+      if (!referenceId) req.body.referenceId = String(contribution._id);
     }
 
-    const tx = await MpesaTransaction.create({
-      member: req.user._id,
+    tx = await MpesaTransaction.create({
+      member: paymentMember._id,
       purpose,
-      referenceId,
+      referenceId: purpose === "contribution" ? (req.body.referenceId || referenceId) : referenceId,
       referenceModel,
       phoneNumber,
       amount: Math.round(amount),
       businessShortCode: String(process.env.MPESA_SHORTCODE || "650014"),
       accountReference: normalizeAccountReference(process.env.MPESA_ACCOUNT_REFERENCE || "BENMIDAX"),
       status: "pending",
-      requestId: String(req.requestId || req.get("X-Request-ID") || ""),
     });
 
     if (!isConfigured()) {
@@ -219,132 +359,448 @@ exports.stk = async (req, res) => {
       amount: tx.amount,
       accountReference: tx.accountReference,
       transactionDesc: purpose === "loan_repayment" ? "Education repayment" : purpose === "support_repayment" ? "Support repayment" : purpose === "community_assistance" ? "Community help" : "MIDAX payment",
-      requestId: req.requestId || req.get("X-Request-ID") || "",
     });
 
     tx.merchantRequestId = String(result?.MerchantRequestID || "");
     tx.checkoutRequestId = String(result?.CheckoutRequestID || "");
     tx.resultCode = result?.ResponseCode != null ? Number(result.ResponseCode) : null;
-    tx.resultDescription = result?.CustomerMessage || result?.ResponseDescription || "STK push sent.";
-    tx.status = String(result?.ResponseCode) === "0" ? "pending" : "failed";
+    tx.resultDescription = String(result?.ResponseDescription || result?.CustomerMessage || "STK push response received.").slice(0, 500);
+
+    const responseCode = result?.ResponseCode != null ? Number(result.ResponseCode) : null;
+    const responseDescription = String(result?.ResponseDescription || "").trim();
+    const customerMessage = String(result?.CustomerMessage || "").trim();
+
+    if (responseCode !== 0) {
+      tx.status = "failed";
+      await tx.save();
+
+      const combined = `${responseDescription} ${customerMessage}`.toLowerCase();
+      const unresolvedReason = /unresolved reason type/.test(combined);
+      const message = unresolvedReason
+        ? "Safaricom rejected this STK request before the payment prompt was accepted. Verify that the production STK shortcode is the live shortcode provisioned for Lipa na M-PESA Online, that its transaction type matches the shortcode, and that the production passkey belongs to that same shortcode. No payment was marked successful."
+        : responseDescription || customerMessage || "Safaricom rejected the M-PESA STK request. No payment was marked successful.";
+
+      console.warn("M-PESA STK business rejection:", {
+        requestId,
+        responseCode,
+        responseDescription,
+        customerMessage,
+        merchantRequestId: tx.merchantRequestId || null,
+        checkoutRequestId: tx.checkoutRequestId || null,
+      });
+
+      return res.status(502).json({
+        success: false,
+        configured: true,
+        code: "MPESA_STK_REJECTED",
+        paymentStage: "stk",
+        upstreamStatus: 200,
+        upstreamCode: String(result?.ResponseCode ?? ""),
+        responseCode,
+        responseDescription: responseDescription || null,
+        customerMessage: customerMessage || null,
+        message,
+        transactionId: tx._id,
+        checkoutRequestId: tx.checkoutRequestId || null,
+        requestId,
+      });
+    }
+
+    tx.status = "pending";
     await tx.save();
-    res.status(200).json({ success: result?.ResponseCode === "0", configured: true, message: result?.CustomerMessage || result?.ResponseDescription || "STK push submitted.", transactionId: tx._id, checkoutRequestId: tx.checkoutRequestId });
+    return res.status(200).json({
+      success: true,
+      configured: true,
+      message: "Safaricom accepted the STK request. Check the phone for the M-PESA prompt and enter the M-PESA PIN if requested.",
+      transactionId: tx._id,
+      checkoutRequestId: tx.checkoutRequestId,
+    });
   } catch (error) {
     const upstream = extractUpstreamError(error);
-    console.error("M-PESA STK error:", { stage: "daraja", ...upstream });
-    const isUpstream404 = upstream.status === 404;
-    // Any Daraja failure is an upstream payment-service problem, not an
-    // application authentication failure. Keep it in the 5xx family so the
-    // member portal can stay signed in and display a payment-specific message.
-    const clientStatus = 502;
-    const diagnosticMessage = isUpstream404
-      ? "Safaricom returned HTTP 404 for the STK request. Verify the Daraja production application, shortcode, environment and callback configuration."
-      : upstream.status === 400
-        ? "Safaricom rejected the STK request. Verify the production shortcode, passkey, consumer credentials, transaction type and callback URL."
-        : upstream.status === 401
-          ? "Safaricom rejected the Daraja credentials. Verify the production consumer key and consumer secret."
-          : upstream.status === 403
-            ? "Safaricom denied the Daraja request. Verify that the production application and shortcode are enabled for STK Push."
-            : "The M-PESA service could not complete the STK request. Your portal session is unchanged.";
+    const paymentStage = upstream.paymentStage === "oauth" ? "oauth" : upstream.paymentStage === "stk" ? "stk" : "unknown";
+    console.error("M-PESA STK error:", { requestId, stage: paymentStage, ...upstream });
+
+    if (tx) {
+      tx.status = "failed";
+      tx.resultCode = upstream.status || null;
+      tx.resultDescription = paymentStage === "oauth"
+        ? "Safaricom Daraja authentication failed. Verify the production consumer key and consumer secret."
+        : upstream.message || "M-PESA STK request failed.";
+      try { await tx.save(); } catch (saveError) { console.error("M-PESA transaction failure update:", saveError); }
+    }
+
+    const isDatabaseError = String(upstream.code || "").toUpperCase().startsWith("E11000") || /Mongo|Mongoose|duplicate key/i.test(String(upstream.message || ""));
+    const isOauth404 = paymentStage === "oauth" && upstream.status === 404;
+    const isStk404 = paymentStage === "stk" && upstream.status === 404;
+    const clientStatus = isDatabaseError ? 500 : (upstream.status && upstream.status >= 500 ? 502 : 502);
+    const diagnosticMessage = paymentStage === "oauth"
+      ? (upstream.status === 401 || upstream.status === 403
+        ? "M-PESA authentication was rejected by Safaricom. Verify the production consumer key, consumer secret and Daraja application permissions."
+        : isOauth404
+          ? "Safaricom Daraja OAuth endpoint returned 404. Verify that production mode is using the correct Daraja host."
+          : "M-PESA authentication with Safaricom could not be completed. Verify the production consumer credentials.")
+      : isStk404
+        ? "Safaricom returned HTTP 404 for the STK request. Verify the production Daraja application, shortcode and endpoint configuration."
+        : upstream.status === 400
+          ? "Safaricom rejected the STK request. Verify the production shortcode, passkey, consumer credentials, transaction type and callback URL."
+          : upstream.status === 401
+            ? "Safaricom rejected the Daraja credentials. Verify the production consumer key and consumer secret."
+            : upstream.status === 403
+              ? "Safaricom denied the Daraja request. Verify that the production application and shortcode are enabled for STK Push."
+              : /ETIMEDOUT|ECONNABORTED/i.test(String(upstream.code || ""))
+                ? "The M-PESA request timed out before Safaricom returned a response. The transaction may still be processing; check the payment again shortly."
+                : isDatabaseError
+        ? "The payment record could not be prepared safely. Your payment was not sent to Safaricom. Please retry once, and contact an administrator if it continues."
+        : "The M-PESA service could not complete the STK request. Your portal session is unchanged.";
+
     return res.status(clientStatus).json({
       success: false,
-      code: isUpstream404 ? "MPESA_DARAJA_404" : "MPESA_STK_FAILED",
+      code: isOauth404 ? "MPESA_OAUTH_404" : isStk404 ? "MPESA_DARAJA_404" : paymentStage === "oauth" ? "MPESA_OAUTH_FAILED" : "MPESA_STK_FAILED",
       upstreamStatus: upstream.status,
-      paymentStage: "daraja",
+      paymentStage,
       message: diagnosticMessage,
-      endpoint: endpointSummary().stk,
+      endpoint: paymentStage === "oauth" ? endpointSummary().oauth : endpointSummary().stk,
+      upstreamCode: upstream.code || null,
+      transactionId: tx?._id || null,
+      requestId,
       details: process.env.NODE_ENV === "production" ? undefined : error.response?.data,
     });
   }
 };
 
-exports.callback = async (req, res) => {
-  const requestId = String(req.requestId || req.get("X-Request-ID") || "");
-  const callback = getStkCallback(req.body);
-  if (!callback) {
-    console.warn("[mpesa][callback:malformed]", { requestId });
-    return res.status(200).json({ ResultCode: 0, ResultDesc: "Accepted" });
+async function applyContributionPayment(transaction) {
+  const contribution = await Contribution.findOne({ _id: transaction.referenceId, member: transaction.member });
+  if (!contribution) throw new Error("Contribution record was not found.");
+  const amount = Number(transaction.amount);
+  const alreadyApplied = Array.isArray(contribution.paymentTransactionIds) && contribution.paymentTransactionIds.some((id) => String(id) === String(transaction._id));
+  if (!alreadyApplied) {
+    const remaining = Math.max(0, Number(contribution.expectedAmount || 0) - Number(contribution.paidAmount || 0));
+    if (amount > remaining) throw new Error("Payment exceeds the contribution balance and needs finance review.");
+    contribution.paidAmount = Number(contribution.paidAmount || 0) + amount;
+    contribution.paymentTransactionIds = Array.isArray(contribution.paymentTransactionIds) ? contribution.paymentTransactionIds : [];
+    contribution.paymentTransactionIds.push(transaction._id);
+    contribution.paymentDate = contribution.paymentDate || new Date();
+    contribution.paymentMethod = "M-PESA";
+    await contribution.save();
   }
-
-  const checkoutRequestId = getCheckoutRequestId(callback);
-  const resultCode = toResultCode(callback.ResultCode);
-  const resultDescription = String(callback.ResultDesc || "");
-  console.info("[mpesa][callback:received]", {
-    requestId,
-    checkoutRequestId,
-    resultCode,
-    resultDescription,
-  });
-
-  if (!checkoutRequestId) {
-    console.warn("[mpesa][callback:missing-checkout]", { requestId, resultCode });
-    return res.status(200).json({ ResultCode: 0, ResultDesc: "Accepted" });
+  const referenceNumber = `MPESA-${transaction._id}`;
+  const existingFinance = await Finance.findOne({ referenceNumber });
+  if (!existingFinance) {
+    await Finance.create({
+      member: contribution.member,
+      transactionNumber: referenceNumber,
+      type: "contribution",
+      category: "Contribution",
+      amount,
+      paymentMethod: "M-PESA",
+      referenceNumber,
+      description: `M-PESA contribution for ${contribution.member}`,
+      status: "completed",
+      transactionDate: transaction.completedAt || new Date(),
+    });
   }
+  return contribution;
+}
 
+async function reconcileSuccessfulTransaction(transaction) {
+  if (!transaction || transaction.reconciled) return transaction;
   try {
+    if (transaction.purpose === "loan_repayment") await applyEducationRepayment(transaction);
+    else if (transaction.purpose === "support_repayment") await applyGenericSupportRepayment(transaction);
+    else if (transaction.purpose === "community_assistance") await applyCommunityContribution(transaction);
+    else if (transaction.purpose === "contribution") await applyContributionPayment(transaction);
+    transaction.reconciled = true;
+    transaction.reconciledAt = transaction.reconciledAt || new Date();
+    if (String(transaction.resultDescription || "").startsWith("Payment received; application reconciliation requires review:")) {
+      transaction.resultDescription = transaction.resultDescription.split(":").slice(1).join(":").trim();
+    }
+    await transaction.save();
+  } catch (applyError) {
+    transaction.status = "successful";
+    transaction.reconciled = false;
+    transaction.resultDescription = `Payment received; application reconciliation requires review: ${applyError.message}`;
+    await transaction.save();
+    console.error("M-PESA settlement application failed:", { transactionId: transaction._id, message: applyError.message });
+    throw applyError;
+  }
+  return transaction;
+}
+
+exports.manualPayment = async (req, res) => {
+  try {
+    const amount = Number(req.body?.amount);
+    const purpose = String(req.body?.purpose || "").trim();
+    const referenceId = req.body?.referenceId || null;
+    const paymentMember = await resolvePaymentMember(req);
+    const role = String(req.user?.role || req.userRole || "").toLowerCase();
+    if (role !== "member" && purpose !== "contribution") return res.status(403).json({ success: false, message: "Administrators may use M-PESA here only for their own Benevolent MIDAX contribution." });
+    const manualTransactionCode = normalizeManualCode(req.body?.transactionCode || req.body?.manualTransactionCode);
+    const suppliedPhone = req.body?.phoneNumber ? normalizePhone(req.body.phoneNumber) : "";
+    if (!amount || amount <= 0) return res.status(400).json({ success: false, message: "Enter a valid M-PESA amount." });
+    if (!manualTransactionCode || manualTransactionCode.length < 6) return res.status(400).json({ success: false, message: "Enter the M-PESA transaction code from the payment confirmation." });
+    if (suppliedPhone && !/^254\d{9}$/.test(suppliedPhone)) return res.status(400).json({ success: false, message: "Enter a valid Kenyan M-PESA number, or leave it blank." });
+    if (!["loan_repayment", "support_repayment", "community_assistance", "contribution", "other"].includes(purpose)) return res.status(400).json({ success: false, message: "Select a valid payment purpose." });
+    if (!MANUAL_PAYBILL() || !MANUAL_ACCOUNT()) return res.status(503).json({ success: false, message: "Manual M-PESA PayBill collection is not configured." });
+    if (purpose === "loan_repayment" || purpose === "support_repayment") {
+      const referenceModel = purpose === "loan_repayment" ? "EducationSupport" : "SupportRequest";
+      const { memberId } = await ensureReferenceExists(referenceModel, referenceId);
+      if (memberId !== String(req.user._id)) return res.status(403).json({ success: false, message: "You are not authorised to submit a repayment for this record." });
+    }
+    if (purpose === "community_assistance") {
+      const campaign = await CommunityAssistance.findById(referenceId);
+      if (!campaign || !campaign.enabled || String(campaign.status) !== "open") return res.status(404).json({ success: false, message: "Community assistance case is not available." });
+      if (String(campaign.recipientMember) === String(req.user._id)) return res.status(400).json({ success: false, message: "You cannot contribute to your own assistance case." });
+      const remaining = Number(campaign.targetAmount) - Number(campaign.raisedAmount || 0);
+      if (amount > remaining) return res.status(400).json({ success: false, message: `Maximum remaining contribution is KSh ${remaining.toLocaleString("en-KE")}.` });
+    } else if (purpose === "contribution") {
+      const contribution = await ensureContributionForPayment(paymentMember, referenceId, amount);
+      req.body.referenceId = String(contribution._id);
+    }
+    const existing = await MpesaTransaction.findOne({ manualTransactionCode }).lean();
+    if (existing) {
+      if (String(existing.member) !== String(req.user._id)) return res.status(409).json({ success: false, message: "This M-PESA transaction code has already been submitted." });
+      return res.json({ success: true, duplicate: true, transaction: existing, message: "This M-PESA transaction is already recorded and is awaiting verification." });
+    }
+    const tx = await MpesaTransaction.create({
+      member: paymentMember._id,
+      purpose,
+      referenceId: purpose === "contribution" ? (req.body.referenceId || referenceId) : referenceId,
+      referenceModel: purpose === "contribution" ? "Contribution" : purpose === "community_assistance" ? "CommunityAssistance" : purpose === "loan_repayment" ? "EducationSupport" : purpose === "support_repayment" ? "SupportRequest" : "",
+      phoneNumber: suppliedPhone,
+      amount: Math.round(amount),
+      businessShortCode: MANUAL_PAYBILL(),
+      accountReference: MANUAL_ACCOUNT(),
+      paymentMethod: "manual_paybill",
+      manualPaybill: MANUAL_PAYBILL(),
+      manualAccountNumber: MANUAL_ACCOUNT(),
+      manualTransactionCode,
+      status: "pending",
+      initiatedAt: new Date(),
+      resultDescription: "Manual M-PESA payment submitted; awaiting administrator verification.",
+    });
+    await createAuditLog({ user: req.user._id, userRole: req.user.role, action: "mpesa_manual_submitted", module: "payments", description: "Member submitted a manual M-PESA PayBill payment for verification.", req, metadata: { transactionId: String(tx._id), amount: tx.amount, purpose } });
+    return res.status(201).json({ success: true, message: "Payment recorded as pending. It will remain pending until an authorised administrator verifies the M-PESA transaction.", transaction: tx });
+  } catch (error) {
+    if (error?.code === 11000) return res.status(409).json({ success: false, message: "This M-PESA transaction code has already been submitted." });
+    console.error("Manual M-PESA payment error:", { message: error.message });
+    return res.status(500).json({ success: false, message: "The manual M-PESA payment could not be recorded. Please try again." });
+  }
+};
+
+exports.manualPaymentsAdmin = async (_req, res) => {
+  const transactions = await MpesaTransaction.find({ paymentMethod: "manual_paybill" }).populate("member", "fullName email memberNumber phone").sort({ createdAt: -1 }).limit(200).lean();
+  return res.json({ success: true, transactions, paybill: MANUAL_PAYBILL(), accountNumber: MANUAL_ACCOUNT() });
+};
+
+exports.manualVerify = async (req, res) => {
+  try {
+    let transaction = await MpesaTransaction.findOne({ _id: req.params.id, paymentMethod: "manual_paybill" });
+    if (!transaction) return res.status(404).json({ success: false, message: "Manual M-PESA transaction not found." });
+    if (transaction.status === "reversed" || transaction.status === "failed") return res.status(400).json({ success: false, message: "This payment cannot be verified from its current status." });
+    if (transaction.status !== "successful") {
+      const claimed = await MpesaTransaction.findOneAndUpdate(
+        { _id: transaction._id, status: "pending", paymentMethod: "manual_paybill" },
+        { $set: { status: "successful", completedAt: new Date(), resultCode: 0, resultDescription: "Manual M-PESA payment verified by an authorised administrator." } },
+        { returnDocument: "after" }
+      );
+      transaction = claimed || await MpesaTransaction.findById(transaction._id);
+    }
+    if (!transaction.reconciled) await reconcileSuccessfulTransaction(transaction);
+    const fresh = await MpesaTransaction.findById(transaction._id).lean();
+    await createAuditLog({ user: req.user._id, userRole: req.user.role, action: "mpesa_manual_verified", module: "payments", description: "Administrator verified a manual M-PESA PayBill payment.", req, metadata: { transactionId: String(transaction._id), reconciled: Boolean(fresh?.reconciled), amount: transaction.amount } });
+    if (!fresh?.reconciled) return res.status(409).json({ success: false, code: "MPESA_RECONCILIATION_REVIEW", message: "Payment verified, but the linked contribution/support record needs finance review before it can be treated as fully reconciled.", transaction: fresh });
+    return res.json({ success: true, message: "M-PESA payment verified and reconciled successfully.", transaction: fresh });
+  } catch (error) {
+    console.error("Manual M-PESA verification error:", { message: error.message });
+    return res.status(500).json({ success: false, message: error.message || "The payment could not be verified." });
+  }
+};
+
+exports.manualReject = async (req, res) => {
+  try {
+    const reason = String(req.body?.reason || "Rejected by administrator").trim().slice(0, 500);
+    const transaction = await MpesaTransaction.findOneAndUpdate(
+      { _id: req.params.id, paymentMethod: "manual_paybill", status: "pending" },
+      { $set: { status: "failed", completedAt: new Date(), resultCode: 1, resultDescription: reason } },
+      { returnDocument: "after" }
+    );
+    if (!transaction) return res.status(404).json({ success: false, message: "Pending manual M-PESA transaction not found." });
+    await createAuditLog({ user: req.user._id, userRole: req.user.role, action: "mpesa_manual_rejected", module: "payments", description: "Administrator rejected a manual M-PESA PayBill payment.", req, metadata: { transactionId: String(transaction._id), reason } });
+    if (transaction.member) await createNotification({ recipient: transaction.member, recipientModel: "Member", title: "M-PESA Payment Update", message: `Your manual M-PESA payment was rejected. Reason: ${reason}`, type: "payment", referenceId: transaction._id, referenceModel: "MpesaTransaction", icon: "payments" });
+    return res.json({ success: true, message: "Manual M-PESA payment rejected.", transaction });
+  } catch (error) {
+    console.error("Manual M-PESA rejection error:", { message: error.message });
+    return res.status(500).json({ success: false, message: "The payment could not be rejected." });
+  }
+};
+
+exports.callbackHealth = async (_req, res) => {
+  res.status(405).json({
+    success: false,
+    code: "CALLBACK_POST_ONLY",
+    message: "M-PESA callback endpoint is active. Safaricom must call this endpoint with HTTP POST; a browser GET request is not a valid callback test.",
+    allowedMethod: "POST",
+    route: "/api/payments/callback",
+    callbackConfigured: Boolean(process.env.MPESA_CALLBACK_URL),
+    callbackUrl: process.env.MPESA_CALLBACK_URL || null,
+    timestamp: new Date().toISOString(),
+  });
+};
+
+exports.stkQuery = async (req, res) => {
+  try {
+    const transactionId = String(req.body?.transactionId || req.body?.id || "").trim();
+    const checkoutRequestId = String(req.body?.checkoutRequestId || "").trim();
+    if (!transactionId && !checkoutRequestId) {
+      return res.status(400).json({ success: false, code: "MPESA_QUERY_REFERENCE_REQUIRED", message: "A payment transaction ID or CheckoutRequestID is required." });
+    }
+
+    const paymentMember = await resolvePaymentMember(req);
+    const transaction = transactionId
+      ? await MpesaTransaction.findOne({ _id: transactionId, member: paymentMember._id })
+      : await MpesaTransaction.findOne({ checkoutRequestId, member: paymentMember._id });
+    if (!transaction) return res.status(404).json({ success: false, code: "MPESA_TRANSACTION_NOT_FOUND", message: "Payment transaction not found." });
+
+    if (transaction.status === "successful" || transaction.status === "failed" || transaction.status === "reversed") {
+      return res.json({ success: true, settled: true, source: "database", transaction });
+    }
+    if (!transaction.checkoutRequestId) {
+      return res.status(409).json({ success: false, code: "MPESA_CHECKOUT_REQUEST_PENDING", settled: false, message: "Safaricom has not returned a CheckoutRequestID yet.", transaction });
+    }
+    if (!isConfigured()) {
+      return res.status(503).json({ success: false, code: "MPESA_NOT_CONFIGURED", settled: false, message: "M-PESA production credentials are not configured on the server." });
+    }
+
+    const result = await stkQuery({ checkoutRequestId: transaction.checkoutRequestId });
+    const resultCode = result?.ResultCode != null ? Number(result.ResultCode) : null;
+    transaction.resultCode = resultCode;
+    transaction.resultDescription = String(result?.ResultDesc || result?.ResponseDescription || transaction.resultDescription || "M-PESA status query completed.");
+
+    if (resultCode === 0) {
+      const claimed = await MpesaTransaction.findOneAndUpdate(
+        { _id: transaction._id, status: { $in: ["pending", "initiated"] } },
+        { $set: { status: "successful", completedAt: transaction.completedAt || new Date(), resultCode, resultDescription: transaction.resultDescription } },
+        { returnDocument: "after" }
+      );
+      const settled = claimed || await MpesaTransaction.findById(transaction._id);
+      console.info("[mpesa][callback:success]", {
+        requestId: req.requestId || null,
+        transactionId: transaction._id,
+        checkoutRequestId,
+        resultCode: transaction.resultCode,
+        mpesaReceiptPresent: Boolean(transaction.mpesaReceiptNumber),
+      });
+      if (settled && !settled.reconciled) await reconcileSuccessfulTransaction(settled);
+      return res.json({ success: true, settled: true, source: "safaricom-query", message: settled?.resultDescription || transaction.resultDescription, transaction: settled });
+    }
+
+    if (resultCode != null && resultCode !== 0) {
+      await MpesaTransaction.findOneAndUpdate(
+        { _id: transaction._id, status: { $in: ["pending", "initiated"] } },
+        { $set: { status: "failed", completedAt: transaction.completedAt || new Date(), resultCode, resultDescription: transaction.resultDescription } },
+        { returnDocument: "after" }
+      );
+      return res.json({ success: true, settled: true, source: "safaricom-query", message: transaction.resultDescription || "M-PESA payment was not completed.", transaction });
+    }
+
+    await transaction.save();
+    return res.json({ success: true, settled: false, source: "safaricom-query", message: transaction.resultDescription || "M-PESA payment is still being processed.", transaction });
+  } catch (error) {
+    const upstream = extractUpstreamError(error);
+    console.error("M-PESA STK query error:", upstream);
+    return res.status(502).json({
+      success: false,
+      code: upstream.paymentStage === "oauth" ? "MPESA_OAUTH_FAILED" : "MPESA_STK_QUERY_FAILED",
+      upstreamStatus: upstream.status,
+      paymentStage: upstream.paymentStage,
+      message: upstream.paymentStage === "oauth"
+        ? "M-PESA authentication failed while checking the STK request. Verify the production Daraja consumer credentials."
+        : upstream.status === 400
+          ? "Safaricom rejected the STK status query. The original request may still be pending or may have expired."
+          : "Unable to confirm the M-PESA transaction status from Safaricom.",
+      endpoint: upstream.paymentStage === "oauth" ? endpointSummary().oauth : endpointSummary().stkQuery,
+    });
+  }
+};
+
+exports.callback = async (req, res) => {
+  const callback = req.body?.Body?.stkCallback || req.body?.stkCallback;
+  if (!callback) {
+    console.warn("[mpesa][callback:invalid]", { requestId: req.requestId || null });
+    return res.json({ ResultCode: 0, ResultDesc: "Accepted" });
+  }
+  try {
+    const checkoutRequestId = String(callback.CheckoutRequestID || "");
+    console.info("[mpesa][callback:received]", {
+      requestId: req.requestId || null,
+      checkoutRequestId: checkoutRequestId || null,
+      resultCode: callback.ResultCode ?? null,
+      resultDescription: String(callback.ResultDesc || "").slice(0, 300),
+    });
     const transaction = await MpesaTransaction.findOne({ checkoutRequestId });
     if (!transaction) {
-      console.warn("[mpesa][callback:unmatched]", { requestId, checkoutRequestId, resultCode });
-      return res.status(200).json({ ResultCode: 0, ResultDesc: "Accepted" });
+      console.warn("[mpesa][callback:unmatched]", {
+        requestId: req.requestId || null,
+        checkoutRequestId: checkoutRequestId || null,
+      });
+      return res.json({ ResultCode: 0, ResultDesc: "Accepted" });
     }
 
     transaction.callbackPayload = req.body;
-    transaction.callbackReceivedAt = new Date();
-    transaction.requestId = transaction.requestId || requestId;
-    transaction.resultCode = resultCode;
-    transaction.resultDescription = resultDescription;
-    transaction.completedAt = new Date();
+    transaction.resultCode = Number(callback.ResultCode ?? 1);
+    transaction.resultDescription = String(callback.ResultDesc || transaction.resultDescription || "");
 
-    if (transaction.status === "successful" && transaction.completedAt) {
-      console.info("[mpesa][callback:duplicate]", { requestId, checkoutRequestId, resultCode, status: transaction.status });
-      await transaction.save();
-      return res.status(200).json({ ResultCode: 0, ResultDesc: "Already processed" });
-    }
+    const items = Array.isArray(callback.CallbackMetadata?.Item) ? callback.CallbackMetadata.Item : [];
+    const getItem = (name) => items.find((item) => item.Name === name)?.Value;
+    const receipt = String(getItem("MpesaReceiptNumber") || "");
+    if (receipt) transaction.mpesaReceiptNumber = receipt;
 
-    if (classifyResultCode(resultCode) === "successful") {
-      const metadata = parseMetadata(callback);
-      transaction.mpesaReceiptNumber = String(metadata.MpesaReceiptNumber || "");
-      if (!transaction.mpesaReceiptNumber) {
-        transaction.callbackProcessingError = "Successful callback did not contain MpesaReceiptNumber.";
-        transaction.status = "failed";
-        transaction.resultDescription = "Safaricom reported success but did not return an M-PESA receipt number.";
-        await transaction.save();
-        console.error("[mpesa][callback:missing-receipt]", { requestId, checkoutRequestId });
-        return res.status(200).json({ ResultCode: 0, ResultDesc: "Accepted" });
-      }
-      transaction.status = "successful";
-      transaction.callbackProcessingError = "";
-      await transaction.save();
-      try {
-        if (transaction.purpose === "loan_repayment") await applyEducationRepayment(transaction);
-        if (transaction.purpose === "support_repayment") await applyGenericSupportRepayment(transaction);
-        else if (transaction.purpose === "community_assistance") await applyCommunityContribution(transaction);
-      } catch (applyError) {
-        transaction.status = "successful";
-        transaction.callbackProcessingError = String(applyError?.message || applyError);
-        transaction.resultDescription = `Payment received; application reconciliation requires review: ${transaction.callbackProcessingError}`;
-        await transaction.save();
-        console.error("[mpesa][callback:reconciliation-error]", { requestId, checkoutRequestId, error: transaction.callbackProcessingError });
-      }
+    if (Number(callback.ResultCode) === 0) {
+      const claimed = await MpesaTransaction.findOneAndUpdate(
+        { _id: transaction._id, status: { $in: ["pending", "initiated"] } },
+        { $set: { status: "successful", completedAt: transaction.completedAt || new Date(), callbackPayload: req.body, resultCode: transaction.resultCode, resultDescription: transaction.resultDescription, mpesaReceiptNumber: transaction.mpesaReceiptNumber } },
+        { returnDocument: "after" }
+      );
+      const settled = claimed || await MpesaTransaction.findById(transaction._id);
+      console.info("[mpesa][callback:success]", {
+        requestId: req.requestId || null,
+        transactionId: transaction._id,
+        checkoutRequestId,
+        resultCode: transaction.resultCode,
+        mpesaReceiptPresent: Boolean(transaction.mpesaReceiptNumber),
+      });
+      if (settled && !settled.reconciled) await reconcileSuccessfulTransaction(settled);
     } else {
-      transaction.status = "failed";
-      transaction.callbackProcessingError = "";
-      await transaction.save();
-      console.warn("[mpesa][callback:failed]", { requestId, checkoutRequestId, resultCode, resultDescription, transactionId: String(transaction._id) });
+      const failed = await MpesaTransaction.findOneAndUpdate(
+        { _id: transaction._id, status: { $in: ["pending", "initiated"] } },
+        { $set: { status: "failed", completedAt: transaction.completedAt || new Date(), callbackPayload: req.body, resultCode: transaction.resultCode, resultDescription: transaction.resultDescription, mpesaReceiptNumber: transaction.mpesaReceiptNumber } },
+        { returnDocument: "after" }
+      );
+      console.warn("[mpesa][callback:failed]", {
+        requestId: req.requestId || null,
+        transactionId: transaction._id,
+        checkoutRequestId,
+        resultCode: transaction.resultCode,
+        resultDescription: transaction.resultDescription,
+      });
+      if (failed?.member) {
+        await createNotification({
+          recipient: transaction.member,
+          recipientModel: "Member",
+          title: "M-PESA Payment Update",
+          message: `Your M-PESA payment was not completed. ${/unresolved reason type/i.test(String(transaction.resultDescription || "")) ? "Safaricom returned a non-specific STK failure. Please verify the production shortcode, passkey, transaction type and customer number." : (transaction.resultDescription || "Please retry or contact the scheme administrator.")}`,
+          type: "payment",
+          referenceId: transaction._id,
+          referenceModel: "MpesaTransaction",
+          link: "/member/mpesa-records",
+          icon: "payments",
+        });
+      }
     }
   } catch (error) {
-    console.error("[mpesa][callback:processing-error]", { requestId, checkoutRequestId, resultCode, error: String(error?.message || error) });
-    try {
-      await MpesaTransaction.updateOne(
-        { checkoutRequestId },
-        { $set: { callbackProcessingError: String(error?.message || error), callbackReceivedAt: new Date(), requestId } }
-      );
-    } catch (persistError) {
-      console.error("[mpesa][callback:error-record-failed]", { requestId, checkoutRequestId, error: String(persistError?.message || persistError) });
-    }
+    console.error("M-PESA callback error:", error);
   }
-
-  return res.status(200).json({ ResultCode: 0, ResultDesc: "Accepted" });
+  return res.json({ ResultCode: 0, ResultDesc: "Accepted" });
 };
 
 exports.enableCommunityAssistance = async (req, res) => {
