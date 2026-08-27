@@ -8,4 +8,7 @@ assert(/requestId/.test(controller), "payment controller must correlate STK requ
 assert(/X-Request-ID/.test(server) && /payment-request.*STK request received/.test(server), "server must log and correlate STK requests");
 assert(/X-Request-ID/.test(api), "frontend API client must send request IDs");
 assert(/The payment server could not be reached|payment gateway/.test(button), "frontend must classify network/proxy failures");
+assert(/MPESA_STK_REJECTED/.test(controller), "STK business rejections must return a distinct diagnostic code");
+assert(/unresolved reason type/.test(controller), "STK unresolved-reason responses must be classified diagnostically");
+assert(/responseCode.*responseDescription.*customerMessage/.test(controller.replace(/\n/g, " ")), "STK rejection diagnostics must retain provider response fields without secrets");
 console.log("Payment diagnostic contract test passed.");

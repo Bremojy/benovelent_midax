@@ -103,7 +103,7 @@ async function applyCommunityContribution(transaction) {
   const updated = await CommunityAssistance.findOneAndUpdate(
     { _id: campaign._id, enabled: campaign.enabled, status: campaign.status, contributionTransactionIds: { $ne: transaction._id }, raisedAmount: { $lte: Math.max(0, Number(campaign.targetAmount || 0) - amount) } },
     { $inc: { raisedAmount: amount }, $addToSet: { contributionTransactionIds: transaction._id } },
-    { new: true }
+    { returnDocument: "after" }
   );
   if (!updated) {
     const alreadyApplied = await CommunityAssistance.findOne({ _id: campaign._id, contributionTransactionIds: transaction._id }).lean();
@@ -364,10 +364,57 @@ exports.stk = async (req, res) => {
     tx.merchantRequestId = String(result?.MerchantRequestID || "");
     tx.checkoutRequestId = String(result?.CheckoutRequestID || "");
     tx.resultCode = result?.ResponseCode != null ? Number(result.ResponseCode) : null;
-    tx.resultDescription = result?.CustomerMessage || result?.ResponseDescription || "STK push sent.";
-    tx.status = String(result?.ResponseCode) === "0" ? "pending" : "failed";
+    tx.resultDescription = String(result?.ResponseDescription || result?.CustomerMessage || "STK push response received.").slice(0, 500);
+
+    const responseCode = result?.ResponseCode != null ? Number(result.ResponseCode) : null;
+    const responseDescription = String(result?.ResponseDescription || "").trim();
+    const customerMessage = String(result?.CustomerMessage || "").trim();
+
+    if (responseCode !== 0) {
+      tx.status = "failed";
+      await tx.save();
+
+      const combined = `${responseDescription} ${customerMessage}`.toLowerCase();
+      const unresolvedReason = /unresolved reason type/.test(combined);
+      const message = unresolvedReason
+        ? "Safaricom rejected this STK request before the payment prompt was accepted. Verify that the production STK shortcode is the live shortcode provisioned for Lipa na M-PESA Online, that its transaction type matches the shortcode, and that the production passkey belongs to that same shortcode. No payment was marked successful."
+        : responseDescription || customerMessage || "Safaricom rejected the M-PESA STK request. No payment was marked successful.";
+
+      console.warn("M-PESA STK business rejection:", {
+        requestId,
+        responseCode,
+        responseDescription,
+        customerMessage,
+        merchantRequestId: tx.merchantRequestId || null,
+        checkoutRequestId: tx.checkoutRequestId || null,
+      });
+
+      return res.status(502).json({
+        success: false,
+        configured: true,
+        code: "MPESA_STK_REJECTED",
+        paymentStage: "stk",
+        upstreamStatus: 200,
+        upstreamCode: String(result?.ResponseCode ?? ""),
+        responseCode,
+        responseDescription: responseDescription || null,
+        customerMessage: customerMessage || null,
+        message,
+        transactionId: tx._id,
+        checkoutRequestId: tx.checkoutRequestId || null,
+        requestId,
+      });
+    }
+
+    tx.status = "pending";
     await tx.save();
-    res.status(200).json({ success: result?.ResponseCode === "0", configured: true, message: result?.CustomerMessage || result?.ResponseDescription || "STK push submitted.", transactionId: tx._id, checkoutRequestId: tx.checkoutRequestId });
+    return res.status(200).json({
+      success: true,
+      configured: true,
+      message: "Safaricom accepted the STK request. Check the phone for the M-PESA prompt and enter the M-PESA PIN if requested.",
+      transactionId: tx._id,
+      checkoutRequestId: tx.checkoutRequestId,
+    });
   } catch (error) {
     const upstream = extractUpstreamError(error);
     const paymentStage = upstream.paymentStage === "oauth" ? "oauth" : upstream.paymentStage === "stk" ? "stk" : "unknown";
@@ -554,7 +601,7 @@ exports.manualVerify = async (req, res) => {
       const claimed = await MpesaTransaction.findOneAndUpdate(
         { _id: transaction._id, status: "pending", paymentMethod: "manual_paybill" },
         { $set: { status: "successful", completedAt: new Date(), resultCode: 0, resultDescription: "Manual M-PESA payment verified by an authorised administrator." } },
-        { new: true }
+        { returnDocument: "after" }
       );
       transaction = claimed || await MpesaTransaction.findById(transaction._id);
     }
@@ -575,7 +622,7 @@ exports.manualReject = async (req, res) => {
     const transaction = await MpesaTransaction.findOneAndUpdate(
       { _id: req.params.id, paymentMethod: "manual_paybill", status: "pending" },
       { $set: { status: "failed", completedAt: new Date(), resultCode: 1, resultDescription: reason } },
-      { new: true }
+      { returnDocument: "after" }
     );
     if (!transaction) return res.status(404).json({ success: false, message: "Pending manual M-PESA transaction not found." });
     await createAuditLog({ user: req.user._id, userRole: req.user.role, action: "mpesa_manual_rejected", module: "payments", description: "Administrator rejected a manual M-PESA PayBill payment.", req, metadata: { transactionId: String(transaction._id), reason } });
@@ -633,7 +680,7 @@ exports.stkQuery = async (req, res) => {
       const claimed = await MpesaTransaction.findOneAndUpdate(
         { _id: transaction._id, status: { $in: ["pending", "initiated"] } },
         { $set: { status: "successful", completedAt: transaction.completedAt || new Date(), resultCode, resultDescription: transaction.resultDescription } },
-        { new: true }
+        { returnDocument: "after" }
       );
       const settled = claimed || await MpesaTransaction.findById(transaction._id);
       if (settled && !settled.reconciled) await reconcileSuccessfulTransaction(settled);
@@ -644,7 +691,7 @@ exports.stkQuery = async (req, res) => {
       await MpesaTransaction.findOneAndUpdate(
         { _id: transaction._id, status: { $in: ["pending", "initiated"] } },
         { $set: { status: "failed", completedAt: transaction.completedAt || new Date(), resultCode, resultDescription: transaction.resultDescription } },
-        { new: true }
+        { returnDocument: "after" }
       );
       return res.json({ success: true, settled: true, source: "safaricom-query", message: transaction.resultDescription || "M-PESA payment was not completed.", transaction });
     }
@@ -690,7 +737,7 @@ exports.callback = async (req, res) => {
       const claimed = await MpesaTransaction.findOneAndUpdate(
         { _id: transaction._id, status: { $in: ["pending", "initiated"] } },
         { $set: { status: "successful", completedAt: transaction.completedAt || new Date(), callbackPayload: req.body, resultCode: transaction.resultCode, resultDescription: transaction.resultDescription, mpesaReceiptNumber: transaction.mpesaReceiptNumber } },
-        { new: true }
+        { returnDocument: "after" }
       );
       const settled = claimed || await MpesaTransaction.findById(transaction._id);
       if (settled && !settled.reconciled) await reconcileSuccessfulTransaction(settled);
@@ -698,7 +745,7 @@ exports.callback = async (req, res) => {
       const failed = await MpesaTransaction.findOneAndUpdate(
         { _id: transaction._id, status: { $in: ["pending", "initiated"] } },
         { $set: { status: "failed", completedAt: transaction.completedAt || new Date(), callbackPayload: req.body, resultCode: transaction.resultCode, resultDescription: transaction.resultDescription, mpesaReceiptNumber: transaction.mpesaReceiptNumber } },
-        { new: true }
+        { returnDocument: "after" }
       );
       if (failed?.member) {
         await createNotification({

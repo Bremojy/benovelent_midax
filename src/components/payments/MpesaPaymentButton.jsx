@@ -28,7 +28,7 @@ const mpesaFriendlyError = (error) => {
   if (status === 400 || Number(body?.upstreamStatus) === 400) return `Safaricom rejected the STK request. Check the M-PESA number and ask the administrator to verify the production shortcode, passkey and Daraja configuration.${requestId ? ` Reference: ${requestId}` : ""}`;
   if (status === 401 || Number(body?.upstreamStatus) === 401) return `M-PESA authentication was rejected by Safaricom. The backend production Daraja credentials need to be checked by an administrator.${requestId ? ` Reference: ${requestId}` : ""}`;
   if (status === 403 || Number(body?.upstreamStatus) === 403) return `Safaricom denied this request. Ask the administrator to verify that the production application and shortcode are provisioned for STK Push.${requestId ? ` Reference: ${requestId}` : ""}`;
-  if (status === 502) return `${bodyMessage || "The payment gateway or deployment proxy could not complete the request."}${requestId ? ` Reference: ${requestId}` : ""}`;
+  if (status === 502) return `${bodyMessage || "The M-PESA request was rejected before a successful payment could be created."}${requestId ? ` Reference: ${requestId}` : ""}`;
   return `${bodyMessage || error?.message || "M-PESA request failed."}${requestId ? ` Reference: ${requestId}` : ""}`;
 };
 
