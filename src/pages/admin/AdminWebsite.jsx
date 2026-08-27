@@ -1,10 +1,10 @@
-import { Globe2, Newspaper, MessageCircle, Settings2, ArrowUpRight, ImagePlus } from "lucide-react";
+import { Globe2, Newspaper, MessageCircle, Settings2, ArrowUpRight } from "lucide-react";
 import { Link } from "react-router-dom";
 import DashboardLayout from "../../layouts/DashboardLayout";
 import "../../styles/portal-redesign.css";
 
 const items=[
- {title:"News & announcements",text:"Create and publish public news with cover photos, gallery images and attachments.",href:"/news",icon:<ImagePlus size={18}/>},
+ {title:"News & announcements",text:"Review published public updates and member-facing news.",href:"/news",icon:<Newspaper size={18}/>},
  {title:"Feedback",text:"Review active feedback collections and responses.",href:"/admin/feedback",icon:<MessageCircle size={18}/>},
  {title:"Portal settings",text:"Maintain administrator-facing settings and preferences.",href:"/admin/settings",icon:<Settings2 size={18}/>},
  {title:"Public site preview",text:"Open the public website to review current published communications.",href:"/news",icon:<Globe2 size={18}/>},

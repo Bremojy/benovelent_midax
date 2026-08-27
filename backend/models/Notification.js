@@ -110,62 +110,37 @@ notificationSchema.index({createdAt:-1});
 notificationSchema.index({recipient:1,createdAt:-1});
 notificationSchema.index({recipient:1,read:1,createdAt:-1});
 
-const fanoutOne = async (notification) => {
+const broadcastNotification = (notification) => {
   if (!notification?.recipient) return;
-  const room = `user:${String(notification.recipient)}`;
   try {
     const { getIO } = require("../sockets/socket");
     const io = getIO();
-    if (io) {
-      io.to(room).emit("new-notification", notification);
-      io.to(room).emit("notification-created", notification);
-      const unread = await mongoose.model("Notification").countDocuments({
-        recipient: notification.recipient,
-        recipientModel: notification.recipientModel || "Member",
-        read: false,
-      });
-      io.to(room).emit("notification-count", unread);
-    }
+    io?.to(`user:${String(notification.recipient)}`).emit("new-notification", notification);
   } catch (error) {
     console.warn("Realtime notification delivery skipped:", error.message);
   }
+};
 
-  if (!notification.suppressPush) {
-    try {
-      const { sendPushForNotification } = require("../services/pushService");
-      await sendPushForNotification(notification);
-    } catch (error) {
-      console.warn("Notification push delivery skipped:", error.message);
-    }
-  }
-
+const pushNotification = (notification) => {
+  if (!notification || notification.suppressPush) return;
   try {
-    const redisCache = require("../services/redisCache");
-    await redisCache.invalidateMany([
-      `notifications:${String(notification.recipient)}:unread`,
-    ]);
-    await redisCache.invalidatePrefix(`notifications:${String(notification.recipient)}`);
+    const { sendPushForNotification } = require("../services/pushService");
+    void sendPushForNotification(notification).catch((error) => console.warn("Notification push delivery skipped:", error.message));
   } catch (error) {
-    console.warn("Notification cache invalidation skipped:", error.message);
+    console.warn("Notification push service unavailable:", error.message);
   }
 };
 
-notificationSchema.post("save", async (notification) => {
-  await fanoutOne(notification);
+notificationSchema.post("save", (notification) => {
+  broadcastNotification(notification);
+  pushNotification(notification);
 });
 
-notificationSchema.post("insertMany", async (notifications) => {
-  for (const notification of notifications || []) await fanoutOne(notification);
-});
-
-notificationSchema.post("findOneAndUpdate", async (notification) => {
-  if (notification) await fanoutOne(notification);
-});
-
-notificationSchema.post("deleteOne", async (result) => {
-  // Queries that delete by recipient are invalidated by the controller/service;
-  // this hook intentionally avoids guessing which recipient was affected.
-  return result;
+notificationSchema.post("insertMany", (notifications) => {
+  for (const notification of notifications || []) {
+    broadcastNotification(notification);
+    pushNotification(notification);
+  }
 });
 
 module.exports =

@@ -205,15 +205,6 @@ exports.createNews = async (req, res) => {
 exports.getAllNews = async (req, res) => {
 
     try {
-        const isPublicQuery = req.query.published === "true" || (req.query.published === undefined && req.query.category);
-        const publicCacheKey = isPublicQuery ? `public:news:list:${JSON.stringify(req.query || {})}` : null;
-        if (publicCacheKey) {
-            const cached = await redisCache.getJson(publicCacheKey);
-            if (cached !== null) {
-                res.set("Cache-Control", "public, max-age=60, stale-while-revalidate=300");
-                return res.json(cached);
-            }
-        }
 
         const page = Number(req.query.page) || 1;
 
@@ -265,12 +256,21 @@ exports.getAllNews = async (req, res) => {
 
             .lean();
 
-        const payload = { success: true, total, page, pages: Math.ceil(total / limit), count: news.length, news };
-        if (publicCacheKey) {
-            await redisCache.setJson(publicCacheKey, payload, 60);
-            res.set("Cache-Control", "public, max-age=60, stale-while-revalidate=300");
-        }
-        res.json(payload);
+        res.json({
+
+            success: true,
+
+            total,
+
+            page,
+
+            pages: Math.ceil(total / limit),
+
+            count: news.length,
+
+            news
+
+        });
 
     }
 
@@ -1323,36 +1323,16 @@ exports.unlikeNews = exports.toggleLike;
 
 // Comments
 exports.addComment = async (req, res) => {
-    try {
-        const text = String(req.body?.text || "").trim();
-        if (!text) return res.status(400).json({ success: false, message: "Comment text is required." });
-        if (text.length > 2000) return res.status(400).json({ success: false, message: "Comment is too long." });
-        const news = await News.findOne({ _id: req.params.id, published: true, status: "published", allowComments: { $ne: false } });
-        if (!news) return res.status(404).json({ success: false, message: "News item not found or comments are closed." });
-        const role = String(req.userRole || req.user?.role || "member").toLowerCase();
-        const authorModel = role === "superadmin" ? "SuperAdmin" : role === "admin" ? "Admin" : "Member";
-        const comment = { author: req.user._id, authorModel, authorName: String(req.user?.fullName || req.user?.name || "Member").trim(), profileImage: req.user?.profileImage || "", text, createdAt: new Date() };
-        news.comments.push(comment);
-        news.commentsCount = news.comments.length;
-        await news.save();
-        await redisCache.invalidatePrefix("public:news");
-        return res.status(201).json({ success: true, message: "Comment added.", comment: news.comments[news.comments.length - 1], commentsCount: news.commentsCount });
-    } catch (error) { return res.status(500).json({ success: false, message: error.message }); }
+    return res.status(501).json({
+        success: false,
+        message: "Comment feature has not been implemented yet."
+    });
 };
 
 exports.deleteComment = async (req, res) => {
-    try {
-        const news = await News.findById(req.params.id);
-        if (!news) return res.status(404).json({ success: false, message: "News item not found." });
-        const comment = news.comments.id(req.params.commentId);
-        if (!comment) return res.status(404).json({ success: false, message: "Comment not found." });
-        const role = String(req.userRole || req.user?.role || "member").toLowerCase();
-        if (String(comment.author) !== String(req.user._id) && !["admin", "superadmin"].includes(role)) return res.status(403).json({ success: false, message: "You can only remove your own comment." });
-        comment.deleteOne();
-        news.commentsCount = news.comments.length;
-        await news.save();
-        await redisCache.invalidatePrefix("public:news");
-        return res.json({ success: true, message: "Comment deleted.", commentsCount: news.commentsCount });
-    } catch (error) { return res.status(500).json({ success: false, message: error.message }); }
+    return res.status(501).json({
+        success: false,
+        message: "Comment feature has not been implemented yet."
+    });
 };
 

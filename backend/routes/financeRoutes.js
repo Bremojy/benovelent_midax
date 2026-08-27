@@ -42,7 +42,7 @@ router.get("/:id", protect, getTransaction);
 router.put("/:id", protect, isAdminOrSuperAdmin, updateTransaction);
 
 // Delete transaction
-router.delete("/:id", protect, isSuperAdmin, deleteTransaction);
+router.delete("/:id", protect, isAdminOrSuperAdmin, deleteTransaction);
 router.patch("/:id/visibility", protect, isSuperAdmin, hideTransaction);
 
 // Approve transaction

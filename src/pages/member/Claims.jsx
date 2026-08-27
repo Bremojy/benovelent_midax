@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { CheckCircle2, Clock3, HeartHandshake, RefreshCw, ShieldCheck } from "lucide-react";
-import MpesaPaymentButton from "../../components/payments/MpesaPaymentButton";
+import { CheckCircle2, Clock3, HeartHandshake, RefreshCw, Smartphone, ShieldCheck } from "lucide-react";
 import toast from "react-hot-toast";
 import DashboardLayout from "../../layouts/DashboardLayout";
 import API from "../../services/api";
@@ -31,6 +30,9 @@ export default function Claims() {
   const [paymentConfigured, setPaymentConfigured] = useState(false);
   const [busy, setBusy] = useState("");
   const [target, setTarget] = useState({});
+  const [phone, setPhone] = useState({});
+  const [paymentStatus, setPaymentStatus] = useState({});
+  const [amount, setAmount] = useState({});
 
   const load = async () => {
     try {
@@ -42,7 +44,7 @@ export default function Claims() {
       ]);
       setClaims(Array.isArray(claimsRes.data?.claims) ? claimsRes.data.claims : []);
       setCampaigns(Array.isArray(casesRes.data?.campaigns) ? casesRes.data.campaigns : []);
-      setPaymentConfigured(Boolean(configRes.data?.configured || configRes.data?.manualCollectionReady));
+      setPaymentConfigured(Boolean(configRes.data?.configured));
     } catch (e) {
       toast.error(e.response?.data?.message || e.message || "Unable to load your claims.");
     } finally {
@@ -72,6 +74,56 @@ export default function Claims() {
     }
   };
 
+  const contribute = async (campaign) => {
+    try {
+      setBusy(`pay-${campaign._id}`);
+      if (!paymentConfigured) throw new Error("M-PESA is not currently configured by the administrator.");
+      const a = Number(amount[campaign._id] || 0);
+      if (a <= 0) throw new Error("Enter a contribution amount.");
+      let data;
+      const payload = { purpose: "community_assistance", referenceId: campaign._id, amount: a, phoneNumber: phone[campaign._id] || undefined };
+      try {
+        ({ data } = await API.post("/payments/stk", payload));
+      } catch (primaryError) {
+        if (primaryError?.response?.status !== 404 || primaryError?.response?.data?.code !== "ROUTE_NOT_FOUND") throw primaryError;
+        const fallbackBase = String(import.meta.env.VITE_API_URL || "https://benovelent-midax.onrender.com").replace(/\/+$/, "");
+        ({ data } = await API.post(`${fallbackBase}/api/payments/stk`, payload, { baseURL: "" }));
+      }
+      if (!data?.success) throw new Error(data?.message || "Unable to start M-PESA payment.");
+      const transactionId = String(data?.transactionId || "");
+      setPaymentStatus((current) => ({ ...current, [campaign._id]: { status: "pending", transactionId } }));
+      toast.success(data?.message || "M-PESA payment prompt sent to your phone. Complete the prompt on your phone.");
+      if (transactionId) {
+        let attempts = 0;
+        const poll = async () => {
+          attempts += 1;
+          try {
+            const { data: transactionData } = await API.get(`/payments/transactions/${transactionId}`);
+            const tx = transactionData?.transaction;
+            if (tx?.status === "successful") {
+              setPaymentStatus((current) => ({ ...current, [campaign._id]: { status: "successful", transactionId, receipt: tx.mpesaReceiptNumber || "recorded" } }));
+              toast.success(`Community contribution confirmed. M-PESA receipt: ${tx.mpesaReceiptNumber || "recorded"}.`);
+              await load();
+              return;
+            }
+            if (tx?.status === "failed") {
+              setPaymentStatus((current) => ({ ...current, [campaign._id]: { status: "failed", transactionId } }));
+              toast.error(tx.resultDescription || "The M-PESA contribution was not completed.");
+              return;
+            }
+          } catch {}
+          if (attempts < 30) window.setTimeout(poll, 2000);
+        };
+        window.setTimeout(poll, 2000);
+      }
+    } catch (e) {
+      const status = e?.response?.status;
+      const apiMessage = e?.response?.data?.message || e?.message;
+      toast.error(status && status >= 400 ? `M-PESA payment could not be started. ${apiMessage || "Please check the M-PESA details and try again."}` : (apiMessage || "Unable to start M-PESA payment."));
+    } finally {
+      setBusy("");
+    }
+  };
 
   return (
     <DashboardLayout>
@@ -88,7 +140,7 @@ export default function Claims() {
 
         <section className="portal-panel community-member-intro">
           <div className="claim-card-head"><div><span>VERIFIED COMMUNITY SUPPORT</span><h2>Help with a rejected claim</h2><p>Administrators and SuperAdmin can open voluntary assistance for a declined case. Contributions are made through M-PESA and are tracked against a dedicated target.</p></div><ShieldCheck size={30} /></div>
-          {!paymentConfigured && <div className="portal-alert" style={{ marginTop: 14 }}>Community cases are visible. Automated STK may be unavailable, but a manual Equity PayBill payment can still be submitted when the collection details are configured.</div>}
+          {!paymentConfigured && <div className="portal-alert" style={{ marginTop: 14 }}>Community cases are visible, but live M-PESA is currently unavailable because the administrator has not configured Daraja production credentials.</div>}
         </section>
 
         {opportunities.length > 0 && <section className="portal-panel">
@@ -105,16 +157,14 @@ export default function Claims() {
                   <div className="community-progress-track"><span style={{ width: `${Math.min(100, Math.round((Number(campaign.raisedAmount || 0) / Math.max(1, Number(campaign.targetAmount || 1))) * 100))}%` }} /></div>
                   <div className="community-progress-meta"><span>{Math.min(100, Math.round((Number(campaign.raisedAmount || 0) / Math.max(1, Number(campaign.targetAmount || 1))) * 100))}% funded</span><span>{money(Math.max(0, Number(campaign.targetAmount || 0) - Number(campaign.raisedAmount || 0)))} remaining</span></div>
                 </div>
-                {!isOwn && campaign.status === "open" && <div style={{ marginTop: 14 }}>
-                  <MpesaPaymentButton
-                    purpose="community_assistance"
-                    referenceId={campaign._id}
-                    label="Contribute via M-PESA"
-                    maxAmount={remaining}
-                    disabled={remaining <= 0}
-                    onSuccess={() => load()}
-                  />
+                {!isOwn && campaign.status === "open" && <div className="portal-form-grid">
+                  <div className="portal-field"><label htmlFor={`community-phone-${campaign._id}`}>M-PESA phone</label><input id={`community-phone-${campaign._id}`} inputMode="tel" autoComplete="tel" value={phone[campaign._id] || ""} onChange={(e) => setPhone({ ...phone, [campaign._id]: e.target.value })} placeholder="07XXXXXXXX or +2547XXXXXXXX" /></div>
+                  <div className="portal-field"><label htmlFor={`community-amount-${campaign._id}`}>Contribution (KSh)</label><input id={`community-amount-${campaign._id}`} type="number" inputMode="decimal" min="1" max={remaining} value={amount[campaign._id] || ""} onChange={(e) => setAmount({ ...amount, [campaign._id]: e.target.value })} placeholder={`Up to ${remaining.toLocaleString("en-KE")}`} /></div>
                 </div>}
+                <div className="portal-actions"><button className="portal-btn primary" disabled={isOwn || campaign.status !== "open" || !paymentConfigured || busy === `pay-${campaign._id}`} onClick={() => contribute(campaign)}><Smartphone size={16} />{isOwn ? "Your assistance case" : busy === `pay-${campaign._id}` ? "Starting…" : "Contribute via M-PESA"}</button></div>
+                {paymentStatus[campaign._id]?.status === "pending" && <div className="community-payment-status pending"><Clock3 size={16} /><span>Payment initiated. Complete the M-PESA prompt; this page is checking for confirmation.</span></div>}
+                {paymentStatus[campaign._id]?.status === "successful" && <div className="community-payment-status success"><CheckCircle2 size={16} /><span>Contribution confirmed. Receipt: {paymentStatus[campaign._id]?.receipt || "recorded"}.</span></div>}
+                {paymentStatus[campaign._id]?.status === "failed" && <div className="community-payment-status error"><ShieldCheck size={16} /><span>Payment was not completed. You can retry when the case remains open.</span></div>}
               </article>;
             })}
           </div>

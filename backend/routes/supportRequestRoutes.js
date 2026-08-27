@@ -16,8 +16,6 @@ router.post(
 );
 
 router.get("/mine", verifyToken, isMember, controller.mine);
-router.put("/mine/:id", verifyToken, isMember, setUploadType("documents"), uploadArray("documents", 30), controller.memberUpdate);
-router.delete("/mine/:id", verifyToken, isMember, controller.memberRemove);
 router.get("/", verifyToken, isAdminOrSuperAdmin, controller.all);
 router.get("/:id", verifyToken, isAdminOrSuperAdmin, controller.getOne);
 router.put("/:id", verifyToken, isAdminOrSuperAdmin, controller.update);

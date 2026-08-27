@@ -428,6 +428,3 @@
   .support-attachment-row { grid-template-columns: 1fr; }
   .support-attachment-fields { grid-template-columns: 1fr; }
 }
-
-
-.support-document-rule{margin:6px 0 0;color:var(--muted,#6b7280);font-size:.88rem}.support-inline-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}.support-edit-backdrop{position:fixed;inset:0;z-index:1200;background:rgba(15,23,42,.52);display:grid;place-items:center;padding:18px}.support-edit-modal{width:min(760px,100%);max-height:min(88vh,900px);overflow:auto;background:var(--surface,#fff);border-radius:22px;box-shadow:0 24px 80px rgba(15,23,42,.28);padding:22px}.support-edit-documents{display:grid;gap:10px;margin:12px 0}.support-edit-modal .support-section-heading p{margin:4px 0 0;color:var(--muted,#6b7280)}

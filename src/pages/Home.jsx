@@ -1,19 +1,10 @@
 
 import { Link } from "react-router-dom";
-import { useEffect, useState } from "react";
-import API, { resolveApiUrl } from "../services/api";
 import { Heart, Stethoscope, MessageCircle, FileText, Users, Images, ArrowRight, ShieldCheck, Wallet, Bell, Sparkles, ClipboardCheck, Smartphone, Headphones, CheckCircle2 } from "lucide-react";
 import Hero from "../components/Hero";
 import "../styles/public-modern.css";
 
 export default function Home() {
-  const [leaders, setLeaders] = useState([]);
-  useEffect(() => {
-    let cancelled = false;
-    API.get("/leaders/current").then(({ data }) => { if (!cancelled) setLeaders(Array.isArray(data?.leaders) ? data.leaders : []); }).catch(() => {});
-    return () => { cancelled = true; };
-  }, []);
-
   return (
     <>
       <Hero />
@@ -43,8 +34,6 @@ export default function Home() {
             <Quick icon={Images} title="Benovelent gallery" text="View community collections." to="/gallery" />
             <Quick icon={FileText} title="Constitution" text="Read the official scheme rules." to="/constitution" />
             <Quick icon={MessageCircle} title="Contact us" text="Send a question or request." to="/contact" />
-            <Quick icon={Smartphone} title="Verify membership" text="Confirm a member record from the public verification page." to="/verify-membership" />
-            <Quick icon={ShieldCheck} title="Member portal" text="Sign in for secure accounts, support, chat and updates." to="/login" />
           </div>
         </section>
 
@@ -80,17 +69,7 @@ export default function Home() {
           <div className="modern-section-head">
             <span className="eyebrow">LEADERSHIP</span>
             <h2>Meet the current scheme leadership</h2>
-            <p>The current leadership cards below are loaded from the live administration records and show the official contact details published for the scheme.</p>
-          </div>
-          <div className="modern-card-grid four-v3">
-            {leaders.length ? leaders.map((leader) => (
-              <article className="modern-card leader-card" key={String(leader._id)}>
-                <div className="leader-avatar-wrap">{leader.profileImage ? <img src={resolveApiUrl(leader.profileImage)} alt={leader.name} className="leader-avatar" /> : <div className="leader-avatar-fallback">{String(leader.name || "B").charAt(0).toUpperCase()}</div>}</div>
-                <h3>{leader.name}</h3><p><strong>{leader.roleLabel}</strong></p>
-                {leader.phone && <p><a href={`tel:${leader.phone}`}>{leader.phone}</a></p>}
-                {leader.email && <p><a href={`mailto:${leader.email}`}>{leader.email}</a></p>}
-              </article>
-            )) : <article className="modern-card"><h3>Leadership directory</h3><p>The current administration directory is temporarily unavailable. Please open the full directory for the latest published records.</p></article>}
+            <p>The leadership directory is loaded from the portal so published names and positions remain the source of truth.</p>
           </div>
           <Link className="modern-btn-secondary" to="/leaders">Open leadership directory</Link>
         </section>

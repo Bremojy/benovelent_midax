@@ -27,6 +27,7 @@ function Hero() {
   const [loading, setLoading] = useState(true);
   const [paused, setPaused] = useState(false);
   const [imageFailed, setImageFailed] = useState(false);
+  const [fetchAttempt, setFetchAttempt] = useState(0);
   const touchStart = useRef(null);
 
 
@@ -35,7 +36,7 @@ function Hero() {
     const run = async () => {
       try {
         setLoading(true);
-        const response = await api.get("/carousel/active", { timeout: 8000 });
+        const response = await api.get("/carousel/active", { params: fetchAttempt ? { attempt: fetchAttempt } : undefined });
         if (cancelled) return;
         const freshSlides = Array.isArray(response.data) ? response.data.filter((slide) => slide?.imageUrl && slide?.isActive !== false) : [];
         setSlides(freshSlides);
@@ -51,6 +52,11 @@ function Hero() {
     };
     run();
     return () => { cancelled = true; };
+  }, [fetchAttempt]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setFetchAttempt((value) => value + 1), 5000);
+    return () => window.clearTimeout(timer);
   }, []);
 
   const visibleSlides = slides.length ? slides : FALLBACK_SLIDES;

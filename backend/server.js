@@ -115,22 +115,9 @@ const corsOptions = {
         "X-CSRF-Token",
         "Cache-Control",
         "Pragma",
-        "X-Request-ID",
-        "X-Client-App-Version",
     ],
     optionsSuccessStatus: 204,
 };
-
-app.use((req, res, next) => {
-    const requestId = String(req.get("X-Request-ID") || `midax-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`).slice(0, 80);
-    req.requestId = requestId;
-    res.setHeader("X-Request-ID", requestId);
-    const clientVersion = String(req.get("X-Client-App-Version") || "").slice(0, 32);
-    if (req.path === "/api/payments/stk" && req.method === "POST") {
-        console.info("[payment-request] STK request received", { requestId, clientVersion, origin: req.get("origin") || null });
-    }
-    next();
-});
 
 app.use(cors(corsOptions));
 app.options(/.*/, cors(corsOptions));
@@ -206,7 +193,7 @@ app.get("/", (req, res) => {
     res.status(200).json({
         success: true,
         application: "Benevolent Midax API",
-        version: process.env.APP_VERSION || "18.5.0",
+        version: process.env.APP_VERSION || "18.0.0",
         status: "Running",
         timestamp: new Date().toISOString(),
     });

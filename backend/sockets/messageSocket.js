@@ -8,7 +8,7 @@ const { addUser, removeUser, touchUser, getPresence, cleanupStale, PRESENCE_TIME
 const { sendPushToRecipient } = require("../services/pushService");
 
 const modelsByRole = { member: Member, admin: Admin, superadmin: SuperAdmin };
-const isChatRole = (role) => ["member", "admin"].includes(String(role || "").toLowerCase());
+const isChatRole = (role) => ["member", "admin", "superadmin"].includes(String(role || "").toLowerCase());
 const activeCalls = new Map();
 const CALL_TIMEOUT_MS = 35_000;
 

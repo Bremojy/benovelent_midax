@@ -1,23 +1,4 @@
 const Member = require('../models/Member');
-const { generateMemberNumber } = require('./memberNumber');
-const generateTemporaryPassword = require('./generateTemporaryPassword');
-
-const VALID_MEMBER_NUMBER = /^BM\d{3,}$/i;
-
-async function ensureValidMemberNumber(member) {
-  if (!member || VALID_MEMBER_NUMBER.test(String(member.memberNumber || ''))) return member;
-
-  // memberNumber is immutable in the normal Mongoose schema. Legacy portal
-  // chat profiles created with AD.../SA... therefore need a controlled raw
-  // collection update before they can be saved again. The replacement is a
-  // normal Benevolent MIDAX BM### number allocated by the existing sequence.
-  const replacement = await generateMemberNumber();
-  await Member.collection.updateOne(
-    { _id: member._id },
-    { $set: { memberNumber: replacement } }
-  );
-  return Member.findById(member._id);
-}
 
 function normalizeName(user) {
   return (
@@ -69,7 +50,6 @@ async function ensureChatProfile(user) {
   }
 
   if (existing) {
-    existing = await ensureValidMemberNumber(existing);
     existing.fullName = payload.fullName;
     if (!existing.username) existing.username = `${payload.role}-${String(user._id).slice(-6)}`.toLowerCase();
     existing.phone = existing.phone || payload.phone || `000${String(user._id).slice(-6)}`;
@@ -84,13 +64,14 @@ async function ensureChatProfile(user) {
     return existing;
   }
 
+  const memberNumberPrefix = role === 'superadmin' ? 'SA' : 'AD';
   const chatProfile = new Member({
-    memberNumber: await generateMemberNumber(),
+    memberNumber: `${memberNumberPrefix}${String(user._id).slice(-8).toUpperCase()}`,
     fullName: payload.fullName,
     username: `${role}-${String(user._id).slice(-6)}`.toLowerCase(),
     phone: payload.phone || `000${String(user._id).slice(-6)}`,
     email: payload.email,
-    password: user.password || generateTemporaryPassword('MIDAX@Chat-'),
+    password: user.password || 'PortalChatOnly123!',
     role: payload.role,
     portalOwnerId: user._id,
     portalOwnerRole: role,

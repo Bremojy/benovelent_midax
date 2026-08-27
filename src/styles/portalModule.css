@@ -203,5 +203,3 @@
 .portal-module input:disabled,.portal-panel input:disabled,.portal-field input:disabled,.portal-module select:disabled,.portal-panel select:disabled,.portal-field select:disabled{background:#f8fafc;cursor:not-allowed;opacity:.8;}
 input[type="password"]{font-variant:normal;letter-spacing:.02em;}
 @media (max-width:680px){.portal-module form,.portal-panel form{width:100%;}.portal-module button,.portal-panel button,.portal-field button{min-height:44px;}.portal-table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}}
-
-.portal-table tbody tr[tabindex="0"]{cursor:pointer}.portal-table tbody tr[tabindex="0"]:focus-visible{outline:2px solid currentColor;outline-offset:-2px}

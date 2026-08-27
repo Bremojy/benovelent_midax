@@ -1,6 +1,5 @@
 const bcrypt = require("bcryptjs");
 const redisCache = require("../services/redisCache");
-const { MEMBER_STATUS } = require("../constants/memberStatus");
 
 const Member = require("../models/Member");
 const Admin = require("../models/Admin");
@@ -58,6 +57,7 @@ exports.getDashboard = async (req, res) => {
 
 
     try {
+
         const member =
             await Member.findById(req.user._id)
             .select("-password -monthlyIncome")
@@ -346,37 +346,9 @@ exports.getProfile = async (req, res) => {
    UPDATE PROFILE
 ========================================== */
 
-const validateProfilePayload = (body = {}) => {
-    const textFields = ["fullName", "physicalAddress", "bankName", "bankBranch"];
-    for (const field of textFields) {
-        if (body[field] !== undefined && String(body[field]).trim().length > 160) return `${field} is too long.`;
-    }
-    if (body.fullName !== undefined && !/^[A-Za-zÀ-ÖØ-öø-ÿ' .-]{2,120}$/.test(String(body.fullName).trim())) return "Full name may contain letters, spaces, apostrophes, dots and hyphens only.";
-    const phonePattern = /^(?:0|254|\+254)7\d{8}$/;
-    for (const field of ["phone", "mpesaNumber"]) {
-        if (body[field] !== undefined) {
-            const value = String(body[field]).replace(/[\s-]/g, "");
-            if (!phonePattern.test(value)) return `${field === "mpesaNumber" ? "M-PESA number" : "Phone number"} must be a valid Kenyan mobile number.`;
-        }
-    }
-    if (body.nationalId !== undefined && !/^\d{5,10}$/.test(String(body.nationalId).trim())) return "National ID must contain 5 to 10 digits.";
-    if (body.accountNumber !== undefined && String(body.accountNumber).trim() && !/^\d{5,30}$/.test(String(body.accountNumber).trim())) return "Bank account number must contain digits only (5–30 digits).";
-    if (body.email !== undefined && String(body.email).trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(body.email).trim())) return "Enter a valid email address.";
-    if (body.dateOfBirth) { const date = new Date(body.dateOfBirth); if (Number.isNaN(date.getTime()) || date > new Date()) return "Date of birth must be a valid past date."; }
-    const nested = [body.nextOfKin, body.emergencyContact].filter(Boolean);
-    for (const person of nested) {
-        for (const field of ["fullName", "relationship"]) if (person[field] !== undefined && String(person[field]).trim().length > 120) return `${field} is too long.`;
-        if (person.phone !== undefined && person.phone !== "" && !phonePattern.test(String(person.phone).replace(/[\s-]/g, ""))) return "Contact phone must be a valid Kenyan mobile number.";
-        if (person.nationalId !== undefined && person.nationalId !== "" && !/^\d{5,10}$/.test(String(person.nationalId).trim())) return "Contact National ID must contain 5 to 10 digits.";
-    }
-    return null;
-};
-
 exports.updateProfile = async (req, res) => {
 
     try {
-        const profileValidationError = validateProfilePayload(req.body || {});
-        if (profileValidationError) return res.status(400).json({ success: false, message: profileValidationError });
 
         const member =
             await Member.findById(req.user._id);
@@ -465,7 +437,6 @@ exports.updateProfile = async (req, res) => {
 
         // Update only supplied fields
         const allowedFields = [
-            "fullName",
             "phone",
             "email",
             "nationalId",
@@ -1230,9 +1201,12 @@ exports.getEligibility = async (req,res)=>{
             calculateProfileCompletion(member);
 
         const eligible =
-            String(member.status || "").toLowerCase() === MEMBER_STATUS.ACTIVE &&
-            Boolean(member.verified) &&
-            profile.percentage === 100;
+
+            MEMBER_STATUS.ACTIVE &&
+
+            member.verified &&
+
+            profile.percentage===100;
 
         const policies = await Policy.find({ enabled: true }).sort({ order: 1, name: 1 }).lean();
 
@@ -1251,7 +1225,7 @@ exports.getEligibility = async (req,res)=>{
                     member.verified,
 
                 activeMember:
-                    String(member.status || "").toLowerCase() === MEMBER_STATUS.ACTIVE
+                    MEMBER_STATUS.ACTIVE
 
             },
 

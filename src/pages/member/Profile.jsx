@@ -174,10 +174,10 @@ export default function Profile() {
               <h2>Personal details</h2>
             </div>
             <div className="profile-card-grid">
-              <Field label="Full name" value={member.fullName} onChange={(v) => set("fullName", v.replace(/[^A-Za-zÀ-ÖØ-öø-ÿ' .-]/g, "").slice(0, 120))} required maxLength={120} />
-              <Field label="Phone" type="tel" inputMode="tel" value={member.phone} onChange={(v) => set("phone", v.replace(/[^0-9+ -]/g, "").slice(0, 16))} required maxLength={16} />
+              <Field label="Full name" value={member.fullName} onChange={(v) => set("fullName", v)} required />
+              <Field label="Phone" type="tel" value={member.phone} onChange={(v) => set("phone", v)} required />
               <Field label="Email" type="email" value={member.email} onChange={(v) => set("email", v)} />
-              <Field label="National ID" type="text" inputMode="numeric" value={member.nationalId} onChange={(v) => set("nationalId", v.replace(/\D/g, "").slice(0, 10))} required maxLength={10} />
+              <Field label="National ID" value={member.nationalId} onChange={(v) => set("nationalId", v)} required />
               <Select label="Gender" value={member.gender} onChange={(v) => set("gender", v)} options={["Male", "Female", "Other"]} />
               <Select label="Marital status" value={member.maritalStatus} onChange={(v) => set("maritalStatus", v)} options={["Single", "Married", "Divorced", "Widowed"]} />
               <Field label="Date of birth" type="date" value={member.dateOfBirth ? String(member.dateOfBirth).slice(0, 10) : ""} onChange={(v) => set("dateOfBirth", v)} />
@@ -218,10 +218,10 @@ export default function Profile() {
               )}
               <Field label="Position" value={member.position || "Employee"} disabled />
               <Field label="Employer" value={member.employer || "MIDAX"} disabled />
-              <Field label="M-Pesa number" type="tel" inputMode="tel" value={member.mpesaNumber} onChange={(v) => set("mpesaNumber", v.replace(/[^0-9+ -]/g, "").slice(0, 16))} maxLength={16} />
+              <Field label="M-Pesa number" value={member.mpesaNumber} onChange={(v) => set("mpesaNumber", v)} />
               <Field label="Bank name" value={member.bankName} onChange={(v) => set("bankName", v)} />
               <Field label="Bank branch" value={member.bankBranch} onChange={(v) => set("bankBranch", v)} />
-              <Field label="Account number" inputMode="numeric" value={member.accountNumber} onChange={(v) => set("accountNumber", v.replace(/\D/g, "").slice(0, 30))} maxLength={30} />
+              <Field label="Account number" value={member.accountNumber} onChange={(v) => set("accountNumber", v)} />
             </div>
           </section>
 
@@ -267,11 +267,11 @@ export default function Profile() {
   );
 }
 
-function Field({ label, value, onChange, type = "text", disabled = false, required = false, inputMode, min, step, maxLength, pattern }) {
+function Field({ label, value, onChange, type = "text", disabled = false, required = false, inputMode, min, step }) {
   return (
     <label className="portal-field">
       <span>{label}</span>
-      <input type={type} value={value ?? ""} disabled={disabled} required={required} inputMode={inputMode} min={min} step={step} maxLength={maxLength} pattern={pattern} onChange={(e) => onChange?.(e.target.value)} />
+      <input type={type} value={value} disabled={disabled} required={required} onChange={(e) => onChange?.(e.target.value)} />
     </label>
   );
 }

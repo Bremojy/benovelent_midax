@@ -42,7 +42,6 @@ const newAttachment = () => ({
   id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
   category: "Other",
   label: "",
-  customCategory: "",
   file: null,
 });
 
@@ -56,9 +55,6 @@ export default function Support() {
   const [success, setSuccess] = useState("");
   const [attachments, setAttachments] = useState([newAttachment()]);
   const [policies, setPolicies] = useState([]);
-  const [editingRequest, setEditingRequest] = useState(null);
-  const [editDraft, setEditDraft] = useState({ description: "", amount: "", documents: [] });
-  const [editBusy, setEditBusy] = useState(false);
 
   const load = async () => {
     try {
@@ -110,77 +106,15 @@ export default function Support() {
   const attachFiles = (formData) => {
     const documentCategories = [];
     const documentLabels = [];
-    const documentCustomCategories = [];
 
     activeAttachments.forEach((item) => {
       formData.append("documents", item.file);
       documentCategories.push(item.category || "Other");
       documentLabels.push(item.label || item.file?.name || "Document");
-      documentCustomCategories.push(item.customCategory || "");
     });
 
     formData.append("documentCategories", JSON.stringify(documentCategories));
     formData.append("documentLabels", JSON.stringify(documentLabels));
-    formData.append("documentCustomCategories", JSON.stringify(documentCustomCategories));
-  };
-
-  const openRequestEditor = (claim) => {
-    if (String(claim?.sourceType || "").toLowerCase() !== "support") return;
-    if (String(claim?.status || "").trim().toLowerCase() !== "under review") {
-      setError("This support request can only be edited while it is Under Review.");
-      return;
-    }
-    const docs = (Array.isArray(claim.documents) ? claim.documents : []).map((doc) => ({
-      ...doc,
-      category: doc?.category || "Other",
-      customCategory: doc?.customCategory || "",
-      label: doc?.label || doc?.fileName || "Document",
-    }));
-    setEditingRequest(claim);
-    setEditDraft({ description: claim.description || "", amount: String(claim.amount || claim.requestedAmount || ""), documents: docs });
-  };
-
-  const updateEditDocument = (index, key, value) => {
-    setEditDraft((current) => ({ ...current, documents: current.documents.map((doc, i) => i === index ? { ...doc, [key]: value } : doc) }));
-  };
-
-  const saveRequestEdit = async () => {
-    if (!editingRequest) return;
-    const docs = editDraft.documents || [];
-    if (docs.length < 2) { setError("At least two supporting documents are required."); return; }
-    if (new Set(docs.map((d) => String(d.category || "Other").toLowerCase())).size < 2) { setError("Use at least two different document categories."); return; }
-    if (docs.some((d) => String(d.category || "").toLowerCase() === "other" && !String(d.customCategory || "").trim())) { setError("Documents marked Other need a custom category name."); return; }
-    try {
-      setEditBusy(true); setError(""); setSuccess("");
-      const { data } = await API.put(`/member/support-requests/mine/${editingRequest._id}`, {
-        description: editDraft.description.trim(),
-        requestedAmount: Number(editDraft.amount),
-        keepDocuments: JSON.stringify(docs),
-      });
-      if (!data?.success) throw new Error(data?.message || "Unable to update support request.");
-      setEditingRequest(null);
-      setSuccess("Support request updated successfully while Under Review.");
-      await load();
-    } catch (err) { setError(err.response?.data?.message || err.message || "Unable to update support request."); }
-    finally { setEditBusy(false); }
-  };
-
-  const removeRequest = async (claim) => {
-    if (String(claim?.sourceType || "").toLowerCase() !== "support") return;
-    if (String(claim?.status || "").trim().toLowerCase() !== "under review") {
-      setError("A support request can only be deleted while it is Under Review.");
-      return;
-    }
-    const confirmed = window.confirm("Delete this support request? This action is allowed only while the request is Under Review.");
-    if (!confirmed) return;
-    try {
-      setError(""); setSuccess(""); setEditBusy(true);
-      const { data } = await API.delete(`/member/support-requests/mine/${claim._id}`);
-      if (!data?.success) throw new Error(data?.message || "Unable to delete support request.");
-      setSuccess("Support request deleted successfully.");
-      await load();
-    } catch (err) { setError(err.response?.data?.message || err.message || "Unable to delete support request."); }
-    finally { setEditBusy(false); }
   };
 
   const submit = async (event) => {
@@ -189,11 +123,6 @@ export default function Support() {
     setSuccess("");
 
     try {
-      if (activeAttachments.length < 2) throw new Error("Please upload at least two supporting documents.");
-      const categories = new Set(activeAttachments.map((item) => String(item.category || "Other").trim().toLowerCase()));
-      if (categories.size < 2) throw new Error("Please use at least two different document categories.");
-      const invalidOther = activeAttachments.some((item) => String(item.category || "").toLowerCase() === "other" && !String(item.customCategory || "").trim());
-      if (invalidOther) throw new Error("For documents marked Other, provide a custom category name.");
       setSubmitting(true);
 
       let endpoint;
@@ -417,12 +346,6 @@ export default function Support() {
                             placeholder="Receipt, report, letter..."
                           />
                         </label>
-                        {item.category === "Other" && (
-                          <label>
-                            <span>Custom category</span>
-                            <input value={item.customCategory} onChange={(e) => updateAttachment(item.id, { customCategory: e.target.value })} placeholder="e.g. Employer letter" maxLength={120} required />
-                          </label>
-                        )}
                         <label>
                           <span>File</span>
                           <input
@@ -500,9 +423,6 @@ export default function Support() {
                       <span className={`claim-status ${String(claim.status || "pending").toLowerCase().replace(/\s+/g, "-")}`}>
                         {claim.status || "Pending"}
                       </span>
-                      {String(claim.sourceType || "").toLowerCase() === "support" && String(claim.status || "").trim().toLowerCase() === "under review" && (
-                        <div className="support-inline-actions"><button type="button" className="support-mini-button" onClick={() => openRequestEditor(claim)}>Edit</button><button type="button" className="support-mini-button danger" onClick={() => removeRequest(claim)}>Delete</button></div>
-                      )}
                     </div>
                   </div>
                 ))}
@@ -510,31 +430,6 @@ export default function Support() {
             )}
           </section>
         </div>
-
-        {editingRequest && (
-          <div className="support-edit-backdrop" role="presentation" onMouseDown={(e) => { if (e.currentTarget === e.target && !editBusy) setEditingRequest(null); }}>
-            <section className="support-edit-modal" role="dialog" aria-modal="true" aria-label="Edit support request">
-              <div className="support-section-heading"><span>UNDER REVIEW</span><h2>Edit Support Request</h2><p>You can update the request while it remains Under Review. At least two different document categories must stay attached.</p></div>
-              <Field label="Description"><textarea rows="5" value={editDraft.description} onChange={(e) => setEditDraft((x) => ({ ...x, description: e.target.value }))} /></Field>
-              <Field label="Requested Amount (KES)"><input type="number" min="1" step="0.01" value={editDraft.amount} onChange={(e) => setEditDraft((x) => ({ ...x, amount: e.target.value }))} /></Field>
-              <div className="support-edit-documents">
-                {(editDraft.documents || []).map((doc, index) => (
-                  <div className="support-attachment-row" key={`${doc.fileUrl || index}-${index}`}>
-                    <div className="support-attachment-index">{index + 1}</div>
-                    <div className="support-attachment-fields">
-                      <label><span>Category</span><select value={doc.category || "Other"} onChange={(e) => updateEditDocument(index, "category", e.target.value)}>{DOCUMENT_CATEGORIES.map((category) => <option key={category}>{category}</option>)}</select></label>
-                      <label><span>Label</span><input value={doc.label || ""} onChange={(e) => updateEditDocument(index, "label", e.target.value)} /></label>
-                      {String(doc.category || "").toLowerCase() === "other" && (
-                        <label><span>Custom category</span><input value={doc.customCategory || ""} onChange={(e) => updateEditDocument(index, "customCategory", e.target.value)} placeholder="Custom category name" maxLength={120} required /></label>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div className="support-inline-actions"><button type="button" className="support-submit-button" disabled={editBusy} onClick={saveRequestEdit}>{editBusy ? "Saving…" : "Save changes"}</button><button type="button" className="support-cancel-button" disabled={editBusy} onClick={() => setEditingRequest(null)}>Cancel</button></div>
-            </section>
-          </div>
-        )}
       </div>
     </DashboardLayout>
   );

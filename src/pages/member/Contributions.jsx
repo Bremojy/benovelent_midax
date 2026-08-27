@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
 import DashboardLayout from "../../layouts/DashboardLayout";
-import { Link } from "react-router-dom";
 import API from "../../services/api";
 import MpesaPaymentButton from "../../components/payments/MpesaPaymentButton";
 import { buildPrintHeadHtml, printHeadStyles } from "../../utils/printHead";
@@ -20,18 +19,13 @@ export default function Contributions() {
   const [mpesaReady, setMpesaReady] = useState(false);
   const [mpesaConfig, setMpesaConfig] = useState({ shortCode: "", accountReference: "", environment: "production" });
   const [loanLoading, setLoanLoading] = useState(true);
-  const todayValue = new Date().toISOString().slice(0, 10);
-  const [startDate, setStartDate] = useState(`${new Date().getFullYear()}-01-01`);
-  const [endDate, setEndDate] = useState(todayValue);
-  const [selectedPayment, setSelectedPayment] = useState(null);
-  const [selectedAssistance, setSelectedAssistance] = useState(null);
   const year = new Date().getFullYear();
 
   const load = useCallback(async () => {
     try {
       setLoading(true);
       setError("");
-      const [response, loanResponse, claimResponse, mpesaResponse, mpesaConfigResponse] = await Promise.all([API.get(`/member/accounts?year=${year}&startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`), API.get("/education/my-applications"), API.get("/member/claims"), API.get("/payments/mine"), API.get("/payments/config")]);
+      const [response, loanResponse, claimResponse, mpesaResponse, mpesaConfigResponse] = await Promise.all([API.get(`/member/accounts?year=${year}`), API.get("/education/my-applications"), API.get("/member/claims"), API.get("/payments/mine"), API.get("/payments/config")]);
       setData(response.data || null);
       setEducationLoans(Array.isArray(loanResponse.data?.applications) ? loanResponse.data.applications : []);
       const allClaims = Array.isArray(claimResponse.data?.claims) ? claimResponse.data.claims : [];
@@ -45,7 +39,7 @@ export default function Contributions() {
       setLoading(false);
       setLoanLoading(false);
     }
-  }, [year, startDate, endDate]);
+  }, [year]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -65,7 +59,7 @@ export default function Contributions() {
       <h3 style="margin-top:22px;">Support summary</h3>
       <p>Total cases: ${Number(data.support?.totalCases || 0)} • Approved cases: ${Number(data.support?.approvedCases || 0)} • Pending cases: ${Number(data.support?.pendingCases || 0)} • Approved support: ${money(data.support?.approvedSupportTotal)}</p>
       <h3 style="margin-top:22px;">Scheme ledger summary</h3>
-      <p>Opening balance: ${money(data.ledger?.openingBalance)} • Money In: ${money(data.totals?.moneyIn)} • Money Out: ${money(data.totals?.moneyOut)} • Closing balance: ${money(data.ledger?.closingBalance)}</p>
+      <p>Credits: ${money(data.totals?.ledgerCredits)} • Debits: ${money(data.totals?.ledgerDebits)} • Closing balance: ${money(data.totals?.ledgerBalance)}</p>
       <table><thead><tr><th>Date</th><th>Type</th><th>Category</th><th>Description</th><th>Debit</th><th>Credit</th><th>Balance</th></tr></thead><tbody>
       ${(data.ledger?.entries || []).map((x) => `<tr><td>${x.date ? new Date(x.date).toLocaleDateString("en-KE") : "—"}</td><td>${safe(x.type || "—")}</td><td>${safe(x.category || "—")}</td><td>${safe(x.description || "—")}</td><td>${money(x.debit)}</td><td>${money(x.credit)}</td><td>${money(x.runningBalance)}</td></tr>`).join("")}
       </tbody></table>
@@ -94,19 +88,11 @@ export default function Contributions() {
 
         <section className="portal-panel accounts-trust-panel">
           <div className="portal-module-header compact-header"><div><span>PAYMENT TRANSPARENCY</span><h2>M-PESA collection details</h2><p>Use the scheme payment details shown here and keep every M-PESA confirmation for your records.</p></div><span className={`portal-badge ${mpesaReady ? "approved" : ""}`}>{mpesaReady ? "Online payment ready" : "Online payment unavailable"}</span></div>
-          <div className="portal-form-grid">
-            <label className="portal-field"><span>Opening date</span><input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} max={endDate} /></label>
-            <label className="portal-field"><span>Closing date</span><input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} min={startDate} max={todayValue} /></label>
-          </div>
           <div className="portal-stat-grid">
-            <Stat label="Opening balance" value={money(data?.ledger?.openingBalance)} />
-            <Stat label="Money In" value={money(totals.moneyIn)} />
-            <Stat label="Money Out" value={money(totals.moneyOut)} />
-            <Stat label="Closing balance" value={money(data?.ledger?.closingBalance ?? totals.ledgerBalance)} />
-            <Stat label="M-PESA records" value={mpesaTransactions.length} />
-            <Stat label="PayBill" value={mpesaConfig.manualPaybill || "247247"} />
+            <Stat label="PayBill" value={mpesaConfig.manualPaybill || "Not configured"} />
             <Stat label="Account Number" value={mpesaConfig.manualAccountNumber || "Not configured"} />
             <Stat label="Payment gateway" value={mpesaReady ? "Daraja STK" : "Manual / pending setup"} />
+            <Stat label="M-PESA records" value={mpesaTransactions.length} />
           </div>
           <div className="portal-alert"><strong>Important:</strong> use the collection PayBill and account number shown above. The STK Push button uses only the secure Daraja configuration held by the backend.</div>
         </section>
@@ -152,18 +138,12 @@ export default function Contributions() {
           <article className="portal-panel"><h2>Scheme ledger</h2><div className="portal-stat-grid"><Stat label="Credits" value={money(data?.totals?.ledgerCredits)} /><Stat label="Debits" value={money(data?.totals?.ledgerDebits)} /><Stat label="Closing balance" value={money(data?.totals?.ledgerBalance)} /></div><p className="print-note">This is a shared scheme account view for members.</p></article>
         </section>
 
-        <section className="portal-panel"><div className="portal-module-header compact-header"><div><span>M-PESA PAYMENT HISTORY</span><h2>Recent payment confirmations</h2><p>Server-recorded STK transactions linked to your member account.</p></div><div className="portal-actions"><Link className="portal-btn secondary" to="/member/mpesa-records">View all records</Link><button className="portal-btn secondary" onClick={load}>Refresh</button></div></div><div className="portal-table-wrap"><table className="portal-table"><thead><tr><th>Date</th><th>Purpose</th><th>Amount</th><th>Status</th><th>Receipt</th></tr></thead><tbody>{mpesaTransactions.slice(0,20).map((x) => <tr key={x._id} tabIndex="0" onClick={() => setSelectedPayment(x)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setSelectedPayment(x); } }}><td>{x.createdAt ? new Date(x.createdAt).toLocaleString("en-KE") : "—"}</td><td>{String(x.purpose || "payment").replace(/_/g," ")}</td><td>{money(x.amount)}</td><td><span className="portal-badge">{x.status || "—"}</span></td><td>{x.mpesaReceiptNumber || "Pending"}</td></tr>)}{mpesaTransactions.length===0 && <tr><td colSpan="5">No M-PESA transactions have been recorded for your account.</td></tr>}</tbody></table></div></section>
-
-        <section className="portal-panel">
-          <div className="portal-module-header compact-header"><div><span>ASSISTANCE TRANSPARENCY</span><h2>Money Out — assisted cases</h2><p>Community M-PESA Support and Benovelent Scheme Support are shown separately. Assisted identities remain private.</p></div></div>
-          <div className="portal-grid two">{(data?.assistanceCases || []).map((item) => <article className="portal-panel" key={`${item.sourceType}-${item.referenceId}`} style={{ margin: 0, cursor: "pointer" }} role="button" tabIndex="0" onClick={() => setSelectedAssistance(item)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setSelectedAssistance(item); } }} aria-label={`View ${item.sourceType} assistance details`}><div className="claim-card-head"><div><span className="portal-badge">{item.sourceType}</span><h3>{money(item.amount)}</h3><p>{item.privacyLabel}</p></div><span className="portal-badge">{item.status || "Recorded"}</span></div><div className="portal-stat-grid compact"><Stat label="Recorded" value={item.date ? new Date(item.date).toLocaleString("en-KE") : "—"} /><Stat label="Receipt" value={item.receipt || "Protected / not applicable"} /></div><p className="print-note">Click to view a privacy-safe case summary.</p></article>)}{!(data?.assistanceCases || []).length && <div className="portal-empty">No completed assistance disbursement has been recorded in the selected range.</div>}</div>
-        </section>
+        <section className="portal-panel"><div className="portal-module-header compact-header"><div><span>M-PESA PAYMENT HISTORY</span><h2>Recent payment confirmations</h2><p>Server-recorded STK transactions linked to your member account.</p></div><button className="portal-btn secondary" onClick={load}>Refresh</button></div><div className="portal-table-wrap"><table className="portal-table"><thead><tr><th>Date</th><th>Purpose</th><th>Amount</th><th>Status</th><th>Receipt</th></tr></thead><tbody>{mpesaTransactions.slice(0,20).map((x) => <tr key={x._id}><td>{x.createdAt ? new Date(x.createdAt).toLocaleString("en-KE") : "—"}</td><td>{String(x.purpose || "payment").replace(/_/g," ")}</td><td>{money(x.amount)}</td><td><span className="portal-badge">{x.status || "—"}</span></td><td>{x.mpesaReceiptNumber || "Pending"}</td></tr>)}{mpesaTransactions.length===0 && <tr><td colSpan="5">No M-PESA transactions have been recorded for your account.</td></tr>}</tbody></table></div></section>
 
         <section className="portal-panel"><h2>Recent scheme ledger activity</h2><div className="portal-table-wrap"><table className="portal-table"><thead><tr><th>Date</th><th>Type</th><th>Category</th><th>Description</th><th>Debit</th><th>Credit</th><th>Balance</th></tr></thead><tbody>
           {(data?.ledger?.entries || []).slice(0, 40).map((x, i) => <tr key={i}><td>{x.date ? new Date(x.date).toLocaleDateString("en-KE") : "—"}</td><td>{x.type || "—"}</td><td>{x.category || "—"}</td><td>{x.description || "—"}</td><td>{x.debit ? money(x.debit) : "—"}</td><td>{x.credit ? money(x.credit) : "—"}</td><td>{money(x.runningBalance)}</td></tr>)}
           {!data?.ledger?.entries?.length && <tr><td colSpan="7">No approved scheme ledger activity for this year.</td></tr>}
         </tbody></table></div></section>
-        {selectedPayment && <div className="mpesa-modal-backdrop" role="presentation" onMouseDown={(e) => { if (e.currentTarget === e.target) setSelectedPayment(null); }}><section className="mpesa-modal" role="dialog" aria-modal="true" aria-label="M-PESA transaction details"><div className="mpesa-modal-head"><div><span>M-PESA RECORD</span><h2>Transaction details</h2></div><button type="button" className="mpesa-close" onClick={() => setSelectedPayment(null)} aria-label="Close">×</button></div><div className="portal-stat-grid"><Stat label="Status" value={selectedPayment.status || "—"} /><Stat label="Amount" value={money(selectedPayment.amount)} /><Stat label="Receipt" value={selectedPayment.mpesaReceiptNumber || "Pending"} /><Stat label="Timestamp" value={selectedPayment.createdAt ? new Date(selectedPayment.createdAt).toLocaleString("en-KE") : "—"} /></div><p className="mpesa-small">Only your own payment record is shown here. Member identity and phone details remain private.</p></section></div>}{selectedAssistance && <div className="mpesa-modal-backdrop" role="presentation" onMouseDown={(e) => { if (e.currentTarget === e.target) setSelectedAssistance(null); }}><section className="mpesa-modal" role="dialog" aria-modal="true" aria-label="Assistance case details"><div className="mpesa-modal-head"><div><span>ASSISTANCE RECORD</span><h2>{selectedAssistance.sourceType || "Assistance"}</h2></div><button type="button" className="mpesa-close" onClick={() => setSelectedAssistance(null)} aria-label="Close">×</button></div><div className="portal-stat-grid"><Stat label="Status" value={selectedAssistance.status || "Recorded"} /><Stat label="Amount" value={money(selectedAssistance.amount)} /><Stat label="Recorded" value={selectedAssistance.date ? new Date(selectedAssistance.date).toLocaleString("en-KE") : "—"} /><Stat label="Receipt" value={selectedAssistance.receipt || "Protected / not applicable"} /></div><p className="mpesa-small">This summary deliberately hides the assisted member’s identity, phone number and other private details while keeping the financial record transparent.</p></section></div>}
       </div>
     </DashboardLayout>
   );

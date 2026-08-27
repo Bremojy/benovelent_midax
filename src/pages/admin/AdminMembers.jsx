@@ -41,7 +41,6 @@ function AdminMembers() { const { role }=useAuth(); const isSuperAdmin=role==="s
   const [search, setSearch] = useState("");
 
   const [searchInput, setSearchInput] = useState("");
-  const [siteStation, setSiteStation] = useState("");
 
   // ========================================
   // PAGINATION
@@ -100,7 +99,6 @@ function AdminMembers() { const { role }=useAuth(); const isSuperAdmin=role==="s
         page,
         limit,
         search,
-        siteStation,
       });
 
       if (!response?.success) {
@@ -139,7 +137,7 @@ function AdminMembers() { const { role }=useAuth(); const isSuperAdmin=role==="s
 
   useEffect(() => {
     loadMembers();
-  }, [page, search, siteStation]);
+  }, [page, search]);
 
   // ========================================
   // SEARCH
@@ -652,10 +650,6 @@ function AdminMembers() { const { role }=useAuth(); const isSuperAdmin=role==="s
             <button type="submit">
               Search
             </button>
-            <select aria-label="Filter by site station" value={siteStation} onChange={(event) => { setPage(1); setSiteStation(event.target.value); }}>
-              <option value="">All site stations</option>
-              {["Chokaa","Saika","Ruaraka","Garden City","Garden Estate","Jacaranda","Depot","None of above"].map((station) => <option key={station}>{station}</option>)}
-            </select>
 
           </form>
 
