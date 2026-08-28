@@ -61,13 +61,14 @@ const localStorage = multer.diskStorage({
 const storage = useCloudinary ? multer.memoryStorage() : localStorage;
 
 const allowedMimeTypes = new Set([
-  "image/jpeg", "image/png", "image/webp", "image/gif", "image/svg+xml",
+  "image/jpeg", "image/png", "image/webp", "image/gif",
   "application/pdf", "application/msword",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   "application/vnd.ms-excel",
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   "application/vnd.ms-powerpoint",
   "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "text/plain",
   "audio/webm", "audio/ogg", "audio/mpeg", "audio/wav", "audio/mp4", "audio/m4a",
   "video/webm", "video/mp4", "video/quicktime", "video/x-matroska",
 ]);

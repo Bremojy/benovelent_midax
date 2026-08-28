@@ -56,6 +56,12 @@ const messageSchema = new mongoose.Schema(
         default:""
     },
 
+    clientMessageId:{
+        type:String,
+        trim:true,
+        maxlength:100
+    },
+
     fileName:{
         type:String,
         default:""
@@ -145,6 +151,8 @@ const messageSchema = new mongoose.Schema(
 messageSchema.index({conversation:1,createdAt:-1});
 messageSchema.index({sender:1});
 
+
+messageSchema.index({ conversation: 1, sender: 1, clientMessageId: 1 }, { unique: true, sparse: true });
 module.exports =
     mongoose.models.Message ||
     mongoose.model("Message", messageSchema);

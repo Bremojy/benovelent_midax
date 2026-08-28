@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Camera, Image, MapPin, Mic, Paperclip, Plus, Send, Smile, Square, X } from "lucide-react";
 import API from "../../services/api";
 import toast from "react-hot-toast";
@@ -32,15 +32,25 @@ export default function MessageInput({ onSend, socket, conversation, currentUser
   const chunksRef = useRef([]);
   const sendingRef = useRef(false);
   const textareaRef = useRef(null);
+  const typingTimerRef = useRef(null);
+  const previewUrlRef = useRef("");
 
   const currentId = String(currentUser?.chatId || currentUser?._id || currentUser?.id || currentUser?.memberId || "");
   const canSend = useMemo(() => Boolean(String(message).trim()) || Boolean(attachment), [message, attachment]);
 
   const clearAttachment = () => {
+    if (previewUrlRef.current) { URL.revokeObjectURL(previewUrlRef.current); previewUrlRef.current = ""; }
     setAttachment("");
     setAttachmentPreview("");
     setMessageType("text");
   };
+
+  useEffect(() => () => {
+    if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+    if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+    socket?.emit("stop-typing", { conversationId: conversation?._id });
+    (streamRef.current?.getTracks() || []).forEach((track) => track.stop());
+  }, [socket, conversation?._id]);
 
   const uploadFile = async (file, autoSend = false) => {
     if (!file || busy || sendingRef.current) return;
@@ -58,7 +68,9 @@ export default function MessageInput({ onSend, socket, conversation, currentUser
         toast.success("Voice note sent.", { id: "chat-voice-sent", duration: 2200 });
       } else {
         setAttachment(url);
-        setAttachmentPreview(type === "image" ? URL.createObjectURL(file) : "");
+        if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+        previewUrlRef.current = type === "image" ? URL.createObjectURL(file) : "";
+        setAttachmentPreview(previewUrlRef.current);
         setMessageType(type);
         toast.success("Attachment ready to send.", { id: "chat-attachment-ready", duration: 2200 });
       }
@@ -89,7 +101,8 @@ export default function MessageInput({ onSend, socket, conversation, currentUser
     clearAttachment();
     setShowEmoji(false);
     setShowMore(false);
-    socket?.emit("stop-typing", { conversationId: conversation?._id, sender: currentId });
+    if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+    socket?.emit("stop-typing", { conversationId: conversation?._id });
 
     try {
       await onSend(cleanMessage, attachment, messageType);
@@ -192,7 +205,13 @@ export default function MessageInput({ onSend, socket, conversation, currentUser
             rows={1}
             placeholder={recording ? "Recording voice note…" : "Message…"}
             value={message}
-            onChange={(event) => { setMessage(event.target.value); socket?.emit("typing", { conversationId: conversation?._id, sender: currentId }); }}
+            onChange={(event) => {
+              const value = event.target.value.slice(0, 5000);
+              setMessage(value);
+              socket?.emit("typing", { conversationId: conversation?._id });
+              if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+              typingTimerRef.current = setTimeout(() => socket?.emit("stop-typing", { conversationId: conversation?._id }), 1200);
+            }}
             onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); event.stopPropagation(); handleSend(); } }}
             disabled={recording}
             aria-label="Send a message"

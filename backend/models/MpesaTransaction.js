@@ -18,6 +18,11 @@ const mpesaTransactionSchema = new mongoose.Schema(
     manualTransactionCode: { type: String, default: undefined, trim: true, uppercase: true },
     reconciled: { type: Boolean, default: false, index: true },
     reconciledAt: { type: Date, default: null },
+    requestId: { type: String, trim: true, maxlength: 80, index: true },
+    idempotencyKey: { type: String, trim: true, maxlength: 200, index: true, unique: true, sparse: true },
+    callbackProcessingAt: { type: Date, default: null },
+    callbackReceivedAt: { type: Date, default: null },
+    callbackProcessingError: { type: String, trim: true, maxlength: 1000, default: "" },
     amount: { type: Number, required: true, min: 1 },
     businessShortCode: { type: String, default: "" },
     accountReference: { type: String, default: "" },
@@ -27,7 +32,7 @@ const mpesaTransactionSchema = new mongoose.Schema(
     resultCode: { type: Number, default: null },
     resultDescription: { type: String, default: "" },
     callbackPayload: { type: mongoose.Schema.Types.Mixed, default: null },
-    status: { type: String, enum: ["initiated", "pending", "successful", "failed", "reversed"], default: "initiated", index: true },
+    status: { type: String, enum: ["initiated", "pending", "processing", "successful", "failed", "cancelled", "timeout", "unknown", "reversed"], default: "initiated", index: true },
     initiatedAt: { type: Date, default: Date.now },
     completedAt: { type: Date, default: null },
   },
@@ -37,6 +42,7 @@ const mpesaTransactionSchema = new mongoose.Schema(
 mpesaTransactionSchema.index({ purpose: 1, referenceId: 1, status: 1 });
 mpesaTransactionSchema.index({ paymentMethod: 1, status: 1, createdAt: -1 });
 mpesaTransactionSchema.index({ manualTransactionCode: 1 }, { unique: true, sparse: true });
+mpesaTransactionSchema.index({ checkoutRequestId: 1, status: 1 });
 mpesaTransactionSchema.index({ createdAt: -1 });
 
 module.exports = mongoose.models.MpesaTransaction || mongoose.model("MpesaTransaction", mpesaTransactionSchema);

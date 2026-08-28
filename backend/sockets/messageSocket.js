@@ -208,6 +208,15 @@ async function markMissedCall(callId, reason = "missed") {
   }
 }
 
+
+async function getAuthorizedConversation(socket, conversationId) {
+  if (!isChatRole(socket.data?.role) || !mongooseIsValid(conversationId) || !socket.data?.chatId) return null;
+  return Conversation.findOne({ _id: conversationId, participants: socket.data.chatId, active: { $ne: false } });
+}
+function mongooseIsValid(value) {
+  return !!value && require("mongoose").isValidObjectId(value);
+}
+
 module.exports = (io, socket) => {
   ensurePresenceCleanup(io);
 
@@ -242,15 +251,31 @@ module.exports = (io, socket) => {
     }
   });
 
-  socket.on("join-conversation", (conversationId) => { if (isChatRole(socket.data?.role) && conversationId) socket.join(String(conversationId)); });
+  socket.on("join-conversation", async (conversationId) => {
+    try {
+      const conversation = await getAuthorizedConversation(socket, conversationId);
+      if (!conversation) return socket.emit("chat-error", { code: "CONVERSATION_FORBIDDEN", message: "You are not authorised to join this conversation." });
+      socket.join(String(conversation._id));
+      socket.emit("conversation-joined", { conversationId: String(conversation._id) });
+    } catch (error) { console.warn("Conversation join failed:", error.message); }
+  });
+
+  socket.on("leave-conversation", (conversationId) => { if (conversationId) socket.leave(String(conversationId)); });
 
 
 
   socket.on("call-user", async ({ to, conversationId, callType, offer, callerUserId, callerName, callerRole }) => {
     if (!isChatRole(socket.data?.role) || !to || !offer) return;
     const recipient = await resolveActor(to);
-    const caller = await resolveActor(callerUserId || socket.data.userId, callerRole || socket.data.role);
+    const caller = await resolveActor(socket.data.chatId || socket.data.userId, socket.data.role);
     if (!recipient || !caller || !isChatRole(recipient.role) || !isChatRole(caller.role)) return;
+    if (conversationId) {
+      const conversation = await getAuthorizedConversation(socket, conversationId);
+      if (!conversation || !conversation.participants.some((id) => String(id) === String(recipient.chatId))) {
+        socket.emit("call-error", { code: "CALL_CONVERSATION_FORBIDDEN", message: "You are not authorised to call this conversation participant." });
+        return;
+      }
+    }
     const normalizedType = callType === "video" ? "video" : "audio";
     if (String(recipient.chatId) === String(caller.chatId)) {
       socket.emit("call-error", { code: "SELF_CALL_BLOCKED", message: "Calling yourself is not available." });
@@ -272,7 +297,7 @@ module.exports = (io, socket) => {
       offer,
       callId,
     };
-    const active = { io, recipient, caller, recipientChatId: String(recipient.chatId), callerChatId: String(caller.chatId), callType: normalizedType, callId, conversationId: conversationId || "", incomingPayload, answered: false, missedNotified: false, summaryCreated: false, answeredAt: null, timeout: null };
+    const active = { io, callerSocketId: socket.id, recipient, caller, recipientChatId: String(recipient.chatId), callerChatId: String(caller.chatId), callType: normalizedType, callId, conversationId: conversationId || "", incomingPayload, answered: false, missedNotified: false, summaryCreated: false, answeredAt: null, timeout: null };
     active.timeout = setTimeout(() => {
       void markMissedCall(callId, "missed");
       void recordCallSummary(activeCalls.get(callId), "missed", 0);
@@ -305,38 +330,44 @@ module.exports = (io, socket) => {
 
   socket.on("call-answer", async ({ to, answer, callId }) => {
     const call = callId ? activeCalls.get(String(callId)) : null;
-    if (call) {
-      call.answered = true;
-      call.answeredAt = Date.now();
-      if (call.timeout) clearTimeout(call.timeout);
-      activeCalls.set(call.callId, call);
-    }
-    if (to && answer) io.to(String(to)).emit("call-answered", { answer, callId: callId || "" });
+    if (!call || !answer || !to) return;
+    const actorChatId = String(socket.data?.chatId || "");
+    if (![String(call.callerChatId), String(call.recipientChatId)].includes(actorChatId)) return;
+    if (actorChatId !== String(call.recipientChatId)) return;
+    call.answered = true;
+    call.answeredAt = Date.now();
+    if (call.timeout) clearTimeout(call.timeout);
+    activeCalls.set(call.callId, call);
+    io.to(String(call.callerSocketId)).emit("call-answered", { answer, callId: call.callId });
   });
 
-  socket.on("call-mode-offer", async ({ to, offer, callId, mode }) => {
-    if (!to || !offer) return;
-    const normalizedMode = mode === "video" ? "video" : "audio";
-    io.to(String(to)).emit("call-mode-offer", {
-      offer,
-      callId: callId || "",
-      mode: normalizedMode,
-    });
-  });
-
-  socket.on("call-mode-answer", async ({ to, answer, callId, mode }) => {
-    if (!to || !answer) return;
-    const normalizedMode = mode === "video" ? "video" : "audio";
-    io.to(String(to)).emit("call-mode-answer", {
-      answer,
-      callId: callId || "",
-      mode: normalizedMode,
-    });
-  });
-
-  socket.on("call-rejected", async ({ to, callId, reason = "declined" }) => {
+  socket.on("call-mode-offer", async ({ offer, callId, mode }) => {
     const call = callId ? activeCalls.get(String(callId)) : null;
-    if (to) io.to(String(to)).emit("call-rejected", { callId: callId || "", reason });
+    if (!call || !offer) return;
+    const actorChatId = String(socket.data?.chatId || "");
+    if (![String(call.callerChatId), String(call.recipientChatId)].includes(actorChatId)) return;
+    const target = actorChatId === String(call.callerChatId) ? call.recipientChatId : call.callerChatId;
+    const normalizedMode = mode === "video" ? "video" : "audio";
+    io.to(String(target)).emit("call-mode-offer", { offer, callId: call.callId, mode: normalizedMode });
+  });
+
+  socket.on("call-mode-answer", async ({ answer, callId, mode }) => {
+    const call = callId ? activeCalls.get(String(callId)) : null;
+    if (!call || !answer) return;
+    const actorChatId = String(socket.data?.chatId || "");
+    if (![String(call.callerChatId), String(call.recipientChatId)].includes(actorChatId)) return;
+    const target = actorChatId === String(call.callerChatId) ? call.recipientChatId : call.callerChatId;
+    const normalizedMode = mode === "video" ? "video" : "audio";
+    io.to(String(target)).emit("call-mode-answer", { answer, callId: call.callId, mode: normalizedMode });
+  });
+
+  socket.on("call-rejected", async ({ callId, reason = "declined" }) => {
+    const call = callId ? activeCalls.get(String(callId)) : null;
+    if (!call) return;
+    const actorChatId = String(socket.data?.chatId || "");
+    if (![String(call.callerChatId), String(call.recipientChatId)].includes(actorChatId)) return;
+    const target = actorChatId === String(call.callerChatId) ? call.recipientChatId : call.callerChatId;
+    io.to(String(target)).emit("call-rejected", { callId: call.callId, reason });
     if (call) {
       if (!call.answered) {
         await markMissedCall(call.callId, reason === "declined" ? "declined" : "missed");
@@ -346,31 +377,52 @@ module.exports = (io, socket) => {
     }
   });
 
-  socket.on("ice-candidate", ({ to, candidate }) => { if (to && candidate) io.to(String(to)).emit("ice-candidate", { candidate }); });
-
-  socket.on("end-call", async ({ to, callId }) => {
+  socket.on("ice-candidate", ({ candidate, callId }) => {
     const call = callId ? activeCalls.get(String(callId)) : null;
-    if (call) {
-      if (!call.answered) {
-        await markMissedCall(call.callId, "missed");
-      } else {
-        const durationSeconds = call.answeredAt ? Math.max(0, Math.round((Date.now() - call.answeredAt) / 1000)) : 0;
-        await recordCallSummary(call, "completed", durationSeconds);
-      }
-    }
-    if (to) io.to(String(to)).emit("call-ended", { callId: callId || "" });
-    if (call) clearCall(call.callId);
+    if (!call || !candidate) return;
+    const actorChatId = String(socket.data?.chatId || "");
+    if (![String(call.callerChatId), String(call.recipientChatId)].includes(actorChatId)) return;
+    const target = actorChatId === String(call.callerChatId) ? call.recipientChatId : call.callerChatId;
+    io.to(String(target)).emit("ice-candidate", { candidate, callId: call.callId });
   });
 
-  socket.on("typing", ({ conversationId, sender }) => { if (isChatRole(socket.data?.role) && conversationId) socket.to(String(conversationId)).emit("typing", sender); });
-  socket.on("stop-typing", ({ conversationId, sender }) => { if (isChatRole(socket.data?.role) && conversationId) socket.to(String(conversationId)).emit("stop-typing", sender); });
+  socket.on("end-call", async ({ callId }) => {
+    const call = callId ? activeCalls.get(String(callId)) : null;
+    if (!call) return;
+    const actorChatId = String(socket.data?.chatId || "");
+    if (![String(call.callerChatId), String(call.recipientChatId)].includes(actorChatId)) return;
+    if (!call.answered) {
+      await markMissedCall(call.callId, "missed");
+    } else {
+      const durationSeconds = call.answeredAt ? Math.max(0, Math.round((Date.now() - call.answeredAt) / 1000)) : 0;
+      await recordCallSummary(call, "completed", durationSeconds);
+    }
+    const target = actorChatId === String(call.callerChatId) ? call.recipientChatId : call.callerChatId;
+    io.to(String(target)).emit("call-ended", { callId: call.callId });
+    clearCall(call.callId);
+  });
+
+  socket.on("typing", async ({ conversationId }) => {
+    try {
+      const conversation = await getAuthorizedConversation(socket, conversationId);
+      if (conversation) socket.to(String(conversationId)).emit("typing", String(socket.data.chatId));
+    } catch (_) {}
+  });
+  socket.on("stop-typing", async ({ conversationId }) => {
+    try {
+      const conversation = await getAuthorizedConversation(socket, conversationId);
+      if (conversation) socket.to(String(conversationId)).emit("stop-typing", String(socket.data.chatId));
+    } catch (_) {}
+  });
 
   socket.on("seen-message", async ({ messageId }) => {
     if (!isChatRole(socket.data?.role)) return;
     try {
       const message = await Message.findById(messageId);
-      if (!message) return;
-      message.seenBy = Array.from(new Set([...(message.seenBy || []).map(String), String(socket.data.userId || "")].filter(Boolean)));
+      if (!message || !socket.data?.chatId) return;
+      const conversation = await Conversation.findOne({ _id: message.conversation, participants: socket.data.chatId }).select("_id").lean();
+      if (!conversation) return;
+      message.seenBy = Array.from(new Set([...(message.seenBy || []).map(String), String(socket.data.chatId)].filter(Boolean)));
       message.seenAt = new Date();
       message.delivered = true;
       message.deliveredAt = message.deliveredAt || new Date();

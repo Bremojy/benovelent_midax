@@ -113,7 +113,9 @@ const errorHandler = (err, req, res, next) => {
   return Response.serverError(
     res,
     err,
-    err.message || "Internal Server Error."
+    process.env.NODE_ENV === "development"
+      ? (err.message || "Internal Server Error.")
+      : "Internal server error."
   );
 };
 

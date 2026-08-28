@@ -1,0 +1,13 @@
+const fs = require("fs");
+const assert = require("assert");
+const socket = fs.readFileSync("backend/sockets/messageSocket.js", "utf8");
+const windowFile = fs.readFileSync("src/components/chat/ChatWindow.jsx", "utf8");
+const controller = fs.readFileSync("backend/controllers/messageController.js", "utf8");
+assert(socket.includes("participants: socket.data.chatId"), "Socket conversation membership must be checked server-side.");
+assert(socket.includes('socket.on("leave-conversation"'), "Chat sockets must leave prior conversation rooms.");
+assert(socket.includes('String(socket.data.chatId)'), "Read receipts/typing must use canonical chat identity.");
+assert(socket.includes("caller = await resolveActor(socket.data.chatId || socket.data.userId"), "Callers must be derived from authenticated socket identity.");
+assert(windowFile.includes('X-Idempotency-Key'), "Chat sends must carry an idempotency key for retry safety.");
+assert(windowFile.includes("loadOlderMessages") && windowFile.includes("hasMore"), "Chat history must support bounded pagination.");
+assert(controller.includes("clientMessageId"), "Message persistence must support idempotent client retries.");
+console.log("CHAT SECURITY REGRESSION TEST PASSED");

@@ -3,12 +3,12 @@ const http = require("http");
 const cors = require("cors");
 const compression = require("compression");
 const cookieParser = require("cookie-parser");
+require("dotenv").config();
+
 const mongoose = require("mongoose");
 const path = require("path");
 const redisCache = require("./services/redisCache");
 const fs = require("fs");
-
-require("dotenv").config();
 
 // ===============================================
 // APP
@@ -117,6 +117,7 @@ const corsOptions = {
         "Pragma",
         "X-Request-ID",
         "X-Client-App-Version",
+        "X-Idempotency-Key",
     ],
     optionsSuccessStatus: 204,
 };
@@ -350,3 +351,22 @@ const connectDatabase = async () => {
 };
 
 connectDatabase();
+
+
+let shuttingDown = false;
+const gracefulShutdown = async (signal) => {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log(`[server] received ${signal}; starting graceful shutdown`);
+  clearInterval(reconnectTimer);
+  const forceTimer = setTimeout(() => process.exit(1), 10000);
+  forceTimer.unref?.();
+  try { await new Promise((resolve) => server.close(resolve)); }
+  catch (error) { console.error("[server] http shutdown error:", error?.message || error); }
+  try { await mongoose.connection.close(false); }
+  catch (error) { console.error("[server] mongodb shutdown error:", error?.message || error); }
+  clearTimeout(forceTimer);
+  process.exit(0);
+};
+process.once("SIGTERM", () => gracefulShutdown("SIGTERM"));
+process.once("SIGINT", () => gracefulShutdown("SIGINT"));

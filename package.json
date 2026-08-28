@@ -32,7 +32,9 @@
     "test:mpesa-manual": "node backend/scripts/manualMpesaContractTest.js",
     "test:mpesa-index": "node backend/scripts/mpesaManualTransactionIndexRegressionTest.js",
     "test:mpesa-diagnostics": "node backend/scripts/paymentDiagnosticContractTest.js",
-    "test:mpesa-portal-roles": "node backend/scripts/mpesaPortalRolesContractTest.js"
+    "test:mpesa-portal-roles": "node backend/scripts/mpesaPortalRolesContractTest.js",
+    "test:mpesa-service": "node backend/scripts/mpesaServiceUnitTest.js",
+    "test:chat-security": "node backend/scripts/chatSecurityRegressionTest.js"
   },
   "dependencies": {
     "axios": "^1.18.1",

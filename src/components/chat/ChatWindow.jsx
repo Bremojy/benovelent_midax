@@ -12,7 +12,13 @@ function ChatWindow({ conversation, socket, currentUser, onBack, onAudioCall, on
   const [typingUserId, setTypingUserId] = useState("");
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [chatError, setChatError] = useState("");
+  const [hasMore, setHasMore] = useState(false);
+  const [nextCursor, setNextCursor] = useState("");
+  const [loadingOlder, setLoadingOlder] = useState(false);
   const messagesEndRef = useRef(null);
+  const messagesContainerRef = useRef(null);
+  const typingUserRef = useRef("");
+  const stickToBottomRef = useRef(true);
   const sendLockRef = useRef(false);
 
   const ownIds = useMemo(
@@ -45,10 +51,13 @@ function ChatWindow({ conversation, socket, currentUser, onBack, onAudioCall, on
       try {
         setLoadingMessages(true);
         setChatError("");
-        const { data } = await API.get(`/messages/conversation/${conversation._id}`);
+        const { data } = await API.get(`/messages/conversation/${conversation._id}`, { params: { limit: 50 } });
         if (cancelled) return;
         const items = Array.isArray(data) ? data : data.messages || [];
         setMessages(items.map(normalizeMessage));
+        setHasMore(Boolean(data?.hasMore));
+        setNextCursor(String(data?.nextCursor || ""));
+        stickToBottomRef.current = true;
         try { await API.put(`/conversations/${conversation._id}/read`); } catch (_) {}
       } catch (error) {
         console.error(error);
@@ -68,12 +77,13 @@ function ChatWindow({ conversation, socket, currentUser, onBack, onAudioCall, on
   }, [conversation?._id]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "auto", block: "end" });
+    if (stickToBottomRef.current) messagesEndRef.current?.scrollIntoView({ behavior: "auto", block: "end" });
   }, [messages, typingUserId]);
 
   useEffect(() => {
     if (!socket || !conversation?._id) return;
-    socket.emit("join-conversation", conversation._id);
+    const conversationId = String(conversation._id);
+    socket.emit("join-conversation", conversationId);
 
     const handleNewMessage = (incoming) => {
       const incomingConversationId = incoming?.conversation?._id || incoming?.conversation || incoming?.conversationId;
@@ -85,6 +95,7 @@ function ChatWindow({ conversation, socket, currentUser, onBack, onAudioCall, on
       }
 
       const normalized = normalizeMessage(incoming);
+      stickToBottomRef.current = true;
       setMessages((previous) => {
         const id = String(normalized._id || "");
         const fingerprint = messageFingerprint(normalized);
@@ -113,11 +124,13 @@ function ChatWindow({ conversation, socket, currentUser, onBack, onAudioCall, on
     };
 
     const handleTyping = (senderId) => {
-      if (String(senderId) !== currentId) setTypingUserId(String(senderId || ""));
+      const id = String(senderId || "");
+      if (id && id !== currentId) { typingUserRef.current = id; setTypingUserId(id); }
     };
 
     const handleStopTyping = (senderId) => {
-      if (!senderId || String(senderId) === String(typingUserId)) setTypingUserId("");
+      const id = String(senderId || "");
+      if (!id || id === typingUserRef.current) { typingUserRef.current = ""; setTypingUserId(""); }
     };
 
     socket.on("new-message", handleNewMessage);
@@ -127,13 +140,14 @@ function ChatWindow({ conversation, socket, currentUser, onBack, onAudioCall, on
     socket.on("stop-typing", handleStopTyping);
 
     return () => {
+      socket.emit("leave-conversation", conversationId);
       socket.off("new-message", handleNewMessage);
       socket.off("message-seen", handleSeen);
       socket.off("message-deleted", handleDeleted);
       socket.off("typing", handleTyping);
       socket.off("stop-typing", handleStopTyping);
     };
-  }, [socket, conversation?._id, currentId, typingUserId, ownIds]);
+  }, [socket, conversation?._id, currentId, ownIds]);
 
   async function sendMessage(text, attachment, messageType = "text") {
     if (!conversation?._id) return;
@@ -160,7 +174,7 @@ function ChatWindow({ conversation, socket, currentUser, onBack, onAudioCall, on
 
     try {
       setChatError("");
-      const { data } = await API.post("/messages", { conversationId: conversation._id, message: text, attachment, messageType });
+      const { data } = await API.post("/messages", { conversationId: conversation._id, message: text, attachment, messageType }, { headers: { "X-Idempotency-Key": tempId } });
       const created = normalizeMessage(data.message || data);
       setMessages((previous) => {
         const withoutTemp = previous.filter((item) => String(item._id) !== tempId);
@@ -182,7 +196,35 @@ function ChatWindow({ conversation, socket, currentUser, onBack, onAudioCall, on
     }
   }
 
+  async function loadOlderMessages() {
+    if (!conversation?._id || !nextCursor || loadingOlder) return;
+    const container = messagesContainerRef.current;
+    const previousHeight = container?.scrollHeight || 0;
+    const previousTop = container?.scrollTop || 0;
+    setLoadingOlder(true);
+    try {
+      const { data } = await API.get(`/messages/conversation/${conversation._id}`, { params: { limit: 50, before: nextCursor } });
+      const older = (Array.isArray(data) ? data : data?.messages || []).map(normalizeMessage);
+      setMessages((current) => {
+        const existing = new Set(current.map((item) => String(item._id)));
+        return [...older.filter((item) => !existing.has(String(item._id))), ...current];
+      });
+      setHasMore(Boolean(data?.hasMore));
+      setNextCursor(String(data?.nextCursor || ""));
+      stickToBottomRef.current = false;
+      requestAnimationFrame(() => {
+        const nextHeight = container?.scrollHeight || previousHeight;
+        if (container) container.scrollTop = previousTop + (nextHeight - previousHeight);
+      });
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Unable to load older messages.", { id: `chat-older-${conversation._id}` });
+    } finally {
+      setLoadingOlder(false);
+    }
+  }
+
   function scrollToBottom() {
+    stickToBottomRef.current = true;
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }
 
@@ -203,13 +245,16 @@ function ChatWindow({ conversation, socket, currentUser, onBack, onAudioCall, on
 
       {chatError && <div className="chat-error-banner" role="alert"><span>{chatError}</span><button type="button" onClick={() => setChatError("")} aria-label="Dismiss chat error">Dismiss</button></div>}
 
-      <div className="messages-container" role="log" aria-live="polite" aria-label="Chat messages">
+      <div ref={messagesContainerRef} className="messages-container" role="log" aria-live="polite" aria-label="Chat messages">
         {loadingMessages ? (
           <div className="chat-loading">Loading messages...</div>
         ) : (
-          messages.map((message) => (
+          <>
+          {hasMore && <button type="button" onClick={loadOlderMessages} disabled={loadingOlder} className="chat-load-older">{loadingOlder ? "Loading older messages…" : "Load older messages"}</button>}
+          {messages.map((message) => (
             <MessageBubble key={message._id} message={message} own={String(message.sender?._id || message.sender) === currentId} />
-          ))
+          ))}
+          </>
         )}
         <TypingIndicator visible={Boolean(typingUserId) && String(typingUserId) !== currentId} user={partner} />
         <div ref={messagesEndRef} />

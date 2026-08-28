@@ -1,5 +1,5 @@
 import toast from "react-hot-toast";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CheckCircle2, Clock3, Loader2, Smartphone, XCircle } from "lucide-react";
 import API from "../../services/api";
 import "./MpesaPaymentButton.css";
@@ -14,9 +14,10 @@ const mpesaFriendlyError = (error) => {
   const bodyMessage = String(body?.message || "").trim();
   const networkCode = String(error?.code || "").trim();
   if (!error?.response) {
-    if (networkCode === "ECONNABORTED" || networkCode === "ETIMEDOUT") return `The payment request timed out before the server responded.${requestId ? ` Reference: ${requestId}` : ""} Please retry.`;
-    return `The payment server could not be reached. Check your connection and retry.${requestId ? ` Reference: ${requestId}` : ""}`;
+    if (networkCode === "ECONNABORTED" || networkCode === "ETIMEDOUT") return `The payment request timed out before the server responded. It may still be processing, so do not make a second payment yet.${requestId ? ` Reference: ${requestId}` : ""} Check the payment status and retry only if it remains unresolved.`;
+    return `The payment server could not be reached. Your payment may still be processing; check the payment status before trying again.${requestId ? ` Reference: ${requestId}` : ""}`;
   }
+  if (body?.code === "MPESA_STK_UNCONFIRMED") return `Safaricom may still be processing this STK request. Please wait for confirmation and do not make a second payment yet.${requestId ? ` Reference: ${requestId}` : ""}`;
   if (body?.paymentStage === "oauth") return body?.upstreamStatus === 401 || body?.upstreamStatus === 403
     ? `M-PESA authentication was rejected by Safaricom. Ask the administrator to verify the production consumer credentials and Daraja permissions.${requestId ? ` Reference: ${requestId}` : ""}`
     : body?.code === "MPESA_OAUTH_404"
@@ -44,6 +45,7 @@ export default function MpesaPaymentButton({ purpose, referenceId, label = "Pay 
   const [manualReady, setManualReady] = useState(false);
   const [mpesaConfig, setMpesaConfig] = useState({ shortCode: "", manualPaybill: "247247", manualAccountNumber: "", accountReference: "", environment: "production" });
   const [transactionId, setTransactionId] = useState("");
+  const paymentAttemptRef = useRef("");
 
   useEffect(() => setPhone(phoneNumber || ""), [phoneNumber]);
   useEffect(() => setAmount(defaultAmount || ""), [defaultAmount]);
@@ -57,11 +59,14 @@ export default function MpesaPaymentButton({ purpose, referenceId, label = "Pay 
         const { data } = await API.get(`/payments/transactions/${transactionId}`);
         const tx = data?.transaction;
         if (!tx || stopped) return;
-        if (tx.status === "successful") {
+        if (tx.status === "successful" && tx.reconciled) {
           setStatus("success");
           setMessage(`Payment confirmed. M-PESA receipt: ${tx.mpesaReceiptNumber || "recorded"}.`);
           onSuccess?.({ transaction: tx });
           return;
+        }
+        if (tx.status === "successful" && !tx.reconciled) {
+          setMessage("Safaricom confirmed the payment, but the account update is still being reconciled. No second payment is required.");
         }
         if (tx.status === "failed") {
           setStatus("error");
@@ -73,11 +78,14 @@ export default function MpesaPaymentButton({ purpose, referenceId, label = "Pay 
           try {
             const query = await API.post("/payments/stk-query", { transactionId });
             const refreshed = query.data?.transaction;
-            if (refreshed?.status === "successful") {
+            if (refreshed?.status === "successful" && refreshed.reconciled) {
               setStatus("success");
               setMessage(`Payment confirmed. M-PESA receipt: ${refreshed.mpesaReceiptNumber || "recorded"}.`);
               onSuccess?.({ transaction: refreshed });
               return;
+            }
+            if (refreshed?.status === "successful" && !refreshed.reconciled) {
+              setMessage("Safaricom confirmed the payment, but the account update is still being reconciled. No second payment is required.");
             }
             if (refreshed?.status === "failed") {
               setStatus("error");
@@ -98,6 +106,7 @@ export default function MpesaPaymentButton({ purpose, referenceId, label = "Pay 
   }, [transactionId, status, method, onSuccess]);
 
   const openPayment = async () => {
+    paymentAttemptRef.current = "";
     setStatus("checking");
     setMessage("");
     try {
@@ -147,7 +156,8 @@ export default function MpesaPaymentButton({ purpose, referenceId, label = "Pay 
         onSuccess?.({ transaction: data?.transaction, manual: true });
         return;
       }
-      const { data } = await API.post("/payments/stk", { purpose, referenceId, amount: numericAmount, phoneNumber: normalizedPhone });
+      if (!paymentAttemptRef.current) paymentAttemptRef.current = crypto.randomUUID();
+      const { data } = await API.post("/payments/stk", { purpose, referenceId, amount: numericAmount, phoneNumber: normalizedPhone }, { headers: { "X-Idempotency-Key": paymentAttemptRef.current } });
       if (!data?.success) throw new Error(data?.message || "M-PESA request could not be submitted.");
       setTransactionId(String(data?.transactionId || ""));
       setStatus("sent");

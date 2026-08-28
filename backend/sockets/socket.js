@@ -66,7 +66,8 @@ const initSocket = (server) => {
     io.use(async (socket, next) => {
         try {
             const cookies = parseCookies(socket.handshake.headers?.cookie || "");
-            const token = cookies[AUTH_COOKIE_NAME] || socket.handshake.auth?.token || socket.handshake.query?.token;
+            const allowLegacyQueryToken = String(process.env.ALLOW_LEGACY_SOCKET_QUERY_TOKEN || "false").toLowerCase() === "true";
+            const token = cookies[AUTH_COOKIE_NAME] || socket.handshake.auth?.token || (allowLegacyQueryToken ? socket.handshake.query?.token : null);
             if (!token) return next(new Error("AUTH_REQUIRED"));
             const decoded = jwt.verify(token, process.env.JWT_SECRET, {
                 algorithms: ["HS256"],
@@ -74,6 +75,7 @@ const initSocket = (server) => {
                 audience: "benevolent-midax-users",
             });
             const userType = String(decoded.role || decoded.userType || "").toLowerCase();
+            if (decoded.purpose && decoded.purpose !== "socket") return next(new Error("AUTH_INVALID"));
             const UserModel = userType === "superadmin" ? SuperAdmin : userType === "admin" ? Admin : Member;
             const user = await UserModel.findById(decoded.id || decoded.userId || decoded._id).select("_id role status sessionVersion fullName").lean();
             if (!user || (user.status && user.status !== "active")) return next(new Error("AUTH_INVALID"));
