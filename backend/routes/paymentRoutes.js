@@ -7,6 +7,7 @@ const controller = require("../controllers/paymentController");
 router.get("/route-status", controller.routeStatus);
 router.get("/public-config", controller.publicConfig);
 router.get("/config", protect, controller.config);
+router.get("/diagnostics", protect, isAdminOrSuperAdmin, controller.diagnostics);
 router.get("/mine", protect, controller.myTransactions);
 router.get("/transactions", protect, isAdminOrSuperAdmin, controller.allTransactions);
 router.get("/transactions/:id", protect, isContributionUser, controller.getTransaction);

@@ -80,17 +80,29 @@ const claimWorkflowRoutes = require("./routes/claimWorkflowRoutes");
 app.disable("x-powered-by");
 try { app.use(require("helmet")({ contentSecurityPolicy: false, crossOriginEmbedderPolicy: false })); } catch (_) { /* helmet optional during constrained builds */ }
 
+const normalizeOrigin = (value) => {
+    const raw = String(value || "").trim();
+    if (!raw) return "";
+    try {
+        const url = new URL(raw);
+        if (!["http:", "https:"].includes(url.protocol)) return "";
+        return url.origin.toLowerCase();
+    } catch {
+        return "";
+    }
+};
 const allowedOrigins = String(process.env.CORS_ORIGINS || "https://benovelent-midax.vercel.app,http://localhost:5173,http://127.0.0.1:5173")
     .split(",")
-    .map((origin) => origin.trim())
+    .map(normalizeOrigin)
     .filter(Boolean);
 const allowVercelPreviews = String(process.env.ALLOW_VERCEL_PREVIEWS || "false").toLowerCase() === "true";
 
 const isAllowedCorsOrigin = (origin) => {
-    if (!origin || allowedOrigins.includes(origin)) return true;
+    const normalized = normalizeOrigin(origin);
+    if (!normalized || allowedOrigins.includes(normalized)) return true;
     if (allowVercelPreviews) {
         try {
-            const url = new URL(origin);
+            const url = new URL(normalized);
             return url.protocol === "https:" && url.hostname.endsWith(".vercel.app");
         } catch {
             return false;

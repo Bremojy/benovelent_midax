@@ -1,4 +1,5 @@
 const webpush = require("web-push");
+const crypto = require("crypto");
 const PushSubscription = require("../models/PushSubscription");
 
 let configured = false;
@@ -11,28 +12,49 @@ function configure() {
   webpush.setVapidDetails(subject, publicKey, privateKey); configured = true; return true;
 }
 function getPublicKey() { return String(process.env.VAPID_PUBLIC_KEY || "").trim(); }
+const subscriptionIdentity = (endpoint) => crypto.createHash("sha256").update(String(endpoint || "")).digest("hex").slice(0, 12);
+const endpointHost = (endpoint) => {
+  try { return new URL(String(endpoint || "")).host || "invalid"; }
+  catch { return "invalid"; }
+};
+
 async function sendPushToRecipient({ recipient, recipientModel = "Member", title, message, link = "/", data = {} }) {
   if (!configure() || !recipient || !title || !message) return { sent: 0, skipped: "push-not-configured" };
-  const subscriptions = await PushSubscription.find({ recipient, recipientModel }).lean(); let sent=0, removed=0;
+  let subscriptions = [];
+  try {
+    subscriptions = await PushSubscription.find({ recipient, recipientModel }).lean();
+  } catch (error) {
+    console.warn("[push][lookup-failed]", { recipient: String(recipient), recipientModel, type: String(data?.type || "notification"), message: String(error?.message || "subscription lookup failed").slice(0, 300) });
+    return { sent: 0, removed: 0, subscriptions: 0, skipped: "subscription-lookup-failed" };
+  }
+
+  let sent=0, removed=0;
   const isCall = ["incoming_call", "audio_call", "video_call", "missed_call", "missed_audio_call", "missed_video_call"].includes(String(data?.type || "").toLowerCase()) || Boolean(data?.incomingCall) || Boolean(data?.missedCall);
   const payload = JSON.stringify({
-    title:String(title).slice(0,120),
-    body:String(message).slice(0,500),
-    icon:"/pwa-icon-192.png",
-    badge:"/pwa-icon-192.png",
+    title:String(title).slice(0,120), body:String(message).slice(0,500), icon:"/pwa-icon-192.png", badge:"/pwa-icon-192.png",
     tag:`benevolent-${String(data?.type||"notification")}-${String(data?.callId || data?.notificationId || "general")}`,
-    requireInteraction: isCall,
-    silent: false,
-    renotify: true,
-    data:{ link, ...data },
+    requireInteraction: isCall, silent: false, renotify: true, data:{ link, ...data },
   });
   for (const subscription of subscriptions) {
-    try { await webpush.sendNotification(
+    const id = subscriptionIdentity(subscription.endpoint);
+    try {
+      await webpush.sendNotification(
         { endpoint:subscription.endpoint, expirationTime:subscription.expirationTime ? subscription.expirationTime.getTime() : null, keys:subscription.keys },
         payload,
         isCall ? { TTL: 60, urgency: "high" } : undefined
-      ); sent++; }
-    catch (error) { if (error.statusCode===404 || error.statusCode===410) { await PushSubscription.deleteOne({_id:subscription._id}); removed++; } else console.warn("Web push delivery failed:",error.message); }
+      );
+      sent++;
+      console.info("[push][sent]", { subscriptionId: id, endpointHost: endpointHost(subscription.endpoint), recipient: String(recipient), recipientModel, type: String(data?.type || "notification") });
+    } catch (error) {
+      const statusCode = Number(error?.statusCode || error?.status || 0) || null;
+      const stale = statusCode === 404 || statusCode === 410;
+      console.warn("[push][delivery-failed]", {
+        subscriptionId: id, endpointHost: endpointHost(subscription.endpoint), recipient: String(recipient), recipientModel, type: String(data?.type || "notification"),
+        httpStatus: statusCode, providerCode: error?.code || null, staleSubscription: stale,
+        message: String(error?.body || error?.message || "Web push delivery failed.").slice(0, 300),
+      });
+      if (stale) { await PushSubscription.deleteOne({_id:subscription._id}).catch(() => null); removed++; }
+    }
   }
   return { sent, removed, subscriptions: subscriptions.length };
 }

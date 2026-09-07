@@ -13,3 +13,10 @@ assert(controller.includes('[mpesa][callback:failed]'), "Callback failure must b
 assert(model.includes('callbackProcessingError'), "Callback processing errors must be persisted.");
 assert(model.includes('requestId'), "Payment correlation id must be persisted.");
 console.log("MPESA PRODUCTION DIAGNOSTICS CONTRACT TEST PASSED");
+
+assert(service.includes('getProductionDiagnostics'), "Safe production diagnostic helper missing.");
+assert(service.includes('probeCallbackUrl'), "Callback reachability probe missing.");
+assert(service.includes('No diagnostic endpoint sends a real STK payment'), "Diagnostic helper must not issue a real STK payment.");
+assert(controller.includes('exports.diagnostics'), "Production diagnostics controller missing.");
+assert(controller.includes('MPESA_DIAGNOSTICS_FAILED'), "Diagnostic failures need a stable error code.");
+assert(controller.includes('Safaricom callback did not contain a definitive numeric ResultCode.'), "Ambiguous callbacks must remain unknown instead of being falsely failed.");

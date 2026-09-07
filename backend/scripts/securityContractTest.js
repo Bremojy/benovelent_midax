@@ -31,6 +31,7 @@ for (const needle of ["withCredentials: true", "setCsrfToken", "getCsrfToken"]) 
   if (!api.includes(needle)) failures.push(`Frontend cookie/CSRF transport missing: ${needle}`);
 }
 if (!server.includes('"X-CSRF-Token"')) failures.push("CORS must allow X-CSRF-Token for cookie-authenticated browser requests.");
+if (!server.includes("normalizeOrigin") || !socketServer.includes("normalizeOrigin")) failures.push("HTTP and Socket.IO CORS origin validation must normalize valid configured origins.");
 for (const needle of ["sessionStorage.setItem(\"user\"", "saveSession(normalizedUser)"]) {
   if (!authContext.includes(needle)) failures.push(`Frontend user-only session contract missing: ${needle}`);
 }

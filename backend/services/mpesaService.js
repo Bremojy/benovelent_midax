@@ -307,6 +307,53 @@ async function b2cPayment({ phoneNumber, amount, remarks, occasion }) {
 }
 
 const idempotencyKey = () => crypto.randomBytes(12).toString("hex");
+const probeCallbackUrl = async () => {
+  const callbackUrl = env("MPESA_CALLBACK_URL");
+  if (!callbackUrl) return { configured: false, reachable: false, reason: "callback-url-missing" };
+  let url;
+  try { url = new URL(callbackUrl); } catch { return { configured: true, reachable: false, reason: "callback-url-invalid" }; }
+  if (url.protocol !== "https:") return { configured: true, reachable: false, reason: "callback-url-not-https", host: url.host };
+  const startedAt = Date.now();
+  try {
+    const response = await axios.get(callbackUrl, { timeout: Math.min(MPESA_REQUEST_TIMEOUT_MS, 8000), maxRedirects: 3, validateStatus: (status) => status >= 200 && status < 400, proxy: false });
+    return { configured: true, reachable: true, httpStatus: response.status, latencyMs: Date.now() - startedAt, host: url.host };
+  } catch (error) {
+    return { configured: true, reachable: false, httpStatus: Number(error?.response?.status || 0) || null, latencyMs: Date.now() - startedAt, host: url.host, reason: String(error?.message || "callback probe failed").slice(0, 200) };
+  }
+};
+
+const getProductionDiagnostics = async ({ probeCallback = true } = {}) => {
+  const environment = env("MPESA_ENVIRONMENT", "production").toLowerCase();
+  const callbackUrl = env("MPESA_CALLBACK_URL");
+  const callback = probeCallback ? await probeCallbackUrl() : { configured: Boolean(callbackUrl), reachable: null, host: (() => { try { return new URL(callbackUrl).host; } catch { return null; } })() };
+  const checks = {
+    productionEnvironmentSelected: environment === "production",
+    productionDarajaHost: baseUrl() === "https://api.safaricom.co.ke",
+    consumerCredentialsPresent: isDarajaConfigured(),
+    passkeyPresent: !isPlaceholder(env("MPESA_PASSKEY")),
+    shortcodePresent: !isPlaceholder(env("MPESA_SHORTCODE")),
+    transactionTypeValid: isValidTransactionType(),
+    callbackConfigured: Boolean(callbackUrl),
+    callbackHttps: /^https:\/\//i.test(callbackUrl),
+    callbackReachable: callback.reachable,
+    fullyConfigured: isConfigured(),
+  };
+  return {
+    enabled: env("MPESA_ENABLED", "false").toLowerCase() === "true",
+    environment, endpoint: endpointSummary(),
+    shortcode: env("MPESA_SHORTCODE") || null,
+    transactionType: env("MPESA_TRANSACTION_TYPE", "CustomerPayBillOnline"),
+    accountReference: normalizeAccountReference(env("MPESA_ACCOUNT_REFERENCE", DEFAULT_MPESA_ACCOUNT_REFERENCE)),
+    callback: { ...callback, https: checks.callbackHttps },
+    checks,
+    notes: [
+      "OAuth success proves client authentication only; it does not prove shortcode/passkey STK provisioning.",
+      "No diagnostic endpoint sends a real STK payment or marks a transaction successful.",
+      "Safaricom ResultCode remains authoritative for final payment state."
+    ],
+  };
+};
+
 const getConfigurationSummary = () => {
   const environment = env("MPESA_ENVIRONMENT", "production").toLowerCase();
   const callbackUrl = env("MPESA_CALLBACK_URL");
@@ -317,4 +364,4 @@ const getConfigurationSummary = () => {
   return { enabled: env("MPESA_ENABLED", "false").toLowerCase() === "true", environment, configured: isConfigured(), darajaConfigured: isDarajaConfigured(), transactionType: env("MPESA_TRANSACTION_TYPE", "CustomerPayBillOnline"), b2cConfigured: isB2CConfigured(), b2cEnabled: env("MPESA_B2C_ENABLED", "false").toLowerCase() === "true", shortcode: env("MPESA_SHORTCODE"), callbackUrl, b2cResultUrl: env("MPESA_B2C_RESULT_URL"), b2cTimeoutUrl: env("MPESA_B2C_TIMEOUT_URL"), warnings };
 };
 
-module.exports = { isConfigured, isB2CConfigured, isDarajaConfigured, isValidTransactionType, normalizePhone, normalizeAccountReference, stkPush, stkQuery, b2cPayment, idempotencyKey, getConfigurationSummary, endpointSummary, extractUpstreamError, classifyUpstreamError, clearAccessToken, timestamp, getStkCallback, toResultCode, parseMetadata };
+module.exports = { isConfigured, isB2CConfigured, isDarajaConfigured, isValidTransactionType, normalizePhone, normalizeAccountReference, stkPush, stkQuery, b2cPayment, idempotencyKey, getConfigurationSummary, getProductionDiagnostics, probeCallbackUrl, endpointSummary, extractUpstreamError, classifyUpstreamError, clearAccessToken, timestamp, getStkCallback, toResultCode, parseMetadata };

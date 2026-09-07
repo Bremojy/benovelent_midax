@@ -25,22 +25,34 @@ let io;
 
 const initSocket = (server) => {
 
+    const normalizeOrigin = (value) => {
+        const raw = String(value || "").trim();
+        if (!raw) return "";
+        try {
+            const url = new URL(raw);
+            if (!["http:", "https:"].includes(url.protocol)) return "";
+            return url.origin.toLowerCase();
+        } catch {
+            return "";
+        }
+    };
     const allowedOrigins = String(
         process.env.CORS_ORIGINS ||
         "https://benovelent-midax.vercel.app,http://localhost:5173,http://127.0.0.1:5173"
     )
         .split(",")
-        .map((value) => value.trim())
+        .map(normalizeOrigin)
         .filter(Boolean);
 
     const allowVercelPreviews = String(process.env.ALLOW_VERCEL_PREVIEWS || "false").toLowerCase() === "true";
 
     const isAllowedOrigin = (origin) => {
-        if (!origin) return true;
-        if (allowedOrigins.includes(origin)) return true;
+        const normalized = normalizeOrigin(origin);
+        if (!normalized) return true;
+        if (allowedOrigins.includes(normalized)) return true;
         if (allowVercelPreviews) {
             try {
-                const url = new URL(origin);
+                const url = new URL(normalized);
                 return url.protocol === "https:" && url.hostname.endsWith(".vercel.app");
             } catch {
                 return false;

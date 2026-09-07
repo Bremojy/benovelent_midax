@@ -11,7 +11,7 @@ const createAuditLog = require("../utils/createAuditLog");
 const Finance = require("../models/Finance");
 const MpesaB2CTransaction = require("../models/MpesaB2CTransaction");
 const { ensureChatProfile } = require("../utils/chatProfile");
-const { stkPush, stkQuery, b2cPayment, normalizePhone, normalizeAccountReference, isConfigured, isB2CConfigured, getConfigurationSummary, idempotencyKey, endpointSummary, extractUpstreamError, classifyUpstreamError, getStkCallback, toResultCode, parseMetadata } = require("../services/mpesaService");
+const { stkPush, stkQuery, b2cPayment, normalizePhone, normalizeAccountReference, isConfigured, isB2CConfigured, getConfigurationSummary, getProductionDiagnostics, idempotencyKey, endpointSummary, extractUpstreamError, classifyUpstreamError, getStkCallback, toResultCode, parseMetadata } = require("../services/mpesaService");
 
 const env = (name, fallback = "") => String(process.env[name] ?? fallback).trim();
 const DEFAULT_MPESA_SHORTCODE = "650014";
@@ -222,6 +222,17 @@ exports.routeStatus = async (_req, res) => {
     timestamp: new Date().toISOString(),
   });
 };
+
+exports.diagnostics = async (_req, res) => {
+  try {
+    const diagnostics = await getProductionDiagnostics({ probeCallback: true });
+    return res.json({ success: true, diagnostics });
+  } catch (error) {
+    console.error("[mpesa][diagnostics:error]", { message: error?.message || "Diagnostic collection failed." });
+    return res.status(500).json({ success: false, code: "MPESA_DIAGNOSTICS_FAILED", message: "Unable to collect M-PESA production diagnostics." });
+  }
+};
+
 
 exports.myTransactions = async (req, res) => {
   try {
@@ -542,9 +553,9 @@ async function applyContributionPayment(transaction) {
   }
   const freshContribution = await Contribution.findById(contribution._id);
   const referenceNumber = `MPESA-${transaction._id}`;
-  const existingFinance = await Finance.findOne({ referenceNumber });
-  if (!existingFinance) {
-    await Finance.create({
+  await Finance.findOneAndUpdate(
+    { transactionNumber: referenceNumber },
+    { $setOnInsert: {
       member: freshContribution.member,
       transactionNumber: referenceNumber,
       type: "contribution",
@@ -555,8 +566,9 @@ async function applyContributionPayment(transaction) {
       description: `M-PESA contribution for ${freshContribution.member}`,
       status: "completed",
       transactionDate: transaction.completedAt || new Date(),
-    });
-  }
+    } },
+    { upsert: true, returnDocument: "after" }
+  );
   return freshContribution || contribution;
 }
 
@@ -755,12 +767,13 @@ exports.stkQuery = async (req, res) => {
     }
 
     if (resultCode != null && resultCode !== 0) {
-      await MpesaTransaction.findOneAndUpdate(
-        { _id: transaction._id, status: { $in: ["pending", "initiated"] } },
-        { $set: { status: "failed", completedAt: transaction.completedAt || new Date(), resultCode, resultDescription: transaction.resultDescription } },
+      const failed = await MpesaTransaction.findOneAndUpdate(
+        { _id: transaction._id, status: { $in: ["pending", "initiated", "processing", "unknown"] } },
+        { $set: { status: "failed", completedAt: transaction.completedAt || new Date(), resultCode, resultDescription: transaction.resultDescription, callbackProcessingAt: null } },
         { returnDocument: "after" }
       );
-      return res.json({ success: true, settled: true, source: "safaricom-query", message: transaction.resultDescription || "M-PESA payment was not completed.", transaction });
+      const fresh = failed || await MpesaTransaction.findById(transaction._id);
+      return res.json({ success: true, settled: true, source: "safaricom-query", message: fresh?.resultDescription || "M-PESA payment was not completed.", transaction: fresh });
     }
 
     await transaction.save();
@@ -846,6 +859,16 @@ async function processStkCallback({ body, requestId, claimedTransactionId = "" }
     return;
   }
 
+  if (!Number.isFinite(resultCode)) {
+    await MpesaTransaction.findOneAndUpdate(
+      { _id: transaction._id, status: { $in: ["pending", "initiated", "unknown", "processing"] } },
+      { $set: { ...baseSet, status: "unknown", callbackProcessingAt: null, callbackProcessingError: "Safaricom callback did not contain a definitive numeric ResultCode." } },
+      { returnDocument: "after" }
+    );
+    console.warn("[mpesa][callback:unknown]", { requestId, transactionId: transaction._id, checkoutRequestId, resultCode: null, resultDescription });
+    return;
+  }
+
   const failed = await MpesaTransaction.findOneAndUpdate(
     { _id: transaction._id, status: { $in: ["pending", "initiated", "unknown", "processing"] } },
     { $set: { ...baseSet, status: "failed", completedAt: transaction.completedAt || now, callbackProcessingAt: null } },
@@ -908,10 +931,16 @@ exports.callback = async (req, res) => {
         { returnDocument: "after" }
       );
       if (claimed) claimedTransactionId = String(claimed._id);
-    } else {
+    } else if (Number.isFinite(resultCode)) {
       await MpesaTransaction.findOneAndUpdate(
         { _id: existing._id, status: { $in: ["pending", "initiated", "unknown", "processing"] } },
         { $set: { ...baseSet, status: "failed", completedAt: existing.completedAt || now, callbackProcessingAt: null } },
+        { returnDocument: "after" }
+      );
+    } else {
+      await MpesaTransaction.findOneAndUpdate(
+        { _id: existing._id, status: { $in: ["pending", "initiated", "unknown", "processing"] } },
+        { $set: { ...baseSet, status: "unknown", callbackProcessingAt: null, callbackProcessingError: "Safaricom callback did not contain a definitive numeric ResultCode." } },
         { returnDocument: "after" }
       );
     }
@@ -919,7 +948,7 @@ exports.callback = async (req, res) => {
     res.status(200).json({ ResultCode: 0, ResultDesc: "Accepted" });
     if (claimedTransactionId) {
       setImmediate(() => void processStkCallback({ body: req.body, requestId, claimedTransactionId }).catch((error) => console.error("[mpesa][callback:unhandled]", { requestId, message: error.message })));
-    } else if (resultCode !== 0) {
+    } else if (Number.isFinite(resultCode) && resultCode !== 0) {
       setImmediate(() => void processStkCallback({ body: req.body, requestId }).catch((error) => console.error("[mpesa][callback:unhandled]", { requestId, message: error.message })));
     }
   } catch (error) {
@@ -1083,8 +1112,12 @@ exports.b2cResult = async (req, res) => {
       directTransaction.completedAt = new Date();
       await directTransaction.save();
       if (resultCode === 0) {
-        const exists = await Finance.findOne({ referenceNumber: directTransaction.conversationId, type: "withdrawal" });
-        if (!exists) await Finance.create({ member: directTransaction.member, transactionNumber: `BMX-B2C-${directTransaction._id.toString().slice(-8)}-${Date.now()}`, type: "withdrawal", category: "B2C disbursement", amount: directTransaction.amount, description: directTransaction.remarks, paymentMethod: "M-PESA", referenceNumber: directTransaction.conversationId || directTransaction.requestReference, receiptNumber: receipt, status: "completed", transactionDate: new Date(), notes: `SuperAdmin B2C disbursement confirmed by M-PESA. Request ${directTransaction.requestReference}.` });
+        const financeTransactionNumber = `BMX-B2C-${directTransaction._id}`;
+        await Finance.findOneAndUpdate(
+          { transactionNumber: financeTransactionNumber },
+          { $setOnInsert: { member: directTransaction.member, transactionNumber: financeTransactionNumber, type: "withdrawal", category: "B2C disbursement", amount: directTransaction.amount, description: directTransaction.remarks, paymentMethod: "M-PESA", referenceNumber: directTransaction.conversationId || directTransaction.requestReference, receiptNumber: receipt, status: "completed", transactionDate: new Date(), notes: `SuperAdmin B2C disbursement confirmed by M-PESA. Request ${directTransaction.requestReference}.` } },
+          { upsert: true, returnDocument: "after" }
+        );
         if (directTransaction.member) await createNotification({ recipient: directTransaction.member, recipientModel: "Member", title: "M-PESA Disbursement Received", message: `KSh ${Number(directTransaction.amount).toLocaleString("en-KE")} has been sent to your M-PESA account. Receipt: ${receipt || "pending"}.`, type: "payment", referenceId: directTransaction._id, referenceModel: "MpesaB2CTransaction", icon: "payments" });
       } else if (directTransaction.member) await createNotification({ recipient: directTransaction.member, recipientModel: "Member", title: "M-PESA Disbursement Update", message: `Your M-PESA disbursement of KSh ${Number(directTransaction.amount).toLocaleString("en-KE")} was not completed. ${result.ResultDesc || "Please contact the scheme administrator."}`, type: "payment", referenceId: directTransaction._id, referenceModel: "MpesaB2CTransaction", icon: "payments" });
     }
@@ -1095,8 +1128,12 @@ exports.b2cResult = async (req, res) => {
       campaign.status = code === 0 ? "paid" : (Number(campaign.raisedAmount) >= Number(campaign.targetAmount) ? "target_reached" : (campaign.enabled ? "open" : "closed"));
       await campaign.save();
       if (code === 0) {
-        const existing = await Finance.findOne({ referenceNumber: campaign.payoutConversationId, type: "withdrawal" });
-        if (!existing) await Finance.create({ member: campaign.recipientMember, transactionNumber: `BMX-PAYOUT-${campaign._id.toString().slice(-8)}-${Date.now()}`, type: "withdrawal", category: "Community assistance disbursement", amount: Number(campaign.payoutAmount || 0), description: campaign.title, paymentMethod: "M-PESA", referenceNumber: campaign.payoutConversationId, receiptNumber: receipt, status: "completed", transactionDate: new Date(), notes: `Community assistance disbursement confirmed by M-PESA. Case ${campaign._id}.` });
+        const financeTransactionNumber = `BMX-PAYOUT-${campaign._id}`;
+        await Finance.findOneAndUpdate(
+          { transactionNumber: financeTransactionNumber },
+          { $setOnInsert: { member: campaign.recipientMember, transactionNumber: financeTransactionNumber, type: "withdrawal", category: "Community assistance disbursement", amount: Number(campaign.payoutAmount || 0), description: campaign.title, paymentMethod: "M-PESA", referenceNumber: campaign.payoutConversationId, receiptNumber: receipt, status: "completed", transactionDate: new Date(), notes: `Community assistance disbursement confirmed by M-PESA. Case ${campaign._id}.` } },
+          { upsert: true, returnDocument: "after" }
+        );
         await createNotification({ recipient: campaign.recipientMember, recipientModel: "Member", title: "Community Assistance Paid", message: `KSh ${Number(campaign.payoutAmount).toLocaleString("en-KE")} has been sent to your registered M-PESA number.`, type: "claim", referenceId: campaign._id, referenceModel: "CommunityAssistance", icon: "payments" });
       }
     }
