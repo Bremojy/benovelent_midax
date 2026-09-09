@@ -29,6 +29,7 @@ for (const [label, source, needles] of [
     "getUserMedia",
     "new RTCPeerConnection",
     "toggleCallMode",
+    "callIdRef",
     "call-mode-offer",
     "call-mode-answer",
   ]],

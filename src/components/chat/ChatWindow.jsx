@@ -3,11 +3,12 @@ import ChatHeader from "./ChatHeader";
 import MessageBubble from "./MessageBubble";
 import MessageInput from "./MessageInput";
 import TypingIndicator from "./TypingIndicator";
+import { BellOff, BellRing, Pin, Trash2, X } from "lucide-react";
 import API from "../../services/api";
 import toast from "react-hot-toast";
 import "./ChatWindow.css";
 
-function ChatWindow({ conversation, socket, currentUser, onBack, onAudioCall, onVideoCall }) {
+function ChatWindow({ conversation, socket, currentUser, onBack, onAudioCall, onVideoCall, onConversationDeleted }) {
   const [messages, setMessages] = useState([]);
   const [typingUserId, setTypingUserId] = useState("");
   const [loadingMessages, setLoadingMessages] = useState(false);
@@ -15,6 +16,9 @@ function ChatWindow({ conversation, socket, currentUser, onBack, onAudioCall, on
   const [hasMore, setHasMore] = useState(false);
   const [nextCursor, setNextCursor] = useState("");
   const [loadingOlder, setLoadingOlder] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [muted, setMuted] = useState(Boolean(conversation?.mutedBy?.some?.((id) => String(id) === currentId)));
+  const [pinned, setPinned] = useState(Boolean(conversation?.pinnedBy?.some?.((id) => String(id) === currentId)));
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
   const typingUserRef = useRef("");
@@ -38,6 +42,12 @@ function ChatWindow({ conversation, socket, currentUser, onBack, onAudioCall, on
     const participants = conversation.participants || [];
     return conversation.partner || participants.find((member) => String(member?._id || member) !== currentId) || null;
   }, [conversation, currentId]);
+
+  useEffect(() => {
+    setDetailsOpen(false);
+    setMuted(Boolean(conversation?.mutedBy?.some?.((id) => String(id) === currentId)));
+    setPinned(Boolean(conversation?.pinnedBy?.some?.((id) => String(id) === currentId)));
+  }, [conversation?._id, currentId]);
 
   useEffect(() => {
     if (!conversation?._id) {
@@ -149,6 +159,31 @@ function ChatWindow({ conversation, socket, currentUser, onBack, onAudioCall, on
     };
   }, [socket, conversation?._id, currentId, ownIds]);
 
+  async function toggleConversationFlag(kind) {
+    if (!conversation?._id) return;
+    const endpoint = kind === "pin" ? "pin" : "mute";
+    try {
+      await API.put(`/conversations/${conversation._id}/${endpoint}`);
+      if (kind === "pin") setPinned((value) => !value);
+      else setMuted((value) => !value);
+      toast.success(kind === "pin" ? (pinned ? "Conversation unpinned." : "Conversation pinned.") : (muted ? "Conversation unmuted." : "Conversation muted."), { id: `chat-${kind}-${conversation._id}` });
+    } catch (error) {
+      toast.error(error?.response?.data?.message || `Unable to ${kind} this conversation.`);
+    }
+  }
+
+  async function removeConversation() {
+    if (!conversation?._id) return;
+    if (typeof window !== "undefined" && !window.confirm("Remove this conversation from your chat list?")) return;
+    try {
+      await API.delete(`/conversations/${conversation._id}`);
+      toast.success("Conversation removed.", { id: `chat-delete-${conversation._id}` });
+      onConversationDeleted?.(conversation._id);
+    } catch (error) {
+      toast.error(error?.response?.data?.message || "Unable to remove this conversation.");
+    }
+  }
+
   async function sendMessage(text, attachment, messageType = "text") {
     if (!conversation?._id) return;
     if (!String(text || "").trim() && !attachment) return;
@@ -241,7 +276,31 @@ function ChatWindow({ conversation, socket, currentUser, onBack, onAudioCall, on
         onAudioCall={onAudioCall}
         onVideoCall={onVideoCall}
         onBack={onBack}
+        onProfile={() => setDetailsOpen((open) => !open)}
       />
+
+      {detailsOpen && (
+        <aside className="chat-details-panel" aria-label="Conversation details">
+          <div className="chat-details-head">
+            <div>
+              <span>Conversation details</span>
+              <strong>{partner?.fullName || "Member"}</strong>
+            </div>
+            <button type="button" onClick={() => setDetailsOpen(false)} aria-label="Close conversation details"><X size={18} /></button>
+          </div>
+          <div className="chat-details-actions">
+            <button type="button" onClick={() => toggleConversationFlag("pin")}><Pin size={17} />{pinned ? "Unpin conversation" : "Pin conversation"}</button>
+            <button type="button" onClick={() => toggleConversationFlag("mute")}><>{muted ? <BellRing size={17} /> : <BellOff size={17} />}</>{muted ? "Unmute notifications" : "Mute notifications"}</button>
+            <button type="button" className="danger" onClick={removeConversation}><Trash2 size={17} />Remove conversation</button>
+          </div>
+          <div className="chat-details-meta">
+            {partner?.email ? <span>Email · {partner.email}</span> : null}
+            {partner?.phone ? <span>Phone · {partner.phone}</span> : null}
+            {partner?.roleLabel ? <span>Role · {partner.roleLabel}</span> : null}
+            {partner?.siteStation ? <span>Station · {partner.siteStation}</span> : null}
+          </div>
+        </aside>
+      )}
 
       {chatError && <div className="chat-error-banner" role="alert"><span>{chatError}</span><button type="button" onClick={() => setChatError("")} aria-label="Dismiss chat error">Dismiss</button></div>}
 

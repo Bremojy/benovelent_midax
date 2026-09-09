@@ -10,7 +10,9 @@ const {
     deleteConversation,
     addMember,
     removeMember,
-    markConversationRead
+    markConversationRead,
+    pinConversation,
+    muteConversation
 } = conversationController;
 
 const { verifyToken: protect } = require("../middleware/authMiddleware");
@@ -31,6 +33,8 @@ router.get("/", protect, isChatUser, safeHandler(getMyConversations, "Conversati
 router.get("/:id", protect, isChatUser, safeHandler(getConversation, "Conversation loading"));
 router.put("/:id/read", protect, isChatUser, safeHandler(markConversationRead, "Conversation read status"));
 router.delete("/:id", protect, isChatUser, safeHandler(deleteConversation, "Conversation removal"));
+router.put("/:id/pin", protect, isChatUser, safeHandler(pinConversation, "Conversation pinning"));
+router.put("/:id/mute", protect, isChatUser, safeHandler(muteConversation, "Conversation muting"));
 router.put("/:id/add-member", protect, isChatUser, safeHandler(addMember, "Add member"));
 router.put("/:id/remove-member", protect, isChatUser, safeHandler(removeMember, "Remove member"));
 

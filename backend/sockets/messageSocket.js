@@ -202,8 +202,7 @@ async function markMissedCall(callId, reason = "missed") {
     });
     const io = call.io;
     io?.to(String(call.recipientChatId)).emit("missed-call", { notification, callId, callType: call.callType, callerUserId: String(call.caller.chatId), callerName: call.caller.user.fullName || call.caller.user.name || "Member" });
-    io?.to(`user:${String(call.recipientChatId)}`).emit("new-notification", notification);
-  } catch (error) {
+    } catch (error) {
     console.warn("Could not create missed call notification:", error.message);
   }
 }
@@ -268,6 +267,10 @@ module.exports = (io, socket) => {
     if (!isChatRole(socket.data?.role) || !to || !offer) return;
     const recipient = await resolveActor(to);
     const caller = await resolveActor(socket.data.chatId || socket.data.userId, socket.data.role);
+    if (String(recipient?.chatId || "") === String(caller?.chatId || "")) {
+      socket.emit("call-error", { code: "SELF_CALL_BLOCKED", message: "Calling yourself is not available." });
+      return;
+    }
     if (!recipient || !caller || !isChatRole(recipient.role) || !isChatRole(caller.role)) return;
     if (conversationId) {
       const conversation = await getAuthorizedConversation(socket, conversationId);
@@ -277,10 +280,6 @@ module.exports = (io, socket) => {
       }
     }
     const normalizedType = callType === "video" ? "video" : "audio";
-    if (String(recipient.chatId) === String(caller.chatId)) {
-      socket.emit("call-error", { code: "SELF_CALL_BLOCKED", message: "Calling yourself is not available." });
-      return;
-    }
     const title = normalizedType === "video" ? "Incoming video call" : "Incoming audio call";
     const message = `${caller.user.fullName || caller.user.name || callerName || "A member"} is calling you.`;
     const callId = `${String(caller.user._id)}-${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
@@ -325,6 +324,9 @@ module.exports = (io, socket) => {
 
       const callNotification = { title, message, callType: normalizedType, callId, callerUserId: String(caller.chatId), callerName: incomingPayload.callerName, notification };
       recipientSockets.forEach((socketId) => io.to(socketId).emit("new-call-notification", callNotification));
+      if (!recipientSockets.size) {
+        io.to(String(caller.chatId)).emit("call-status", { callId, status: "ringing-offline", message: "The recipient is offline. A call notification was queued for their registered device." });
+      }
     } catch (error) { console.warn("Could not save/deliver call notification:", error.message); }
   });
 

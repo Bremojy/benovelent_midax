@@ -1,6 +1,4 @@
 const News = require("../models/News");
-const Notification = require("../models/Notification");
-const Member = require("../models/Member");
 
 module.exports = (io, socket) => {
 
@@ -34,31 +32,8 @@ module.exports = (io, socket) => {
                 news
             );
 
-            const members = await Member.find({
-                status: "active"
-            }).select("_id");
+            // Persistence and push delivery are owned by the news controller/model notification flow.
 
-            for (const member of members) {
-
-                await Notification.create({
-
-                    recipient: member._id,
-
-                    sender: news.author._id,
-
-                    title: "New Announcement",
-
-                    message: news.title,
-
-                    type: "news",
-
-                    referenceId: news._id,
-
-                    referenceModel: "News"
-
-                });
-
-            }
 
 
         }

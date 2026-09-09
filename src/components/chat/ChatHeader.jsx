@@ -7,7 +7,7 @@ function formatLastSeen(value) {
   return date.toLocaleString(undefined, { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
-function ChatHeader({ conversation, partner, typingUser, onAudioCall, onVideoCall, onBack }) {
+function ChatHeader({ conversation, partner, typingUser, onAudioCall, onVideoCall, onBack, onProfile }) {
   const user =
     partner ||
     conversation?.partner ||
@@ -58,7 +58,7 @@ function ChatHeader({ conversation, partner, typingUser, onAudioCall, onVideoCal
               <Video size={20} />
             </button>
           )}
-          <button type="button" title="Profile" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}>
+          <button type="button" title="Conversation details" aria-label="Conversation details" onClick={() => onProfile?.()}>
             <Info size={20} />
           </button>
         </div>

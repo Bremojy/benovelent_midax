@@ -7,6 +7,7 @@ import API from "../../services/api";
 import { buildPrintHeadHtml, printHeadStyles } from "../../utils/printHead";
 import MpesaPaymentButton from "../../components/payments/MpesaPaymentButton";
 import "../../styles/portalModule.css";
+import "./adminFinance.css";
 
 const today = new Date().toISOString().slice(0, 10);
 
@@ -381,10 +382,19 @@ export default function AdminFinance() {
           </div>
         </header>
 
+        <nav className="admin-account-tabs" aria-label="Accounts sections">
+          <a href="#finance-overview">Overview</a>
+          <a href="#finance-payments">Payments</a>
+          <a href="#finance-community">Community support</a>
+          <a href="#finance-payroll">Payroll & contributions</a>
+          <a href="#finance-ledger">Ledger</a>
+          {isSuperAdmin && <a href="#finance-superadmin">SuperAdmin controls</a>}
+        </nav>
+
         {message && <div className="portal-alert success">{message}</div>}
         {error && <div className="portal-alert">{error}</div>}
 
-        <section className="portal-panel accounts-trust-panel">
+        <section id="finance-overview" className="portal-panel accounts-trust-panel">
           <div className="portal-module-header compact-header"><div><span>PAYMENT TRUST CENTRE</span><h2>M-PESA status & collection details</h2><p>Live configuration is read from the secure backend. Secrets are never displayed in the portal.</p></div></div>
           <div className="portal-stat-grid">
             <Stat label="STK status" value={mpesaConfig?.configured ? "Ready" : "Not configured"} />
@@ -409,7 +419,7 @@ export default function AdminFinance() {
           <div className="portal-table-wrap" style={{ marginTop: 18 }}><table className="portal-table"><thead><tr><th>Date</th><th>Recipient</th><th>Amount</th><th>Status</th><th>Receipt / conversation</th><th>Remarks</th></tr></thead><tbody>{b2cHistory.length === 0 ? <tr><td colSpan="6">No direct B2C disbursements recorded.</td></tr> : b2cHistory.map((x, i) => <tr key={x._id || i}><td>{date(x.createdAt)}</td><td>{x.member?.fullName || x.phoneNumber}</td><td>{number(x.amount)}</td><td><span className={`portal-badge ${x.status === "successful" ? "approved" : ""}`}>{x.status}</span></td><td>{x.transactionReceipt || x.conversationId || x.originatorConversationId || "Pending callback"}</td><td>{x.remarks || "—"}</td></tr>)}</tbody></table></div>
         </section>}
 
-        <section className="portal-panel">
+        <section id="finance-payments" className="portal-panel">
           <div className="portal-module-header compact-header"><div><span>MANUAL M-PESA VERIFICATION</span><h2>Equity PayBill 247247 submissions</h2><p>Verify the transaction code against the authorised payment records before approving. Submitted payments remain pending until an administrator verifies them.</p></div><span className="portal-badge">PayBill {mpesaConfig?.manualPaybill || "247247"} · Account {mpesaConfig?.manualAccountNumber || "0650186528835"}</span></div>
           {manualMpesa.length === 0 ? <div className="portal-empty">No manual M-PESA PayBill submissions are waiting for review.</div> : <div className="portal-table-wrap"><table className="portal-table"><thead><tr><th>Date</th><th>Member</th><th>Amount</th><th>Transaction code</th><th>Status</th><th>Reconciliation</th><th>Action</th></tr></thead><tbody>{manualMpesa.map((x) => {
             const pending = x.status === "pending";
@@ -418,7 +428,7 @@ export default function AdminFinance() {
           })}</tbody></table></div>}
         </section>
 
-        <section className="portal-panel community-control-panel">
+        <section id="finance-community" className="portal-panel community-control-panel">
           <div className="portal-module-header compact-header"><div><span>COMMUNITY M-PESA CONTROL</span><h2>Collection requests</h2><p>Monitor every verified community collection. Only SuperAdmin can disburse collected funds or close a collection request.</p></div><span className="portal-badge"><LockKeyhole size={14} /> {isSuperAdmin ? "Controls enabled" : "Monitoring only"}</span></div>
           {community.length === 0 ? <div className="portal-empty">No community M-PESA requests have been created.</div> : <div className="portal-grid two">{community.map((campaign) => {
             const pct = Math.min(100, Math.round((Number(campaign.raisedAmount || 0) / Math.max(1, Number(campaign.targetAmount || 1))) * 100));
@@ -444,7 +454,7 @@ export default function AdminFinance() {
           <Stat label="Support Disbursed / Claims" value={number(first("totalClaims", "claims"))} />
         </div>
 
-        <section className="portal-panel payroll-run-panel">
+        <section id="finance-payroll" className="portal-panel payroll-run-panel">
           <div className="portal-module-header">
             <div><span>PAYROLL CONTRIBUTION RUN</span><h2>Record the common deduction for all active members</h2><p>The Admin records one approved monthly amount for every active member. Re-running the same month updates the existing contribution records instead of creating duplicates.</p></div>
             <div className="portal-stat"><span>Model</span><strong>One amount</strong><small>shared by all members</small></div>
@@ -481,7 +491,7 @@ export default function AdminFinance() {
         </section>
 
 
-        <section className="portal-panel">
+        <section id="finance-ledger" className="portal-panel">
           <div className="portal-module-header"><div><span>DOUBLE-ENTRY STYLE VIEW</span><h2>Benovelent Fund Ledger</h2><p>Credits increase the fund balance; debits record support, expenses and withdrawals.</p></div></div>
           <div className="portal-stat-grid">
             <Stat label="Credits" value={number(ledger?.totals?.credit)} />
@@ -495,7 +505,7 @@ export default function AdminFinance() {
         </section>
 
         {isSuperAdmin && (
-          <section className="portal-panel">
+          <section id="finance-superadmin" className="portal-panel">
             <div className="portal-module-header compact-header"><div><span>SUPERADMIN M-PESA CONTROL</span><h2>All M-PESA transactions</h2><p>View every STK and manual PayBill collection record. Settled transactions remain protected; unsettled records can be permanently deleted with an audit trail.</p></div><span className="portal-badge"><Eye size={14} /> Full view</span></div>
             {allMpesa.length === 0 ? <div className="portal-empty">No M-PESA transactions returned.</div> : <div className="portal-table-wrap"><table className="portal-table"><thead><tr><th>Date</th><th>Account</th><th>Method</th><th>Purpose</th><th>Amount</th><th>Status</th><th>Receipt / Code</th><th>Actions</th></tr></thead><tbody>
               {allMpesa.slice(0, 200).map((x) => { const settled = Boolean(x.reconciled || x.status === "successful"); return <tr key={x._id}><td>{date(x.createdAt || x.initiatedAt)}</td><td>{x.member?.fullName || x.member?.memberNumber || "—"}<br /><small>{x.member?.email || ""}</small></td><td>{x.paymentMethod === "manual_paybill" ? `PayBill ${x.manualPaybill || mpesaConfig?.manualPaybill || "247247"}` : "STK Push"}</td><td>{x.purpose || "—"}</td><td>{number(x.amount)}</td><td><span className={`portal-badge ${settled ? "approved" : x.status === "failed" ? "rejected" : ""}`}>{x.status}</span></td><td>{x.mpesaReceiptNumber || x.manualTransactionCode || x.checkoutRequestId || "—"}</td><td><div className="portal-actions"><button type="button" className="portal-btn secondary" onClick={() => setSelectedMpesa(x)}><Eye size={14} /> View</button><button type="button" className="portal-btn danger" disabled={mpesaDeleteBusy === String(x._id) || settled} title={settled ? "Settled transactions are protected" : "Delete transaction"} onClick={() => deleteMpesaTransaction(x)}><Trash2 size={14} /> {mpesaDeleteBusy === String(x._id) ? "Deleting…" : "Delete"}</button></div></td></tr>; })}

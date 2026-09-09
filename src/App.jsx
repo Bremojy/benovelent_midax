@@ -153,6 +153,13 @@ const Contributions = lazy(
     )
 );
 
+const MemberAccounts = lazy(
+  () =>
+    import(
+      "./pages/member/Accounts"
+    )
+);
+
 const Claims = lazy(
   () =>
     import(
@@ -531,7 +538,7 @@ function AppContent() {
 
           <Route path="/member/platform" element={<ProtectedRoute allowedRoles={["member"]}><Navigate to="/member" replace /></ProtectedRoute>} />
 
-          <Route path="/member/accounts" element={<ProtectedRoute allowedRoles={["member"]}><Contributions /></ProtectedRoute>} />
+          <Route path="/member/accounts" element={<ProtectedRoute allowedRoles={["member"]}><MemberAccounts /></ProtectedRoute>} />
 
           <Route
             path="/member/contributions"

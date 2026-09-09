@@ -29,6 +29,8 @@ export default function CallOverlay({
 }) {
   const [status, setStatus] = useState(incomingCall ? "Incoming call" : "Calling...");
   const [callId, setCallId] = useState(incomingCall?.callId || "");
+  const callIdRef = useRef(incomingCall?.callId || "");
+  const endingRef = useRef(false);
   const [connected, setConnected] = useState(false);
   const [muted, setMuted] = useState(false);
   const [activeCallType, setActiveCallType] = useState(callType === "video" ? "video" : "audio");
@@ -61,6 +63,13 @@ export default function CallOverlay({
     mountedRef.current = true;
     return () => { mountedRef.current = false; };
   }, []);
+
+  useEffect(() => {
+    const initialId = String(incomingCall?.callId || "");
+    callIdRef.current = initialId;
+    setCallId(initialId);
+    endingRef.current = false;
+  }, [incomingCall?.callId]);
 
   useEffect(() => {
     if (selfCall) {
@@ -116,7 +125,11 @@ export default function CallOverlay({
     if (!socket) return undefined;
 
     const handleStarted = ({ callId: startedCallId }) => {
-      if (startedCallId) setCallId(String(startedCallId));
+      if (startedCallId) {
+        const normalized = String(startedCallId);
+        callIdRef.current = normalized;
+        setCallId(normalized);
+      }
     };
     const handleAnswered = async ({ answer }) => {
       if (!peerRef.current || !answer) return;
@@ -177,6 +190,9 @@ export default function CallOverlay({
     };
     const handleEnded = () => finish(false);
     const handleRejected = () => finish(false);
+    const handleSocketDisconnect = () => {
+      if (!endingRef.current) setError("The realtime call connection was interrupted. Reconnecting…");
+    };
 
     socket.on("call-started", handleStarted);
     socket.on("call-answered", handleAnswered);
@@ -185,6 +201,7 @@ export default function CallOverlay({
     socket.on("ice-candidate", handleCandidate);
     socket.on("call-ended", handleEnded);
     socket.on("call-rejected", handleRejected);
+    socket.on("disconnect", handleSocketDisconnect);
 
     return () => {
       socket.off("call-started", handleStarted);
@@ -194,6 +211,7 @@ export default function CallOverlay({
       socket.off("ice-candidate", handleCandidate);
       socket.off("call-ended", handleEnded);
       socket.off("call-rejected", handleRejected);
+      socket.off("disconnect", handleSocketDisconnect);
     };
   }, [socket, partnerId, callId]);
 
@@ -203,7 +221,7 @@ export default function CallOverlay({
     videoTransceiverRef.current = peer.addTransceiver("video", { direction: "recvonly" });
     peer.onicecandidate = (event) => {
       if (event.candidate && partnerId) {
-        socket?.emit("ice-candidate", { to: incomingCall?.from || partnerId, candidate: event.candidate, callId });
+        socket?.emit("ice-candidate", { to: incomingCall?.from || partnerId, candidate: event.candidate, callId: callIdRef.current || incomingCall?.callId || "" });
       }
     };
     peer.ontrack = (event) => {
@@ -279,7 +297,7 @@ export default function CallOverlay({
       await flushCandidates();
       const answer = await peer.createAnswer();
       await peer.setLocalDescription(answer);
-      socket.emit("call-answer", { to: incomingCall.from, answer, callId: incomingCall.callId || callId });
+      socket.emit("call-answer", { to: incomingCall.from, answer, callId: incomingCall.callId || callIdRef.current || callId });
       setStatus("Connecting...");
     } else {
       const offer = await peer.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true });
@@ -350,7 +368,7 @@ export default function CallOverlay({
       socket.emit("call-mode-offer", {
         to: incomingCall?.from || partnerId,
         offer,
-        callId: incomingCall?.callId || callId,
+        callId: incomingCall?.callId || callIdRef.current || callId,
         mode: nextType,
       });
     } catch (err) {
@@ -372,19 +390,25 @@ export default function CallOverlay({
   }
 
   function rejectCall(reason = "declined") {
+    if (endingRef.current) return;
+    endingRef.current = true;
+    const activeCallId = incomingCall?.callId || callIdRef.current || callId;
     const target = incomingCall?.from || partnerId;
-    socket?.emit("call-rejected", { to: target, callId: incomingCall?.callId || callId, reason });
-    stopNativeIncomingCall(incomingCall?.callId || callId);
+    if (target && activeCallId) socket?.emit("call-rejected", { to: target, callId: activeCallId, reason });
+    stopNativeIncomingCall(activeCallId);
     ringtoneRef.current?.stop?.();
     cleanupMedia();
     onClose?.();
   }
 
   function finish(notify = true) {
+    if (endingRef.current) return;
+    endingRef.current = true;
+    const activeCallId = incomingCall?.callId || callIdRef.current || callId;
     const target = incomingCall?.from || partnerId;
-    if (notify && target) socket?.emit("end-call", { to: target, callId: incomingCall?.callId || callId });
+    if (notify && target && activeCallId) socket?.emit("end-call", { to: target, callId: activeCallId });
     ringtoneRef.current?.stop?.();
-    stopNativeIncomingCall(incomingCall?.callId || callId);
+    stopNativeIncomingCall(activeCallId);
     cleanupMedia();
     onClose?.();
   }

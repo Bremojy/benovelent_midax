@@ -293,9 +293,9 @@ message:"Conversation not found."
 
 }
 
-if(!conversation.deletedFor.includes(req.user._id)){
+if(!conversation.deletedFor.includes(actorId)){
 
-conversation.deletedFor.push(req.user._id);
+conversation.deletedFor.push(actorId);
 
 }
 
@@ -335,11 +335,9 @@ exports.pinConversation=async(req,res)=>{
 
 try{
 
-const conversation=await Conversation.findById(
+const actorId = req.auth?.chatId || req.user?.chatMemberId || req.user?._id;
 
-req.params.id
-
-);
+const conversation = await Conversation.findOne({ _id: req.params.id, participants: actorId, active: { $ne: false } });
 
 if(!conversation){
 
@@ -353,9 +351,9 @@ message:"Conversation not found."
 
 }
 
-if(!conversation.pinnedBy.includes(req.user._id)){
+if(!conversation.pinnedBy.includes(actorId)){
 
-conversation.pinnedBy.push(req.user._id);
+conversation.pinnedBy.push(actorId);
 
 }
 
@@ -395,11 +393,9 @@ exports.muteConversation=async(req,res)=>{
 
 try{
 
-const conversation=await Conversation.findById(
+const actorId = req.auth?.chatId || req.user?.chatMemberId || req.user?._id;
 
-req.params.id
-
-);
+const conversation = await Conversation.findOne({ _id: req.params.id, participants: actorId, active: { $ne: false } });
 
 if(!conversation){
 
@@ -413,9 +409,9 @@ message:"Conversation not found."
 
 }
 
-if(!conversation.mutedBy.includes(req.user._id)){
+if(!conversation.mutedBy.includes(actorId)){
 
-conversation.mutedBy.push(req.user._id);
+conversation.mutedBy.push(actorId);
 
 }
 

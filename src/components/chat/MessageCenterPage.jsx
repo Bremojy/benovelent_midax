@@ -127,9 +127,11 @@ function MessageCenterPage({
     const handleCallNotification = (payload) => {
       const title = payload?.title || "Incoming call";
       const body = payload?.message || "Someone is calling you.";
-      toast(`${title}: ${body}`, { icon: "📞", duration: 5500, id: "incoming-call-notice" });
-      if (typeof document !== "undefined" && document.visibilityState !== "visible" && typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
-        try { new Notification(title, { body, tag: `call-${payload?.callerUserId || Date.now()}` }); } catch {}
+      // Native/browser push is already delivered by the backend notification path.
+      // Keep this event strictly for the in-app toast so one call never produces
+      // two browser notifications in the foreground/background transition.
+      if (typeof document === "undefined" || document.visibilityState === "visible") {
+        toast(`${title}: ${body}`, { icon: "📞", duration: 5500, id: "incoming-call-notice" });
       }
     };
 
@@ -348,6 +350,15 @@ function MessageCenterPage({
     setMobileChatOpen(isMobile);
   };
 
+  const handleConversationDeleted = (conversationId) => {
+    setConversations((previous) => previous.filter((item) => String(item?._id) !== String(conversationId)));
+    if (String(selectedConversationRef.current?._id || "") === String(conversationId)) {
+      setSelectedConversation(null);
+      setMobileChatOpen(false);
+      selectedConversationRef.current = null;
+    }
+  };
+
   const startConversation = async (person) => {
     try {
       if (!person?._id) return;
@@ -466,6 +477,7 @@ function MessageCenterPage({
             onBack={mobileBack}
             onAudioCall={() => startCall("audio")}
             onVideoCall={() => startCall("video")}
+            onConversationDeleted={handleConversationDeleted}
           />
         </div>
         {call && (
@@ -643,6 +655,7 @@ function MessageCenterPage({
                     onBack={mobileBack}
                     onAudioCall={() => startCall("audio")}
                     onVideoCall={() => startCall("video")}
+                    onConversationDeleted={handleConversationDeleted}
                   />
                 )}
                 {isMobile && !mobileChatOpen && <div className="chat-window-empty choose-chat-empty">Select a chat above to open the conversation.</div>}

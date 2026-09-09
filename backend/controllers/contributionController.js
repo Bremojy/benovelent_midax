@@ -350,29 +350,25 @@ exports.getMemberContributions = async (req,res)=>{
     try{
         const isMemberRole = String(req.user?.role || '').toLowerCase() === 'member';
         if (isMemberRole) {
+            const requestedMemberId = req.user._id;
             const currentYear = Number(req.query.year) || new Date().getFullYear();
-            const rows = await Contribution.find({ year: currentYear }).lean();
-            const monthly = Array.from({ length: 12 }, (_, i) => {
-                const month = i + 1;
-                const monthRows = rows.filter((item) => Number(item.month) === month);
-                return {
-                    month,
-                    expected: monthRows.reduce((sum, item) => sum + Number(item.expectedAmount || 0), 0),
-                    collected: monthRows.reduce((sum, item) => sum + Number(item.paidAmount || 0), 0),
-                    membersCharged: new Set(monthRows.map((item) => String(item.member))).size,
-                };
-            });
+            const query = { member: requestedMemberId };
+            if (req.query.year !== undefined) query.year = currentYear;
+            const rows = await Contribution.find(query)
+                .populate('finance')
+                .sort({ paymentDate: -1, year: -1, month: -1, createdAt: -1 })
+                .lean();
             return res.json({
                 success: true,
-                scope: 'scheme-wide',
+                scope: 'member',
                 year: currentYear,
                 count: rows.length,
-                monthly,
+                contributions: rows,
                 summary: {
                     totalExpected: rows.reduce((sum, item) => sum + Number(item.expectedAmount || 0), 0),
-                    totalCollected: rows.reduce((sum, item) => sum + Number(item.paidAmount || 0), 0),
+                    totalPaid: rows.reduce((sum, item) => sum + Number(item.paidAmount || 0), 0),
+                    totalBalance: rows.reduce((sum, item) => sum + Math.max(0, Number(item.expectedAmount || 0) - Number(item.paidAmount || 0)), 0),
                 },
-                notice: 'Individual member contribution records are not displayed to members.'
             });
         }
 
