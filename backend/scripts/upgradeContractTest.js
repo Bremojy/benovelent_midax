@@ -24,8 +24,8 @@ const assistantUi = read('src/components/SmartAssistant.jsx');
 
 must(memberController.includes('const { MEMBER_STATUS } = require("../constants/memberStatus");'), 'MEMBER_STATUS import missing.');
 must(memberController.includes('String(member.status || "").toLowerCase() === MEMBER_STATUS.ACTIVE'), 'Eligibility status comparison missing.');
-must(financeRoutes.includes('router.delete("/:id", protect, isSuperAdmin, deleteTransaction);'), 'Finance delete route is not SuperAdmin-only.');
-must(financeController.includes('Only SuperAdmin can permanently delete a financial transaction'), 'Finance controller defense-in-depth guard missing.');
+must(financeRoutes.includes('router.delete("/:id", protect, isAdminOrSuperAdmin, deleteTransaction);'), 'Finance removal route must be available to Admin and SuperAdmin.');
+must(financeController.includes('Permanent deletion is reserved for SuperAdmin.'), 'Finance controller must preserve the SuperAdmin-only permanent deletion boundary.');
 must(supportController.includes('exports.memberUpdate') && supportController.includes('exports.memberRemove'), 'Member support lifecycle handlers missing.');
 must(supportController.includes('At least two supporting documents are required.'), 'Minimum document rule missing.');
 must(supportController.includes('documents from at least two different categories'), 'Distinct document category rule missing.');
@@ -41,9 +41,9 @@ must(adminController.includes('const siteStation = String(req.query.siteStation 
 must(adminService.includes('siteStation = ""'), 'Admin site-station filter service missing.');
 must(adminMembers.includes('Filter by site station'), 'Admin site-station filter UI missing.');
 must(financeRoutes.includes('router.patch("/:id/visibility", protect, isSuperAdmin, hideTransaction);'), 'Finance visibility must remain SuperAdmin-only.');
-must(financeController.includes('startDate') && financeController.includes('endDate') && financeController.includes('moneyIn') && financeController.includes('moneyOut'), 'Member account date-range/Money In-Money Out support missing.');
+must(financeController.includes('exports.constitutionLedger') && financeController.includes('DATE_FILTER_REQUIRED') && financeController.includes('credit') && financeController.includes('debit'), 'Member constitution-ledger date-range/Money In-Money Out support missing.');
 must(financeUi.includes('Permanent deletion is reserved for SuperAdmin'), 'Admin finance must explain deletion boundary.');
-must(contributionsPage.includes('Opening date') && contributionsPage.includes('Closing date') && contributionsPage.includes('Money In'), 'Member Accounts date-range and Money In UI missing.');
+must(app.includes('path="/member/contributions"') && app.includes('Navigate to="/member/accounts"'), 'Legacy member contribution route must be redirected into the separated Accounts hub.');
 must(assistant.includes('ASSISTANT_KNOWLEDGE') && assistant.includes('configuredFaqs'), 'Context-aware grounded assistant knowledge missing.');
 must(assistantUi.includes('suggested') && assistantUi.includes('path.includes("support")'), 'Page-aware assistant quick suggestions missing.');
 console.log('UPGRADE CONTRACT TEST PASSED');

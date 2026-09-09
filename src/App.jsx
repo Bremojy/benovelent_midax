@@ -106,7 +106,7 @@ const AdminMembers = lazy(
     )
 );
 
-const AdminFinance = lazy(() => import("./pages/admin/AdminFinance"));
+const AdminAccounts = lazy(() => import("./pages/admin/AdminAccounts"));
 const AdminClaims = lazy(() => import("./pages/admin/AdminClaims"));
 const AdminSupport = lazy(() => import("./pages/admin/AdminSupport"));
 const AdminMessages = lazy(() => import("./pages/admin/AdminMessages"));
@@ -143,13 +143,6 @@ const Profile = lazy(
   () =>
     import(
       "./pages/member/Profile"
-    )
-);
-
-const Contributions = lazy(
-  () =>
-    import(
-      "./pages/member/Contributions"
     )
 );
 
@@ -219,6 +212,7 @@ const SuperAdminAudit = lazy(() => import("./pages/superadmin/SuperAdminAudit"))
 const SuperAdminSettings = lazy(() => import("./pages/superadmin/SuperAdminSettings"));
 const SuperAdminSystem = lazy(() => import("./pages/superadmin/SuperAdminSystem"));
 const SuperAdminDataIntegrity = lazy(() => import("./pages/superadmin/SuperAdminDataIntegrity"));
+const SuperAdminAccounts = lazy(() => import("./pages/superadmin/SuperAdminAccounts"));
 const SuperAdminConstitution = lazy(() => import("./pages/superadmin/SuperAdminConstitution"));
 const SuperAdminNotifications = lazy(() => import("./pages/superadmin/SuperAdminNotifications"));
 const SuperAdminNews = lazy(() => import("./pages/superadmin/SuperAdminNews"));
@@ -494,7 +488,7 @@ function AppContent() {
           />
 
           <Route path="/admin/platform" element={<ProtectedRoute allowedRoles={["admin","superadmin"]}><Navigate to="/admin" replace /></ProtectedRoute>} />
-          <Route path="/admin/accounts" element={<ProtectedRoute allowedRoles={["admin"]}><AdminFinance /></ProtectedRoute>} />
+          <Route path="/admin/accounts" element={<ProtectedRoute allowedRoles={["admin"]}><AdminAccounts /></ProtectedRoute>} />
           <Route path="/admin/finance" element={<Navigate to="/admin/accounts" replace />} />
           <Route path="/admin/claims" element={<ProtectedRoute allowedRoles={["admin", "superadmin"]}><AdminClaims /></ProtectedRoute>} />
           <Route path="/admin/support" element={<ProtectedRoute allowedRoles={["admin", "superadmin"]}><AdminSupport /></ProtectedRoute>} />
@@ -540,18 +534,7 @@ function AppContent() {
 
           <Route path="/member/accounts" element={<ProtectedRoute allowedRoles={["member"]}><MemberAccounts /></ProtectedRoute>} />
 
-          <Route
-            path="/member/contributions"
-            element={
-              <ProtectedRoute
-                allowedRoles={[
-                  "member",
-                ]}
-              >
-                <Contributions />
-              </ProtectedRoute>
-            }
-          />
+          <Route path="/member/contributions" element={<ProtectedRoute allowedRoles={["member"]}><Navigate to="/member/accounts" replace /></ProtectedRoute>} />
 
           <Route
             path="/member/claims"
@@ -688,7 +671,7 @@ function AppContent() {
           <Route path="/superadmin/platform" element={<ProtectedRoute allowedRoles={["superadmin"]}><Navigate to="/superadmin" replace /></ProtectedRoute>} />
           <Route path="/superadmin/messages" element={<ProtectedRoute allowedRoles={["superadmin"]}><Navigate to="/superadmin" replace /></ProtectedRoute>} />
           <Route path="/superadmin/members" element={<ProtectedRoute allowedRoles={["superadmin"]}><AdminMembers /></ProtectedRoute>} />
-          <Route path="/superadmin/accounts" element={<ProtectedRoute allowedRoles={["superadmin"]}><AdminFinance /></ProtectedRoute>} />
+          <Route path="/superadmin/accounts" element={<ProtectedRoute allowedRoles={["superadmin"]}><SuperAdminAccounts /></ProtectedRoute>} />
           <Route path="/superadmin/finance" element={<Navigate to="/superadmin/accounts" replace />} />
           <Route path="/superadmin/audit" element={<ProtectedRoute allowedRoles={["superadmin"]}><SuperAdminAudit /></ProtectedRoute>} />
           <Route path="/superadmin/notifications" element={<ProtectedRoute allowedRoles={["superadmin"]}><SuperAdminNotifications /></ProtectedRoute>} />

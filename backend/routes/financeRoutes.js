@@ -13,10 +13,13 @@ const {
   getFinanceSummary,
   getLedger,
   hideTransaction,
+  constitutionLedger,
+  uploadAttachment,
 } = require("../controllers/financeController");
 
 const { verifyToken: protect } = require("../middleware/authMiddleware");
 const { isAdminOrSuperAdmin, isMember, isSuperAdmin } = require("../middleware/roleMiddleware");
+const { uploadSingle, setUploadType } = require("../middleware/upload");
 
 // ==========================================
 // FINANCE ROUTES
@@ -28,7 +31,8 @@ router.post("/", protect, isAdminOrSuperAdmin, createTransaction);
 // Get all transactions
 router.get("/", protect, isAdminOrSuperAdmin, getTransactions);
 
-// Finance dashboard summary
+// Finance dashboards / constitutional ledger
+router.get("/constitution-ledger", protect, constitutionLedger);
 router.get("/ledger", protect, getLedger);
 router.get("/summary/dashboard", protect, isAdminOrSuperAdmin, getFinanceSummary);
 
@@ -42,7 +46,8 @@ router.get("/:id", protect, getTransaction);
 router.put("/:id", protect, isAdminOrSuperAdmin, updateTransaction);
 
 // Delete transaction
-router.delete("/:id", protect, isSuperAdmin, deleteTransaction);
+router.delete("/:id", protect, isAdminOrSuperAdmin, deleteTransaction);
+router.post("/:id/attachment", protect, isAdminOrSuperAdmin, setUploadType("finance"), uploadSingle("attachment"), uploadAttachment);
 router.patch("/:id/visibility", protect, isSuperAdmin, hideTransaction);
 
 // Approve transaction

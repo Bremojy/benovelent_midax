@@ -118,7 +118,6 @@ const fanoutOne = async (notification) => {
     const io = getIO();
     if (io) {
       io.to(room).emit("new-notification", notification);
-      io.to(room).emit("notification-created", notification);
       const unread = await mongoose.model("Notification").countDocuments({
         recipient: notification.recipient,
         recipientModel: notification.recipientModel || "Member",
@@ -162,12 +161,69 @@ notificationSchema.post("findOneAndUpdate", async (notification) => {
   if (notification) await fanoutOne(notification);
 });
 
+
+const notificationFingerprint = (doc = {}) => [
+  doc.recipientModel || "Member",
+  doc.recipient,
+  doc.type || "system",
+  doc.referenceModel || "",
+  doc.referenceId || "",
+  doc.title || "",
+  doc.message || "",
+].map((value) => String(value ?? "")).join("|");
+
+// Centralised idempotency for every Notification.create/insertMany caller,
+// including older controllers that have not yet migrated to notificationService.
+// This prevents exact duplicate notifications without requiring a data migration.
+const NotificationModel = mongoose.models.Notification || mongoose.model("Notification", notificationSchema);
+if (!NotificationModel.__midaxNotificationDedupe) {
+  const originalCreate = NotificationModel.create.bind(NotificationModel);
+  const originalInsertMany = NotificationModel.insertMany.bind(NotificationModel);
+  NotificationModel.create = async function createDeduped(doc, ...rest) {
+    if (!doc?.recipient || !doc?.title || !doc?.message) return originalCreate(doc, ...rest);
+    const existing = await NotificationModel.findOne({
+      recipient: doc.recipient,
+      recipientModel: doc.recipientModel || "Member",
+      type: doc.type || "system",
+      referenceModel: doc.referenceModel || "",
+      referenceId: doc.referenceId || null,
+      title: doc.title,
+      message: doc.message,
+    }).sort({ createdAt: -1 });
+    if (existing) return existing;
+    return originalCreate(doc, ...rest);
+  };
+  NotificationModel.insertMany = async function insertManyDeduped(docs, ...rest) {
+    const source = Array.isArray(docs) ? docs : [];
+    const seen = new Set();
+    const fresh = [];
+    for (const doc of source) {
+      const key = notificationFingerprint(doc);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const existing = doc?.recipient && doc?.title && doc?.message
+        ? await NotificationModel.findOne({
+            recipient: doc.recipient,
+            recipientModel: doc.recipientModel || "Member",
+            type: doc.type || "system",
+            referenceModel: doc.referenceModel || "",
+            referenceId: doc.referenceId || null,
+            title: doc.title,
+            message: doc.message,
+          }).select("_id").lean()
+        : null;
+      if (!existing) fresh.push(doc);
+    }
+    if (!fresh.length) return [];
+    return originalInsertMany(fresh, ...rest);
+  };
+  NotificationModel.__midaxNotificationDedupe = true;
+}
+
 notificationSchema.post("deleteOne", async (result) => {
   // Queries that delete by recipient are invalidated by the controller/service;
   // this hook intentionally avoids guessing which recipient was affected.
   return result;
 });
 
-module.exports =
-    mongoose.models.Notification ||
-    mongoose.model("Notification", notificationSchema);
+module.exports = NotificationModel;

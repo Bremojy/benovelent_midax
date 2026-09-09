@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const { verifyToken: protect } = require("../middleware/authMiddleware");
-const { isMember, isContributionUser, isAdminOrSuperAdmin, isSuperAdmin } = require("../middleware/roleMiddleware");
+const { isMember, isContributionUser, isMemberOrAdminContributionUser, isAdminOrSuperAdmin, isSuperAdmin } = require("../middleware/roleMiddleware");
 const controller = require("../controllers/paymentController");
 
 router.get("/route-status", controller.routeStatus);
@@ -34,5 +34,8 @@ router.get("/community-assistance/mine", protect, controller.myCommunityCases);
 router.post("/community-assistance", protect, isAdminOrSuperAdmin, controller.enableCommunityAssistance);
 router.post("/community-assistance/:id/payout", protect, isSuperAdmin, controller.payoutCommunity);
 router.post("/community-assistance/:id/close", protect, isSuperAdmin, controller.closeCommunity);
+router.delete("/community-assistance/:id", protect, isSuperAdmin, controller.deleteCommunity);
+router.post("/transactions/:id/cancel", protect, isAdminOrSuperAdmin, controller.cancelTransaction);
+router.get("/community-assistance/mine/ledger", protect, isMember, controller.myCommunityLedger);
 
 module.exports = router;

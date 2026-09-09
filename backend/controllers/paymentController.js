@@ -296,6 +296,7 @@ exports.deleteTransaction = async (req, res) => {
 
 exports.stk = async (req, res) => {
   let tx = null;
+  if (String(req.user?.role || req.userRole || "").toLowerCase() === "superadmin") return res.status(403).json({ success: false, message: "SuperAdmin accounts cannot make personal M-PESA contributions." });
   let paymentMember = null;
   let idempotencyKey = "";
   const requestId = String(req.requestId || req.get("X-Request-ID") || "unknown");
@@ -599,6 +600,7 @@ async function reconcileSuccessfulTransaction(transaction) {
 
 exports.manualPayment = async (req, res) => {
   try {
+    if (String(req.user?.role || req.userRole || "").toLowerCase() === "superadmin") return res.status(403).json({ success: false, message: "SuperAdmin accounts cannot make personal M-PESA contributions." });
     const amount = Number(req.body?.amount);
     const purpose = String(req.body?.purpose || "").trim();
     const referenceId = req.body?.referenceId || null;
@@ -720,6 +722,7 @@ exports.callbackHealth = async (_req, res) => {
 
 exports.stkQuery = async (req, res) => {
   try {
+    if (String(req.user?.role || req.userRole || "").toLowerCase() === "superadmin") return res.status(403).json({ success: false, message: "SuperAdmin accounts cannot make or manage personal M-PESA contribution payments from Accounts." });
     const transactionId = String(req.body?.transactionId || req.body?.id || "").trim();
     const checkoutRequestId = String(req.body?.checkoutRequestId || "").trim();
     if (!transactionId && !checkoutRequestId) {
@@ -1165,4 +1168,92 @@ exports.b2cTimeout = async (req, res) => {
     }
   } catch (error) { console.error("B2C timeout callback error:", error); }
   res.json({ ResultCode: 0, ResultDesc: "Accepted" });
+};
+
+exports.cancelTransaction = async (req, res) => {
+  try {
+    const role = String(req.user?.role || "").toLowerCase();
+    const transaction = await MpesaTransaction.findOne({
+      _id: req.params.id,
+      status: { $in: ["initiated", "pending", "processing", "unknown"] },
+    });
+    if (!transaction) return res.status(404).json({ success: false, message: "An open M-PESA transaction was not found." });
+    transaction.status = "cancelled";
+    transaction.completedAt = new Date();
+    transaction.resultCode = transaction.resultCode ?? 1;
+    transaction.resultDescription = String(req.body?.reason || `Cancelled by ${role === "superadmin" ? "SuperAdmin" : "Admin / leader"}`).slice(0, 500);
+    await transaction.save();
+    if (transaction.member) {
+      await createNotification({
+        recipient: transaction.member,
+        recipientModel: "Member",
+        sender: req.user._id,
+        senderModel: role === "superadmin" ? "SuperAdmin" : "Admin",
+        title: "M-PESA Payment Update",
+        message: `Your M-PESA transaction ${transaction.mpesaReceiptNumber || transaction.manualTransactionCode || transaction.requestId || transaction._id} was cancelled by an administrator.`,
+        type: "payment",
+        referenceId: transaction._id,
+        referenceModel: "MpesaTransaction",
+        icon: "payments",
+      });
+    }
+    return res.json({ success: true, message: "Open M-PESA transaction cancelled.", transaction });
+  } catch (error) {
+    console.error("M-PESA transaction cancellation error:", error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+exports.deleteCommunity = async (req, res) => {
+  try {
+    const campaign = await CommunityAssistance.findById(req.params.id);
+    if (!campaign) return res.status(404).json({ success: false, message: "Community assistance request not found." });
+    if (Number(campaign.raisedAmount || 0) > 0 || ["pending", "successful"].includes(String(campaign.payoutStatus || "")) || String(campaign.status) === "paid") {
+      return res.status(409).json({ success: false, code: "FUNDS_ALREADY_RECORDED", message: "This request already has collected or disbursed funds. Close it instead of permanently deleting it." });
+    }
+    await MpesaTransaction.deleteMany({ referenceModel: "CommunityAssistance", referenceId: campaign._id, status: { $in: ["initiated", "pending", "processing", "failed", "cancelled", "unknown"] } });
+    await campaign.deleteOne();
+    await createAuditLog({ user: req.user._id, userRole: req.user.role, action: "COMMUNITY_COLLECTION_DELETED", module: "M-PESA", description: `SuperAdmin permanently deleted community M-PESA request ${campaign.title}.`, req, metadata: { campaignId: campaign._id } });
+    return res.json({ success: true, message: "Community M-PESA request permanently deleted." });
+  } catch (error) {
+    console.error("Delete community assistance error:", error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+exports.myCommunityLedger = async (req, res) => {
+  try {
+    const campaigns = await CommunityAssistance.find({ recipientMember: req.user._id }).sort({ createdAt: -1 }).lean();
+    const result = [];
+    for (const campaign of campaigns) {
+      const payments = await MpesaTransaction.find({ referenceModel: "CommunityAssistance", referenceId: campaign._id, status: { $in: ["pending", "successful", "failed", "reversed", "cancelled", "timeout", "unknown"] } })
+        .select("amount status mpesaReceiptNumber manualTransactionCode createdAt initiatedAt completedAt resultDescription reconciled")
+        .sort({ createdAt: 1 })
+        .lean();
+      const successful = payments.filter((p) => String(p.status) === "successful" && p.reconciled !== false);
+      const totalSuccessful = successful.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+      result.push({
+        campaign: {
+          _id: campaign._id,
+          title: campaign.title,
+          description: campaign.description,
+          targetAmount: campaign.targetAmount,
+          raisedAmount: campaign.raisedAmount,
+          status: campaign.status,
+          payoutStatus: campaign.payoutStatus,
+          payoutAmount: campaign.payoutAmount,
+          payoutReceipt: campaign.payoutReceipt,
+          payoutDate: campaign.payoutDate,
+          createdAt: campaign.createdAt,
+          closedAt: campaign.closedAt,
+        },
+        totals: { totalSuccessful, disbursement: Number(campaign.payoutAmount || 0), balance: totalSuccessful - Number(campaign.payoutAmount || 0) },
+        payments,
+      });
+    }
+    return res.json({ success: true, cases: result });
+  } catch (error) {
+    console.error("My community ledger error:", error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
 };

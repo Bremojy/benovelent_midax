@@ -430,7 +430,17 @@ function MessageCenterPage({
   };
 
   const startCall = async (type) => {
+    const actorRole = String(actor?.role || currentUser?.role || authUser?.role || "").toLowerCase();
     const partner = selectedConversation?.partner;
+    if (!["member", "admin"].includes(actorRole)) {
+      toast.error("Calling is available to members and Admin / leader accounts.");
+      return;
+    }
+    const partnerRole = String(partner?.role || "member").toLowerCase();
+    if (!["member", "admin"].includes(partnerRole)) {
+      toast.error("This account is not available for calls.");
+      return;
+    }
     if (!partner?._id) {
       toast.error("Select a member before starting a call.");
       return;

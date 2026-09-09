@@ -37,15 +37,22 @@ exports.getNotifications = async (req, res) => {
     const skip = (page - 1) * limit;
     const filter = { recipient: req.user._id };
 
-    const [total, notifications] = await Promise.all([
-      Notification.countDocuments(filter),
-      Notification.find(filter)
-        .populate("sender", "fullName profileImage")
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limit)
-        .lean(),
-    ]);
+    const rawNotifications = await Notification.find(filter)
+      .populate("sender", "fullName profileImage")
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(Math.min(100, limit * 2))
+      .lean();
+    const notifications = [];
+    const fingerprints = new Set();
+    for (const item of rawNotifications) {
+      const fingerprint = [item.recipientModel, item.recipient, item.type, item.referenceModel, item.referenceId, item.title, item.message].map((v) => String(v ?? "")).join("|");
+      if (fingerprints.has(fingerprint)) continue;
+      fingerprints.add(fingerprint);
+      notifications.push(item);
+      if (notifications.length >= limit) break;
+    }
+    const total = await Notification.countDocuments(filter);
 
     return res.json({
       success: true,
@@ -75,10 +82,14 @@ exports.getUnreadCount = async (req, res) => {
     res.json = (body) => { redisCache.setJson(cacheKey, body, 5).catch(() => {}); return __originalJson(body); };
 
   try {
-    const unread = await Notification.countDocuments({
-      recipient: req.user._id,
-      read: false,
-    });
+    const unreadRows = await Notification.find({ recipient: req.user._id, read: false })
+      .select("recipientModel recipient type referenceModel referenceId title message")
+      .lean();
+    const fingerprints = new Set();
+    for (const item of unreadRows) {
+      fingerprints.add([item.recipientModel, item.recipient, item.type, item.referenceModel, item.referenceId, item.title, item.message].map((v) => String(v ?? "")).join("|"));
+    }
+    const unread = fingerprints.size;
 
     return res.json({
       success: true,

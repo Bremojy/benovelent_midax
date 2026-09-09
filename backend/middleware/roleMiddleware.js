@@ -44,6 +44,7 @@ const isMember = authorize("member");
 // Admins and SuperAdmins remain fully privileged administrators; this role
 // group is only used for self-payment/contribution flows.
 const isContributionUser = authorize("member", "admin", "superadmin");
+const isMemberOrAdminContributionUser = authorize("member", "admin");
 
 // ==========================================
 // ADMIN ONLY
@@ -72,6 +73,7 @@ module.exports = {
   authorize,
   isMember,
   isContributionUser,
+  isMemberOrAdminContributionUser,
   isAdmin,
   isSuperAdmin,
   isAdminOrSuperAdmin,

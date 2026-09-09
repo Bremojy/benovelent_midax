@@ -98,6 +98,35 @@ const financeSchema = new mongoose.Schema({
         default: ""
     },
 
+    contributorType: {
+        type: String,
+        enum: ["member", "admin", "all"],
+        default: null
+    },
+
+    contributor: {
+        type: mongoose.Schema.Types.ObjectId,
+        refPath: "contributorModel",
+        default: null
+    },
+
+    contributorModel: {
+        type: String,
+        enum: ["Member", "Admin"],
+        default: null
+    },
+
+    contributorName: {
+        type: String,
+        default: ""
+    },
+
+    attachment: {
+        url: { type: String, default: "" },
+        name: { type: String, default: "" },
+        type: { type: String, default: "" }
+    },
+
     hidden: {
         type: Boolean,
         default: false,

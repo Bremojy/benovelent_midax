@@ -1,8 +1,10 @@
 const Finance = require("../models/Finance");
 const Member = require("../models/Member");
+const Admin = require("../models/Admin");
 const Notification = require("../models/Notification");
 const Contribution = require("../models/Contribution");
 const redisCache = require("../services/redisCache");
+const { resolveStoredFileUrl } = require("../utils/uploadUrl");
 
 /* =====================================================
    GENERATE TRANSACTION NUMBER
@@ -25,7 +27,7 @@ const generateTransactionNumber = () => {
 
 exports.createTransaction = async (req, res) => {
     try {
-        const { member, employeeNumber, type, category, amount, description, paymentMethod, referenceNumber, receiptNumber, notes, transactionDate } = req.body || {};
+        const { member, employeeNumber, type, category, amount, description, paymentMethod, referenceNumber, receiptNumber, notes, transactionDate, contributorType, contributorId } = req.body || {};
         let memberId = member || null;
         if (!memberId && employeeNumber) {
             const found = await Member.findOne({ memberNumber: String(employeeNumber).trim() }).select("_id").lean();
@@ -35,17 +37,53 @@ exports.createTransaction = async (req, res) => {
             return res.status(400).json({ success: false, message: "Transaction type and a positive amount are required." });
         }
         const memberRequiredFor = new Set(["contribution", "claim", "refund"]);
-        if (memberRequiredFor.has(type) && !memberId) {
+        const scope = type === "contribution" ? String(contributorType || (memberId ? "member" : "all")).toLowerCase() : null;
+        if (type === "contribution" && !["member", "admin", "all"].includes(scope)) {
+            return res.status(400).json({ success: false, message: "Select whether the contribution is from a member, admin/leader, or all members and admins." });
+        }
+        if (scope === "member") {
+            if (!memberId) return res.status(400).json({ success: false, message: "Benovelent MIDAX Number is required for a member contribution." });
+            if (!await Member.exists({ _id: memberId })) return res.status(404).json({ success: false, message: "Benovelent MIDAX Number not found." });
+        } else if (scope === "admin") {
+            memberId = null;
+            const requesterRole = String(req.user?.role || "").toLowerCase();
+            if (requesterRole === "admin") {
+                // The contributor is the logged-in Admin/leader.
+            } else if (requesterRole === "superadmin") {
+                if (!contributorId || !await Admin.exists({ _id: contributorId })) return res.status(400).json({ success: false, message: "Select a valid Admin / leader for this contribution." });
+            } else {
+                return res.status(403).json({ success: false, message: "Only Admin or SuperAdmin can record an Admin contribution." });
+            }
+        } else if (scope === "all") {
+            memberId = null;
+        } else if (memberId && !await Member.exists({ _id: memberId })) {
+            return res.status(404).json({ success: false, message: "Benovelent MIDAX Number not found." });
+        }
+        if (memberRequiredFor.has(type) && !memberId && type !== "contribution") {
             return res.status(400).json({ success: false, message: "Benovelent MIDAX Number is required for this transaction type." });
         }
-        if (memberId && !await Member.exists({ _id: memberId })) {
-            return res.status(404).json({ success: false, message: "Benovelent MIDAX Number not found." });
+        let contributor = null;
+        let contributorModel = null;
+        let contributorName = "";
+        if (scope === "member") {
+            contributor = memberId;
+            contributorModel = "Member";
+            const found = await Member.findById(memberId).select("fullName").lean();
+            contributorName = found?.fullName || "Member";
+        } else if (scope === "admin") {
+            contributor = contributorId || req.user._id;
+            contributorModel = "Admin";
+            const selectedAdmin = await Admin.findById(contributor).select("fullName name").lean();
+            contributorName = selectedAdmin?.fullName || selectedAdmin?.name || req.user.fullName || req.user.name || "Admin / Leader";
+        } else if (scope === "all") {
+            contributorName = "All members & admins";
         }
         const transaction = await Finance.create({
             member: memberId,
             transactionNumber: generateTransactionNumber(),
             type, category, amount: Number(amount), description, paymentMethod,
             referenceNumber, receiptNumber, notes,
+            contributorType: scope, contributor, contributorModel, contributorName,
             transactionDate: transactionDate ? new Date(transactionDate) : new Date(),
             status: "approved",
             approvedBy: req.user._id,
@@ -265,7 +303,9 @@ exports.updateTransaction = async (req, res) => {
             "referenceNumber",
             "receiptNumber",
             "transactionDate",
-            "notes"
+            "notes",
+            "contributorType",
+            "contributorName"
         ];
 
         fields.forEach(field => {
@@ -287,6 +327,32 @@ exports.updateTransaction = async (req, res) => {
             }
         }
 
+        if (transaction.type === "contribution") {
+            const scope = String(req.body.contributorType || transaction.contributorType || (transaction.member ? "member" : "all")).toLowerCase();
+            if (!["member", "admin", "all"].includes(scope)) return res.status(400).json({ success: false, message: "Invalid contribution source." });
+            transaction.contributorType = scope;
+            if (scope === "member") {
+                const memberId = transaction.member;
+                if (!memberId || !await Member.exists({ _id: memberId })) return res.status(400).json({ success: false, message: "A valid member is required for this contribution." });
+                const member = await Member.findById(memberId).select("fullName").lean();
+                transaction.contributor = memberId;
+                transaction.contributorModel = "Member";
+                transaction.contributorName = member?.fullName || transaction.contributorName || "Member";
+            } else if (scope === "admin") {
+                transaction.member = null;
+                const selectedAdminId = req.body.contributorId || transaction.contributor || req.user._id;
+                if (!await Admin.exists({ _id: selectedAdminId })) return res.status(400).json({ success: false, message: "Select a valid Admin / leader for this contribution." });
+                transaction.contributor = selectedAdminId;
+                transaction.contributorModel = "Admin";
+                const selectedAdmin = await Admin.findById(selectedAdminId).select("fullName name").lean();
+                transaction.contributorName = selectedAdmin?.fullName || selectedAdmin?.name || transaction.contributorName || "Admin / Leader";
+            } else {
+                transaction.member = null;
+                transaction.contributor = null;
+                transaction.contributorModel = null;
+                transaction.contributorName = "All members & admins";
+            }
+        }
         await transaction.save();
         if (transaction.member) {
             await Notification.create({
@@ -384,8 +450,9 @@ exports.hideTransaction = async (req, res) => {
 
 exports.deleteTransaction = async (req, res) => {
     try {
-        if (String(req.user?.role || "").toLowerCase() !== "superadmin") {
-            return res.status(403).json({ success: false, message: "Only SuperAdmin can permanently delete a financial transaction. Admins may edit records or hide them only when authorised." });
+        const role = String(req.user?.role || "").toLowerCase();
+        if (!["admin", "superadmin"].includes(role)) {
+            return res.status(403).json({ success: false, message: "Only Admin or SuperAdmin can remove a financial transaction." });
         }
         const transaction = await Finance.findById(req.params.id);
         if (!transaction) {
@@ -405,21 +472,28 @@ exports.deleteTransaction = async (req, res) => {
         }
 
         const affectedMember = transaction.member;
-        await transaction.deleteOne();
+        if (role === "superadmin") {
+            await transaction.deleteOne();
+        } else {
+            transaction.hidden = true;
+            transaction.hiddenAt = new Date();
+            transaction.hiddenBy = req.user._id;
+            await transaction.save();
+        }
         if (affectedMember) {
             await Notification.create({
                 recipient: affectedMember,
                 recipientModel: "Member",
                 sender: req.user._id,
-                senderModel: "SuperAdmin",
+                senderModel: role === "superadmin" ? "SuperAdmin" : "Admin",
                 title: "Finance Record Removed",
-                message: "A financial record linked to your account was permanently removed by SuperAdmin.",
+                message: `A financial record linked to your account was removed by ${role === "superadmin" ? "SuperAdmin" : "an Admin / leader"}.`,
                 type: "finance", referenceId: transaction._id, referenceModel: "Finance"
             });
         }
         return res.json({
             success: true,
-            message: "Transaction deleted successfully.",
+            message: role === "superadmin" ? "Transaction permanently deleted successfully." : "Transaction removed from the Accounts ledger. Permanent deletion is reserved for SuperAdmin.",
         });
     } catch (error) {
         console.error(error);
@@ -801,185 +875,87 @@ exports.getFinanceSummary = async (req, res) => {
 
 
 exports.getMemberAccounts = async (req, res) => {
-  const year = Number(req.query.year) || new Date().getFullYear();
-  const startParam = String(req.query.startDate || "").trim();
-  const endParam = String(req.query.endDate || "").trim();
-  const startDate = /^\d{4}-\d{2}-\d{2}$/.test(startParam) ? new Date(`${startParam}T00:00:00.000Z`) : new Date(`${year}-01-01T00:00:00.000Z`);
-  const endDate = /^\d{4}-\d{2}-\d{2}$/.test(endParam) ? new Date(`${endParam}T23:59:59.999Z`) : new Date(`${year + 1}-01-01T00:00:00.000Z`);
-  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime()) || startDate > endDate) {
-    return res.status(400).json({ success: false, message: "The opening date must be on or before the closing date." });
-  }
-  const cacheKey = `member:${req.user?._id}:accounts:${year}:${startDate.toISOString()}:${endDate.toISOString()}`;
-  const cached = await redisCache.getJson(cacheKey);
-  if (cached !== null) return res.json(cached);
+  // Legacy endpoint kept for older clients. It now returns only the constitution
+  // ledger, never the scheme-wide contribution/support dashboard.
+  const startDate = String(req.query?.startDate || "").trim();
+  const endDate = String(req.query?.endDate || "").trim();
+  if (!startDate || !endDate) return res.status(400).json({ success: false, code: "DATE_FILTER_REQUIRED", message: "Select an opening and closing date for the constitution ledger." });
+  return exports.constitutionLedger(req, res);
+};
 
+/* =====================================================
+   CONSTITUTION LEDGER (MEMBER + ADMIN + SUPERADMIN)
+===================================================== */
+exports.constitutionLedger = async (req, res) => {
   try {
-    const yearStart = new Date(`${year}-01-01T00:00:00.000Z`);
-    const yearEnd = new Date(`${year + 1}-01-01T00:00:00.000Z`);
-    const month = Number(req.query.month) || new Date().getMonth() + 1;
-
-    const [activeMembers, contributions, allFinance, medical, funeral, education, community] = await Promise.all([
-      Member.countDocuments({ role: "member", status: "active", isDeleted: false }),
-      Contribution.find().sort({ paymentDate: -1, createdAt: -1 }).lean(),
-      Finance.find({ status: { $in: ["approved", "completed"] } }).sort({ transactionDate: 1, createdAt: 1 }).lean(),
-      require("../models/MedicalSupport").find({ isDeleted: { $ne: true } }).select("status approvedAmount requestedAmount createdAt paymentDate updatedAt dependent member").lean(),
-      require("../models/FuneralSupport").find({}).select("status approvedAmount requestedAmount createdAt paymentDate applicationDate closedDate member deceasedType").lean(),
-      require("../models/EducationSupport").find({}).select("status approvedAmount requestedAmount createdAt disbursementDate applicationDate completionDate member dependentName").lean(),
-      require("../models/CommunityAssistance").find({}).select("title description targetAmount raisedAmount status payoutAmount payoutStatus payoutReceipt payoutDate createdAt recipientMember referenceModel").lean(),
-    ]);
-
-    const schemeContributions = contributions.filter((item) => Number(item.year) === year);
-    const totalExpected = schemeContributions.reduce((sum, item) => sum + Number(item.expectedAmount || 0), 0);
-    const totalCollected = schemeContributions.reduce((sum, item) => sum + Number(item.paidAmount || 0), 0);
-    const outstanding = schemeContributions.reduce((sum, item) => sum + Math.max(0, Number(item.expectedAmount || 0) - Number(item.paidAmount || 0)), 0);
-    const monthly = Array.from({ length: 12 }, (_, index) => {
-      const m = index + 1;
-      const rows = schemeContributions.filter((item) => Number(item.month) === m);
+    const role = String(req.user?.role || "").toLowerCase();
+    const startDate = String(req.query?.startDate || "").trim();
+    const endDate = String(req.query?.endDate || "").trim();
+    if (role === "member" && (!startDate || !endDate)) {
+      return res.status(400).json({ success: false, code: "DATE_FILTER_REQUIRED", message: "Select a start and end date before loading the constitution ledger." });
+    }
+    const start = startDate ? new Date(`${startDate}T00:00:00.000Z`) : new Date(`${new Date().getFullYear()}-01-01T00:00:00.000Z`);
+    const end = endDate ? new Date(`${endDate}T23:59:59.999Z`) : new Date(`${new Date().getFullYear()}-12-31T23:59:59.999Z`);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || start > end) {
+      return res.status(400).json({ success: false, message: "Enter a valid date range." });
+    }
+    const filter = {
+      transactionDate: { $gte: start, $lte: end },
+      status: { $in: ["approved", "completed"] },
+      hidden: { $ne: true },
+    };
+    const rows = await Finance.find(filter)
+      .populate("member", "fullName memberNumber")
+      .populate("contributor", "fullName memberNumber")
+      .sort({ transactionDate: 1, createdAt: 1 })
+      .lean();
+    let balance = 0;
+    const creditTypes = new Set(["contribution", "income", "refund"]);
+    const entries = rows.map((row) => {
+      const credit = creditTypes.has(row.type) ? Number(row.amount || 0) : 0;
+      const debit = credit ? 0 : Number(row.amount || 0);
+      balance += credit - debit;
       return {
-        month: m,
-        expected: rows.reduce((sum, item) => sum + Number(item.expectedAmount || 0), 0),
-        collected: rows.reduce((sum, item) => sum + Number(item.paidAmount || 0), 0),
-        outstanding: rows.reduce((sum, item) => sum + Math.max(0, Number(item.expectedAmount || 0) - Number(item.paidAmount || 0)), 0),
-        membersCharged: new Set(rows.map((item) => String(item.member))).size,
+        _id: row._id,
+        transactionNumber: row.transactionNumber,
+        date: row.transactionDate || row.createdAt,
+        type: row.type,
+        category: row.category || "",
+        description: row.description || "",
+        paymentMethod: row.paymentMethod || "",
+        referenceNumber: row.referenceNumber || row.receiptNumber || "",
+        contributorType: row.contributorType || (row.member ? "member" : ""),
+        contributorName: row.contributorName || row.member?.fullName || row.contributor?.fullName || (row.member?.memberNumber ? `Member ${row.member.memberNumber}` : ""),
+        member: row.member ? { _id: row.member._id, fullName: row.member.fullName, memberNumber: row.member.memberNumber } : null,
+        debit,
+        credit,
+        runningBalance: balance,
+        attachment: row.attachment || { url: "", name: "", type: "" },
+        notes: row.notes || "",
       };
     });
-
-    const currentMonthRows = schemeContributions.filter((item) => Number(item.month) === month);
-    const deductionCounts = currentMonthRows.reduce((map, item) => { const value = Number(item.expectedAmount || 0); if (value > 0) map.set(value, (map.get(value) || 0) + 1); return map; }, new Map());
-    const standardMonthlyDeduction = [...deductionCounts.entries()].sort((a, b) => b[1] - a[1] || b[0] - a[0])[0]?.[0] || 500;
-
-    const credits = (row) => ["contribution", "income", "refund"].includes(String(row.type || "").toLowerCase());
-    const financeRows = allFinance.filter((row) => String(row.type || "").toLowerCase() !== "contribution");
-    const contributionRows = contributions.filter((row) => Number(row.paidAmount || 0) > 0 && row.paymentDate);
-
-    // Build a real cash ledger: chronological entries with an opening balance
-    // from every approved/completed record before the selected range.
-    let openingBalance = 0;
-    for (const row of financeRows) {
-      const date = new Date(row.transactionDate || row.createdAt || 0);
-      if (date < startDate) openingBalance += credits(row) ? Number(row.amount || 0) : -Number(row.amount || 0);
-    }
-    for (const row of contributionRows) {
-      const date = new Date(row.paymentDate || row.createdAt || 0);
-      if (date < startDate) openingBalance += Number(row.paidAmount || 0);
-    }
-
-    const rangeEntries = [];
-    for (const row of financeRows) {
-      const date = new Date(row.transactionDate || row.createdAt || 0);
-      if (date < startDate || date > endDate) continue;
-      const amount = Number(row.amount || 0);
-      rangeEntries.push({
-        date: row.transactionDate || row.createdAt,
-        type: row.type || "other",
-        category: row.category || "scheme activity",
-        description: row.description || row.category || row.type || "Scheme activity",
-        amount,
-        debit: credits(row) ? 0 : amount,
-        credit: credits(row) ? amount : 0,
-        source: "finance",
-        reference: row.receiptNumber || row.referenceNumber || row.transactionNumber || "",
-      });
-    }
-    for (const row of contributionRows) {
-      const date = new Date(row.paymentDate || row.createdAt || 0);
-      if (date < startDate || date > endDate) continue;
-      const amount = Number(row.paidAmount || 0);
-      if (!amount) continue;
-      rangeEntries.push({
-        date: row.paymentDate || row.createdAt,
-        type: "contribution",
-        category: "Member contribution",
-        description: `Contribution for ${String(row.month).padStart(2, "0")}/${row.year}`,
-        amount,
-        debit: 0,
-        credit: amount,
-        source: "contribution",
-        reference: row.mpesaCode || row.receiptNumber || "",
-      });
-    }
-    rangeEntries.sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
-    let runningBalance = openingBalance;
-    for (const entry of rangeEntries) {
-      runningBalance += Number(entry.credit || 0) - Number(entry.debit || 0);
-      entry.runningBalance = runningBalance;
-    }
-
-    const assistanceCases = [
-      ...medical.filter((x) => ["Approved", "Paid", "Completed", "Closed"].includes(x.status)).map((x) => ({
-        sourceType: "Medical Support", status: x.status, date: x.paymentDate || x.updatedAt || x.createdAt,
-        amount: Number(x.approvedAmount || 0), referenceId: x._id, privacyLabel: "Assisted member / dependent protected",
-      })),
-      ...funeral.filter((x) => ["Approved", "Paid", "Completed", "Closed"].includes(x.status)).map((x) => ({
-        sourceType: "Benovelent Scheme Support", status: x.status, date: x.paymentDate || x.closedDate || x.createdAt,
-        amount: Number(x.approvedAmount || 0), referenceId: x._id, privacyLabel: "Assisted member identity protected",
-      })),
-      ...education.filter((x) => ["Approved", "Disbursed", "Completed"].includes(x.status)).map((x) => ({
-        sourceType: "Education Policy", status: x.status, date: x.disbursementDate || x.completionDate || x.createdAt,
-        amount: Number(x.approvedAmount || 0), referenceId: x._id, privacyLabel: "Assisted member / dependent protected",
-      })),
-      ...community.filter((x) => Number(x.payoutAmount || 0) > 0 || x.payoutStatus === "successful").map((x) => ({
-        sourceType: "Community M-PESA Support", status: x.payoutStatus || x.status, date: x.payoutDate || x.createdAt,
-        amount: Number(x.payoutAmount || 0), referenceId: x._id, receipt: x.payoutReceipt || "",
-        privacyLabel: "Assisted member identity protected",
-      })),
-    ].sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
-
-    const approvedSupportRows = [...medical, ...funeral, ...education];
-    const approvedStatuses = new Set(["Approved", "Paid", "Disbursed", "Completed", "Closed"]);
-    const pendingStatuses = new Set(["Pending", "Under Review"]);
-    const approvedSupportTotal = approvedSupportRows.reduce((sum, item) => sum + (approvedStatuses.has(item.status) ? Number(item.approvedAmount || 0) : 0), 0);
-    const pendingSupportTotal = approvedSupportRows.filter((item) => pendingStatuses.has(item.status)).length;
-    const closingBalance = runningBalance;
-
-    const payload = {
-      success: true,
-      scope: "scheme-wide",
-      year,
-      month,
-      standardMonthlyDeduction,
-      activeMembers,
-      monthly,
-      totals: {
-        totalExpected,
-        totalCollected,
-        outstanding,
-        membersCharged: new Set(schemeContributions.map((item) => String(item.member))).size,
-        approvedSupportTotal,
-        pendingSupportCases: pendingSupportTotal,
-        ledgerBalance: closingBalance,
-        ledgerCredits: rangeEntries.reduce((sum, item) => sum + item.credit, 0),
-        ledgerDebits: rangeEntries.reduce((sum, item) => sum + item.debit, 0),
-        moneyIn: rangeEntries.reduce((sum, item) => sum + item.credit, 0),
-        moneyOut: rangeEntries.reduce((sum, item) => sum + item.debit, 0),
-      },
-      ledger: {
-        openingDate: startDate.toISOString(),
-        closingDate: endDate.toISOString(),
-        openingBalance,
-        closingBalance,
-        entries: rangeEntries.slice(0, 200),
-        totals: {
-          credit: rangeEntries.reduce((sum, item) => sum + item.credit, 0),
-          debit: rangeEntries.reduce((sum, item) => sum + item.debit, 0),
-          balance: closingBalance,
-        },
-      },
-      assistanceCases,
-      support: {
-        totalCases: approvedSupportRows.length,
-        approvedCases: approvedSupportRows.filter((item) => approvedStatuses.has(item.status)).length,
-        pendingCases: pendingSupportTotal,
-        approvedSupportTotal,
-      },
-      openingDate: startDate.toISOString(),
-      closingDate: endDate.toISOString(),
-      notice: "Money In = member contributions, income and refunds. Money Out = assistance, claims, expenses and withdrawals. Assisted case identities are privacy-protected.",
-    };
-    await redisCache.setJson(cacheKey, payload, 15);
-    return res.json(payload);
+    const totals = entries.reduce((a, row) => ({ credit: a.credit + row.credit, debit: a.debit + row.debit }), { credit: 0, debit: 0 });
+    return res.json({ success: true, startDate, endDate, entries, totals: { ...totals, balance: totals.credit - totals.debit } });
   } catch (error) {
-    console.error("Scheme-wide member accounts error:", error);
-    res.status(500).json({ success: false, message: error.message || "Unable to load scheme accounts." });
+    console.error("Constitution ledger error:", error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+exports.uploadAttachment = async (req, res) => {
+  try {
+    const transaction = await Finance.findById(req.params.id);
+    if (!transaction) return res.status(404).json({ success: false, message: "Transaction not found." });
+    if (!req.file) return res.status(400).json({ success: false, message: "Choose an attachment first." });
+    transaction.attachment = {
+      url: resolveStoredFileUrl(req.file, `/uploads/${req.uploadType || "finance"}`),
+      name: String(req.file.originalname || req.file.filename || "attachment").slice(0, 180),
+      type: String(req.file.mimetype || "").slice(0, 120),
+    };
+    await transaction.save();
+    return res.json({ success: true, message: "Transaction attachment saved.", transaction });
+  } catch (error) {
+    console.error("Finance attachment error:", error);
+    return res.status(500).json({ success: false, message: error.message });
   }
 };
