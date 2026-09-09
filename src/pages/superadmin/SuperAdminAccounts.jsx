@@ -6,7 +6,7 @@ import { confirmAction } from "../../utils/modernDialog";
 import { MpesaStatusBadge, MpesaTransactionButton } from "../../components/accounts/MpesaTransactionViewer";
 import ConstitutionLedgerTable from "../../components/accounts/ConstitutionLedgerTable";
 import "../../styles/portalModule.css";
-import "../admin/Accounts.css";
+import "../member/Accounts.css";
 
 const today=new Date().toISOString().slice(0,10);
 const money=v=>new Intl.NumberFormat("en-KE",{style:"currency",currency:"KES",maximumFractionDigits:0}).format(Number(v||0));

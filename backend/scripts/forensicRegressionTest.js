@@ -1,6 +1,28 @@
 #!/usr/bin/env node
 const fs=require("fs"),path=require("path"),assert=require("assert");
 const root=path.resolve(__dirname,"../.."),read=r=>fs.readFileSync(path.join(root,r),"utf8");
+
+// Vercel/build guard: every frontend relative import must resolve on the
+// case-sensitive production filesystem (including CSS/static module imports).
+const sourceFiles=[];
+(function walk(dir){
+  for(const entry of fs.readdirSync(dir,{withFileTypes:true})){
+    const full=path.join(dir,entry.name);
+    if(entry.isDirectory()){ if(!["node_modules","dist"].includes(entry.name)) walk(full); }
+    else if(/\.(?:js|jsx|ts|tsx)$/.test(entry.name)) sourceFiles.push(full);
+  }
+})(path.join(root,"src"));
+const missingImports=[];
+const importPattern=/(?:from\s*|import\s*(?:\(\s*)?)["'](\.{1,2}\/[^"']+)["']/g;
+for(const file of sourceFiles){
+  const text=fs.readFileSync(file,"utf8"); let match;
+  while((match=importPattern.exec(text))){
+    const spec=match[1]; const base=path.resolve(path.dirname(file),spec);
+    const candidates=path.extname(base) ? [base] : [base+".js",base+".jsx",base+".ts",base+".tsx",base+".css",base+".json",path.join(base,"index.js"),path.join(base,"index.jsx"),path.join(base,"index.ts"),path.join(base,"index.tsx")];
+    if(!candidates.some(fs.existsSync)) missingImports.push(`${path.relative(root,file)} -> ${spec}`);
+  }
+}
+assert.deepStrictEqual(missingImports,[] ,`Build blocker: unresolved local imports: ${missingImports.join("; ")}`);
 const dashboard=read("src/pages/member/MemberDashboard.jsx"),model=read("backend/models/Notification.js"),nc=read("backend/controllers/notificationController.js"),ns=read("backend/sockets/notificationSocket.js"),ms=read("backend/sockets/messageSocket.js"),top=read("src/components/dashboard/DashboardTopbar.jsx"),payment=read("backend/controllers/paymentController.js"),finance=read("backend/controllers/financeController.js"),fr=read("backend/routes/financeRoutes.js"),sa=read("src/pages/superadmin/SuperAdminAccounts.jsx"),aa=read("src/pages/admin/AdminAccounts.jsx"),pr=read("backend/routes/paymentRoutes.js"),roles=read("backend/middleware/roleMiddleware.js");
 assert(!dashboard.includes("/member/accounts?year="),"A: incompatible dashboard Accounts request remains"); assert(dashboard.includes("/member/contributions?year="),"A: member contribution contract missing");
 assert(!model.includes('notificationSchema.post("save"'),"B: generic save fanout remains"); assert(!model.includes('notificationSchema.post("findOneAndUpdate"'),"B: generic update fanout remains"); assert(model.includes("fanoutCreatedNotification")&&model.includes("emitNotificationUpdated"),"B: lifecycle split missing"); assert(nc.includes("Notification.emitNotificationUpdated(notification)"),"B: HTTP read update lifecycle missing"); assert(ns.includes("Notification.emitNotificationUpdated(notification)"),"B: socket read update lifecycle missing");

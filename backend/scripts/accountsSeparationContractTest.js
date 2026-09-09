@@ -9,7 +9,7 @@ must(member.includes('M-PESA Accounts')&&member.includes('Benovelent Constitutio
 must(member.includes('/payments/mine')&&member.includes('/finance/constitution-ledger')&&member.includes('MpesaTransactionButton'),'Member M-PESA/account ledger separation missing.');
 must(admin.includes('contributorType')&&admin.includes('/finance')&&admin.includes('/finance/${tx._id}/attachment'),'Admin constitution transaction controls missing.');
 must(admin.includes('Approve')&&admin.includes('Reject')&&admin.includes('Cancel'),'Admin M-PESA review controls missing.');
-must(superadmin.includes('superAdmin'),'SuperAdmin account wrapper missing.');
+must(superadmin.includes('export default function SuperAdminAccounts')&&!superadmin.includes('import AdminAccounts'),'SuperAdmin Accounts must use independent composition.');
 must(financeRoutes.includes('router.get("/constitution-ledger", protect, constitutionLedger);'),'Constitution ledger endpoint missing.');
 must(financeRoutes.includes('router.post("/:id/attachment", protect, isAdminOrSuperAdmin'),'Finance attachment route missing.');
 must(finance.includes('contributorType')&&finance.includes('exports.constitutionLedger'),'Constitution ledger backend model/controller support missing.');
