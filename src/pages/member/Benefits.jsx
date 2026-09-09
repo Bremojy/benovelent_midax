@@ -108,6 +108,7 @@ export default function Benefits() {
       : [];
 
   const policies = Array.isArray(data?.policies) ? data.policies : [];
+  const requirements = data?.requirements || { profileComplete: false, verified: false, activeMember: false };
 
 
   return (
@@ -130,6 +131,20 @@ export default function Benefits() {
             available through your membership.
           </p>
 
+        </section>
+
+
+        <section className="benefits-readiness-panel">
+          <div>
+            <span className="benefits-readiness-kicker">ELIGIBILITY CHECK</span>
+            <h2>{data?.eligible ? "Your member benefits are active" : "Complete the requirements to unlock benefits"}</h2>
+            <p>{data?.eligible ? "You are currently eligible for the support and policy benefits shown below." : "Eligibility requires an active membership, a verified account and a complete member profile."}</p>
+          </div>
+          <div className="benefits-readiness-list">
+            <span className={requirements.profileComplete ? "complete" : "pending"}>{requirements.profileComplete ? "✓" : "•"} Profile complete</span>
+            <span className={requirements.verified ? "complete" : "pending"}>{requirements.verified ? "✓" : "•"} Account verified</span>
+            <span className={requirements.activeMember ? "complete" : "pending"}>{requirements.activeMember ? "✓" : "•"} Active membership</span>
+          </div>
         </section>
 
 
@@ -234,6 +249,7 @@ export default function Benefits() {
                 <h2>{policy.name}</h2><p>{policy.description || "Policy details are managed by SuperAdmin."}</p>
                 {policy.maxAmount > 0 && <div className="benefit-limit"><span>Maximum</span><strong>{formatCurrency(policy.maxAmount)}</strong></div>}
                 {policy.repaymentEnabled && <div className="benefit-limit"><span>Repayment</span><strong>{Number(policy.interestRate || 0)}% • {Number(policy.repaymentMonths || 12)} months</strong></div>}
+                <a className="benefit-action" href={policy.applicationPath || "/member/support"}>{policy.eligible && policy.enabled ? "Apply / request support" : "View support options"}</a>
               </div>
             ))}
           </section>

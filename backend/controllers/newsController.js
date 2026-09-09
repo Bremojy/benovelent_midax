@@ -4,6 +4,33 @@ const Member = require("../models/Member");
 const Notification = require("../models/Notification");
 const { notifyMembers } = require("../services/memberBroadcastService");
 
+const invalidatePublicNewsCache = async () => {
+    await redisCache.invalidatePrefix("public:news");
+};
+
+const notifyPublishedNews = async ({ news, actorId }) => {
+    const members = await Member.find({ status: "active", isDeleted: false }).select("_id");
+    if (members.length > 0) {
+        await Notification.insertMany(members.map((member) => ({
+            recipient: member._id,
+            sender: actorId,
+            title: "New Announcement",
+            message: news.title,
+            type: "news",
+            referenceId: news._id,
+            referenceModel: "News",
+            icon: "campaign",
+        })));
+    }
+    await notifyMembers({
+        subject: `New announcement: ${news.title}`,
+        text: news.summary || news.content,
+        html: `<h2>${news.title}</h2><p>${String(news.summary || news.content || "").replace(/\n/g, "<br>")}</p><p>Open the Benevolent Midax portal for the full update.</p>`,
+        smsText: `${news.title} - Open the Benevolent Midax portal for the latest announcement.`,
+        broadcastSms: true,
+    });
+};
+
 const NEWS_CATEGORIES = new Map([
     ["general", "General"],
     ["announcement", "Announcement"],
@@ -125,48 +152,10 @@ exports.createNews = async (req, res) => {
 
         });
 
-        if (published !== false) {
-
-            const members = await Member.find({
-                status: "active",
-                isDeleted: false
-            }).select("_id");
-
-            if (members.length > 0) {
-
-                const notifications = members.map(member => ({
-
-                    recipient: member._id,
-
-                    sender: req.user._id,
-
-                    title: "New Announcement",
-
-                    message: title,
-
-                    type: "news",
-
-                    referenceId: news._id,
-
-                    referenceModel: "News",
-
-                    icon: "campaign"
-
-                }));
-
-                await Notification.insertMany(notifications);
-
-            }
-
-            await notifyMembers({
-                subject: `New announcement: ${title}`,
-                text: summary || content,
-                html: `<h2>${title}</h2><p>${(summary || content || "").replace(/\n/g, "<br>")}</p><p>Open the Benevolent Midax portal for the full update.</p>`,
-                smsText: `${title} - Open the Benevolent Midax portal for the latest announcement.`,
-                broadcastSms: true,
-            });
-
+        if (news.published !== false && news.status === "published") {
+            await notifyPublishedNews({ news, actorId: req.user._id });
         }
+        await invalidatePublicNewsCache();
 
         res.status(201).json({
 
@@ -354,6 +343,7 @@ exports.updateNews = async (req, res) => {
     try {
 
         const news = await News.findById(req.params.id);
+        const wasPublished = Boolean(news?.published) && news?.status === "published";
 
         if (!news) {
 
@@ -414,7 +404,12 @@ exports.updateNews = async (req, res) => {
             news.allowComments = req.body.allowComments;
 
         if (req.body.published !== undefined)
-            news.published = req.body.published;
+            news.published = req.body.published === true || req.body.published === "true";
+
+        if (news.published) news.status = "published";
+        if (req.body.published !== undefined && news.published && !wasPublished && !req.body.publishDate) {
+            news.publishDate = new Date();
+        }
 
         if (req.body.publishDate !== undefined)
             news.publishDate = req.body.publishDate;
@@ -430,6 +425,10 @@ exports.updateNews = async (req, res) => {
 
         await news.save();
 
+        if (!wasPublished && news.published && news.status === "published") {
+            await notifyPublishedNews({ news, actorId: req.user._id });
+        }
+        await invalidatePublicNewsCache();
         await news.populate("author", "fullName profileImage");
 
         res.json({
@@ -484,6 +483,7 @@ exports.deleteNews = async (req, res) => {
         }
 
         await news.deleteOne();
+        await invalidatePublicNewsCache();
 
         res.json({
 
@@ -535,6 +535,8 @@ exports.publishNews = async (req, res) => {
         news.publishDate = new Date();
 
         await news.save();
+        await notifyPublishedNews({ news, actorId: req.user._id });
+        await invalidatePublicNewsCache();
 
         res.json({
             success: true,
@@ -579,6 +581,7 @@ exports.unpublishNews = async (req, res) => {
         news.status = "draft";
 
         await news.save();
+        await invalidatePublicNewsCache();
 
         res.json({
             success: true,
@@ -622,6 +625,7 @@ exports.pinNews = async (req, res) => {
         news.pinned = true;
 
         await news.save();
+        await invalidatePublicNewsCache();
 
         res.json({
             success: true,
@@ -665,6 +669,7 @@ exports.unpinNews = async (req, res) => {
         news.pinned = false;
 
         await news.save();
+        await invalidatePublicNewsCache();
 
         res.json({
             success: true,
@@ -705,6 +710,7 @@ exports.featureNews = async (req, res) => {
         news.featured = true;
 
         await news.save();
+        await invalidatePublicNewsCache();
 
         res.json({
             success: true,
@@ -746,6 +752,7 @@ exports.unfeatureNews = async (req, res) => {
         news.featured = false;
 
         await news.save();
+        await invalidatePublicNewsCache();
 
         res.json({
             success: true,
@@ -788,6 +795,7 @@ exports.archiveNews = async (req, res) => {
         news.published = false;
 
         await news.save();
+        await invalidatePublicNewsCache();
 
         res.json({
             success: true,
@@ -834,6 +842,7 @@ exports.restoreNews = async (req, res) => {
         }
 
         await news.save();
+        await invalidatePublicNewsCache();
 
         res.json({
             success: true,

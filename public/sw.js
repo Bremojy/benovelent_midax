@@ -1,5 +1,5 @@
-const CACHE = "benevolent-shell-v26-contributions-18-5-0";
-const VIDEO_CACHE = "benevolent-midax-videos-v2";
+const CACHE = "benevolent-shell-v27-api-pwa-18-5-0";
+const VIDEO_CACHE = "benevolent-midax-videos-v3";
 const ASSETS = ["/", "/index.html", "/manifest.webmanifest", "/pwa-icon-192.png", "/pwa-icon-512.png", "/apple-touch-icon.png"];
 const DB_NAME = "benovelent-pwa";
 const DB_STORE = "calls";
@@ -135,7 +135,14 @@ self.addEventListener("fetch", (event) => {
       const cached = await cache.match(event.request);
       if (cached) return cached;
       const response = await fetch(event.request);
-      if (response.ok) cache.put(event.request, response.clone());
+      // Media requests commonly use HTTP 206 (Partial Content) for seeking/range
+      // playback. Cache.put() rejects partial responses, so cache only complete
+      // 200 responses and always return the network response to the caller.
+      if (response.status === 200 && response.type !== "opaque") {
+        try { await cache.put(event.request, response.clone()); } catch (cacheError) {
+          console.debug("PWA video cache write skipped:", cacheError);
+        }
+      }
       return response;
     }));
     return;
