@@ -110,7 +110,7 @@ notificationSchema.index({createdAt:-1});
 notificationSchema.index({recipient:1,createdAt:-1});
 notificationSchema.index({recipient:1,read:1,createdAt:-1});
 
-const fanoutOne = async (notification) => {
+const fanoutCreatedNotification = async (notification) => {
   if (!notification?.recipient) return;
   const room = `user:${String(notification.recipient)}`;
   try {
@@ -118,107 +118,88 @@ const fanoutOne = async (notification) => {
     const io = getIO();
     if (io) {
       io.to(room).emit("new-notification", notification);
-      const unread = await mongoose.model("Notification").countDocuments({
-        recipient: notification.recipient,
-        recipientModel: notification.recipientModel || "Member",
-        read: false,
-      });
+      const unread = await mongoose.model("Notification").countDocuments({ recipient: notification.recipient, recipientModel: notification.recipientModel || "Member", read: false });
       io.to(room).emit("notification-count", unread);
     }
-  } catch (error) {
-    console.warn("Realtime notification delivery skipped:", error.message);
-  }
-
+  } catch (error) { console.warn("Realtime notification delivery skipped:", error.message); }
   if (!notification.suppressPush) {
     try {
       const { sendPushForNotification } = require("../services/pushService");
       await sendPushForNotification(notification);
-    } catch (error) {
-      console.warn("Notification push delivery skipped:", error.message);
-    }
+    } catch (error) { console.warn("Notification push delivery skipped:", error.message); }
   }
-
   try {
     const redisCache = require("../services/redisCache");
-    await redisCache.invalidateMany([
-      `notifications:${String(notification.recipient)}:unread`,
-    ]);
+    await redisCache.invalidateMany([`notifications:${String(notification.recipient)}:unread`]);
     await redisCache.invalidatePrefix(`notifications:${String(notification.recipient)}`);
-  } catch (error) {
-    console.warn("Notification cache invalidation skipped:", error.message);
-  }
+  } catch (error) { console.warn("Notification cache invalidation skipped:", error.message); }
 };
 
-notificationSchema.post("save", async (notification) => {
-  await fanoutOne(notification);
-});
+const emitNotificationUpdated = async (notification) => {
+  if (!notification?.recipient) return;
+  const room = `user:${String(notification.recipient)}`;
+  try {
+    const { getIO } = require("../sockets/socket");
+    const io = getIO();
+    if (io) {
+      io.to(room).emit("notification-updated", notification);
+      const unread = await mongoose.model("Notification").countDocuments({ recipient: notification.recipient, recipientModel: notification.recipientModel || "Member", read: false });
+      io.to(room).emit("notification-count", unread);
+    }
+  } catch (error) { console.warn("Realtime notification update delivery skipped:", error.message); }
+  try {
+    const redisCache = require("../services/redisCache");
+    await redisCache.invalidateMany([`notifications:${String(notification.recipient)}:unread`]);
+    await redisCache.invalidatePrefix(`notifications:${String(notification.recipient)}`);
+  } catch (error) { console.warn("Notification update cache invalidation skipped:", error.message); }
+};
 
-notificationSchema.post("insertMany", async (notifications) => {
-  for (const notification of notifications || []) await fanoutOne(notification);
-});
-
-notificationSchema.post("findOneAndUpdate", async (notification) => {
-  if (notification) await fanoutOne(notification);
-});
-
-
-const notificationFingerprint = (doc = {}) => [
-  doc.recipientModel || "Member",
-  doc.recipient,
-  doc.type || "system",
-  doc.referenceModel || "",
-  doc.referenceId || "",
-  doc.title || "",
-  doc.message || "",
-].map((value) => String(value ?? "")).join("|");
-
-// Centralised idempotency for every Notification.create/insertMany caller,
-// including older controllers that have not yet migrated to notificationService.
-// This prevents exact duplicate notifications without requiring a data migration.
+// Notification.save() is used by read/update paths. It must never be interpreted
+// as notification creation, so there is intentionally no generic save fanout hook.
 const NotificationModel = mongoose.models.Notification || mongoose.model("Notification", notificationSchema);
-if (!NotificationModel.__midaxNotificationDedupe) {
+if (!NotificationModel.__midaxNotificationLifecycle) {
   const originalCreate = NotificationModel.create.bind(NotificationModel);
   const originalInsertMany = NotificationModel.insertMany.bind(NotificationModel);
-  NotificationModel.create = async function createDeduped(doc, ...rest) {
+  const fingerprintQueryFor = (doc) => ({
+    recipient: doc.recipient,
+    recipientModel: doc.recipientModel || "Member",
+    type: doc.type || "system",
+    referenceModel: doc.referenceModel || "",
+    referenceId: doc.referenceId || null,
+    title: doc.title,
+    message: doc.message,
+    createdAt: { $gte: new Date(Date.now() - 10_000) },
+  });
+  NotificationModel.create = async function createWithLifecycle(doc, ...rest) {
+    if (Array.isArray(doc)) return NotificationModel.insertMany(doc, ...rest);
     if (!doc?.recipient || !doc?.title || !doc?.message) return originalCreate(doc, ...rest);
-    const existing = await NotificationModel.findOne({
-      recipient: doc.recipient,
-      recipientModel: doc.recipientModel || "Member",
-      type: doc.type || "system",
-      referenceModel: doc.referenceModel || "",
-      referenceId: doc.referenceId || null,
-      title: doc.title,
-      message: doc.message,
-    }).sort({ createdAt: -1 });
+    const existing = await NotificationModel.findOne(fingerprintQueryFor(doc)).sort({ createdAt: -1 });
     if (existing) return existing;
-    return originalCreate(doc, ...rest);
+    const created = await originalCreate(doc, ...rest);
+    await fanoutCreatedNotification(created);
+    return created;
   };
-  NotificationModel.insertMany = async function insertManyDeduped(docs, ...rest) {
+  NotificationModel.insertMany = async function insertManyWithLifecycle(docs, ...rest) {
     const source = Array.isArray(docs) ? docs : [];
-    const seen = new Set();
-    const fresh = [];
+    if (!source.length) return originalInsertMany(source, ...rest);
+    const seen = new Set(), fresh = [], threshold = new Date(Date.now() - 10_000);
     for (const doc of source) {
       const key = notificationFingerprint(doc);
       if (seen.has(key)) continue;
       seen.add(key);
-      const existing = doc?.recipient && doc?.title && doc?.message
-        ? await NotificationModel.findOne({
-            recipient: doc.recipient,
-            recipientModel: doc.recipientModel || "Member",
-            type: doc.type || "system",
-            referenceModel: doc.referenceModel || "",
-            referenceId: doc.referenceId || null,
-            title: doc.title,
-            message: doc.message,
-          }).select("_id").lean()
-        : null;
+      if (!doc?.recipient || !doc?.title || !doc?.message) { fresh.push(doc); continue; }
+      const existing = await NotificationModel.findOne({ ...fingerprintQueryFor(doc), createdAt: { $gte: threshold } }).select("_id").lean();
       if (!existing) fresh.push(doc);
     }
     if (!fresh.length) return [];
-    return originalInsertMany(fresh, ...rest);
+    const inserted = await originalInsertMany(fresh, ...rest);
+    for (const notification of inserted || []) await fanoutCreatedNotification(notification);
+    return inserted;
   };
-  NotificationModel.__midaxNotificationDedupe = true;
+  NotificationModel.__midaxNotificationLifecycle = true;
 }
+NotificationModel.emitNotificationUpdated = emitNotificationUpdated;
+NotificationModel.fanoutCreatedNotification = fanoutCreatedNotification;
 
 notificationSchema.post("deleteOne", async (result) => {
   // Queries that delete by recipient are invalidated by the controller/service;

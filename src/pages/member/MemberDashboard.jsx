@@ -27,7 +27,7 @@ const money = (value) =>
 export default function MemberDashboard() {
   const [d, setD] = useState(null);
   const [c, setC] = useState(null);
-  const [accounts, setAccounts] = useState(null);
+  const [contributionSummary, setContributionSummary] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
 
@@ -65,7 +65,7 @@ export default function MemberDashboard() {
 
     const [communityResult, accountsResult] = await Promise.allSettled([
       API.get("/member/community-stats"),
-      API.get(`/member/accounts?year=${new Date().getFullYear()}`),
+      API.get(`/member/contributions?year=${new Date().getFullYear()}`),
     ]);
 
     if (communityResult.status === "fulfilled") {
@@ -73,7 +73,7 @@ export default function MemberDashboard() {
     }
 
     if (accountsResult.status === "fulfilled") {
-      setAccounts(accountsResult.value?.data || null);
+      setContributionSummary(accountsResult.value?.data?.summary || null);
     }
 
     if (communityResult.status === "rejected" || accountsResult.status === "rejected") {
@@ -147,7 +147,7 @@ export default function MemberDashboard() {
           <article className="portal-panel member-personal-panel">
             <div className="panel-heading"><div><span className="panel-kicker">YOUR SPACE</span><h2>Your live activity</h2><p>Personal information only. Monthly income is not collected.</p></div></div>
             <div className="personal-signal-grid">{memberSignals.map(({label,value,icon:Icon}) => <div className="personal-signal" key={label}><div className="personal-icon"><Icon size={17} /></div><div><strong>{value}</strong><span>{label}</span></div></div>)}</div>
-            <div className="personal-total"><span>Standard monthly payroll deduction</span><strong>{money(accounts?.standardMonthlyDeduction)}</strong><small>Scheme-wide amount currently scheduled for payroll deduction.</small></div>
+            <div className="personal-total"><span>Your contributions this year</span><strong>{money(contributionSummary?.totalPaid)}</strong><small>Personal contribution total from the member contribution record for the current year.</small></div>
           </article>
 
           <article className="portal-panel member-quick-panel">

@@ -34,13 +34,7 @@ const createNotification = async ({
       suppressPush,
     });
 
-    // Realtime Socket.IO fanout, browser push, unread counts and cache invalidation
-    // are centralized in the Notification model hooks so every notification path
-    // (create/save/insertMany) gets exactly one delivery.
-    try {
-      const redisCache = require("./redisCache");
-      await redisCache.invalidatePrefix(`notifications:${recipient}`);
-    } catch (_) {}
+    // Notification.create owns CREATE lifecycle fanout. Do not emit or push again here.
 
     return notification;
   } catch (error) {

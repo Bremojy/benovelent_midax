@@ -210,64 +210,28 @@ exports.getTransactions = async (req, res) => {
 ===================================================== */
 
 exports.getTransaction = async (req, res) => {
-
     try {
-
-        const transaction =
-            await Finance.findById(req.params.id)
-
-            .populate(
-
-                "member",
-
-                "fullName memberNumber email phone"
-
-            )
-
-            .populate(
-
-                "approvedBy",
-
-                "fullName"
-
-            );
-
-        if (!transaction) {
-
-            return res.status(404).json({
-
-                success: false,
-
-                message: "Transaction not found."
-
-            });
-
+        const role = String(req.user?.role || "").toLowerCase();
+        if (!["member", "admin", "superadmin"].includes(role)) {
+            return res.status(403).json({ success: false, message: "You do not have permission to view finance records." });
         }
-
-        res.json({
-
-            success: true,
-
-            transaction
-
-        });
-
-    }
-
-    catch (error) {
-
+        if (role === "member") {
+            const transaction = await Finance.findOne({ _id: req.params.id, member: req.user._id })
+                .select("transactionNumber type category amount description paymentMethod referenceNumber receiptNumber notes transactionDate status contributorType contributorName hidden createdAt updatedAt")
+                .lean();
+            if (!transaction) return res.status(404).json({ success: false, message: "Transaction not found." });
+            return res.json({ success: true, transaction });
+        }
+        const transaction = await Finance.findById(req.params.id)
+            .populate("member", "fullName memberNumber email phone")
+            .populate("approvedBy", "fullName")
+            .lean();
+        if (!transaction) return res.status(404).json({ success: false, message: "Transaction not found." });
+        return res.json({ success: true, transaction });
+    } catch (error) {
         console.error(error);
-
-        res.status(500).json({
-
-            success: false,
-
-            message: error.message
-
-        });
-
+        return res.status(500).json({ success: false, message: error.message });
     }
-
 };
 
 /* =====================================================
@@ -473,6 +437,14 @@ exports.deleteTransaction = async (req, res) => {
 
         const affectedMember = transaction.member;
         if (role === "superadmin") {
+            const protectedSettled = transaction.reconciled === true || ["approved", "completed"].includes(String(transaction.status || "").toLowerCase());
+            if (protectedSettled) {
+                return res.status(409).json({
+                    success: false,
+                    code: "SETTLED_FINANCE_PROTECTED",
+                    message: "Settled or approved financial history cannot be permanently deleted. Use the visibility/audit controls instead so the ledger remains traceable.",
+                });
+            }
             await transaction.deleteOne();
         } else {
             transaction.hidden = true;

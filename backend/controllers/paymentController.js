@@ -236,7 +236,7 @@ exports.diagnostics = async (_req, res) => {
 
 exports.myTransactions = async (req, res) => {
   try {
-    paymentMember = await resolvePaymentMember(req);
+    const paymentMember = await resolvePaymentMember(req);
     const transactions = await MpesaTransaction.find({ member: paymentMember._id }).sort({ createdAt: -1 }).limit(100).lean();
     res.json({ success: true, transactions });
   } catch (error) {

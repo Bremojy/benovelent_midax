@@ -16,7 +16,7 @@ module.exports = (io, socket) => {
       notification.read = true;
       notification.readAt = new Date();
       await notification.save();
-      io.to(`user:${String(socket.user._id)}`).emit("notification-updated", notification);
+      await Notification.emitNotificationUpdated(notification);
     } catch (error) { console.warn("Notification read update failed:", error.message); }
   });
 

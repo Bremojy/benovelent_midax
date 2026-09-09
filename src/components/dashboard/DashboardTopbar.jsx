@@ -88,12 +88,10 @@ function DashboardTopbar({
       socket.on("message-seen", onMessage);
     }
     socket.on("new-notification", onNotification);
-    socket.on("new-call-notification", onNotification);
     return () => {
       mounted = false;
       window.clearInterval(interval);
       socket.off("new-notification", onNotification);
-      socket.off("new-call-notification", onNotification);
       if (normalizedRole !== "superadmin") {
         socket.off("new-message", onMessage);
         socket.off("message-seen", onMessage);

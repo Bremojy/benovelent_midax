@@ -123,6 +123,7 @@ exports.markRead = async (req, res) => {
     notification.read = true;
     notification.readAt = new Date();
     await notification.save();
+    await Notification.emitNotificationUpdated(notification);
     await invalidateNotificationCaches(req.user._id);
 
     return res.json({
