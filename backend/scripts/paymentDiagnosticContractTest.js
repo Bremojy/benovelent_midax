@@ -12,7 +12,7 @@ assert(/The payment server could not be reached|payment gateway/.test(button), "
 assert(/MPESA_STK_REJECTED/.test(controller), "STK business rejections must return a distinct diagnostic code");
 assert(/unresolved reason type/.test(controller), "STK unresolved-reason responses must be classified diagnostically");
 assert(/exports\.diagnostics/.test(controller) && /router\.get\("\/diagnostics", protect, isAdminOrSuperAdmin, controller\.diagnostics\)/.test(routes), "Safe M-PESA diagnostics endpoint must be wired.");
-assert(/findOneAndUpdate\(\s*\{ transactionNumber: referenceNumber \}/.test(controller), "Contribution finance reconciliation must be atomic.");
+assert(/CommunityAssistance\.findOneAndUpdate/.test(controller) && /raisedAmount: \{ \$lte:/.test(controller), "Community assistance reconciliation must use an atomic target guard.");
 assert(/BMX-B2C-\$\{directTransaction\._id\}/.test(controller), "B2C finance transaction number must be deterministic for idempotency.");
 assert(/BMX-PAYOUT-\$\{campaign\._id\}/.test(controller), "Community payout finance transaction number must be deterministic for idempotency.");
 assert(/responseCode.*responseDescription.*customerMessage/.test(controller.replace(/\n/g, " ")), "STK rejection diagnostics must retain provider response fields without secrets");

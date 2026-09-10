@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const { createNews, getNews, getSingleNews, getLatestNews, updateNews, deleteNews, likeNews, unlikeNews, addComment, deleteComment, pinNews, unpinNews } = require("../controllers/newsController");
+const { createNews, getNews, getSingleNews, getLatestNews, updateNews, deleteNews, publishNews, unpublishNews, likeNews, unlikeNews, addComment, deleteComment, pinNews, unpinNews } = require("../controllers/newsController");
 const { verifyToken: protect } = require("../middleware/authMiddleware");
 const { isAdminOrSuperAdmin } = require("../middleware/roleMiddleware");
 const { setUploadType, uploadFields } = require("../middleware/upload");
@@ -10,6 +10,8 @@ router.get("/public", getLatestNews);
 router.get("/", protect, getNews);
 router.get("/:id", protect, getSingleNews);
 router.put("/:id", protect, isAdminOrSuperAdmin, updateNews);
+router.post("/:id/publish", protect, isAdminOrSuperAdmin, publishNews);
+router.post("/:id/unpublish", protect, isAdminOrSuperAdmin, unpublishNews);
 router.delete("/:id", protect, isAdminOrSuperAdmin, deleteNews);
 router.put("/:id/like", protect, likeNews);
 router.put("/:id/unlike", protect, unlikeNews);

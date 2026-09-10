@@ -1,33 +1,6 @@
 const Conversation = require("../models/Conversation");
 const Member = require("../models/Member");
-const Admin = require("../models/Admin");
-const SuperAdmin = require("../models/SuperAdmin");
-const { ensureChatProfile } = require("../utils/chatProfile");
-const redisCache = require("../services/redisCache");
-
-const resolveChatActor = async (id) => {
-    const chatId = String(id || "").trim();
-    if (!chatId) return null;
-
-    const member = await Member.findById(chatId).lean();
-    if (member) {
-        return { id: String(member._id), role: String(member.role || "member").toLowerCase(), user: member };
-    }
-
-    const admin = await Admin.findById(chatId).lean();
-    if (admin) {
-        const profile = await ensureChatProfile(admin);
-        return profile ? { id: String(profile._id), role: "admin", user: profile, portalUser: admin } : null;
-    }
-
-    const superAdmin = await SuperAdmin.findById(chatId).lean();
-    if (superAdmin) {
-        const profile = await ensureChatProfile(superAdmin);
-        return profile ? { id: String(profile._id), role: "superadmin", user: profile, portalUser: superAdmin } : null;
-    }
-
-    return null;
-};
+const { resolveChatActor, resolveCanonicalChatActorForAuthenticatedUser, getChatActorId, isChatRole } = require("../utils/chatProfile");
 
 const getConversationPartnerIds = (conversation, currentUserId) => {
     const participantIds = Array.isArray(conversation?.participants)
@@ -60,8 +33,11 @@ exports.createConversation = async (req, res) => {
             });
         }
 
-        const currentActor = await resolveChatActor(me);
+        const currentActor = await resolveCanonicalChatActorForAuthenticatedUser(req.user);
         const targetActor = await resolveChatActor(participantId);
+        if (!currentActor || !isChatRole(currentActor.role) || !targetActor || !isChatRole(targetActor.role)) {
+            return res.status(403).json({ success: false, message: "Only member and Admin chat identities are available in ordinary chat." });
+        }
 
         if (!currentActor || !targetActor) {
             return res.status(404).json({
@@ -70,8 +46,9 @@ exports.createConversation = async (req, res) => {
             });
         }
 
-        const canonicalMe = String(currentActor.id);
-        const canonicalTarget = String(targetActor.id);
+        const canonicalMe = String(currentActor.chatId);
+        const canonicalTarget = String(targetActor.chatId);
+        const directKey = [canonicalMe, canonicalTarget].sort().join(":");
 
         if (canonicalMe === canonicalTarget) {
             return res.status(400).json({
@@ -80,10 +57,7 @@ exports.createConversation = async (req, res) => {
             });
         }
 
-        let conversation = await Conversation.findOne({
-            participants: { $all: [canonicalMe, canonicalTarget] },
-            isGroup: false
-        });
+        let conversation = await Conversation.findOne({ directKey, isGroup: false });
 
         if (conversation) {
             return res.json({
@@ -92,9 +66,12 @@ exports.createConversation = async (req, res) => {
             });
         }
 
-        conversation = await Conversation.create({
-            participants: [canonicalMe, canonicalTarget]
-        });
+        try {
+            conversation = await Conversation.create({ participants: [canonicalMe, canonicalTarget], directKey, isGroup: false });
+        } catch (error) {
+            if (error?.code !== 11000) throw error;
+            conversation = await Conversation.findOne({ directKey, isGroup: false });
+        }
 
         await conversation.populate(
             "participants",
@@ -121,16 +98,11 @@ GET MY CONVERSATIONS
 ===================================================== */
 
 exports.getMyConversations=async(req,res)=>{
-    const cacheKey = `chat:${req.auth?.chatId || req.user._id}:conversations`;
-    const cached = await redisCache.getJson(cacheKey);
-    if (cached !== null) return res.json(cached);
-    const __originalJson = res.json.bind(res);
-    res.json = (body) => { redisCache.setJson(cacheKey, body, 10).catch(() => {}); return __originalJson(body); };
 
 
 try{
 
-const currentUserId = req.auth?.chatId || req.user._id;
+const currentUserId = String(getChatActorId(req));
 
 const conversations=await Conversation.find({
 
@@ -275,6 +247,7 @@ exports.deleteConversation=async(req,res)=>{
 
 try{
 
+const actorId = String(getChatActorId(req));
 const conversation=await Conversation.findById(
 
 req.params.id
@@ -456,6 +429,9 @@ exports.addMember = async (req, res) => {
             });
         }
 
+        const actorId = String(getChatActorId(req));
+        if (!conversation.participants.some((id) => String(id) === actorId)) return res.status(403).json({ success: false, message: "You are not a participant in this conversation." });
+        if (!conversation.isGroup) return res.status(400).json({ success: false, message: "Direct conversations cannot have participants added." });
         const { memberId } = req.body;
 
         if (!memberId) {
@@ -495,6 +471,9 @@ exports.removeMember = async (req, res) => {
             });
         }
 
+        const actorId = String(getChatActorId(req));
+        if (!conversation.participants.some((id) => String(id) === actorId)) return res.status(403).json({ success: false, message: "You are not a participant in this conversation." });
+        if (!conversation.isGroup) return res.status(400).json({ success: false, message: "Direct conversations cannot remove participants." });
         const { memberId } = req.body;
 
         conversation.participants = conversation.participants.filter(

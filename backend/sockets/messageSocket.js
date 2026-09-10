@@ -8,57 +8,10 @@ const { addUser, removeUser, touchUser, getPresence, cleanupStale, PRESENCE_TIME
 const { sendPushToRecipient } = require("../services/pushService");
 
 const modelsByRole = { member: Member, admin: Admin, superadmin: SuperAdmin };
-const isChatRole = (role) => ["member", "admin"].includes(String(role || "").toLowerCase());
+const { resolveChatActor, isChatRole } = require("../utils/chatProfile");
 const activeCalls = new Map();
+// Canonical admin mirrors carry portalOwnerId; call/presence routing uses the same actor identity.
 const CALL_TIMEOUT_MS = 35_000;
-
-async function resolveActor(id, hintedRole = "") {
-  const requestedRole = String(hintedRole || "").toLowerCase();
-  const chatId = String(id || "").trim();
-  if (!chatId) return null;
-
-  async function fromPortal(Model, role) {
-    const owner = await Model.findById(chatId).select("_id fullName name role profileImage email phone online lastSeen").lean();
-    if (owner) return { user: owner, role, chatId: String(owner._id) };
-    const profile = await Member.findOne({ _id: chatId, portalOwnerRole: role, portalOwnerId: { $ne: null } }).select("_id portalOwnerId portalOwnerRole fullName profileImage online lastSeen").lean();
-    if (!profile) return null;
-    const portalOwner = await Model.findById(profile.portalOwnerId).select("_id fullName name role profileImage email phone online lastSeen").lean();
-    if (!portalOwner) return null;
-    return { user: portalOwner, role, chatId: String(profile._id) };
-  }
-
-  if (requestedRole === "admin") {
-    const result = await fromPortal(Admin, "admin");
-    if (result) return result;
-  }
-  if (requestedRole === "superadmin") {
-    const result = await fromPortal(SuperAdmin, "superadmin");
-    if (result) return result;
-  }
-  if (requestedRole === "member") {
-    const member = await Member.findById(chatId).select("_id fullName name role profileImage email phone online lastSeen portalOwnerId portalOwnerRole").lean();
-    if (member) return { user: member, role: member.portalOwnerRole || "member", chatId: String(member._id) };
-  }
-
-  const member = await Member.findById(chatId).select("_id fullName name role profileImage email phone online lastSeen portalOwnerId portalOwnerRole").lean();
-  if (member) {
-    if (member.portalOwnerId && member.portalOwnerRole === "admin") {
-      const admin = await Admin.findById(member.portalOwnerId).select("_id fullName name role profileImage email phone online lastSeen").lean();
-      if (admin) return { user: admin, role: "admin", chatId: String(member._id) };
-    }
-    if (member.portalOwnerId && member.portalOwnerRole === "superadmin") {
-      const superadmin = await SuperAdmin.findById(member.portalOwnerId).select("_id fullName name role profileImage email phone online lastSeen").lean();
-      if (superadmin) return { user: superadmin, role: "superadmin", chatId: String(member._id) };
-    }
-    return { user: member, role: "member", chatId: String(member._id) };
-  }
-
-  for (const [candidateRole, Model] of Object.entries(modelsByRole)) {
-    const user = await Model.findById(chatId).select("_id fullName name role profileImage email phone online lastSeen").lean();
-    if (user) return { user, role: candidateRole, chatId: String(user._id) };
-  }
-  return null;
-}
 
 function modelName(role) {
   return role === "superadmin" ? "SuperAdmin" : role === "admin" ? "Admin" : "Member";
@@ -89,7 +42,7 @@ function ensurePresenceCleanup(io) {
     const stale = cleanupStale();
     if (!stale.length) return;
     Promise.all(stale.map(async ({ userId, lastSeen }) => {
-      const actor = await resolveActor(userId);
+      const actor = await resolveChatActor(userId);
       if (actor) await savePresence(actor, false, "").catch(() => null);
       return lastSeen;
     })).finally(() => broadcastPresence(io)).catch(() => null);
@@ -223,7 +176,7 @@ module.exports = (io, socket) => {
     try {
       const role = socket.userRole || "member";
       if (!isChatRole(role)) return;
-      const actor = await resolveActor(socket.user?._id, role);
+      const actor = await resolveChatActor(socket.user?._id, role);
       if (!actor) return;
       socket.data.userId = String(actor.user._id);
       socket.data.chatId = String(actor.chatId);
@@ -243,7 +196,7 @@ module.exports = (io, socket) => {
         socket.emit("presence-required");
         return;
       }
-      const actor = await resolveActor(socket.data?.userId, socket.data?.role || "member");
+      const actor = await resolveChatActor(socket.data?.userId, socket.data?.role || "member");
       if (actor) await savePresence(actor, true, socket.id);
     } catch (error) {
       console.warn("Presence heartbeat failed:", error.message);
@@ -265,8 +218,8 @@ module.exports = (io, socket) => {
 
   socket.on("call-user", async ({ to, conversationId, callType, offer, callerUserId, callerName, callerRole }) => {
     if (!isChatRole(socket.data?.role) || !to || !offer) return;
-    const recipient = await resolveActor(to);
-    const caller = await resolveActor(socket.data.chatId || socket.data.userId, socket.data.role);
+    const recipient = await resolveChatActor(to);
+    const caller = await resolveChatActor(socket.data.chatId || socket.data.userId, socket.data.role);
     if (String(recipient?.chatId || "") === String(caller?.chatId || "")) {
       socket.emit("call-error", { code: "SELF_CALL_BLOCKED", message: "Calling yourself is not available." });
       return;
@@ -440,7 +393,7 @@ module.exports = (io, socket) => {
     const removed = removeUser(socket.id);
     try {
       if (userId && removed?.offline) {
-        const actor = await resolveActor(chatId, role);
+        const actor = await resolveChatActor(chatId, role);
         if (actor) await savePresence(actor, false, "");
       }
       broadcastPresence(io);

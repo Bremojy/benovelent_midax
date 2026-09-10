@@ -140,9 +140,9 @@ exports.createNews = async (req, res) => {
 
             allowComments,
 
-            published,
+            published: published === true || published === "true",
 
-            publishDate,
+            publishDate: (published === true || published === "true") ? (publishDate || new Date()) : null,
 
             expiryDate,
 
@@ -177,7 +177,7 @@ exports.createNews = async (req, res) => {
 
             success: false,
 
-            message: error.message
+            message: process.env.NODE_ENV === "development" ? error.message : "Unable to complete the news operation."
 
         });
 
@@ -194,8 +194,10 @@ exports.createNews = async (req, res) => {
 exports.getAllNews = async (req, res) => {
 
     try {
-        const isPublicQuery = req.query.published === "true" || (req.query.published === undefined && req.query.category);
-        const publicCacheKey = isPublicQuery ? `public:news:list:${JSON.stringify(req.query || {})}` : null;
+        const role = String(req.user?.role || "").toLowerCase();
+        const isPublicViewer = role === "member";
+        const isPublicQuery = isPublicViewer || req.query.published === "true";
+        const publicCacheKey = isPublicViewer ? `public:news:list:${JSON.stringify({ page: req.query.page, limit: req.query.limit, category: req.query.category })}` : (req.query.published === "true" ? `public:news:list:${JSON.stringify(req.query || {})}` : null);
         if (publicCacheKey) {
             const cached = await redisCache.getJson(publicCacheKey);
             if (cached !== null) {
@@ -212,7 +214,14 @@ exports.getAllNews = async (req, res) => {
 
         const filter = {};
 
-        if (req.query.status) {
+        if (isPublicViewer) {
+            filter.published = true;
+            filter.status = "published";
+            filter.publishDate = { $lte: new Date() };
+            filter.$and = [{ $or: [{ expiryDate: { $exists: false } }, { expiryDate: null }, { expiryDate: { $gt: new Date() } }] }];
+        }
+
+        if (req.query.status && !isPublicViewer) {
 
             filter.status = req.query.status;
 
@@ -224,10 +233,8 @@ exports.getAllNews = async (req, res) => {
 
         }
 
-        if (req.query.published !== undefined) {
-
+        if (req.query.published !== undefined && !isPublicViewer) {
             filter.published = req.query.published === "true";
-
         }
 
         const total = await News.countDocuments(filter);
@@ -271,7 +278,7 @@ exports.getAllNews = async (req, res) => {
 
             success: false,
 
-            message: error.message
+            message: process.env.NODE_ENV === "development" ? error.message : "Unable to complete the news operation."
 
         });
 
@@ -287,12 +294,17 @@ exports.getNewsById = async (req, res) => {
 
     try {
 
-        const news = await News.findById(req.params.id)
-
-            .populate("author", "fullName email profileImage")
-
+        const role = String(req.user?.role || "").toLowerCase();
+        const query = { _id: req.params.id };
+        if (role === "member") {
+            query.published = true;
+            query.status = "published";
+            query.publishDate = { $lte: new Date() };
+            query.$or = [{ expiryDate: { $exists: false } }, { expiryDate: null }, { expiryDate: { $gt: new Date() } }];
+        }
+        const news = await News.findOne(query)
+            .populate("author", "fullName profileImage")
             .populate("poll")
-
             .lean();
 
         if (!news) {
@@ -325,7 +337,7 @@ exports.getNewsById = async (req, res) => {
 
             success: false,
 
-            message: error.message
+            message: process.env.NODE_ENV === "development" ? error.message : "Unable to complete the news operation."
 
         });
 
@@ -403,22 +415,8 @@ exports.updateNews = async (req, res) => {
         if (req.body.allowComments !== undefined)
             news.allowComments = req.body.allowComments;
 
-        if (req.body.published !== undefined)
-            news.published = req.body.published === true || req.body.published === "true";
-
-        if (news.published) news.status = "published";
-        if (req.body.published !== undefined && news.published && !wasPublished && !req.body.publishDate) {
-            news.publishDate = new Date();
-        }
-
-        if (req.body.publishDate !== undefined)
-            news.publishDate = req.body.publishDate;
-
         if (req.body.expiryDate !== undefined)
             news.expiryDate = req.body.expiryDate;
-
-        if (req.body.status !== undefined)
-            news.status = req.body.status;
 
         if (req.body.poll !== undefined)
             news.poll = req.body.poll;
@@ -451,7 +449,7 @@ exports.updateNews = async (req, res) => {
 
             success: false,
 
-            message: error.message
+            message: process.env.NODE_ENV === "development" ? error.message : "Unable to complete the news operation."
 
         });
 
@@ -503,7 +501,7 @@ exports.deleteNews = async (req, res) => {
 
             success: false,
 
-            message: error.message
+            message: process.env.NODE_ENV === "development" ? error.message : "Unable to complete the news operation."
 
         });
 
@@ -538,11 +536,8 @@ exports.publishNews = async (req, res) => {
         await notifyPublishedNews({ news, actorId: req.user._id });
         await invalidatePublicNewsCache();
 
-        res.json({
-            success: true,
-            message: "News published successfully.",
-            news
-        });
+        await news.populate("author", "fullName profileImage");
+        res.json({ success: true, message: "News published successfully.", news });
 
     } catch (error) {
 
@@ -583,11 +578,8 @@ exports.unpublishNews = async (req, res) => {
         await news.save();
         await invalidatePublicNewsCache();
 
-        res.json({
-            success: true,
-            message: "News moved to drafts.",
-            news
-        });
+        await news.populate("author", "fullName profileImage");
+        res.json({ success: true, message: "News moved to drafts.", news });
 
     } catch (error) {
 

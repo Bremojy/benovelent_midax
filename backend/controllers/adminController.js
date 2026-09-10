@@ -804,7 +804,7 @@ exports.verifyMember = async (req, res) => {
       });
     }
 
-    res.json({ success: true, message: alreadyVerified ? "Member is already verified." : "Member verified successfully.", member });
+    res.json({ success: true, message: alreadyVerified ? "Member is already verified." : "Member verified successfully.", member: sanitizeMemberForClient(member) });
   } catch (error) {
     console.error(error);
     res.status(500).json({ success: false, message: error.message });
@@ -1392,7 +1392,7 @@ exports.getProfile = async (req, res) => {
       return res.status(404).json({ success: false, message: "Administrator not found." });
     }
 
-    return res.json({ success: true, profile: admin });
+    return res.json({ success: true, profile: sanitizeAdminForClient(admin) });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
   }

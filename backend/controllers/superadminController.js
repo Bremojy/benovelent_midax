@@ -1,5 +1,6 @@
 const bcrypt = require("bcryptjs");
 const { resolveStoredFileUrl } = require("../utils/uploadUrl");
+const { sanitizeAdminForClient } = require("../utils/clientSanitizer");
 
 const Admin = require("../models/Admin");
 const Member = require("../models/Member");
@@ -163,7 +164,7 @@ exports.createAdmin = async (req, res) => {
       message:
         "Administrator created successfully.",
 
-      admin: adminResponse,
+      admin: sanitizeAdminForClient(adminResponse),
     });
 
   } catch (error) {
@@ -454,7 +455,7 @@ exports.updateAdmin = async (req, res) => {
       message:
         "Administrator updated successfully.",
 
-      admin: response,
+      admin: sanitizeAdminForClient(response),
     });
 
   } catch (error) {

@@ -2,6 +2,7 @@ const Contribution = require("../models/Contribution");
 const Finance = require("../models/Finance");
 const Member = require("../models/Member");
 const Notification = require("../models/Notification");
+const { sanitizeDocument } = require("../utils/clientSanitizer");
 
 /* =====================================================
    CREATE CONTRIBUTION
@@ -22,6 +23,10 @@ exports.createContribution = async (req, res) => {
       paymentDate,
       notes,
     } = req.body || {};
+
+    if (paymentMethod !== undefined && String(paymentMethod).toLowerCase() !== "payroll") {
+      return res.status(400).json({ success: false, code: "PAYROLL_ONLY_CONTRIBUTIONS", message: "Ordinary Benevolent MIDAX contributions are recorded from payroll only." });
+    }
 
     if (!month || !year || expectedAmount == null) {
       return res.status(400).json({
@@ -55,7 +60,8 @@ exports.createContribution = async (req, res) => {
       year,
       expectedAmount: Number(expectedAmount),
       paidAmount: Number(paidAmount || 0),
-      paymentMethod,
+      source: "payroll",
+      paymentMethod: "Payroll",
       receiptNumber,
       mpesaCode,
       paymentDate,
@@ -69,7 +75,7 @@ exports.createContribution = async (req, res) => {
         type: "contribution",
         category: "Monthly Contribution",
         amount: Number(paidAmount),
-        paymentMethod,
+        paymentMethod: "Payroll",
         receiptNumber,
         referenceNumber: mpesaCode,
         description: `Contribution ${month}/${year}`,
@@ -96,7 +102,7 @@ exports.createContribution = async (req, res) => {
     return res.status(201).json({
       success: true,
       message: "Contribution created successfully.",
-      contribution,
+      contribution: sanitizeDocument(contribution),
     });
   } catch (error) {
     console.error(error);
@@ -355,7 +361,7 @@ exports.getMemberContributions = async (req,res)=>{
             const query = { member: requestedMemberId };
             if (req.query.year !== undefined) query.year = currentYear;
             const rows = await Contribution.find(query)
-                .populate('finance')
+                .populate('finance', 'transactionNumber type category amount paymentMethod receiptNumber referenceNumber transactionDate status notes')
                 .sort({ paymentDate: -1, year: -1, month: -1, createdAt: -1 })
                 .lean();
             return res.json({
@@ -373,8 +379,13 @@ exports.getMemberContributions = async (req,res)=>{
         }
 
         const requestedMemberId = req.params.memberId || req.user._id;
+        const requested = String(requestedMemberId);
+        const own = String(req.user._id);
+        if (String(req.user?.role || "").toLowerCase() === "member" && requested !== own) {
+            return res.status(403).json({ success: false, code: "CONTRIBUTION_OWNERSHIP_FORBIDDEN", message: "You can only view your own contribution records." });
+        }
         const contributions=await Contribution.find({ member: requestedMemberId })
-            .populate('finance')
+            .populate('finance', 'transactionNumber type category amount paymentMethod receiptNumber referenceNumber transactionDate status notes')
             .sort({ paymentDate: -1, year: -1, month: -1, createdAt: -1 });
         res.json({ success:true, count:contributions.length, contributions });
     } catch(error){
@@ -408,8 +419,6 @@ exports.updateContribution = async (req, res) => {
 
             "paidAmount",
 
-            "paymentMethod",
-
             "receiptNumber",
 
             "mpesaCode",
@@ -419,6 +428,12 @@ exports.updateContribution = async (req, res) => {
             "notes"
 
         ];
+
+        if (req.body.paymentMethod !== undefined && String(req.body.paymentMethod).toLowerCase() !== "payroll") {
+            return res.status(400).json({ success: false, code: "PAYROLL_ONLY_CONTRIBUTIONS", message: "Ordinary Benevolent MIDAX contributions are recorded from payroll only." });
+        }
+        contribution.source = "payroll";
+        contribution.paymentMethod = "Payroll";
 
         fields.forEach(field => {
 
@@ -442,7 +457,7 @@ exports.updateContribution = async (req, res) => {
                 finance.type = "contribution";
                 finance.category = finance.category || "Monthly Contribution";
                 finance.amount = Number(contribution.paidAmount || 0);
-                finance.paymentMethod = contribution.paymentMethod || finance.paymentMethod;
+                finance.paymentMethod = "Payroll";
                 finance.receiptNumber = contribution.receiptNumber || "";
                 finance.referenceNumber = contribution.mpesaCode || "";
                 finance.transactionDate = contribution.paymentDate || finance.transactionDate;
@@ -457,7 +472,7 @@ exports.updateContribution = async (req, res) => {
                 type: "contribution",
                 category: "Monthly Contribution",
                 amount: Number(contribution.paidAmount || 0),
-                paymentMethod: contribution.paymentMethod || "M-PESA",
+                paymentMethod: "Payroll",
                 receiptNumber: contribution.receiptNumber || "",
                 referenceNumber: contribution.mpesaCode || "",
                 description: `Contribution ${contribution.month}/${contribution.year}`,
@@ -477,7 +492,7 @@ exports.updateContribution = async (req, res) => {
 
             message: "Contribution updated successfully.",
 
-            contribution
+            contribution: sanitizeDocument(contribution)
 
         });
 
@@ -611,7 +626,7 @@ exports.approveContribution = async (req, res) => {
 
             message: "Contribution approved successfully.",
 
-            contribution
+            contribution: sanitizeDocument(contribution)
 
         });
 
@@ -689,7 +704,7 @@ exports.rejectContribution = async (req, res) => {
 
             message: "Contribution sent back for review.",
 
-            contribution
+            contribution: sanitizeDocument(contribution)
 
         });
 
@@ -879,9 +894,12 @@ exports.getContributionSummary = async (req, res) => {
 // Get one contribution
 exports.getContribution = async (req, res) => {
     try {
-        const contribution = await Contribution.findById(req.params.id)
-            .populate("member")
-            .populate("finance");
+        const query = { _id: req.params.id };
+        if (String(req.user?.role || "").toLowerCase() === "member") query.member = req.user._id;
+        const contribution = await Contribution.findOne(query)
+            .select("member month year expectedAmount paidAmount balance paymentDate paymentMethod source receiptNumber status approvedBy approvedAt notes finance createdAt updatedAt")
+            .populate("member", "_id fullName memberNumber profileImage department position")
+            .populate("finance", "transactionNumber type category amount paymentMethod receiptNumber referenceNumber transactionDate status notes");
 
         if (!contribution) {
             return res.status(404).json({
@@ -892,7 +910,7 @@ exports.getContribution = async (req, res) => {
 
         res.json({
             success: true,
-            contribution
+            contribution: sanitizeDocument(contribution)
         });
 
     } catch (error) {

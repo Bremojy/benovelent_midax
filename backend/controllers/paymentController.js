@@ -122,52 +122,7 @@ async function applyCommunityContribution(transaction) {
 async function resolvePaymentMember(req) {
   const role = String(req.user?.role || req.userRole || "").toLowerCase();
   if (role === "member") return req.user;
-  if (["admin", "superadmin"].includes(role)) {
-    const profile = await ensureChatProfile(req.user);
-    if (!profile?._id) throw new Error("Your portal contribution profile could not be prepared.");
-    return profile;
-  }
-  throw new Error("This account is not allowed to make a contribution.");
-}
-
-async function ensureContributionForPayment(paymentMember, referenceId, amount) {
-  if (referenceId) {
-    const existing = await Contribution.findOne({ _id: referenceId, member: paymentMember._id });
-    if (!existing) throw new Error("Contribution record not found for this account.");
-    if (Number(existing.balance) <= 0) throw new Error("This contribution is already fully paid.");
-    if (Number(amount) > Number(existing.balance)) throw new Error("Payment cannot exceed the current contribution balance.");
-    return existing;
-  }
-
-  const month = new Date().getMonth() + 1;
-  const year = new Date().getFullYear();
-  let contribution = await Contribution.findOne({ member: paymentMember._id, month, year });
-  if (!contribution) {
-    try {
-      contribution = await Contribution.create({
-        member: paymentMember._id,
-        month,
-        year,
-        expectedAmount: Math.max(1, Number(amount)),
-        paidAmount: 0,
-        paymentMethod: "M-PESA",
-        notes: "Self-service contribution created from portal M-PESA payment.",
-      });
-    } catch (error) {
-      if (error?.code !== 11000) throw error;
-      contribution = await Contribution.findOne({ member: paymentMember._id, month, year });
-    }
-  }
-  if (!contribution) throw new Error("Unable to prepare your current contribution record.");
-  if (Number(contribution.balance) <= 0) {
-    // A fully paid current-month record should not block a new top-up.
-    // Create the next payment as an additional contribution only when the
-    // current record is already complete is undesirable because of the unique
-    // monthly index, so direct additional payment requires the existing balance.
-    throw new Error("Your current monthly contribution is already fully paid.");
-  }
-  if (Number(amount) > Number(contribution.balance)) throw new Error("Payment cannot exceed the current contribution balance.");
-  return contribution;
+  throw new Error("Only member accounts may use member M-PESA payment flows.");
 }
 
 exports.publicConfig = async (_req, res) => {
@@ -296,7 +251,6 @@ exports.deleteTransaction = async (req, res) => {
 
 exports.stk = async (req, res) => {
   let tx = null;
-  if (String(req.user?.role || req.userRole || "").toLowerCase() === "superadmin") return res.status(403).json({ success: false, message: "SuperAdmin accounts cannot make personal M-PESA contributions." });
   let paymentMember = null;
   let idempotencyKey = "";
   const requestId = String(req.requestId || req.get("X-Request-ID") || "unknown");
@@ -306,9 +260,7 @@ exports.stk = async (req, res) => {
     const amount = Number(req.body?.amount);
     paymentMember = await resolvePaymentMember(req);
     const role = String(req.user?.role || req.userRole || "").toLowerCase();
-    if (role !== "member" && purpose !== "contribution") {
-      return res.status(403).json({ success: false, message: "Administrators may use M-PESA here only for their own Benevolent MIDAX contribution." });
-    }
+    if (role !== "member") return res.status(403).json({ success: false, code: "MPESA_MEMBER_ONLY", message: "This M-PESA payment flow is available to member accounts only." });
     const phoneNumber = normalizePhone(req.body?.phoneNumber || paymentMember?.phone || paymentMember?.mpesaNumber || req.user?.phone);
     idempotencyKey = String(req.get("x-idempotency-key") || "").trim().slice(0, 200);
     if (idempotencyKey && !/^[A-Za-z0-9._:-]{8,200}$/.test(idempotencyKey)) {
@@ -334,7 +286,7 @@ exports.stk = async (req, res) => {
     }
     if (!Number.isInteger(amount) || amount < 1) return res.status(400).json({ success: false, message: "Enter a valid whole-number M-PESA amount." });
     if (!phoneNumber || !/^254\d{9}$/.test(phoneNumber)) return res.status(400).json({ success: false, message: "Enter a valid Kenyan M-PESA number." });
-    if (!["loan_repayment", "support_repayment", "community_assistance", "contribution", "other"].includes(purpose)) return res.status(400).json({ success: false, message: "Unsupported payment purpose." });
+    if (!["loan_repayment", "support_repayment", "community_assistance"].includes(purpose)) return res.status(400).json({ success: false, message: "Unsupported payment purpose." });
 
     let referenceModel = "";
     if (purpose === "loan_repayment") {
@@ -351,23 +303,20 @@ exports.stk = async (req, res) => {
       if (amount > Number(application.balance)) return res.status(400).json({ success: false, message: "Repayment cannot exceed the current balance." });
       referenceModel = "SupportRequest";
     } else if (purpose === "community_assistance") {
+      if (role !== "member") return res.status(403).json({ success: false, code: "COMMUNITY_MEMBER_ONLY", message: "Only member accounts can contribute to community assistance cases." });
       const campaign = await CommunityAssistance.findById(referenceId);
       if (!campaign || !campaign.enabled || String(campaign.status) !== "open") return res.status(404).json({ success: false, message: "Community assistance case is not available." });
       if (String(campaign.recipientMember) === String(req.user._id)) return res.status(400).json({ success: false, message: "You cannot contribute to your own assistance case." });
       const remaining = Number(campaign.targetAmount) - Number(campaign.raisedAmount || 0);
       if (amount > remaining) return res.status(400).json({ success: false, message: `Maximum remaining contribution is KSh ${remaining.toLocaleString("en-KE")}.` });
       referenceModel = "CommunityAssistance";
-    } else if (purpose === "contribution") {
-      const contribution = await ensureContributionForPayment(paymentMember, referenceId, amount);
-      referenceModel = "Contribution";
-      if (!referenceId) req.body.referenceId = String(contribution._id);
     }
 
     tx = await MpesaTransaction.create({
       member: paymentMember._id,
       idempotencyKey: idempotencyKey || undefined,
       purpose,
-      referenceId: purpose === "contribution" ? (req.body.referenceId || referenceId) : referenceId,
+      referenceId,
       referenceModel,
       phoneNumber,
       amount,
@@ -512,66 +461,6 @@ exports.stk = async (req, res) => {
   }
 };
 
-async function applyContributionPayment(transaction) {
-  const contribution = await Contribution.findOne({ _id: transaction.referenceId, member: transaction.member });
-  if (!contribution) throw new Error("Contribution record was not found.");
-  const amount = Number(transaction.amount);
-  const alreadyApplied = Array.isArray(contribution.paymentTransactionIds) && contribution.paymentTransactionIds.some((id) => String(id) === String(transaction._id));
-  if (!alreadyApplied) {
-    const updated = await Contribution.findOneAndUpdate(
-      {
-        _id: contribution._id,
-        member: transaction.member,
-        paymentTransactionIds: { $ne: transaction._id },
-        $expr: { $lte: [{ $add: [{ $ifNull: ["$paidAmount", 0] }, amount] }, { $ifNull: ["$expectedAmount", 0] }] },
-      },
-      {
-        $inc: { paidAmount: amount },
-        $addToSet: { paymentTransactionIds: transaction._id },
-        $set: { paymentDate: contribution.paymentDate || new Date(), paymentMethod: "M-PESA" },
-      },
-      { returnDocument: "after" }
-    );
-    if (!updated) {
-      const alreadyAppliedNow = await Contribution.findOne({ _id: contribution._id, paymentTransactionIds: transaction._id }).lean();
-      if (!alreadyAppliedNow) throw new Error("Payment exceeds the contribution balance or the contribution changed concurrently. Finance review is required.");
-    }
-    await Contribution.updateOne(
-      { _id: contribution._id },
-      [{
-        $set: {
-          balance: { $subtract: [{ $ifNull: ["$expectedAmount", 0] }, { $ifNull: ["$paidAmount", 0] }] },
-          status: {
-            $cond: [
-              { $lte: [{ $subtract: [{ $ifNull: ["$expectedAmount", 0] }, { $ifNull: ["$paidAmount", 0] }] }, 0] },
-              "paid",
-              { $cond: [{ $gt: [{ $ifNull: ["$paidAmount", 0] }, 0] }, "partial", "pending"] }
-            ]
-          }
-        }
-      }]
-    )
-  }
-  const freshContribution = await Contribution.findById(contribution._id);
-  const referenceNumber = `MPESA-${transaction._id}`;
-  await Finance.findOneAndUpdate(
-    { transactionNumber: referenceNumber },
-    { $setOnInsert: {
-      member: freshContribution.member,
-      transactionNumber: referenceNumber,
-      type: "contribution",
-      category: "Contribution",
-      amount,
-      paymentMethod: "M-PESA",
-      referenceNumber,
-      description: `M-PESA contribution for ${freshContribution.member}`,
-      status: "completed",
-      transactionDate: transaction.completedAt || new Date(),
-    } },
-    { upsert: true, returnDocument: "after" }
-  );
-  return freshContribution || contribution;
-}
 
 async function reconcileSuccessfulTransaction(transaction) {
   if (!transaction || transaction.reconciled) return transaction;
@@ -579,7 +468,7 @@ async function reconcileSuccessfulTransaction(transaction) {
     if (transaction.purpose === "loan_repayment") await applyEducationRepayment(transaction);
     else if (transaction.purpose === "support_repayment") await applyGenericSupportRepayment(transaction);
     else if (transaction.purpose === "community_assistance") await applyCommunityContribution(transaction);
-    else if (transaction.purpose === "contribution") await applyContributionPayment(transaction);
+    else throw new Error("Unsupported payment purpose cannot be reconciled.");
     transaction.reconciled = true;
     transaction.reconciledAt = transaction.reconciledAt || new Date();
     if (String(transaction.resultDescription || "").startsWith("Payment received; application reconciliation requires review:")) {
@@ -600,19 +489,18 @@ async function reconcileSuccessfulTransaction(transaction) {
 
 exports.manualPayment = async (req, res) => {
   try {
-    if (String(req.user?.role || req.userRole || "").toLowerCase() === "superadmin") return res.status(403).json({ success: false, message: "SuperAdmin accounts cannot make personal M-PESA contributions." });
     const amount = Number(req.body?.amount);
     const purpose = String(req.body?.purpose || "").trim();
     const referenceId = req.body?.referenceId || null;
     const paymentMember = await resolvePaymentMember(req);
     const role = String(req.user?.role || req.userRole || "").toLowerCase();
-    if (role !== "member" && purpose !== "contribution") return res.status(403).json({ success: false, message: "Administrators may use M-PESA here only for their own Benevolent MIDAX contribution." });
+    if (role !== "member") return res.status(403).json({ success: false, code: "MPESA_MEMBER_ONLY", message: "This manual M-PESA flow is available to member accounts only." });
     const manualTransactionCode = normalizeManualCode(req.body?.transactionCode || req.body?.manualTransactionCode);
     const suppliedPhone = req.body?.phoneNumber ? normalizePhone(req.body.phoneNumber) : "";
     if (!Number.isInteger(amount) || amount < 1) return res.status(400).json({ success: false, message: "Enter a valid whole-number M-PESA amount." });
     if (!manualTransactionCode || manualTransactionCode.length < 6) return res.status(400).json({ success: false, message: "Enter the M-PESA transaction code from the payment confirmation." });
     if (suppliedPhone && !/^254\d{9}$/.test(suppliedPhone)) return res.status(400).json({ success: false, message: "Enter a valid Kenyan M-PESA number, or leave it blank." });
-    if (!["loan_repayment", "support_repayment", "community_assistance", "contribution", "other"].includes(purpose)) return res.status(400).json({ success: false, message: "Select a valid payment purpose." });
+    if (!["loan_repayment", "support_repayment", "community_assistance"].includes(purpose)) return res.status(400).json({ success: false, message: "Select a valid payment purpose." });
     if (!MANUAL_PAYBILL() || !MANUAL_ACCOUNT()) return res.status(503).json({ success: false, message: "Manual M-PESA PayBill collection is not configured." });
     if (purpose === "loan_repayment" || purpose === "support_repayment") {
       const referenceModel = purpose === "loan_repayment" ? "EducationSupport" : "SupportRequest";
@@ -625,9 +513,6 @@ exports.manualPayment = async (req, res) => {
       if (String(campaign.recipientMember) === String(req.user._id)) return res.status(400).json({ success: false, message: "You cannot contribute to your own assistance case." });
       const remaining = Number(campaign.targetAmount) - Number(campaign.raisedAmount || 0);
       if (amount > remaining) return res.status(400).json({ success: false, message: `Maximum remaining contribution is KSh ${remaining.toLocaleString("en-KE")}.` });
-    } else if (purpose === "contribution") {
-      const contribution = await ensureContributionForPayment(paymentMember, referenceId, amount);
-      req.body.referenceId = String(contribution._id);
     }
     const existing = await MpesaTransaction.findOne({ manualTransactionCode }).lean();
     if (existing) {
@@ -637,8 +522,8 @@ exports.manualPayment = async (req, res) => {
     const tx = await MpesaTransaction.create({
       member: paymentMember._id,
       purpose,
-      referenceId: purpose === "contribution" ? (req.body.referenceId || referenceId) : referenceId,
-      referenceModel: purpose === "contribution" ? "Contribution" : purpose === "community_assistance" ? "CommunityAssistance" : purpose === "loan_repayment" ? "EducationSupport" : purpose === "support_repayment" ? "SupportRequest" : "",
+      referenceId,
+      referenceModel: purpose === "community_assistance" ? "CommunityAssistance" : purpose === "loan_repayment" ? "EducationSupport" : "SupportRequest",
       phoneNumber: suppliedPhone,
       amount,
       businessShortCode: MANUAL_PAYBILL(),
@@ -722,7 +607,7 @@ exports.callbackHealth = async (_req, res) => {
 
 exports.stkQuery = async (req, res) => {
   try {
-    if (String(req.user?.role || req.userRole || "").toLowerCase() === "superadmin") return res.status(403).json({ success: false, message: "SuperAdmin accounts cannot make or manage personal M-PESA contribution payments from Accounts." });
+    if (String(req.user?.role || req.userRole || "").toLowerCase() !== "member") return res.status(403).json({ success: false, code: "MPESA_MEMBER_ONLY", message: "M-PESA payment status is available to member accounts only." });
     const transactionId = String(req.body?.transactionId || req.body?.id || "").trim();
     const checkoutRequestId = String(req.body?.checkoutRequestId || "").trim();
     if (!transactionId && !checkoutRequestId) {
@@ -988,11 +873,19 @@ exports.communityCases = async (req, res) => {
   try {
     const isAdminView = ["admin", "superadmin"].includes(String(req.user?.role || "").toLowerCase());
     const filter = isAdminView ? {} : { enabled: true, status: { $in: ["open", "target_reached"] } };
+    const currentMemberId = String(req.user?._id || "");
     const campaigns = await CommunityAssistance.find(filter)
       .populate("recipientMember", "_id fullName memberNumber profileImage department position phone mpesaNumber")
       .sort({ createdAt: -1 })
       .lean();
-    res.json({ success: true, campaigns });
+    const enriched = campaigns.map((campaign) => ({
+      ...campaign,
+      canContribute: !isAdminView && String(campaign.recipientMember?._id || campaign.recipientMember || "") !== currentMemberId
+        && Number(campaign.raisedAmount || 0) < Number(campaign.targetAmount || 0)
+        && campaign.enabled === true
+        && String(campaign.status || "") === "open",
+    }));
+    res.json({ success: true, campaigns: enriched });
   } catch (error) { res.status(500).json({ success: false, message: error.message }); }
 };
 

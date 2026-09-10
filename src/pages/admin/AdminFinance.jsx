@@ -5,7 +5,6 @@ import { useAuth } from "../../context/AuthContext";
 import DashboardLayout from "../../layouts/DashboardLayout";
 import API from "../../services/api";
 import { buildPrintHeadHtml, printHeadStyles } from "../../utils/printHead";
-import MpesaPaymentButton from "../../components/payments/MpesaPaymentButton";
 import "../../styles/portalModule.css";
 import "./adminFinance.css";
 
@@ -17,7 +16,7 @@ const EMPTY_FORM = {
   category: "",
   amount: "",
   description: "",
-  paymentMethod: "M-PESA",
+  paymentMethod: "Payroll",
   referenceNumber: "",
   receiptNumber: "",
   transactionDate: today,
@@ -38,7 +37,7 @@ export default function AdminFinance() {
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [editingContribution, setEditingContribution] = useState(null);
-  const [contributionForm, setContributionForm] = useState({ expectedAmount: "", paidAmount: "", paymentMethod: "M-PESA", receiptNumber: "", mpesaCode: "", paymentDate: today, notes: "" });
+  const [contributionForm, setContributionForm] = useState({ expectedAmount: "", paidAmount: "", paymentMethod: "Payroll", receiptNumber: "", mpesaCode: "", paymentDate: today, notes: "" });
   const [bulkForm, setBulkForm] = useState({ month: new Date().getMonth() + 1, year: new Date().getFullYear(), amount: "500", paymentDate: today, recordAsCollected: true, notes: "Monthly payroll deduction" });
   const [bulkSaving, setBulkSaving] = useState(false);
   const [community, setCommunity] = useState([]);
@@ -135,7 +134,7 @@ export default function AdminFinance() {
     setContributionForm({
       expectedAmount: contribution?.expectedAmount ?? "",
       paidAmount: contribution?.paidAmount ?? "",
-      paymentMethod: contribution?.paymentMethod || "M-PESA",
+      paymentMethod: contribution?.paymentMethod || "Payroll",
       receiptNumber: contribution?.receiptNumber || "",
       mpesaCode: contribution?.mpesaCode || "",
       paymentDate: contribution?.paymentDate ? new Date(contribution.paymentDate).toISOString().slice(0, 10) : today,
@@ -154,7 +153,7 @@ export default function AdminFinance() {
       const response = await API.put(`/contributions/${editingContribution._id}`, {
         expectedAmount: Number(contributionForm.expectedAmount),
         paidAmount: Number(contributionForm.paidAmount),
-        paymentMethod: contributionForm.paymentMethod,
+        paymentMethod: "Payroll",
         receiptNumber: contributionForm.receiptNumber,
         mpesaCode: contributionForm.mpesaCode,
         paymentDate: contributionForm.paymentDate || today,

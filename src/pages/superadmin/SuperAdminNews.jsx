@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { CheckCircle2, Edit3, EyeOff, Newspaper, Plus, RefreshCw, Save, Trash2, Upload, X } from "lucide-react";
 import toast from "react-hot-toast";
 import DashboardLayout from "../../layouts/DashboardLayout";
-import { createManagedNews, deleteManagedNews, getManagedNews, updateManagedNews } from "../../services/newsService";
+import { createManagedNews, deleteManagedNews, getManagedNews, updateManagedNews, publishManagedNews, unpublishManagedNews } from "../../services/newsService";
 import "./SuperAdminNews.css";
 
 const initial = { title: "", summary: "", content: "", category: "Announcement", published: true, featured: false, pinned: false, allowComments: true };
@@ -56,13 +56,16 @@ export default function SuperAdminNews() {
     try {
       setLoading(true);
       if (editing) {
-        const payload = {
-          ...form,
-          published: Boolean(form.published),
-          status: form.published ? "published" : "draft",
-        };
+        const payload = { ...form };
+        delete payload.published;
         const r = await updateManagedNews(editing, payload);
-        setItems((prev) => prev.map((item) => item._id === editing ? r.news : item));
+        let updated = r.news;
+        const currentPublished = Boolean(updated?.published && updated?.status !== "draft");
+        if (Boolean(form.published) !== currentPublished) {
+          const publication = Boolean(form.published) ? await publishManagedNews(editing) : await unpublishManagedNews(editing);
+          updated = publication.news || updated;
+        }
+        setItems((prev) => prev.map((item) => item._id === editing ? updated : item));
         toast.success(form.published ? "News updated and published." : "News saved as draft.");
         resetEditor();
       } else {
@@ -93,7 +96,7 @@ export default function SuperAdminNews() {
   const togglePublished = async (item) => {
     const nextPublished = !(item.published && item.status !== "draft");
     try {
-      const r = await updateManagedNews(item._id, { published: nextPublished, status: nextPublished ? "published" : "draft" });
+      const r = nextPublished ? await publishManagedNews(item._id) : await unpublishManagedNews(item._id);
       setItems((prev) => prev.map((entry) => entry._id === item._id ? r.news : entry));
       toast.success(nextPublished ? "News published." : "News moved to draft.");
     } catch (e) {

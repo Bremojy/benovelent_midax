@@ -7,6 +7,8 @@ const migrations = [
   require("../migrations/004_normalize_member_defaults"),
   require("../migrations/005_align_policies_to_constitution"),
   require("../migrations/006_cleanup_blank_manual_transaction_codes"),
+  require("../migrations/007_repair_direct_conversations"),
+  require("../migrations/008_normalize_contribution_source"),
 ];
 
 function normalizeMigration(migration, index) {

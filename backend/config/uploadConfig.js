@@ -14,7 +14,7 @@ const useCloudinary = Boolean(
 
 
 if (process.env.NODE_ENV === "production" && !useCloudinary) {
-  console.warn("Cloudinary is not configured. Durable production uploads are disabled; configure Cloudinary before accepting image/PDF uploads.");
+  throw new Error("Cloudinary is required in production. Configure CLOUDINARY_URL or CLOUDINARY_CLOUD_NAME/CLOUDINARY_API_KEY/CLOUDINARY_API_SECRET before starting the server.");
 }
 
 if (useCloudinary) {
@@ -32,15 +32,11 @@ if (useCloudinary) {
 
 const uploadRoot = process.env.UPLOAD_ROOT
   ? path.resolve(process.env.UPLOAD_ROOT)
-  : (process.env.RENDER === "true" || process.env.NODE_ENV === "production"
-      ? path.join("/var", "data", "uploads")
-      : path.join(__dirname, "..", "uploads"));
+  : path.join(__dirname, "..", "uploads");
 
 const documentRoot = process.env.DOCUMENT_ROOT
   ? path.resolve(process.env.DOCUMENT_ROOT)
-  : (process.env.RENDER === "true" || process.env.NODE_ENV === "production"
-      ? path.join("/var", "data", "documents")
-      : path.join(__dirname, "..", "documents"));
+  : path.join(__dirname, "..", "documents");
 
 const ensureDirectory = (directory) => fs.mkdirSync(directory, { recursive: true });
 
@@ -73,9 +69,13 @@ const allowedMimeTypes = new Set([
   "video/webm", "video/mp4", "video/quicktime", "video/x-matroska",
 ]);
 
-const fileFilter = (req, file, cb) => allowedMimeTypes.has(file.mimetype)
-  ? cb(null, true)
-  : cb(new Error("Unsupported file type."));
+const ALLOWED_EXTENSIONS = new Set([".jpg", ".jpeg", ".png", ".webp", ".gif", ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".txt", ".webm", ".ogg", ".mp3", ".wav", ".m4a", ".mp4", ".mov", ".mkv"]);
+
+const fileFilter = (req, file, cb) => {
+  const extension = path.extname(file.originalname || "").toLowerCase();
+  if (allowedMimeTypes.has(file.mimetype) && ALLOWED_EXTENSIONS.has(extension)) return cb(null, true);
+  return cb(new Error("Unsupported file type."));
+};
 
 const upload = multer({
   storage,

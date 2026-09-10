@@ -3,6 +3,7 @@ const jwt = require("jsonwebtoken");
 const Member = require("../models/Member");
 const Admin = require("../models/Admin");
 const SuperAdmin = require("../models/SuperAdmin");
+const { resolveCanonicalChatActorForAuthenticatedUser } = require("../utils/chatProfile");
 
 const registerMessageSocket = require("./messageSocket");
 const registerNotificationSocket = require("./notificationSocket");
@@ -92,10 +93,13 @@ const initSocket = (server) => {
             const user = await UserModel.findById(decoded.id || decoded.userId || decoded._id).select("_id role status sessionVersion fullName").lean();
             if (!user || (user.status && user.status !== "active")) return next(new Error("AUTH_INVALID"));
             if (Number(decoded.sessionVersion ?? 0) !== Number(user.sessionVersion ?? 0)) return next(new Error("SESSION_REPLACED"));
+            const actor = await resolveCanonicalChatActorForAuthenticatedUser(user);
             socket.user = user;
             socket.userRole = userType;
             socket.sessionVersion = Number(user.sessionVersion || 0);
+            socket.data = { userId: String(user._id), role: userType, chatId: actor?.chatId || String(user._id), portalOwnerId: actor?.portalOwnerId || String(user._id) };
             socket.join(`user:${String(user._id)}`);
+            if (socket.data.chatId) socket.join(String(socket.data.chatId));
             socket.join(`session:${String(user._id)}`);
             next();
         } catch (error) {

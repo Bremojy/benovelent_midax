@@ -28,7 +28,6 @@ for (const expected of [
   'exports.manualReject = async',
   'manualTransactionCode',
   'reconciled = true',
-  'applyContributionPayment',
   'findOneAndUpdate',
 ]) assert(controller.includes(expected), `Manual payment controller contract missing ${expected}`);
 assert(model.includes('paymentMethod: { type: String, enum: ["stk", "manual_paybill"]'), "Payment method field missing.");

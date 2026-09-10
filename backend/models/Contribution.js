@@ -49,16 +49,17 @@ const contributionSchema = new mongoose.Schema({
         type:Date
     },
 
+    source:{
+        type:String,
+        enum:["payroll"],
+        default:"payroll",
+        immutable:true
+    },
+
     paymentMethod:{
         type:String,
-        enum:[
-            "Cash",
-            "M-PESA",
-            "Bank",
-            "Cheque",
-            "Payroll"
-        ],
-        default:"M-PESA"
+        enum:["Cash", "M-PESA", "Bank", "Cheque", "Payroll"],
+        default:"Payroll"
     },
 
     receiptNumber:{

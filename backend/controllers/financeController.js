@@ -36,6 +36,9 @@ exports.createTransaction = async (req, res) => {
         if (!type || amount === undefined || amount === null || Number(amount) <= 0) {
             return res.status(400).json({ success: false, message: "Transaction type and a positive amount are required." });
         }
+        if (type === "contribution" && paymentMethod !== undefined && String(paymentMethod).toLowerCase() !== "payroll") {
+            return res.status(400).json({ success: false, code: "PAYROLL_ONLY_CONTRIBUTIONS", message: "Ordinary Benevolent MIDAX contributions are recorded from payroll only." });
+        }
         const memberRequiredFor = new Set(["contribution", "claim", "refund"]);
         const scope = type === "contribution" ? String(contributorType || (memberId ? "member" : "all")).toLowerCase() : null;
         if (type === "contribution" && !["member", "admin", "all"].includes(scope)) {
@@ -81,7 +84,7 @@ exports.createTransaction = async (req, res) => {
         const transaction = await Finance.create({
             member: memberId,
             transactionNumber: generateTransactionNumber(),
-            type, category, amount: Number(amount), description, paymentMethod,
+            type, category, amount: Number(amount), description, paymentMethod: type === "contribution" ? "Payroll" : paymentMethod,
             referenceNumber, receiptNumber, notes,
             contributorType: scope, contributor, contributorModel, contributorName,
             transactionDate: transactionDate ? new Date(transactionDate) : new Date(),
@@ -100,6 +103,7 @@ exports.createTransaction = async (req, res) => {
                 type: "finance", referenceId: transaction._id, referenceModel: "Finance"
             });
         }
+        await redisCache.invalidatePrefix("finance:list");
         return res.status(201).json({ success: true, message: "Transaction created successfully.", transaction });
     } catch (error) {
         console.error(error);
@@ -292,6 +296,8 @@ exports.updateTransaction = async (req, res) => {
         }
 
         if (transaction.type === "contribution") {
+            if (req.body.paymentMethod !== undefined && String(req.body.paymentMethod).toLowerCase() !== "payroll") return res.status(400).json({ success: false, code: "PAYROLL_ONLY_CONTRIBUTIONS", message: "Ordinary Benevolent MIDAX contributions are recorded from payroll only." });
+            transaction.paymentMethod = "Payroll";
             const scope = String(req.body.contributorType || transaction.contributorType || (transaction.member ? "member" : "all")).toLowerCase();
             if (!["member", "admin", "all"].includes(scope)) return res.status(400).json({ success: false, message: "Invalid contribution source." });
             transaction.contributorType = scope;
@@ -337,7 +343,8 @@ exports.updateTransaction = async (req, res) => {
                 linked.member = transaction.member || linked.member;
                 linked.expectedAmount = Number(transaction.amount || 0);
                 linked.paidAmount = Number(transaction.amount || 0);
-                linked.paymentMethod = transaction.paymentMethod;
+                linked.source = "payroll";
+                linked.paymentMethod = "Payroll";
                 linked.receiptNumber = transaction.receiptNumber || linked.receiptNumber;
                 linked.mpesaCode = transaction.referenceNumber || linked.mpesaCode;
                 linked.paymentDate = transaction.transactionDate;
@@ -346,6 +353,7 @@ exports.updateTransaction = async (req, res) => {
             }
         }
 
+        await redisCache.invalidatePrefix("finance:list");
         res.json({
 
             success: true,
@@ -402,6 +410,7 @@ exports.hideTransaction = async (req, res) => {
                 type: "finance", referenceId: transaction._id, referenceModel: "Finance"
             });
         }
+        await redisCache.invalidatePrefix("finance:list");
         return res.json({ success: true, hidden: transaction.hidden, message: transaction.hidden ? "Transaction hidden from the community ledger." : "Transaction restored to the community ledger.", transaction });
     } catch (error) {
         return res.status(500).json({ success: false, message: error.message });
@@ -463,6 +472,7 @@ exports.deleteTransaction = async (req, res) => {
                 type: "finance", referenceId: transaction._id, referenceModel: "Finance"
             });
         }
+        await redisCache.invalidatePrefix("finance:list");
         return res.json({
             success: true,
             message: role === "superadmin" ? "Transaction permanently deleted successfully." : "Transaction removed from the Accounts ledger. Permanent deletion is reserved for SuperAdmin.",

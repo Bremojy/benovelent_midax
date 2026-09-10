@@ -163,15 +163,10 @@ app.use(express.urlencoded({
 // STATIC FILES
 // ===============================================
 
-const { uploadRoot, documentRoot } = require("./config/uploadConfig");
+const { documentRoot } = require("./config/uploadConfig");
 
-app.use("/uploads", express.static(uploadRoot, {
-    maxAge: "7d",
-    etag: true,
-    lastModified: true,
-}));
-app.use("/documents", express.static(documentRoot));
-app.use("/documents", express.static(path.join(__dirname, "..", "public", "documents")));
+// Protected production uploads are never exposed through a public static directory.
+// The only intentionally public document is the published constitution bundled with the site.
 
 // Serve bundled frontend/public assets from the API host as a safe fallback.
 // This prevents requests such as /about-welcome.svg from falling into the API 404 handler
@@ -185,30 +180,10 @@ app.use(express.static(publicRoot, {
 }));
 
 app.get("/documents/:filename", (req, res, next) => {
-    const filename = String(req.params.filename || "").trim();
-    if (!filename) {
-        return next();
-    }
-
-    const candidates = [
-        path.join(documentRoot, filename),
-        path.join(__dirname, "..", "public", "documents", filename),
-    ];
-
-    for (const candidate of candidates) {
-        if (fs.existsSync(candidate)) {
-            return res.sendFile(candidate);
-        }
-    }
-
-    if (/constitution/i.test(filename)) {
-        const fallback = path.join(__dirname, "..", "public", "documents", "benevolent-midax-constitution.pdf");
-        if (fs.existsSync(fallback)) {
-            return res.sendFile(fallback);
-        }
-    }
-
-    return next();
+    const filename = decodeURIComponent(String(req.params.filename || "")).trim();
+    if (filename !== "benevolent-midax-constitution.pdf") return next();
+    const candidate = path.join(__dirname, "..", "public", "documents", filename);
+    return fs.existsSync(candidate) ? res.sendFile(candidate) : next();
 });
 
 // ===============================================
@@ -350,6 +325,7 @@ const connectDatabase = async () => {
             await runMigrations();
         } catch (migrationError) {
             console.error("❌ Database migration failed:", migrationError.message);
+            if (process.env.NODE_ENV === "production") process.exit(1);
         }
         if (reconnectTimer) { clearInterval(reconnectTimer); reconnectTimer = undefined; }
     } catch (err) {
