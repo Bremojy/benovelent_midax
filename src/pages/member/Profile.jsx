@@ -298,7 +298,24 @@ function Agreement({ label, checked, onChange }) {
 }
 
 function UploadCard({ title, hint, value, file, onFile, icon }) {
-  const preview = file ? URL.createObjectURL(file) : value ? resolveApiUrl(value) : "";
+  const [preview, setPreview] = useState(
+    () => (value ? resolveApiUrl(value) : "")
+  );
+
+  useEffect(() => {
+    if (!file) {
+      setPreview(value ? resolveApiUrl(value) : "");
+      return undefined;
+    }
+
+    const objectUrl = URL.createObjectURL(file);
+    setPreview(objectUrl);
+
+    return () => {
+      URL.revokeObjectURL(objectUrl);
+    };
+  }, [file, value]);
+
   return (
     <div className="profile-upload-card">
       <div className="profile-upload-card-header">

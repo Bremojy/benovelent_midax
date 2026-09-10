@@ -36,6 +36,7 @@ const THEMES = [
 export default function PortalSettings() {
   const { user, role, refreshUser } = useAuth();
   const fileRef = useRef(null);
+  const photoPreviewUrlRef = useRef("");
   const normalizedRole = String(role || user?.role || "member").toLowerCase();
 
   const [profile, setProfile] = useState({
@@ -61,6 +62,13 @@ export default function PortalSettings() {
 
   const isMember = normalizedRole === "member";
   const isAdmin = normalizedRole === "admin";
+
+  useEffect(() => () => {
+    if (photoPreviewUrlRef.current) {
+      URL.revokeObjectURL(photoPreviewUrlRef.current);
+      photoPreviewUrlRef.current = "";
+    }
+  }, []);
 
   const roleLabel = useMemo(
     () =>
@@ -112,8 +120,13 @@ export default function PortalSettings() {
     }
 
     setError("");
+    if (photoPreviewUrlRef.current) {
+      URL.revokeObjectURL(photoPreviewUrlRef.current);
+    }
+    const previewUrl = URL.createObjectURL(file);
+    photoPreviewUrlRef.current = previewUrl;
     setPhoto(file);
-    setPhotoPreview(URL.createObjectURL(file));
+    setPhotoPreview(previewUrl);
   };
 
   const saveProfile = async (event) => {
