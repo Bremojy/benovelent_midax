@@ -65,9 +65,14 @@ async function run() {
     await conversations.updateOne({ _id: survivor._id }, update);
   }
 
+  await conversations.updateMany(
+    { isGroup: { $ne: true }, $or: [{ directKey: "" }, { directKey: null }] },
+    { $unset: { directKey: "" } },
+  );
+
   await conversations.createIndex(
     { directKey: 1 },
-    { unique: true, partialFilterExpression: { isGroup: false, directKey: { $type: "string", $ne: "" } }, name: "direct_conversation_key_unique" },
+    { unique: true, partialFilterExpression: { isGroup: false, directKey: { $exists: true } }, name: "direct_conversation_key_unique" },
   );
 }
 

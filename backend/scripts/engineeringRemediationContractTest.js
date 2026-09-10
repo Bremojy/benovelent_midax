@@ -24,6 +24,7 @@ assert(contribution.includes('source: "payroll"') && contribution.includes('paym
 assert(finance.includes('PAYROLL_ONLY_CONTRIBUTIONS') && finance.includes('paymentMethod: type === "contribution" ? "Payroll"'), "Finance contribution policy is not payroll-only.");
 assert(conversation.includes('directKey') && conversation.includes('[canonicalMe, canonicalTarget].sort().join(":")'), "Direct conversation canonical key is missing.");
 assert(conversationModel.includes('direct_conversation_key_unique'), "Unique direct conversation index is missing.");
+assert(!conversationModel.includes('directKey: { $type: "string", $ne: "" }'), "MongoDB-incompatible direct conversation partial-index predicate remains.");
 assert(chatProfile.includes('resolveCanonicalChatActorForAuthenticatedUser') && chatProfile.includes('resolveChatActor'), "Canonical chat identity service is missing.");
 assert(!conversation.includes('redisCache.getJson'), "Conversation lists still use blind TTL caching.");
 assert(newsRoutes.includes('/:id/publish') && newsRoutes.includes('/:id/unpublish'), "Protected publication endpoints are not wired.");
@@ -33,6 +34,8 @@ assert(!server.includes('app.use("/uploads", express.static'), "Protected upload
 assert(!server.includes('app.use("/documents", express.static(documentRoot)'), "Protected document directory is still public.");
 assert(sanitizer.includes('"monthlyIncome"') && sanitizer.includes('"password"'), "Client sanitizer does not cover required sensitive fields.");
 assert(migrationRunner.includes('007_repair_direct_conversations') && migrationRunner.includes('008_normalize_contribution_source'), "New repair migrations are not registered.");
+const directRepairMigration = read("backend/migrations/007_repair_direct_conversations.js");
+assert(!directRepairMigration.includes('directKey: { $type: "string", $ne: "" }'), "Migration still uses MongoDB-incompatible $ne partial-index predicate.");
 assert(!frontendMemberAccounts.includes('purpose="contribution"'), "Member Accounts still renders personal M-PESA contribution.");
 assert(!frontendAdminAccounts.includes('purpose="contribution"') && !frontendAdminAccounts.includes('Your Admin contribution'), "Admin Accounts still renders personal contribution M-PESA.");
 console.log("Engineering remediation contract tests: PASS");

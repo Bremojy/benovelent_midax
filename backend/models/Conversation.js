@@ -13,7 +13,7 @@ const conversationSchema = new mongoose.Schema(
 
     directKey:{
         type:String,
-        default:"",
+        default:undefined,
         select:false
     },
     isGroup:{
@@ -116,7 +116,7 @@ const conversationSchema = new mongoose.Schema(
 );
 
 conversationSchema.index({participants:1});
-conversationSchema.index({ directKey: 1 }, { unique: true, partialFilterExpression: { isGroup: false, directKey: { $type: "string", $ne: "" } }, name: "direct_conversation_key_unique" });
+conversationSchema.index({ directKey: 1 }, { unique: true, partialFilterExpression: { isGroup: false, directKey: { $exists: true } }, name: "direct_conversation_key_unique" });
 conversationSchema.index({lastMessageTime:-1});
 
 module.exports =
