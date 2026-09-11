@@ -22,6 +22,9 @@ for (const needle of ["incomingNativeCall", "incomingPushCall", "callAction", "a
 for (const needle of ["CALL_TIMEOUT_MS", "recordCallSummary", "call-mode-offer", "call-mode-answer", "call-ended", "answeredAt"]) {
   if (!socket.includes(needle)) failures.push(`Backend call lifecycle missing: ${needle}`);
 }
+if (!socket.includes('if (reason === "declined")') || !socket.includes('recordCallSummary(call, "declined", 0)') || !socket.includes('markMissedCall(call.callId, "missed")')) {
+  failures.push("Declined and missed calls must follow separate lifecycle paths.");
+}
 for (const needle of ["ACTIVE_ACCOUNT_KEY", "localStorage", "BroadcastChannel", "Another account was signed in on this device"]) {
   if (!auth.includes(needle)) failures.push(`Single-account browser session missing: ${needle}`);
 }

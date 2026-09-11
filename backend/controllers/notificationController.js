@@ -144,22 +144,33 @@ MARK ALL AS READ
 
 exports.markAllRead = async (req, res) => {
   try {
-    await Notification.updateMany(
-      {
-        recipient: req.user._id,
-        read: false,
-      },
-      {
-        $set: {
-          read: true,
-          readAt: new Date(),
-        },
-      }
-    );
+    const readAt = new Date();
+    const unreadNotifications = await Notification.find({
+      recipient: req.user._id,
+      read: false,
+    }).limit(1000);
+
+    if (unreadNotifications.length) {
+      const ids = unreadNotifications.map((notification) => notification._id);
+      await Notification.updateMany(
+        { _id: { $in: ids }, recipient: req.user._id, read: false },
+        { $set: { read: true, readAt } }
+      );
+
+      // Broadcast the persisted state change so other open tabs/devices move
+      // the same records into history instead of only clearing their unread list.
+      await Promise.all(unreadNotifications.map(async (notification) => {
+        notification.read = true;
+        notification.readAt = readAt;
+        await Notification.emitNotificationUpdated(notification);
+      }));
+    }
+
     await invalidateNotificationCaches(req.user._id);
 
     return res.json({
       success: true,
+      updated: unreadNotifications.length,
       message: "All notifications marked as read.",
     });
   } catch (error) {

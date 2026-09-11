@@ -98,7 +98,6 @@ export default function Notifications() {
   const markOne = async (id) => {
     try {
       setBusy(true);
-      try { socket.emit("notification-read", id); } catch {}
       await API.put(`/notifications/${id}/read`);
       const moved = activeNotifications.find((item) => String(item._id) === String(id));
       setActiveNotifications((previous) => previous.filter((item) => String(item._id) !== String(id)));
@@ -119,7 +118,6 @@ export default function Notifications() {
   const markAll = async () => {
     try {
       setBusy(true);
-      try { socket.emit("read-all-notifications"); } catch {}
       await API.put("/notifications/read-all");
       setHistoryNotifications((previous) => [
         ...activeNotifications.map((item) => ({ ...item, read: true, readAt: new Date().toISOString() })),

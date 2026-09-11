@@ -325,8 +325,11 @@ module.exports = (io, socket) => {
     io.to(String(target)).emit("call-rejected", { callId: call.callId, reason });
     if (call) {
       if (!call.answered) {
-        await markMissedCall(call.callId, reason === "declined" ? "declined" : "missed");
-        if (reason === "declined") await recordCallSummary(call, "declined", 0);
+        if (reason === "declined") {
+          await recordCallSummary(call, "declined", 0);
+        } else {
+          await markMissedCall(call.callId, "missed");
+        }
       }
       clearCall(call.callId);
     }
