@@ -6,7 +6,11 @@ const controller = fs.readFileSync("backend/controllers/messageController.js", "
 assert(socket.includes("participants: socket.data.chatId"), "Socket conversation membership must be checked server-side.");
 assert(socket.includes('socket.on("leave-conversation"'), "Chat sockets must leave prior conversation rooms.");
 assert(socket.includes('String(socket.data.chatId)'), "Read receipts/typing must use canonical chat identity.");
-assert(socket.includes("caller = await resolveActor(socket.data.chatId || socket.data.userId"), "Callers must be derived from authenticated socket identity.");
+assert(
+  socket.includes("const caller = await resolveChatActor(socket.data.chatId || socket.data.userId, socket.data.role)") ||
+  socket.includes("await resolveChatActor(socket.data.chatId || socket.data.userId, socket.data.role)"),
+  "Callers must be derived from authenticated socket identity."
+);
 assert(windowFile.includes('X-Idempotency-Key'), "Chat sends must carry an idempotency key for retry safety.");
 assert(windowFile.includes("loadOlderMessages") && windowFile.includes("hasMore"), "Chat history must support bounded pagination.");
 assert(controller.includes("clientMessageId"), "Message persistence must support idempotent client retries.");

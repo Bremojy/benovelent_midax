@@ -122,6 +122,9 @@ async function applyCommunityContribution(transaction) {
 async function resolvePaymentMember(req) {
   const role = String(req.user?.role || req.userRole || "").toLowerCase();
   if (role === "member") return req.user;
+  if (role === "superadmin") {
+    throw new Error("SuperAdmin accounts cannot make personal M-PESA contributions.");
+  }
   throw new Error("Only member accounts may use member M-PESA payment flows.");
 }
 
