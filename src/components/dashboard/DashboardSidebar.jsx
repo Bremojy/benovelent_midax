@@ -41,12 +41,29 @@ function DashboardSidebar({ role, sidebarOpen, setSidebarOpen, mobileHidden = fa
   const roleLabel = currentRole === "superadmin"
     ? "Super Admin"
     : currentRole === "admin"
-      ? "Administrator"
+      ? "Admin / Benevolent Leader"
       : "Member";
 
-  const renderMenuLinks = (items) => (
-    items.length > 0
-      ? items.map((item) => {
+  const renderMenuLinks = (items, { grouped = true } = {}) => {
+    if (items.length === 0) return <div className="sidebar-empty">No menu items available.</div>;
+
+    const groups = [];
+    const groupMap = new Map();
+
+    items.forEach((item) => {
+      const section = grouped ? (item.section || "Portal") : null;
+      if (!groupMap.has(section)) {
+        const group = { section, items: [] };
+        groupMap.set(section, group);
+        groups.push(group);
+      }
+      groupMap.get(section).items.push(item);
+    });
+
+    return groups.map(({ section, items: groupItems }) => (
+      <div className="sidebar-menu-group" key={section || "ungrouped"}>
+        {grouped && section && <div className="sidebar-menu-label">{section}</div>}
+        {groupItems.map((item) => {
           const Icon = item.icon;
           return (
             <NavLink
@@ -59,9 +76,10 @@ function DashboardSidebar({ role, sidebarOpen, setSidebarOpen, mobileHidden = fa
               <span>{item.title}</span>
             </NavLink>
           );
-        })
-      : <div className="sidebar-empty">No menu items available.</div>
-  );
+        })}
+      </div>
+    ));
+  };
 
   const renderMorePanel = () => (
     mobileMoreItems.length > 0 && moreOpen ? (
@@ -93,7 +111,7 @@ function DashboardSidebar({ role, sidebarOpen, setSidebarOpen, mobileHidden = fa
       <>
         <aside className="dashboard-sidebar mobile-bottom-nav" aria-label="Dashboard quick navigation">
           <nav className="sidebar-menu" aria-label={`${roleLabel} quick navigation`}>
-            {renderMenuLinks(mobilePrimaryItems)}
+            {renderMenuLinks(mobilePrimaryItems, { grouped: false })}
             {mobileMoreItems.length > 0 && (
               <button
                 type="button"
