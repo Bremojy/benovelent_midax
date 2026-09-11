@@ -24,7 +24,7 @@ const initialForm = {
   purpose: "",
   school: "",
   admissionNumber: "",
-  repaymentPeriodMonths: 12,
+  repaymentPeriodMonths: "",
 };
 
 const DOCUMENT_CATEGORIES = [
@@ -230,12 +230,13 @@ export default function Support() {
         attachFiles(formData);
       } else if (form.type === "education") {
         const educationPolicy = policies.find((policy) => policy.slug === "education-policy");
-        const educationMinimum = Number(educationPolicy?.minAmount || 1000);
-        const educationMaximum = Number(educationPolicy?.maxAmount || 0);
-        if (!form.dependentId || !form.purpose || !form.school || !form.admissionNumber || Number(form.requestedAmount) < educationMinimum) {
-          throw new Error(`Please complete the education policy details. Minimum requested amount is KES ${educationMinimum.toLocaleString("en-KE")}.`);
+        if (!educationPolicy) throw new Error("The Education Policy is not currently configured or enabled.");
+        const educationMinimum = educationPolicy.minAmount == null ? null : Number(educationPolicy.minAmount);
+        const educationMaximum = educationPolicy.maxAmount == null ? null : Number(educationPolicy.maxAmount);
+        if (!form.dependentId || !form.purpose || !form.school || !form.admissionNumber || (educationMinimum !== null && Number(form.requestedAmount) < educationMinimum)) {
+          throw new Error(educationMinimum === null ? "Please complete the education policy details." : `Please complete the education policy details. Minimum requested amount is KES ${educationMinimum.toLocaleString("en-KE")}.`);
         }
-        if (educationMaximum > 0 && Number(form.requestedAmount) > educationMaximum) {
+        if (educationMaximum !== null && educationMaximum > 0 && Number(form.requestedAmount) > educationMaximum) {
           throw new Error(`Requested amount cannot exceed KES ${educationMaximum.toLocaleString("en-KE")}.`);
         }
 
@@ -246,7 +247,7 @@ export default function Support() {
           school: form.school.trim(),
           admissionNumber: form.admissionNumber.trim(),
           requestedAmount: Number(form.requestedAmount),
-          repaymentPeriodMonths: Number(form.repaymentPeriodMonths) || 12,
+          repaymentPeriodMonths: form.repaymentPeriodMonths === "" ? undefined : Number(form.repaymentPeriodMonths),
         }).forEach(([key, value]) => formData.append(key, String(value)));
 
         attachFiles(formData);

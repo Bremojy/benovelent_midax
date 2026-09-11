@@ -829,49 +829,78 @@ exports.changePassword = async (req, res) => {
 
 exports.getSettings = async (req, res) => {
   try {
-    const SuperAdmin = require("../models/SuperAdmin");
-    const profile = await SuperAdmin.findById(req.user._id).select("themeColor");
-    return res.json({
-      success: true,
-      settings: { themeColor: profile?.themeColor || "#ff7a00" },
-    });
-  } catch (error) {
-    return res.status(500).json({ success: false, message: error.message });
-  }
+    const { getSystemSettings, toPublicConfig } = require("../services/systemSettings");
+    const settings = await getSystemSettings();
+    if (!settings) return res.status(503).json({ success: false, message: "System settings are not configured." });
+    return res.json({ success: true, settings: toPublicConfig(settings), raw: settings });
+  } catch (error) { return res.status(500).json({ success: false, message: error.message }); }
 };
 
 exports.updateSettings = async (req, res) => {
   try {
-    const SuperAdmin = require("../models/SuperAdmin");
-    const profile = await SuperAdmin.findById(req.user._id);
+    const SystemSettings = require("../models/SystemSettings");
+    const { invalidateSystemSettings, toPublicConfig, getSystemSettings } = require("../services/systemSettings");
+    const body = req.body || {};
+    const current = await SystemSettings.findOne({ singletonKey: "primary" });
+    if (!current) return res.status(503).json({ success: false, message: "System settings are not configured. Run migrations first." });
 
-    if (!profile) {
-      return res.status(404).json({ success: false, message: "Super administrator not found." });
+    const assignString = (path, value, max = 500) => { if (value === undefined) return; const v = String(value ?? "").trim().slice(0, max); path(v); };
+    if (body.organization) {
+      if (body.organization.legalName !== undefined) current.organizationName = String(body.organization.legalName).trim().slice(0, 160);
+      if (body.organization.name !== undefined) current.displayName = String(body.organization.name).trim().slice(0, 160);
+      if (body.organization.email !== undefined) current.email = String(body.organization.email).trim().slice(0, 200);
+      if (body.organization.phone !== undefined) current.phone = String(body.organization.phone).trim().slice(0, 60);
+      if (body.organization.address !== undefined) current.address = String(body.organization.address).trim().slice(0, 300);
+      if (body.organization.location !== undefined) current.location = String(body.organization.location).trim().slice(0, 200);
+      if (body.organization.officeHours !== undefined) current.officeHours = String(body.organization.officeHours).trim().slice(0, 200);
+      if (body.organization.logo !== undefined) current.logo = String(body.organization.logo).trim().slice(0, 500);
+      if (body.organization.favicon !== undefined) current.favicon = String(body.organization.favicon).trim().slice(0, 500);
+      if (body.organization.socialChannels && typeof body.organization.socialChannels === "object") current.socialChannels = { ...current.socialChannels?.toObject?.(), ...body.organization.socialChannels };
     }
-
-    const allowed = ["#ff7a00", "#7c3aed", "#0ea5e9", "#10b981", "#e11d48", "#f59e0b"];
-    if (req.body.themeColor && allowed.includes(req.body.themeColor)) {
-      profile.themeColor = req.body.themeColor;
+    if (body.website && typeof body.website === "object") current.website = { ...current.website?.toObject?.(), ...body.website, visibility: { ...current.website?.visibility?.toObject?.(), ...(body.website.visibility || {}) } };
+    if (body.scheme && typeof body.scheme === "object") {
+      const patch = { ...body.scheme };
+      for (const key of ["monthlyContribution", "gracePeriodDays", "minimumBookBalance"]) if (patch[key] !== undefined) patch[key] = patch[key] === null || patch[key] === "" ? null : Math.max(0, Number(patch[key]));
+      if (patch.maintenanceMode !== undefined) patch.maintenanceMode = Boolean(patch.maintenanceMode);
+      current.scheme = { ...current.scheme?.toObject?.(), ...patch };
     }
-
-    await profile.save();
-
-    return res.json({
-      success: true,
-      message: "Portal preferences saved.",
-      settings: { themeColor: profile.themeColor || "#ff7a00" },
-    });
-  } catch (error) {
-    return res.status(500).json({ success: false, message: error.message });
-  }
+    if (body.support && typeof body.support === "object") current.support = { ...current.support?.toObject?.(), ...body.support };
+    if (body.branding && typeof body.branding === "object") current.branding = { ...current.branding?.toObject?.(), ...body.branding };
+    if (body.homepage && typeof body.homepage === "object") current.homepage = { ...current.homepage?.toObject?.(), ...body.homepage };
+    if (body.notificationReadiness && typeof body.notificationReadiness === "object") current.notificationReadiness = { ...current.notificationReadiness?.toObject?.(), ...body.notificationReadiness };
+    if (body.featureToggles && typeof body.featureToggles === "object") current.featureToggles = body.featureToggles;
+    if (body.mpesa && typeof body.mpesa === "object") {
+      const patch = { ...body.mpesa };
+      delete patch.consumerKey; delete patch.consumerSecret; delete patch.passkey; delete patch.securityCredential; delete patch.jwtSecret; delete patch.cloudinarySecret; delete patch.smtpPassword; delete patch.aiSecret; delete patch.vapidPrivateKey; delete patch.turnCredential;
+      if (patch.manualPaybill !== undefined) patch.manualPaybill = String(patch.manualPaybill).replace(/\D/g, "").slice(0, 20);
+      if (patch.manualAccountReference !== undefined) patch.manualAccountReference = String(patch.manualAccountReference).trim().slice(0, 120);
+      if (patch.displayLabel !== undefined) patch.displayLabel = String(patch.displayLabel).trim().slice(0, 80);
+      if (patch.environment !== undefined && !["sandbox", "production", "unknown"].includes(patch.environment)) return res.status(400).json({ success:false, message:"Invalid M-PESA environment." });
+      current.mpesa = { ...current.mpesa?.toObject?.(), ...patch };
+    }
+    current.updatedBy = req.user._id; current.updatedByModel = "SuperAdmin";
+    await current.save();
+    await invalidateSystemSettings();
+    const saved = await getSystemSettings({ refresh: true });
+    return res.json({ success: true, message: "System settings saved.", settings: toPublicConfig(saved), updatedAt: saved.updatedAt, updatedBy: req.user._id });
+  } catch (error) { return res.status(400).json({ success: false, message: error.message }); }
 };
 
-
-exports.getSystemStatus = async (req, res) => {
+exports.getSystemStatus = async (_req, res) => {
   try {
     const mongoose = require("mongoose");
-    res.json({ success: true, status: mongoose.connection.readyState === 1 ? "operational" : "database-connection-needed", databaseReady: mongoose.connection.readyState === 1, checkedAt: new Date().toISOString() });
-  } catch (error) { res.status(500).json({ success: false, message: error.message }); }
+    const { getSystemSettings } = require("../services/systemSettings");
+    const [settings, redis] = await Promise.all([getSystemSettings(), require("../services/redisCache").health()]);
+    const uploads = require("../config/uploadConfig");
+    const mpesaConfigured = Boolean(String(process.env.MPESA_SHORTCODE || "").trim() && String(process.env.MPESA_PASSKEY || "").trim());
+    const pushConfigured = Boolean(String(process.env.VAPID_PUBLIC_KEY || "").trim() && String(process.env.VAPID_PRIVATE_KEY || "").trim());
+    const assistantConfigured = Boolean(String(process.env.ASSISTANT_PROVIDER_URL || process.env.AI_API_URL || "").trim() && String(process.env.ASSISTANT_PROVIDER_KEY || process.env.AI_API_KEY || "").trim() && String(process.env.ASSISTANT_MODEL || process.env.AI_MODEL || "").trim());
+    const realtimeReady = require("../sockets/socket").health();
+    const databaseReady = mongoose.connection.readyState === 1;
+    const checks = { database: databaseReady, redis: Boolean(redis?.ready || redis?.status === "connected" || redis?.available), uploads: Boolean(uploads), realtime: realtimeReady, mpesa: mpesaConfigured || Boolean(settings?.mpesa?.manualPaymentEnabled), push: pushConfigured, assistant: assistantConfigured };
+    const readyCount = Object.values(checks).filter(Boolean).length;
+    res.json({ success:true, status: readyCount === Object.keys(checks).length ? "ready" : "partially-ready", checks, checkedAt:new Date().toISOString() });
+  } catch (error) { res.status(500).json({ success:false, message:error.message }); }
 };
 
 

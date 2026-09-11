@@ -1,4 +1,5 @@
 import { confirmAction } from "../../utils/modernDialog";
+import { Link } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import {
   Check,
@@ -13,6 +14,8 @@ import {
   Users,
   ImagePlus,
   Edit3,
+  Smartphone,
+  FileText,
 } from "lucide-react";
 import DashboardLayout from "../../layouts/DashboardLayout";
 import NotificationSettings from "../../components/NotificationSettings";
@@ -79,6 +82,20 @@ export default function SuperAdminSettings() {
     Object.fromEntries(SECTION_FIELDS.map((item) => [item.key, EMPTY_SECTION(item.key)]))
   );
   const [themeColor, setThemeColor] = useState("#ff7a00");
+  const [systemSettings, setSystemSettings] = useState(null);
+  const [systemForm, setSystemForm] = useState({
+    organization: { name:"", legalName:"", email:"", phone:"", address:"", location:"", officeHours:"", logo:"", favicon:"", socialChannels:{ whatsapp:"", instagram:"", facebook:"", x:"", website:"" } },
+    website: { siteTitle:"", subtitle:"", seoDescription:"", footer:"", publicContactInformation:"" },
+    scheme: { monthlyContribution:"", gracePeriodDays:"", minimumBookBalance:"", maintenanceMode:false },
+    support: { funeral:{enabled:null}, medical:{enabled:null}, education:{enabled:null} },
+    mpesa: { manualPaybill:"", manualAccountReference:"", displayLabel:"M-PESA", manualPaymentEnabled:false, stkEnabled:false, environment:"production", operationalShortcode:"", operationalStatus:"unknown" },
+    branding: { accentColor:"", secondaryColor:"", logoUrl:"", faviconUrl:"" },
+    homepage: { showCarousel:true, showLeaders:true, showPolicies:true },
+    notificationReadiness: { browserPushEnabled:false, incomingCallPushEnabled:false },
+    featureToggles: {},
+  });
+  const [systemSaving, setSystemSaving] = useState(false);
+  const [systemUpdatedAt, setSystemUpdatedAt] = useState(null);
   const [slides, setSlides] = useState([]);
   const [leaders, setLeaders] = useState([]);
   const [gallery, setGallery] = useState([]);
@@ -117,12 +134,13 @@ export default function SuperAdminSettings() {
     const load = async () => {
       try {
         setLoading(true);
-        const [websiteRes, carouselRes, leadersRes, galleryRes, settingsRes] = await Promise.allSettled([
+        const [websiteRes, carouselRes, leadersRes, galleryRes, settingsRes, systemRes] = await Promise.allSettled([
           API.get("/website"),
           API.get("/carousel"),
           API.get("/leaders"),
           API.get("/website/gallery"),
           API.get("/website/settings"),
+          API.get("/superadmin/settings"),
         ]);
 
         if (!active) return;
@@ -148,6 +166,22 @@ export default function SuperAdminSettings() {
           const settingsContent = settingsRes.value.data?.section?.content || settingsRes.value.data?.settings || {};
           const color = settingsContent.themeColor || settingsContent.accentColor;
           if (color) setThemeColor(color);
+        }
+
+        if (systemRes?.status === "fulfilled") {
+          const safe = systemRes.value.data?.settings || {};
+          const next = {
+            organization: { ...systemForm.organization, ...(safe.organization || {}), socialChannels: { ...systemForm.organization.socialChannels, ...(safe.organization?.socialChannels || {}) } },
+            website: { ...systemForm.website, ...(safe.website || {}) },
+            scheme: { ...systemForm.scheme, ...(safe.scheme || {}) },
+            support: { ...systemForm.support, ...(safe.support || {}) },
+            mpesa: { ...systemForm.mpesa, ...(safe.mpesa || {}) },
+            branding: { ...systemForm.branding, ...(safe.branding || {}) },
+            homepage: { ...systemForm.homepage, ...(safe.homepage || {}) },
+            notificationReadiness: { ...systemForm.notificationReadiness, ...(safe.notificationReadiness || {}) },
+            featureToggles: safe.featureToggles || {},
+          };
+          setSystemSettings(safe); setSystemForm(next); setSystemUpdatedAt(safe.updatedAt || null);
         }
 
         if (carouselRes.status === "fulfilled") {
@@ -207,6 +241,24 @@ export default function SuperAdminSettings() {
     } finally {
       setSavingKey("");
     }
+  };
+
+  const patchSystem = (group, patch) => setSystemForm((prev) => ({ ...prev, [group]: { ...prev[group], ...patch } }));
+  const saveSystemSettings = async () => {
+    try {
+      setSystemSaving(true); setError(""); setMessage("");
+      const payload = { ...systemForm, scheme: { ...systemForm.scheme,
+        monthlyContribution: systemForm.scheme.monthlyContribution === "" ? null : Number(systemForm.scheme.monthlyContribution),
+        gracePeriodDays: systemForm.scheme.gracePeriodDays === "" ? null : Number(systemForm.scheme.gracePeriodDays),
+        minimumBookBalance: systemForm.scheme.minimumBookBalance === "" ? null : Number(systemForm.scheme.minimumBookBalance),
+      }};
+      const { data } = await API.put("/superadmin/settings", payload);
+      setSystemSettings(data?.settings || null); setSystemUpdatedAt(data?.updatedAt || null);
+      setSystemForm((prev) => ({ ...prev, ...(data?.settings || {}) }));
+      setThemeColor(data?.settings?.branding?.accentColor || themeColor);
+      setMessage(data?.message || "System settings saved.");
+    } catch (err) { setError(err.response?.data?.message || err.message || "Unable to save system settings."); }
+    finally { setSystemSaving(false); }
   };
 
   const saveTheme = async () => {
@@ -431,11 +483,11 @@ export default function SuperAdminSettings() {
             <p>See what the public website contains, then edit pages, leaders, gallery images and theme settings from one place.</p>
           </div>
           <div className="portal-actions">
-            <button type="button" className={activeTab === "website" ? "portal-btn" : "portal-btn light"} onClick={() => setActiveTab("website")} type="button">Website content</button>
-            <button type="button" className={activeTab === "carousel" ? "portal-btn" : "portal-btn light"} onClick={() => setActiveTab("carousel")} type="button">Carousel</button>
-            <button type="button" className={activeTab === "leaders" ? "portal-btn" : "portal-btn light"} onClick={() => setActiveTab("leaders")} type="button">Leaders</button>
-            <button type="button" className={activeTab === "gallery" ? "portal-btn" : "portal-btn light"} onClick={() => setActiveTab("gallery")} type="button">Gallery</button>
-            <button type="button" className={activeTab === "settings" ? "portal-btn" : "portal-btn light"} onClick={() => setActiveTab("settings")} type="button">Theme</button>
+            <button type="button" className={activeTab === "website" ? "portal-btn" : "portal-btn light"} onClick={() => setActiveTab("website")}>Website content</button>
+            <button type="button" className={activeTab === "carousel" ? "portal-btn" : "portal-btn light"} onClick={() => setActiveTab("carousel")}>Carousel</button>
+            <button type="button" className={activeTab === "leaders" ? "portal-btn" : "portal-btn light"} onClick={() => setActiveTab("leaders")}>Leaders</button>
+            <button type="button" className={activeTab === "gallery" ? "portal-btn" : "portal-btn light"} onClick={() => setActiveTab("gallery")}>Gallery</button>
+            <button type="button" className={activeTab === "system" ? "portal-btn" : "portal-btn light"} onClick={() => setActiveTab("system")}>System settings</button><button type="button" className={activeTab === "settings" ? "portal-btn" : "portal-btn light"} onClick={() => setActiveTab("settings")}>Theme</button>
           </div>
         </header>
 
@@ -504,12 +556,37 @@ export default function SuperAdminSettings() {
                     </div>
 
                     <div className="portal-actions">
-                      <button type="button" className="portal-btn" onClick={() => saveSection(item.key)} disabled={savingKey === item.key} type="button">
+                      <button type="button" className="portal-btn" onClick={() => saveSection(item.key)} disabled={savingKey === item.key}>
                         <Save size={16} /> {savingKey === item.key ? "Saving..." : "Save section"}
                       </button>
                     </div>
                   </section>
                 ))}
+              </div>
+            )}
+
+            {activeTab === "system" && (
+              <div className="portal-grid">
+                <section className="portal-panel">
+                  <div className="portal-section-title"><Settings2 size={20}/><div><span>AUTHORITATIVE CONFIGURATION</span><h2>Organization</h2><small>Stored in the SystemSettings singleton. {systemUpdatedAt ? `Last updated ${new Date(systemUpdatedAt).toLocaleString()}.` : "Not yet updated."}</small></div></div>
+                  <div className="portal-form-grid">
+                    {[["name","Display name"],["legalName","Legal name"],["email","Email"],["phone","Phone"],["address","Address"],["location","Location"],["officeHours","Office hours"],["logo","Logo URL"],["favicon","Favicon URL"]].map(([key,label])=><label className="portal-field" key={key}><span>{label}</span><input value={systemForm.organization[key]||""} onChange={(e)=>patchSystem("organization",{[key]:e.target.value})}/></label>)}
+                    <label className="portal-field"><span>WhatsApp</span><input value={systemForm.organization.socialChannels?.whatsapp||""} onChange={(e)=>patchSystem("organization",{socialChannels:{...systemForm.organization.socialChannels,whatsapp:e.target.value}})}/></label>
+                  </div>
+                </section>
+                <section className="portal-panel">
+                  <div className="portal-section-title"><Check size={20}/><div><span>WEBSITE / SCHEME</span><h2>Public website and contribution rules</h2></div></div>
+                  <div className="portal-form-grid">
+                    {[["siteTitle","Site title"],["subtitle","Subtitle"],["seoDescription","SEO description"],["footer","Footer"],["publicContactInformation","Public contact information"]].map(([key,label])=><label className="portal-field" key={key}><span>{label}</span><input value={systemForm.website[key]||""} onChange={(e)=>patchSystem("website",{[key]:e.target.value})}/></label>)}
+                    {[["monthlyContribution","Monthly contribution"],["gracePeriodDays","Grace period (days)"],["minimumBookBalance","Minimum book balance"]].map(([key,label])=><label className="portal-field" key={key}><span>{label}</span><input type="number" min="0" value={systemForm.scheme[key] ?? ""} placeholder="Not configured" onChange={(e)=>patchSystem("scheme",{[key]:e.target.value})}/></label>)}
+                    <label className="portal-field"><span>Maintenance mode</span><input type="checkbox" checked={Boolean(systemForm.scheme.maintenanceMode)} onChange={(e)=>patchSystem("scheme",{maintenanceMode:e.target.checked})}/></label>
+                  </div>
+                </section>
+                <section className="portal-panel"><div className="portal-section-title"><ShieldCheck size={20}/><div><span>SUPPORT POLICIES</span><h2>Benefit availability flags</h2><small>Detailed amounts and repayment rules are managed in Policy Administration.</small></div></div><div className="portal-form-grid">{[["funeral","Funeral support"],["medical","Medical support"],["education","Education policy"]].map(([key,label])=><label className="portal-field" key={key}><span>{label}</span><select value={systemForm.support[key]?.enabled===null?"":systemForm.support[key]?.enabled?"true":"false"} onChange={(e)=>patchSystem("support",{[key]:{enabled:e.target.value===""?null:e.target.value==="true"}})}><option value="">Use policy/default</option><option value="true">Enabled</option><option value="false">Disabled</option></select></label>)}</div></section>
+                <section className="portal-panel"><div className="portal-section-title"><Smartphone size={20}/><div><span>SAFE M-PESA CONFIGURATION</span><h2>Manual collection and operational status</h2><small>Only non-secret business configuration is stored here. Daraja secrets remain deployment environment variables.</small></div></div><div className="portal-form-grid"><label className="portal-field"><span>PayBill</span><input inputMode="numeric" value={systemForm.mpesa.manualPaybill||""} onChange={(e)=>patchSystem("mpesa",{manualPaybill:e.target.value.replace(/\D/g,"")})}/></label><label className="portal-field"><span>Account / reference</span><input value={systemForm.mpesa.manualAccountReference||""} onChange={(e)=>patchSystem("mpesa",{manualAccountReference:e.target.value})}/></label><label className="portal-field"><span>Display label</span><input value={systemForm.mpesa.displayLabel||""} onChange={(e)=>patchSystem("mpesa",{displayLabel:e.target.value})}/></label><label className="portal-field"><span>Environment</span><select value={systemForm.mpesa.environment||"production"} onChange={(e)=>patchSystem("mpesa",{environment:e.target.value})}><option value="production">Production</option><option value="sandbox">Sandbox</option><option value="unknown">Unknown</option></select></label><label className="portal-field"><span>Operational shortcode</span><input value={systemForm.mpesa.operationalShortcode||""} onChange={(e)=>patchSystem("mpesa",{operationalShortcode:e.target.value})}/></label><label className="portal-field"><span>Operational status</span><select value={systemForm.mpesa.operationalStatus||"unknown"} onChange={(e)=>patchSystem("mpesa",{operationalStatus:e.target.value})}><option>unknown</option><option>ready</option><option>not-configured</option><option>degraded</option></select></label><label className="portal-field"><span>Manual payment enabled</span><input type="checkbox" checked={Boolean(systemForm.mpesa.manualPaymentEnabled)} onChange={(e)=>patchSystem("mpesa",{manualPaymentEnabled:e.target.checked})}/></label><label className="portal-field"><span>STK enabled</span><input type="checkbox" checked={Boolean(systemForm.mpesa.stkEnabled)} onChange={(e)=>patchSystem("mpesa",{stkEnabled:e.target.checked})}/></label></div></section>
+                <section className="portal-panel"><div className="portal-section-title"><Palette size={20}/><div><span>THEME / HOMEPAGE / NOTIFICATIONS</span><h2>Presentation and readiness</h2></div></div><div className="portal-form-grid"><label className="portal-field"><span>Accent color</span><input type="text" value={systemForm.branding.accentColor||""} onChange={(e)=>patchSystem("branding",{accentColor:e.target.value})}/></label><label className="portal-field"><span>Secondary color</span><input type="text" value={systemForm.branding.secondaryColor||""} onChange={(e)=>patchSystem("branding",{secondaryColor:e.target.value})}/></label>{[["showCarousel","Show carousel"],["showLeaders","Show leaders"],["showPolicies","Show policies"]].map(([key,label])=><label className="portal-field" key={key}><span>{label}</span><input type="checkbox" checked={Boolean(systemForm.homepage[key])} onChange={(e)=>setSystemForm(p=>({...p,homepage:{...p.homepage,[key]:e.target.checked}}))}/></label>)}{[["browserPushEnabled","Browser push"],["incomingCallPushEnabled","Incoming call push"]].map(([key,label])=><label className="portal-field" key={key}><span>{label}</span><input type="checkbox" checked={Boolean(systemForm.notificationReadiness[key])} onChange={(e)=>setSystemForm(p=>({...p,notificationReadiness:{...p.notificationReadiness,[key]:e.target.checked}}))}/></label>)}</div></section>
+                <section className="portal-panel"><div className="portal-section-title"><FileText size={20}/><div><span>CONTROL CONSOLE INDEX</span><h2>Related authoritative modules</h2></div></div><div className="portal-card-grid">{[["Policy Administration","Manage create/edit/delete/enable/disable and policy rules.","/superadmin/policies"],["Leaders","Manage live leadership records.","/superadmin/leaders"],["Gallery","Manage live gallery records.","/superadmin/settings"],["Constitution","Manage the published document/version.","/superadmin/settings"],["News & events","Manage published updates and activities.","/superadmin/news"],["Assistant","Published content/settings feed assistant context.","/superadmin/settings"],["Notifications","Manage push/readiness controls.","/superadmin/settings"],["System health","Review dependency readiness.","/superadmin/settings"]].map(([title,desc,to])=><Link key={title} className="portal-panel" to={to} style={{margin:0}}><strong>{title}</strong><p>{desc}</p></Link>)}</div></section>
+                <div className="portal-actions"><button type="button" className="portal-btn" onClick={saveSystemSettings} disabled={systemSaving}><Save size={16}/> {systemSaving?"Saving…":"Save system settings"}</button></div>
               </div>
             )}
 

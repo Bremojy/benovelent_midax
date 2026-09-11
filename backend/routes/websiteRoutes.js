@@ -34,18 +34,18 @@ router.post("/constitution/upload", protect, isSuperAdmin, setUploadType("docume
 router.get("/:section", getSection);
 
 // Create new section (Admin/Super Admin)
-router.post("/", protect, createSection);
+router.post("/", protect, isSuperAdmin, createSection);
 
 // Update website settings directly
-router.put("/settings", protect, (req, res) => {
+router.put("/settings", protect, isSuperAdmin, (req, res) => {
   req.params.section = "settings";
   return updateSection(req, res);
 });
 
 // Update section
-router.put("/:section", protect, updateSection);
+router.put("/:section", protect, isSuperAdmin, updateSection);
 
 // Delete section
-router.delete("/:section", protect, deleteSection);
+router.delete("/:section", protect, isSuperAdmin, deleteSection);
 
 module.exports = router;

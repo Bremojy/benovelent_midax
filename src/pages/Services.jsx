@@ -9,7 +9,8 @@ const heroVideo = "/videos/benevolent-community-loop.mp4";
 
 export default function Services() {
   const [policies, setPolicies] = useState([]);
-  useEffect(() => { API.get("/policies/public").then(({ data }) => setPolicies(data?.policies || [])).catch(() => setPolicies([])); }, []);
+  const [error, setError] = useState("");
+  useEffect(() => { API.get("/policies/public").then(({ data }) => setPolicies(data?.policies || [])).catch((err) => setError(err.response?.data?.message || "Unable to load current policies.")); }, []);
   return (
     <main className="public-modern-page">
       <section className="modern-hero modern-video-hero">
@@ -40,40 +41,29 @@ export default function Services() {
       </section>
 
       <section className="modern-section">
+        {error && <p role="alert">{error}</p>}
         <div className="modern-card-grid">
-          <Service icon={Heart} title="Funeral Support" text="Ksh 100,000 per eligible funeral claim for parents, husband/wife and children. The constitution also notes qualifying sibling support at Ksh 30,000." />
-          <Service icon={Stethoscope} title="Medical Support" text="Inpatient help follows the constitution's amount bands and claim conditions for eligible family members." />
-          <Service icon={BookOpen} title="Constitution-led support" text="Published support benefits and claim conditions are governed by the official Constitution and current scheme records." />
+          {policies.length ? policies.map((policy) => <Service key={policy._id} icon={iconFor(policy.category)} title={policy.title || policy.name || "Support policy"} text={policyDescription(policy)} />) : <Service icon={BookOpen} title="Support policies" text="No enabled support policy is currently configured." />}
         </div>
       </section>
 
       <section className="modern-section">
         <div className="modern-trust-band">
-          <div className="trust-chip"><BadgeCheck size={19} /><strong>Ksh 500</strong><span>Member contribution</span></div>
-          <div className="trust-chip"><ShieldCheck size={19} /><strong>Ksh 500,000</strong><span>Minimum book balance</span></div>
-          <div className="trust-chip"><MessageCircle size={19} /><strong>2 + 2</strong><span>Funeral and medical claim limits</span></div>
-          <div className="trust-chip"><BookOpen size={19} /><strong>3 days</strong><span>Chairperson dispatch window</span></div>
+          <div className="trust-chip"><BadgeCheck size={19}/><strong>{policies.length}</strong><span>Enabled policies</span></div>
+          <div className="trust-chip"><ShieldCheck size={19}/><strong>Live</strong><span>Policy records</span></div>
+          <div className="trust-chip"><MessageCircle size={19}/><strong>Dynamic</strong><span>Rules from the server</span></div>
+          <div className="trust-chip"><BookOpen size={19}/><strong>Official</strong><span>Constitution-led</span></div>
         </div>
       </section>
 
-      {policies.length > 0 && (
-        <section className="modern-section">
-          <div className="modern-card-grid">
-            {policies.map((policy) => (
-              <article className="service-card" key={policy._id}>
-                <div className="service-icon">{policy.category === "loan" ? "🎓" : policy.category === "support" ? "🤝" : "📋"}</div>
-                <div><h3>{policy.name}</h3><p>{policy.description}</p>{policy.maxAmount ? <strong>Up to KSh {Number(policy.maxAmount).toLocaleString("en-KE")}</strong> : null}</div>
-              </article>
-            ))}
-          </div>
-        </section>
-      )}
     </main>
   );
 }
 
 const shouldSkipBackgroundVideo = typeof navigator !== "undefined" && (navigator.connection?.saveData || /2g/.test(navigator.connection?.effectiveType || ""));
 
+function iconFor(category) { const value=String(category||"").toLowerCase(); return value.includes("medical")?Stethoscope:value.includes("funeral")?Heart:value.includes("education")?BookOpen:ShieldCheck; }
+function policyDescription(policy) { const parts=[]; if(policy.minAmount!==null&&policy.minAmount!==undefined) parts.push(`Minimum: Ksh ${Number(policy.minAmount).toLocaleString("en-KE")}`); if(policy.maxAmount!==null&&policy.maxAmount!==undefined) parts.push(`Maximum: Ksh ${Number(policy.maxAmount).toLocaleString("en-KE")}`); if(policy.repaymentMonths) parts.push(`Repayment: ${Number(policy.repaymentMonths)} months`); return parts.join(" • ") || policy.description || policy.summary || "Current policy details are maintained by SuperAdmin."; }
 function Service({ icon: Icon, title, text }) {
   return (
     <article className="modern-card">

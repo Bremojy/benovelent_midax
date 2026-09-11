@@ -130,11 +130,13 @@ const initSocket = (server) => {
 };
 
 const getIO = () => io;
+const health = () => Boolean(io && io.engine);
 
 module.exports = {
 
     initSocket,
 
-    getIO
+    getIO,
+    health
 
 };

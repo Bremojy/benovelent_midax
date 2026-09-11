@@ -7,6 +7,7 @@ const { resolveStoredFileUrl } = require("../utils/uploadUrl");
 const MedicalSupport = require("../models/MedicalSupport");
 const Member = require("../models/Member");
 const Dependent = require("../models/Dependent");
+const Policy = require("../models/Policy");
 
 const createNotification = require("../utils/createNotification");
 
@@ -128,6 +129,13 @@ exports.createMedicalApplication = async (req, res) => {
         } = req.body;
 
 
+
+        const policy = await Policy.findOne({ slug: "medical-support", enabled: true }).lean();
+        if (!policy) return res.status(403).json({ success:false, message:"Medical Support is currently unavailable. Please contact the administrator." });
+        const requested = Number(requestedAmount);
+        if (!Number.isFinite(requested) || requested <= 0) return res.status(400).json({ success:false, message:"Enter a valid requested amount." });
+        if (Number(policy.minAmount || 0) > 0 && requested < Number(policy.minAmount)) return res.status(400).json({ success:false, message:`Minimum ${policy.name} amount is KSh ${Number(policy.minAmount).toLocaleString("en-KE")}.` });
+        if (Number(policy.maxAmount || 0) > 0 && requested > Number(policy.maxAmount)) return res.status(400).json({ success:false, message:`Maximum ${policy.name} amount is KSh ${Number(policy.maxAmount).toLocaleString("en-KE")}.` });
 
         const member = await validateMember(
 

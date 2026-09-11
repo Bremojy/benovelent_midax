@@ -3,6 +3,12 @@ const Finance = require("../models/Finance");
 const Member = require("../models/Member");
 const Notification = require("../models/Notification");
 const { sanitizeDocument } = require("../utils/clientSanitizer");
+const SystemSettings = require("../models/SystemSettings");
+
+async function configuredMonthlyContribution() {
+  const settings = await SystemSettings.findOne({ singletonKey: "primary" }).select("scheme.monthlyContribution").lean();
+  return settings?.scheme?.monthlyContribution ?? null;
+}
 
 /* =====================================================
    CREATE CONTRIBUTION
@@ -128,8 +134,15 @@ exports.createBulkContributionRun = async (req, res) => {
     if (!Number.isInteger(month) || month < 1 || month > 12) {
       return res.status(400).json({ success: false, message: "A valid contribution month is required." });
     }
+    const configuredAmount = await configuredMonthlyContribution();
+    if (configuredAmount == null) {
+      return res.status(503).json({ success: false, message: "The monthly contribution is not configured in SystemSettings." });
+    }
     if (!Number.isFinite(amount) || amount <= 0) {
       return res.status(400).json({ success: false, message: "A positive monthly contribution amount is required." });
+    }
+    if (Number(amount) !== Number(configuredAmount)) {
+      return res.status(400).json({ success: false, code: "MONTHLY_CONTRIBUTION_MISMATCH", message: `The payroll amount must match the configured monthly contribution (${Number(configuredAmount).toLocaleString("en-KE")}).` });
     }
     if (Number.isNaN(paymentDate.getTime())) {
       return res.status(400).json({ success: false, message: "A valid payment date is required." });
@@ -311,16 +324,13 @@ exports.getContributions = async (req,res)=>{
             .filter(item => Number(item.year) === currentYear)
             .reduce((sum, item) => sum + Number(item.paidAmount || item.amount || 0), 0);
 
-        const requestedMemberId = req.params.memberId || req.user?._id || null;
-        const member = requestedMemberId
-            ? await Member.findById(requestedMemberId).select("monthlyContribution").lean()
-            : null;
+        const configuredAmount = await configuredMonthlyContribution();
 
         res.json({
             success:true,
             count:contributions.length,
             summary: {
-                monthlyContribution: Number(member?.monthlyContribution || 0),
+                monthlyContribution: Number(configuredAmount || 0),
                 totalContributed,
                 currentYear: currentYearTotal,
                 outstanding,

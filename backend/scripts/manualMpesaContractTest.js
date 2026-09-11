@@ -34,9 +34,9 @@ assert(model.includes('paymentMethod: { type: String, enum: ["stk", "manual_payb
 assert(model.includes('mpesaTransactionSchema.index({ manualTransactionCode: 1 }, { unique: true, sparse: true })'), "Manual transaction-code idempotency index missing.");
 assert(contribution.includes('paymentTransactionIds'), "Contribution transaction-id reconciliation metadata missing.");
 assert(community.includes('contributionTransactionIds'), "Community contribution transaction-id reconciliation metadata missing.");
-for (const expected of ['/payments/manual', 'PayBill 247247', 'Account / Reference', 'I have paid — submit for verification']) assert(button.includes(expected), `Frontend manual payment UX missing ${expected}`);
+for (const expected of ['/payments/manual', 'manualPaybill', 'Account / Reference', 'I have paid — submit for verification', 'Not configured']) assert(button.includes(expected), `Frontend manual payment UX missing ${expected}`);
 assert(claims.includes('MpesaPaymentButton'), "Claims must use shared payment component for manual fallback.");
-assert(finance.includes('/payments/manual/admin') && finance.includes('/payments/manual/') && finance.includes('Equity PayBill 247247 submissions'), "Admin manual payment verification UI missing.");
+assert(finance.includes('/payments/manual/admin') && finance.includes('/payments/manual/') && finance.includes('manualPaybill') && finance.includes('manualAccountNumber'), "Admin manual payment verification UI missing dynamic configuration.");
 assert(env.includes('MPESA_MANUAL_PAYBILL=247247') && env.includes('MPESA_MANUAL_ACCOUNT_NUMBER=0650186528835'), "Backend manual Equity payment configuration missing.");
 assert(env.includes('MPESA_B2C_ENABLED=false'), "B2C must remain disabled until officially provisioned.");
 assert(frontendEnv.includes('VITE_API_URL=/api'), "Frontend must use same-origin /api proxy.");

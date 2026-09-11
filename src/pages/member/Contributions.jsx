@@ -104,7 +104,7 @@ export default function Contributions() {
             <Stat label="Money Out" value={money(totals.moneyOut)} />
             <Stat label="Closing balance" value={money(data?.ledger?.closingBalance ?? totals.ledgerBalance)} />
             <Stat label="M-PESA records" value={mpesaTransactions.length} />
-            <Stat label="PayBill" value={mpesaConfig.manualPaybill || "247247"} />
+            <Stat label="PayBill" value={mpesaConfig.manualPaybill || "Not configured"} />
             <Stat label="Account Number" value={mpesaConfig.manualAccountNumber || "Not configured"} />
             <Stat label="Payment gateway" value={mpesaReady ? "Daraja STK" : "Manual / pending setup"} />
           </div>

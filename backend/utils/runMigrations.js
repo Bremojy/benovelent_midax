@@ -9,6 +9,7 @@ const migrations = [
   require("../migrations/006_cleanup_blank_manual_transaction_codes"),
   require("../migrations/007_repair_direct_conversations"),
   require("../migrations/008_normalize_contribution_source"),
+  require("../migrations/009_create_system_settings_authority"),
 ];
 
 function normalizeMigration(migration, index) {

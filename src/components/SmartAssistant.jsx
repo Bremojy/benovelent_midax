@@ -11,16 +11,10 @@ const MAX_MESSAGES = 30;
 const FAQ = [
   { keys: ["hello", "hi", "hey", "good morning", "good afternoon", "good evening"], answer: "Hello! Welcome to Benevolent MIDAX. I can guide you around the public website and the secure member, admin and superadmin portals." },
   { keys: ["who are you", "what can you do", "help"], answer: "I’m the Benevolent Assistant. I explain published website information, show you where features are located and help with portal navigation, notifications, chat and calls." },
-  { keys: ["contribution", "pay", "monthly contribution", "500"], answer: "The website currently describes the member contribution as Ksh 500. Your Accounts area shows the contribution records available to your account, while the Constitution remains the authority for scheme rules." },
-  { keys: ["funeral", "death", "burial"], answer: "Funeral support is a core scheme benefit. The public Services page currently describes Ksh 100,000 for an eligible funeral claim and Ksh 30,000 for qualifying sibling funeral expenses, subject to the Constitution and claim conditions." },
-  { keys: ["medical", "hospital", "inpatient"], answer: "Medical support is part of the scheme and follows the Constitution’s inpatient amount bands, eligibility rules and family claim limits. Members can use Support or Claims after signing in." },
   { keys: ["constitution", "rules", "governance", "policy"], answer: "Open Constitution to read, view, download or print the official scheme rules. The Constitution is the authoritative source for governance, eligibility and benefit procedures." },
-  { keys: ["about", "history", "midax company"], answer: "The About page explains the relationship between Midax Petroleum Marketing and the Benevolent scheme, the scheme’s purpose, member voice, accountability and communication." },
-  { keys: ["services", "benefits", "support services"], answer: "The Services page covers the support benefits currently published by the scheme, including Funeral Support and Medical Support, together with Constitution-led guidance." },
   { keys: ["news", "announcement", "update", "newsroom"], answer: "Open News to read published updates, upcoming activities, resources and community polls. Signed-in users can also receive portal notifications." },
   { keys: ["event", "events", "calendar", "activity"], answer: "Open News or the Events area to see published upcoming activities. Event visibility depends on the audience configured by the scheme team." },
   { keys: ["resource", "resources", "form", "guide", "document"], answer: "Open Resource Centre or the Resources section of News to access published forms, guides and official documents, including the Constitution." },
-  { keys: ["contact", "phone", "email", "whatsapp", "location", "nairobi"], answer: "Open Contact for the official enquiry form and scheme contact information. The public page lists Nairobi, Kenya as the location and routes messages through the website." },
   { keys: ["login", "sign in", "access portal", "password"], answer: "Use Login to access the secure portal. Member, admin and superadmin accounts see different tools according to their roles. Keep your password private." },
   { keys: ["member portal", "member dashboard", "member"], answer: "The member portal includes Profile, Dependants, Accounts, Support, Claims, Messages, Notifications, News/Announcements, Polls and Settings." },
   { keys: ["admin portal", "administrator", "admin dashboard", "admin", "leader portal", "benevolent leader"], answer: "The Admin portal is the working portal for authorised Benevolent leaders. It includes member management, Benevolent accounts and contribution records, M-PESA verification and community support finance, claims, support, chat, notifications, announcements, polls, feedback and profile/settings. Admins are part of Benevolent and should use the portal for both leadership work and their own authorised member/leader activities." },
@@ -74,10 +68,10 @@ function fallbackAnswer(question, role) {
   const text = normalize(question);
   if (!text) return "Hello! I’m here to help. Ask me what you want to know or do, and I’ll explain it in simple, human language.";
   if (text.includes("another phone") || text.includes("other phone") || text.includes("same device") || text.includes("two accounts") || text.includes("different accounts") || text.includes("logged out") || text.includes("security")) return "Benevolent MIDAX keeps one active portal account per browser origin. Signing into another account in the same browser switches that browser session to the new account; separate devices can stay signed in independently.";
-  if (text.includes("who are you") || text.includes("what can you do")) return "I’m Benevolent Assistant. I can explain Benevolent MIDAX information, guide you around the website and portal, and help you understand what to do next without technical language.";
+  if (text.includes("who are you") || text.includes("what can you do")) return "I’m Benevolent Assistant. I guide you using current published website information and authorised portal data.";
   const hit = FAQ.find((item) => item.keys.some((key) => text.includes(key)));
   if (hit) return hit.answer;
-  return "I do not want to guess and give you the wrong answer. Tell me what you are trying to do in simple words—such as completing your profile, getting verified, adding a dependant, submitting support, finding a member, making an audio/video call, or finding the Constitution—and I’ll guide you from there.";
+  return "I do not want to guess when the live server information is unavailable. Please try again, or open the authoritative page for the information you need.";
 }
 function getHistoryKey(role, path) {
   const portal = String(role || "public").toLowerCase();

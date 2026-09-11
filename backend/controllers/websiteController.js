@@ -2,6 +2,7 @@ const fs = require("fs");
 const path = require("path");
 const WebsiteContent = require("../models/WebsiteContent");
 const redisCache = require("../services/redisCache");
+const { getSystemSettings, toPublicConfig } = require("../services/systemSettings");
 const { resolveStoredFileUrl } = require("../utils/uploadUrl");
 const { useCloudinary, cloudinary, getCloudinaryFolder } = require("../config/uploadConfig");
 
@@ -93,6 +94,10 @@ async function findOrCreateSection(section, defaults = {}) {
     return record;
 }
 
+async function findSection(section) {
+    return WebsiteContent.findOne({ section });
+}
+
 /* =====================================================
    GET ALL WEBSITE CONTENT
 ===================================================== */
@@ -104,8 +109,7 @@ exports.getWebsiteContent = async (req, res) => {
             res.set("Cache-Control", "public, max-age=120, stale-while-revalidate=600");
             return res.json(cached);
         }
-        await Promise.all(DEFAULT_SECTIONS.map((section) => findOrCreateSection(section)));
-        const content = await WebsiteContent.find().sort({ section: 1 }).lean();
+        const content = await WebsiteContent.find({ published: true }).sort({ section: 1 }).lean();
         const payload = { success: true, count: content.length, content };
         await redisCache.setJson("public:website:content", payload, 300);
         res.set("Cache-Control", "public, max-age=120, stale-while-revalidate=600");
@@ -120,17 +124,11 @@ exports.getWebsiteContent = async (req, res) => {
    GET WEBSITE SETTINGS
 ===================================================== */
 
-exports.getWebsiteSettings = async (req, res) => {
+exports.getWebsiteSettings = async (_req, res) => {
     try {
-        const section = await findOrCreateSection("settings", {
-            title: "Website Settings",
-            subtitle: "Brand color and public website preferences",
-            description: "Managed by the superadmin portal.",
-            content: { themeColor: "#ff7a00", accentColor: "#ff7a00" },
-            images: [],
-        });
-
-        const payload = { success: true, section, settings: section.content || {} };
+        const settings = await getSystemSettings();
+        if (!settings) return res.status(503).json({ success: false, message: "Website system settings are not configured." });
+        const payload = { success: true, settings: toPublicConfig(settings), updatedAt: settings.updatedAt || null };
         await redisCache.setJson("public:website:settings", payload, 300);
         res.set("Cache-Control", "public, max-age=120, stale-while-revalidate=600");
         res.json(payload);
@@ -139,20 +137,14 @@ exports.getWebsiteSettings = async (req, res) => {
         res.status(500).json({ success: false, message: error.message });
     }
 };
-
 /* =====================================================
    GET GALLERY
 ===================================================== */
 
 exports.getGallery = async (req, res) => {
     try {
-        const section = await findOrCreateSection("gallery", {
-            title: "Gallery",
-            subtitle: "Community moments",
-            description: "A growing collection of public moments from Benevolent Midax.",
-            content: {},
-            images: [],
-        });
+        const section = await findSection("gallery");
+        if (!section) return res.status(404).json({ success: false, message: "Gallery is not configured." });
 
         const payload = { success: true, section, gallery: section.images || [] };
         await redisCache.setJson("public:website:gallery", payload, 300);
@@ -170,13 +162,8 @@ exports.getGallery = async (req, res) => {
 
 exports.getConstitution = async (req, res) => {
     try {
-        let section = await findOrCreateSection("constitution", {
-            title: "Constitution",
-            subtitle: "Official governance document",
-            description: "The latest Benevolent Midax Constitution file.",
-            content: { fileUrl: "/documents/benevolent-midax-constitution.pdf", fileName: "Benevolent Midax Constitution.pdf" },
-            images: [],
-        });
+        let section = await findSection("constitution");
+        if (!section) return res.status(404).json({ success: false, message: "Constitution is not configured." });
 
         section = await ensureConstitutionCloudinary(section);
         const payload = { success: true, section, file: section.content || {} };
@@ -241,13 +228,8 @@ exports.uploadGalleryImage = async (req, res) => {
             return res.status(400).json({ success: false, message: "Please choose an image to upload." });
         }
 
-        const section = await findOrCreateSection("gallery", {
-            title: "Gallery",
-            subtitle: "Community moments",
-            description: "A growing collection of public moments from Benevolent Midax.",
-            content: {},
-            images: [],
-        });
+        const section = await findSection("gallery");
+        if (!section) return res.status(404).json({ success: false, message: "Gallery is not configured." });
 
         const imageUrl = resolveStoredFileUrl(req.file, `/uploads/${req.uploadType || "gallery"}`);
 
@@ -285,7 +267,8 @@ exports.uploadGalleryImage = async (req, res) => {
 
 exports.getSection = async (req, res) => {
     try {
-        const section = await findOrCreateSection(req.params.section);
+        const section = await findSection(req.params.section);
+        if (!section) return res.status(404).json({ success: false, message: "Website section not found." });
         res.json({ success: true, section });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });

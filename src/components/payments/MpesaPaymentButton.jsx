@@ -43,7 +43,7 @@ export default function MpesaPaymentButton({ purpose, referenceId, label = "Pay 
   const [message, setMessage] = useState("");
   const [stkConfigured, setStkConfigured] = useState(false);
   const [manualReady, setManualReady] = useState(false);
-  const [mpesaConfig, setMpesaConfig] = useState({ shortCode: "", manualPaybill: "247247", manualAccountNumber: "", accountReference: "", environment: "production" });
+  const [mpesaConfig, setMpesaConfig] = useState({ shortCode: "", manualPaybill: "", manualAccountNumber: "", accountReference: "", environment: "production", displayLabel: "Manual M-PESA" });
   const [transactionId, setTransactionId] = useState("");
   const paymentAttemptRef = useRef("");
 
@@ -117,7 +117,7 @@ export default function MpesaPaymentButton({ purpose, referenceId, label = "Pay 
       setManualReady(manual);
       setMpesaConfig({
         shortCode: String(data?.shortCode || ""),
-        manualPaybill: String(data?.manualPaybill || "247247"),
+        manualPaybill: String(data?.manualPaybill || ""),
         manualAccountNumber: String(data?.manualAccountNumber || ""),
         accountReference: String(data?.accountReference || ""),
         environment: String(data?.environment || "production"),
@@ -184,13 +184,13 @@ export default function MpesaPaymentButton({ purpose, referenceId, label = "Pay 
             {message && <div className={`mpesa-alert ${["error"].includes(status) ? "error" : ["sent", "success", "manualPending"].includes(status) ? "success" : "warning"}`}>{["sent", "success", "manualPending"].includes(status) ? <CheckCircle2 size={17} /> : status === "error" ? <XCircle size={17} /> : status === "checking" ? <Clock3 size={17} /> : null}<span>{message}</span></div>}
             <div className="mpesa-methods" role="group" aria-label="M-PESA payment method">
               <button type="button" className={method === "stk" ? "mpesa-method active" : "mpesa-method"} onClick={() => { setMethod("stk"); setStatus("idle"); setMessage(""); }} disabled={!stkConfigured}>STK Push{stkConfigured ? "" : " (unavailable)"}</button>
-              <button type="button" className={method === "manual" ? "mpesa-method active" : "mpesa-method"} onClick={() => { setMethod("manual"); setStatus("idle"); setMessage(""); }} disabled={!manualReady}>PayBill 247247</button>
+              <button type="button" className={method === "manual" ? "mpesa-method active" : "mpesa-method"} onClick={() => { setMethod("manual"); setStatus("idle"); setMessage(""); }} disabled={!manualReady}>{mpesaConfig.displayLabel || "Manual M-PESA"} {mpesaConfig.manualPaybill ? mpesaConfig.manualPaybill : "(unavailable)"}</button>
             </div>
             <form onSubmit={submit} className="mpesa-form" aria-label="M-PESA payment form">
               <label htmlFor="mpesa-payment-amount">Amount (KES)<input id="mpesa-payment-amount" name="amount" type="number" autoComplete="transaction-amount" min="1" step="1" value={amount} onChange={(e) => setAmount(e.target.value)} disabled={status === "sending" || (!stkConfigured && !manualReady)} /></label>
               <label htmlFor="mpesa-payment-phone">M-PESA number{method === "manual" ? " (optional)" : ""}<input id="mpesa-payment-phone" name="phoneNumber" type="tel" inputMode="numeric" autoComplete="tel" placeholder="0712345678" value={phone} onChange={(e) => setPhone(e.target.value)} disabled={status === "sending"} /></label>
               {method === "manual" && <label htmlFor="mpesa-payment-code">M-PESA transaction code<input id="mpesa-payment-code" name="transactionCode" type="text" inputMode="text" autoComplete="off" placeholder="e.g. QHX123ABC" value={transactionCode} onChange={(e) => setTransactionCode(e.target.value.toUpperCase())} disabled={status === "sending"} /></label>}
-              <div className="mpesa-account-note">Equity M-PESA collection: PayBill <strong>{mpesaConfig.manualPaybill || "247247"}</strong> • Account / Reference <strong>{mpesaConfig.manualAccountNumber || "0650186528835"}</strong></div>
+              <div className="mpesa-account-note">Manual M-PESA collection: PayBill <strong>{mpesaConfig.manualPaybill || "Not configured"}</strong> • Account / Reference <strong>{mpesaConfig.manualAccountNumber || "Not configured"}</strong></div>
               {method === "stk" && <div className="mpesa-account-note">{mpesaConfig.environment === "sandbox" ? "Sandbox" : "Production"} STK merchant shortcode <strong>{mpesaConfig.shortCode || "not configured"}</strong>{mpesaConfig.accountReference ? <> • Backend reference <strong>{mpesaConfig.accountReference}</strong></> : null}</div>}
               {method === "manual" && <div className="mpesa-small">After paying through the displayed Equity PayBill, enter the transaction code here. The payment is <strong>Pending</strong> until an authorised administrator verifies it. A member confirmation alone never marks a payment as successful.</div>}
               <button className="mpesa-submit" type="submit" disabled={status === "sending" || (method === "stk" ? !stkConfigured : !manualReady)}>{status === "sending" ? <><Loader2 size={17} className="mpesa-spin" /> Recording…</> : method === "stk" ? "Send STK Push" : "I have paid — submit for verification"}</button>

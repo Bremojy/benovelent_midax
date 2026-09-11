@@ -14,10 +14,8 @@ const { ensureChatProfile } = require("../utils/chatProfile");
 const { stkPush, stkQuery, b2cPayment, normalizePhone, normalizeAccountReference, isConfigured, isB2CConfigured, getConfigurationSummary, getProductionDiagnostics, idempotencyKey, endpointSummary, extractUpstreamError, classifyUpstreamError, getStkCallback, toResultCode, parseMetadata } = require("../services/mpesaService");
 
 const env = (name, fallback = "") => String(process.env[name] ?? fallback).trim();
-const DEFAULT_MPESA_SHORTCODE = "650014";
-const DEFAULT_MPESA_ACCOUNT_REFERENCE = "BENMIDAX";
-const MANUAL_PAYBILL = () => env("MPESA_MANUAL_PAYBILL", "247247");
-const MANUAL_ACCOUNT = () => env("MPESA_MANUAL_ACCOUNT_NUMBER", "0650186528835");
+const SystemSettings = require("../models/SystemSettings");
+const getSafeMpesaSettings = async () => (await SystemSettings.findOne({ singletonKey: "primary" }).select("mpesa").lean())?.mpesa || {};
 const normalizeManualCode = (value) => String(value || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 32);
 
 const modelMap = { SupportRequest, MedicalSupport, FuneralSupport, EducationSupport };
@@ -130,10 +128,12 @@ async function resolvePaymentMember(req) {
 
 exports.publicConfig = async (_req, res) => {
   res.set("Cache-Control", "public, max-age=300, stale-while-revalidate=900");
-  return res.json({ success:true, enabled:env("MPESA_ENABLED","false").toLowerCase()==="true", configured:isConfigured(), environment:env("MPESA_ENVIRONMENT","production"), shortCode:env("MPESA_SHORTCODE",DEFAULT_MPESA_SHORTCODE), accountReference:normalizeAccountReference(env("MPESA_ACCOUNT_REFERENCE",DEFAULT_MPESA_ACCOUNT_REFERENCE)), manualPaybill:env("MPESA_MANUAL_PAYBILL","247247"), manualAccountNumber:MANUAL_ACCOUNT(), transactionType:env("MPESA_TRANSACTION_TYPE","CustomerPayBillOnline") });
+  const settings = await getSafeMpesaSettings();
+  return res.json({ success:true, enabled:env("MPESA_ENABLED","false").toLowerCase()==="true" && settings.stkEnabled !== false, configured:isConfigured(), environment:env("MPESA_ENVIRONMENT","production"), shortCode:env("MPESA_SHORTCODE"), accountReference:normalizeAccountReference(env("MPESA_ACCOUNT_REFERENCE")), manualPaybill:settings.manualPaymentEnabled ? String(settings.manualPaybill || "") : "", manualAccountNumber:settings.manualPaymentEnabled ? String(settings.manualAccountReference || "") : "", transactionType:env("MPESA_TRANSACTION_TYPE","CustomerPayBillOnline") });
 };
 
 exports.config = async (_req, res) => {
+  const safeSettings = await getSafeMpesaSettings();
   const stkConfigured = isConfigured();
   const b2cConfigured = isB2CConfigured();
   const enabled = String(process.env.MPESA_ENABLED || "false").toLowerCase() === "true";
@@ -144,13 +144,13 @@ exports.config = async (_req, res) => {
     stkConfigured,
     b2cConfigured,
     enabled,
-    ready: Boolean(stkConfigured || MANUAL_PAYBILL()),
-    manualCollectionReady: Boolean(MANUAL_PAYBILL() && MANUAL_ACCOUNT()),
-    shortCode: String(process.env.MPESA_SHORTCODE || "650014"),
-    manualPaybill: String(process.env.MPESA_MANUAL_PAYBILL || "247247"),
-    manualAccountNumber: MANUAL_ACCOUNT(),
-    accountReference: normalizeAccountReference(process.env.MPESA_ACCOUNT_REFERENCE || "BENMIDAX"),
-    environment: String(process.env.MPESA_ENVIRONMENT || "production"),
+    ready: Boolean(stkConfigured || safeSettings.manualPaymentEnabled),
+    manualCollectionReady: Boolean(safeSettings.manualPaymentEnabled && safeSettings.manualPaybill && safeSettings.manualAccountReference),
+    shortCode: String(process.env.MPESA_SHORTCODE || safeSettings.operationalShortcode || ""),
+    manualPaybill: safeSettings.manualPaymentEnabled ? String(safeSettings.manualPaybill || "") : "",
+    manualAccountNumber: safeSettings.manualPaymentEnabled ? String(safeSettings.manualAccountReference || "") : "",
+    accountReference: normalizeAccountReference(process.env.MPESA_ACCOUNT_REFERENCE || ""),
+    environment: String(safeSettings.environment || process.env.MPESA_ENVIRONMENT || "unknown"),
     message: !enabled
       ? "M-PESA is disabled on the server."
       : stkConfigured
@@ -324,7 +324,7 @@ exports.stk = async (req, res) => {
       phoneNumber,
       amount,
       businessShortCode: String(process.env.MPESA_SHORTCODE || "650014"),
-      accountReference: normalizeAccountReference(process.env.MPESA_ACCOUNT_REFERENCE || "BENMIDAX"),
+      accountReference: normalizeAccountReference(process.env.MPESA_ACCOUNT_REFERENCE || ""),
       status: "pending",
       requestId,
     });
@@ -504,7 +504,8 @@ exports.manualPayment = async (req, res) => {
     if (!manualTransactionCode || manualTransactionCode.length < 6) return res.status(400).json({ success: false, message: "Enter the M-PESA transaction code from the payment confirmation." });
     if (suppliedPhone && !/^254\d{9}$/.test(suppliedPhone)) return res.status(400).json({ success: false, message: "Enter a valid Kenyan M-PESA number, or leave it blank." });
     if (!["loan_repayment", "support_repayment", "community_assistance"].includes(purpose)) return res.status(400).json({ success: false, message: "Select a valid payment purpose." });
-    if (!MANUAL_PAYBILL() || !MANUAL_ACCOUNT()) return res.status(503).json({ success: false, message: "Manual M-PESA PayBill collection is not configured." });
+    const safeSettings = await getSafeMpesaSettings();
+    if (!safeSettings.manualPaymentEnabled || !safeSettings.manualPaybill || !safeSettings.manualAccountReference) return res.status(503).json({ success: false, message: "Manual M-PESA PayBill collection is not configured." });
     if (purpose === "loan_repayment" || purpose === "support_repayment") {
       const referenceModel = purpose === "loan_repayment" ? "EducationSupport" : "SupportRequest";
       const { memberId } = await ensureReferenceExists(referenceModel, referenceId);
@@ -529,11 +530,11 @@ exports.manualPayment = async (req, res) => {
       referenceModel: purpose === "community_assistance" ? "CommunityAssistance" : purpose === "loan_repayment" ? "EducationSupport" : "SupportRequest",
       phoneNumber: suppliedPhone,
       amount,
-      businessShortCode: MANUAL_PAYBILL(),
-      accountReference: MANUAL_ACCOUNT(),
+      businessShortCode: String(safeSettings.manualPaybill),
+      accountReference: String(safeSettings.manualAccountReference),
       paymentMethod: "manual_paybill",
-      manualPaybill: MANUAL_PAYBILL(),
-      manualAccountNumber: MANUAL_ACCOUNT(),
+      manualPaybill: String(safeSettings.manualPaybill),
+      manualAccountNumber: String(safeSettings.manualAccountReference),
       manualTransactionCode,
       status: "pending",
       initiatedAt: new Date(),
@@ -549,8 +550,9 @@ exports.manualPayment = async (req, res) => {
 };
 
 exports.manualPaymentsAdmin = async (_req, res) => {
+  const safeSettings = await getSafeMpesaSettings();
   const transactions = await MpesaTransaction.find({ paymentMethod: "manual_paybill" }).populate("member", "fullName email memberNumber phone").sort({ createdAt: -1 }).limit(200).lean();
-  return res.json({ success: true, transactions, paybill: MANUAL_PAYBILL(), accountNumber: MANUAL_ACCOUNT() });
+  return res.json({ success: true, transactions, paybill: safeSettings.manualPaymentEnabled ? String(safeSettings.manualPaybill || "") : "", accountNumber: safeSettings.manualPaymentEnabled ? String(safeSettings.manualAccountReference || "") : "" });
 };
 
 exports.manualVerify = async (req, res) => {

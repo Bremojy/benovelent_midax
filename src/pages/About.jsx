@@ -1,71 +1,14 @@
 import { Link } from "react-router-dom";
-import { MessageCircle, ShieldCheck, HeartHandshake, Sparkles, Phone } from "lucide-react";
+import { MessageCircle, ShieldCheck, HeartHandshake, Sparkles, Phone, Loader2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import API from "../services/api";
 import "../styles/public-modern.css";
-
 const shouldSkipBackgroundVideo = typeof navigator !== "undefined" && (navigator.connection?.saveData || /2g/.test(navigator.connection?.effectiveType || ""));
-
 const aboutVideo = "/videos/benevolent-community-loop.mp4";
 
 export default function About() {
-  return (
-    <main className="public-modern-page">
-      <section className="modern-hero">
-        <video className="modern-hero-video" autoPlay={!shouldSkipBackgroundVideo} muted loop playsInline preload={shouldSkipBackgroundVideo ? "none" : "metadata"} poster="/hero.jpg">
-          <source src={aboutVideo} type="video/mp4" />
-        </video>
-        <div className="modern-hero-overlay" />
-        <div className="modern-hero-content">
-          <div>
-            <span className="modern-kicker"><Sparkles size={14} /> ABOUT MIDAX & Benovelent</span>
-            <h1>Midax Petroleum Marketing and the Benovelent scheme were built around people, service and family support.</h1>
-            <p>
-              The letterhead shows Midax Petroleum Marketing as a service-focused company offering fuels, lubricants, LPG gas, service and carwash.
-              Benovelent Midax carries that same care into a support scheme for members and their families.
-            </p>
-            <div className="modern-hero-actions">
-              <Link to="/contact" className="modern-btn">Your member voice is needed <MessageCircle size={17} /></Link>
-              <Link to="/services" className="modern-btn-secondary">View support services</Link>
-            </div>
-          </div>
-          <div className="modern-hero-panel">
-            <div className="modern-panel-grid">
-              <Link to="/contact" className="modern-metric"><strong>Member voice</strong><span>Every member has right to speak</span></Link>
-              <Link to="/privacy-policy" className="modern-metric"><strong>Privacy</strong><span>Your information is handled with care and protected through the portal</span></Link>
-              <Link to="/services" className="modern-metric"><strong>Support</strong><span>Detailed information about the Benovelent Midax Constitution services</span></Link>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="modern-section">
-        <div className="modern-section-head">
-          <span className="eyebrow">HISTORY</span>
-          <h2>About the Midax family and why Benovelent Midax exists</h2>
-        </div>
-        <div className="modern-split">
-          <div className="modern-card">
-            <h3>About Midax company</h3>
-            <p>
-              Midax is presented in the supplied letterhead as a petroleum marketing business serving Nairobi with fuels, lubricants, LPG gas, service and carwash.
-              This website keeps that family-and-service feel while focusing on the Benovelent fund scheme.
-            </p>
-          </div>
-          <div className="modern-card">
-            <h3>Why Benovelent Midax came up</h3>
-            <p>
-              The scheme was formed so members can stand together during medical and funeral needs. According to the supplied brief, the Benovelent constitution started in May 2023 with contributions of Ksh 300, then moved to Ksh 500 in January 2025.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      <section className="modern-section">
-        <div className="modern-card-grid">
-          <div className="modern-card"><HeartHandshake size={24} /><h3>Representatives</h3><p>Each station provides five to seven representatives for operations, meetings, amendments and oversight.</p></div>
-          <div className="modern-card"><ShieldCheck size={24} /><h3>Accountability</h3><p>The Treasurer is responsible for accounting and ensuring accountability, integrity and transparency.</p></div>
-          <div className="modern-card"><Phone size={24} /><h3>Communication</h3><p>Communication should be done on time so members know how their requests and contributions are being handled.</p></div>
-        </div>
-      </section>
-    </main>
-  );
+  const [section,setSection]=useState(null),[loading,setLoading]=useState(true),[error,setError]=useState("");
+  useEffect(()=>{API.get("/website").then(({data})=>setSection((data?.content||[]).find((item)=>item?.section==="about")||null)).catch(e=>setError(e.response?.data?.message||"Unable to load the published About content.")).finally(()=>setLoading(false));},[]);
+  const text=section?.content?.body||section?.content?.text||section?.description||"";
+  return <main className="public-modern-page"><section className="modern-hero"><video className="modern-hero-video" autoPlay={!shouldSkipBackgroundVideo} muted loop playsInline preload={shouldSkipBackgroundVideo ? "none":"metadata"} poster="/hero.jpg"><source src={aboutVideo} type="video/mp4" /></video><div className="modern-hero-overlay" /><div className="modern-hero-content"><div><span className="modern-kicker"><Sparkles size={14}/> ABOUT MIDAX & BENOVELENT</span><h1>{loading?<><Loader2 size={18}/> Loading…</>:section?.title||"About Benevolent MIDAX"}</h1><p>{loading?"Loading the current published content…":error||section?.subtitle||section?.description||"The current organisation information has not been configured."}</p><div className="modern-hero-actions"><Link to="/contact" className="modern-btn">Your member voice is needed <MessageCircle size={17}/></Link><Link to="/services" className="modern-btn-secondary">View support services</Link></div></div><div className="modern-hero-panel"><div className="modern-panel-grid"><Link to="/contact" className="modern-metric"><strong>Member voice</strong><span>Use the current Contact channel</span></Link><Link to="/privacy-policy" className="modern-metric"><strong>Privacy</strong><span>Read the published Privacy Policy</span></Link><Link to="/services" className="modern-metric"><strong>Support</strong><span>See current enabled policies</span></Link></div></div></div></section><section className="modern-section"><div className="modern-section-head"><span className="eyebrow">PUBLISHED ABOUT CONTENT</span><h2>{section?.subtitle||"Current organisation and scheme information"}</h2>{error&&<p role="alert">{error}</p>}</div><div className="modern-card"><h3>{section?.title||"About"}</h3><p style={{whiteSpace:"pre-wrap"}}>{loading?"Loading…":text||"Not configured"}</p></div></section><section className="modern-section"><div className="modern-card-grid"><div className="modern-card"><HeartHandshake size={24}/><h3>Representatives</h3><p>The current published WebsiteContent is the source for organisation-specific representation information.</p></div><div className="modern-card"><ShieldCheck size={24}/><h3>Accountability</h3><p>Use the current Constitution and published governance content for authoritative accountability rules.</p></div><div className="modern-card"><Phone size={24}/><h3>Communication</h3><p>Use Contact for the current official communication channels.</p></div></div></section></main>;
 }
