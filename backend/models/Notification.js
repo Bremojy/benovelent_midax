@@ -160,6 +160,15 @@ const NotificationModel = mongoose.models.Notification || mongoose.model("Notifi
 if (!NotificationModel.__midaxNotificationLifecycle) {
   const originalCreate = NotificationModel.create.bind(NotificationModel);
   const originalInsertMany = NotificationModel.insertMany.bind(NotificationModel);
+  const notificationFingerprint = (doc) => JSON.stringify({
+    recipient: doc?.recipient ? String(doc.recipient) : "",
+    recipientModel: doc?.recipientModel || "Member",
+    type: doc?.type || "system",
+    referenceModel: doc?.referenceModel || "",
+    referenceId: doc?.referenceId ? String(doc.referenceId) : "",
+    title: String(doc?.title || "").trim(),
+    message: String(doc?.message || "").trim(),
+  });
   const fingerprintQueryFor = (doc) => ({
     recipient: doc.recipient,
     recipientModel: doc.recipientModel || "Member",

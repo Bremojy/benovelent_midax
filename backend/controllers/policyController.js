@@ -54,12 +54,27 @@ exports.create = async (req, res) => {
 
 exports.update = async (req, res) => {
   try {
+    const existing = await Policy.findById(req.params.id);
+    if (!existing) return res.status(404).json({ success: false, message: "Policy not found." });
+
     const payload = clean(req.body);
-    const policy = await Policy.findByIdAndUpdate(req.params.id, payload, { returnDocument: "after", runValidators: true });
-    if (!policy) return res.status(404).json({ success: false, message: "Policy not found." });
+    // Policy slugs are stable identifiers used by existing support/claim records.
+    // Renaming a policy must not silently orphan historical applications.
+    payload.slug = req.body?.slug === undefined || String(req.body.slug).trim() === ""
+      ? existing.slug
+      : slugify(req.body.slug);
+
+    if (!payload.name) return res.status(400).json({ success: false, message: "Policy name is required." });
+    const conflict = await Policy.findOne({ slug: payload.slug, _id: { $ne: existing._id } }).select("_id").lean();
+    if (conflict) return res.status(409).json({ success: false, message: "A policy with this name/slug already exists." });
+
+    Object.assign(existing, payload);
+    const policy = await existing.save();
     await redisCache.invalidateMany(["public:policies:enabled", "assistant:context:public", "assistant:context:member", "assistant:context:admin", "assistant:context:superadmin"]);
     res.json({ success: true, policy });
-  } catch (error) { res.status(500).json({ success: false, message: error.message }); }
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
 };
 
 exports.remove = async (req, res) => {

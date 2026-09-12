@@ -623,6 +623,8 @@ exports.approveApplication = async (req, res) => {
     application.status = "Approved";
     application.approvalDate = new Date();
     application.approvedBy = req.user._id;
+    application.approvedByModel = req.user.role === "superadmin" ? "SuperAdmin" : "Admin";
+    application.approvedByModel = req.user.role === "superadmin" ? "SuperAdmin" : "Admin";
     application.remarks =
       req.body.remarks || "";
 

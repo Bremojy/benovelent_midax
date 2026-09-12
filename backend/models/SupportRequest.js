@@ -111,7 +111,7 @@ const supportRequestSchema = new mongoose.Schema(
 );
 
 supportRequestSchema.pre("save", function(next) {
-  if (this.isNew || this.isModified("approvedAmount") || this.isModified("repaymentEnabled") || this.isModified("interestRate")) {
+  if (this.isNew || this.isModified("requestedAmount") || this.isModified("approvedAmount") || this.isModified("repaymentEnabled") || this.isModified("repaymentMonths") || this.isModified("interestRate")) {
     const principal = Number(this.approvedAmount || this.requestedAmount || 0);
     this.totalRepayment = this.repaymentEnabled ? principal + (principal * Number(this.interestRate || 0) / 100) : 0;
     this.balance = this.repaymentEnabled ? Math.max(0, this.totalRepayment - Number(this.amountPaid || 0)) : 0;

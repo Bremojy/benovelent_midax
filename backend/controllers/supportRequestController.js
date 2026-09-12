@@ -228,16 +228,53 @@ exports.memberUpdate = async (req, res) => {
     const documentError = validateMinimumDocuments(documents);
     if (documentError) return res.status(400).json({ success: false, message: documentError });
 
-    const { description, requestedAmount, supportType, policySlug, policyName } = req.body || {};
+    const { description, requestedAmount, supportType, policySlug } = req.body || {};
     if (description !== undefined) item.description = asText(description);
     if (supportType !== undefined) item.supportType = asText(supportType);
-    if (policySlug !== undefined) item.policySlug = asText(policySlug);
-    if (policyName !== undefined) item.policyName = asText(policyName);
+
+    const policyWasChanged = policySlug !== undefined;
+    const finalPolicySlug = policyWasChanged ? asText(policySlug) : asText(item.policySlug);
+    const amountWasChanged = requestedAmount !== undefined;
     if (requestedAmount !== undefined) {
       const amount = Number(requestedAmount);
       if (!Number.isFinite(amount) || amount <= 0) return res.status(400).json({ success: false, message: "Requested amount must be a positive number." });
       item.requestedAmount = amount;
     }
+
+    // Re-read the active policy whenever the member changes the policy, and
+    // also when an amount is edited for a request that still references a policy.
+    // This prevents members from bypassing policy limits during Under Review edits.
+    const policy = finalPolicySlug
+      ? await Policy.findOne({ slug: finalPolicySlug, ...(policyWasChanged ? { enabled: true } : {}) }).lean()
+      : null;
+    if (policyWasChanged && finalPolicySlug && !policy) {
+      return res.status(400).json({ success: false, message: "The selected support policy is unavailable." });
+    }
+    if (policy && (policyWasChanged || amountWasChanged)) {
+      const amount = Number(item.requestedAmount);
+      const policyMin = Number(policy.minAmount || 0);
+      const policyMax = Number(policy.maxAmount || 0);
+      if (policyMin > 0 && amount < policyMin) {
+        return res.status(400).json({ success: false, message: `Minimum amount for ${policy.name} is KSh ${policyMin.toLocaleString("en-KE")}.` });
+      }
+      if (policyMax > 0 && amount > policyMax) {
+        return res.status(400).json({ success: false, message: `Maximum amount for ${policy.name} is KSh ${policyMax.toLocaleString("en-KE")}.` });
+      }
+    }
+    if (policy) {
+      item.policySlug = policy.slug;
+      item.policyName = policy.name;
+      item.repaymentEnabled = Boolean(policy.repaymentEnabled);
+      item.repaymentMonths = Number(policy.repaymentMonths || 12);
+      item.interestRate = Number(policy.interestRate || 0);
+    } else if (policyWasChanged) {
+      item.policySlug = "";
+      item.policyName = "";
+      item.repaymentEnabled = false;
+      item.repaymentMonths = 12;
+      item.interestRate = 0;
+    }
+
     item.documents = documents;
     item.timeline.push({ status: item.status, remarks: "Member updated support request details while Under Review.", updatedBy: req.user._id });
     await item.save();

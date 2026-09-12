@@ -23,8 +23,8 @@ export default function Home() {
   }, []);
 
   const scheme = settings?.scheme || {};
-  const funeral = policies.find((p) => String(p.category || "").toLowerCase() === "funeral-support");
-  const medical = policies.find((p) => String(p.category || "").toLowerCase() === "medical-support");
+  const funeral = policies.find((p) => String(p.slug || "").toLowerCase() === "funeral-support");
+  const medical = policies.find((p) => String(p.slug || "").toLowerCase() === "medical-support");
   const configured = (value, formatter = (v) => `Ksh ${Number(v).toLocaleString("en-KE")}`) => value === null || value === undefined || value === "" ? "Not configured" : formatter(value);
 
   return (<>
@@ -42,8 +42,8 @@ export default function Home() {
           </div>
         </div>
         <div className="modern-card-grid">
-          {funeral ? <Card icon={Heart} title={funeral.title} text={policyText(funeral)} /> : <Card icon={Heart} title="Funeral support" text="Not configured" />}
-          {medical ? <Card icon={Stethoscope} title={medical.title} text={policyText(medical)} /> : <Card icon={Stethoscope} title="Medical support" text="Not configured" />}
+          {funeral ? <Card icon={Heart} title={funeral.name || "Funeral support"} text={policyText(funeral)} /> : <Card icon={Heart} title="Funeral support" text="Not configured" />}
+          {medical ? <Card icon={Stethoscope} title={medical.name || "Medical support"} text={policyText(medical)} /> : <Card icon={Stethoscope} title="Medical support" text="Not configured" />}
           <Card icon={ShieldCheck} title="Accountability" text="See the current published policy and Constitution for authoritative scheme rules." />
         </div>
         {policyError && <p role="alert" className="portal-error">{policyError}</p>}

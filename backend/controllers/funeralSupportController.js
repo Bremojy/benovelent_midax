@@ -664,6 +664,7 @@ exports.approveApplication = async (req, res) => {
 
         application.approvedBy=
         req.user._id;
+        application.approvedByModel = req.user.role === "superadmin" ? "SuperAdmin" : "Admin";
 
         application.remarks=
         req.body.remarks || "";

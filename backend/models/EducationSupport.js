@@ -178,7 +178,14 @@ const educationSupportSchema = new mongoose.Schema(
 
     approvedBy: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Member",
+      refPath: "approvedByModel",
+      default: null,
+    },
+
+    approvedByModel: {
+      type: String,
+      enum: ["Admin", "SuperAdmin"],
+      default: "Admin",
     },
 
     createdBy: {

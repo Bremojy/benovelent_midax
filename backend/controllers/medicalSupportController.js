@@ -786,6 +786,7 @@ exports.approveApplication = async (req, res) => {
             approvedAmount || application.requestedAmount;
 
         application.approvedBy = req.user._id;
+    application.approvedByModel = req.user.role === "superadmin" ? "SuperAdmin" : "Admin";
 
         application.processedBy = req.user._id;
 

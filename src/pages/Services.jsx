@@ -63,7 +63,7 @@ export default function Services() {
 const shouldSkipBackgroundVideo = typeof navigator !== "undefined" && (navigator.connection?.saveData || /2g/.test(navigator.connection?.effectiveType || ""));
 
 function iconFor(category) { const value=String(category||"").toLowerCase(); return value.includes("medical")?Stethoscope:value.includes("funeral")?Heart:value.includes("education")?BookOpen:ShieldCheck; }
-function policyDescription(policy) { const parts=[]; if(policy.minAmount!==null&&policy.minAmount!==undefined) parts.push(`Minimum: Ksh ${Number(policy.minAmount).toLocaleString("en-KE")}`); if(policy.maxAmount!==null&&policy.maxAmount!==undefined) parts.push(`Maximum: Ksh ${Number(policy.maxAmount).toLocaleString("en-KE")}`); if(policy.repaymentMonths) parts.push(`Repayment: ${Number(policy.repaymentMonths)} months`); return parts.join(" • ") || policy.description || policy.summary || "Current policy details are maintained by SuperAdmin."; }
+function policyDescription(policy) { const parts=[]; if(policy.minAmount!==null&&policy.minAmount!==undefined) parts.push(`Minimum: Ksh ${Number(policy.minAmount).toLocaleString("en-KE")}`); if(policy.maxAmount!==null&&policy.maxAmount!==undefined) parts.push(`Maximum: Ksh ${Number(policy.maxAmount).toLocaleString("en-KE")}`); if(policy.repaymentMonths) parts.push(`Repayment: ${Number(policy.repaymentMonths)} months`); return parts.join(" • ") || policy.description || "Current policy details are maintained by SuperAdmin."; }
 function Service({ icon: Icon, title, text }) {
   return (
     <article className="modern-card">

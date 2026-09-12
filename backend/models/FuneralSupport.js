@@ -201,9 +201,16 @@ const funeralSupportSchema = new mongoose.Schema(
     // ADMIN PROCESSING
     // =====================================
 
-    approvedBy:{
-        type:mongoose.Schema.Types.ObjectId,
-        ref:"Admin"
+    approvedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      refPath: "approvedByModel",
+      default: null,
+    },
+
+    approvedByModel: {
+      type: String,
+      enum: ["Admin", "SuperAdmin"],
+      default: "Admin",
     },
 
     processedBy:{

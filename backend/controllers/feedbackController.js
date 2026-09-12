@@ -127,11 +127,21 @@ exports.pendingLogin = async (req, res) => {
     $and: [{ $or: [{ startDate: null }, { startDate: { $lte: now } }] }, { $or: [{ endDate: null }, { endDate: { $gte: now } }] }],
   }).sort({ requireOnLogin: -1, createdAt: -1 });
   for (const doc of docs) {
-    const alreadyAnswered = doc.responses?.some((r) =>
-      String(r.member || "") === actorId &&
-      (!r.respondentRole || String(r.respondentRole) === actorRole)
-    );
+    const responses = Array.isArray(doc.responses) ? doc.responses : [];
+    const matchingResponses = responses
+      .filter((r) => String(r.member || "") === actorId && (!r.respondentRole || String(r.respondentRole) === actorRole))
+      .sort((a, b) => new Date(b.submittedAt || 0).getTime() - new Date(a.submittedAt || 0).getTime());
+    const latestResponse = matchingResponses[0];
+    const alreadyAnswered = Boolean(latestResponse);
     if (alreadyAnswered && doc.preventDuplicate) continue;
+
+    const frequencyDays = Math.max(0, Number(doc.promptFrequencyDays || 0));
+    if (alreadyAnswered && frequencyDays > 0) {
+      const submittedAt = new Date(latestResponse.submittedAt || 0);
+      const nextPromptAt = submittedAt.getTime() + frequencyDays * 86400000;
+      if (Number.isFinite(submittedAt.getTime()) && now.getTime() < nextPromptAt) continue;
+    }
+
     return res.json({ success: true, prompt: visible(doc), required: Boolean(doc.requireOnLogin) });
   }
   return res.json({ success: true, prompt: null, required: false });

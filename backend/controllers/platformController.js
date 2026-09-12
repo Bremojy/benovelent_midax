@@ -257,7 +257,7 @@ exports.assistant = async (req, res) => {
       News.find({ published: true, status: "published" }).sort({ publishDate: -1 }).limit(20).select("title summary category content publishDate").lean(),
       Event.find({ published: true, startAt: { $gte: new Date(Date.now() - 86400000 * 30) }, ...(role !== "public" ? { audience: role } : {}) }).sort({ startAt: 1 }).limit(20).select("title description type startAt location audience").lean(),
       WebsiteContent.find({ published: true, section: { $in: ["home", "about", "services", "contact", "footer", "settings", "gallery", "constitution", "privacy-policy", "terms-conditions", "news", "events", "resources", "chatbot"] } }).select("section title subtitle description content updatedAt").lean(),
-      Policy.find({ enabled: true }).sort({ displayOrder: 1, updatedAt: -1 }).limit(50).select("_id title summary description category minAmount maxAmount interestRate repaymentEnabled repaymentMonths communityAssistance displayOrder applicationPath updatedAt").lean(),
+      Policy.find({ enabled: true }).sort({ order: 1, updatedAt: -1 }).limit(50).select("_id name slug description category minAmount maxAmount interestRate repaymentEnabled repaymentMonths communityAssistanceEnabled applicationPath order updatedAt").lean(),
       getSystemSettings(),
       (async () => {
         const publicRoot = path.join(__dirname, "..", "..", "public", "documents");
@@ -327,7 +327,7 @@ exports.assistantContext = async (req, res) => {
     WebsiteContent.find({ published: true }).sort({ section: 1 }).limit(40).select("section title subtitle description content updatedAt").lean(),
     News.find({ published: true, status: "published" }).sort({ publishDate: -1 }).limit(8).select("title summary category publishDate").lean(),
     Event.find({ published: true, ...(role !== "public" ? { audience: role } : {}), startAt: { $gte: new Date(Date.now() - 86400000) } }).sort({ startAt: 1 }).limit(8).select("title description type startAt location audience").lean().catch(() => []),
-    Policy.find({ enabled: true }).sort({ displayOrder: 1, updatedAt: -1 }).limit(50).select("title summary description category minAmount maxAmount interestRate repaymentEnabled repaymentMonths communityAssistance displayOrder applicationPath updatedAt").lean(),
+    Policy.find({ enabled: true }).sort({ order: 1, updatedAt: -1 }).limit(50).select("name slug description category minAmount maxAmount interestRate repaymentEnabled repaymentMonths communityAssistanceEnabled applicationPath order updatedAt").lean(),
     getSystemSettings(),
   ]);
   res.json({ success: true, context: { role, service: "Benevolent Midax", website, news, events, policies, settings: settings ? toPublicConfig(settings) : null } });
