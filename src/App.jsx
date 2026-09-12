@@ -86,6 +86,7 @@ const Feedback = lazy(() => import("./pages/Feedback"));
 const PortalGuide = lazy(() => import("./pages/member/PortalGuide"));
 const VerifyMembership = lazy(() => import("./pages/VerifyMembership"));
 const NotFound = lazy(() => import("./pages/NotFound"));
+const PortalSectionPage = lazy(() => import("./pages/PortalSectionPage"));
 
 
 // =====================================================
@@ -458,6 +459,33 @@ function AppContent() {
 
           <Route path="/verify-membership" element={<VerifyMembership />} />
 
+
+          {/* =================================================
+              PORTAL SECTION HUBS
+
+              The primary portal navigation stays intentionally compact.
+              Related tools open inside section pages rather than becoming
+              additional sidebar/nav items. Existing direct routes remain
+              available for bookmarks and backward compatibility.
+          ================================================= */}
+
+          <Route path="/member/account" element={<ProtectedRoute allowedRoles={["member"]}><PortalSectionPage role="member" sectionKey="account" /></ProtectedRoute>} />
+          <Route path="/member/money" element={<ProtectedRoute allowedRoles={["member"]}><PortalSectionPage role="member" sectionKey="money" /></ProtectedRoute>} />
+          <Route path="/member/support-center" element={<ProtectedRoute allowedRoles={["member"]}><PortalSectionPage role="member" sectionKey="support" /></ProtectedRoute>} />
+          <Route path="/member/community" element={<ProtectedRoute allowedRoles={["member"]}><PortalSectionPage role="member" sectionKey="community" /></ProtectedRoute>} />
+          <Route path="/member/help" element={<ProtectedRoute allowedRoles={["member"]}><PortalSectionPage role="member" sectionKey="help" /></ProtectedRoute>} />
+
+          <Route path="/admin/operations" element={<ProtectedRoute allowedRoles={["admin","superadmin"]}><PortalSectionPage role="admin" sectionKey="operations" /></ProtectedRoute>} />
+          <Route path="/admin/finance-center" element={<ProtectedRoute allowedRoles={["admin"]}><PortalSectionPage role="admin" sectionKey="finance" /></ProtectedRoute>} />
+          <Route path="/admin/communications" element={<ProtectedRoute allowedRoles={["admin"]}><PortalSectionPage role="admin" sectionKey="communications" /></ProtectedRoute>} />
+          <Route path="/admin/leadership" element={<ProtectedRoute allowedRoles={["admin"]}><PortalSectionPage role="admin" sectionKey="leadership" /></ProtectedRoute>} />
+
+          <Route path="/superadmin/people" element={<ProtectedRoute allowedRoles={["superadmin"]}><PortalSectionPage role="superadmin" sectionKey="people" /></ProtectedRoute>} />
+          <Route path="/superadmin/governance" element={<ProtectedRoute allowedRoles={["superadmin"]}><PortalSectionPage role="superadmin" sectionKey="governance" /></ProtectedRoute>} />
+          <Route path="/superadmin/finance-center" element={<ProtectedRoute allowedRoles={["superadmin"]}><PortalSectionPage role="superadmin" sectionKey="finance" /></ProtectedRoute>} />
+          <Route path="/superadmin/communications" element={<ProtectedRoute allowedRoles={["superadmin"]}><PortalSectionPage role="superadmin" sectionKey="communications" /></ProtectedRoute>} />
+          <Route path="/superadmin/system-center" element={<ProtectedRoute allowedRoles={["superadmin"]}><PortalSectionPage role="superadmin" sectionKey="system" /></ProtectedRoute>} />
+          <Route path="/superadmin/settings-center" element={<ProtectedRoute allowedRoles={["superadmin"]}><PortalSectionPage role="superadmin" sectionKey="settings" /></ProtectedRoute>} />
 
           {/* =================================================
               ADMIN PORTAL

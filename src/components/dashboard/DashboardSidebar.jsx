@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { ChevronUp, LogOut, MoreHorizontal, X } from "lucide-react";
-import { NavLink } from "react-router-dom";
+import { NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { dashboardMenus } from "../../config/dashboardMenu";
 import "../../styles/sidebar.css";
@@ -9,17 +9,16 @@ function DashboardSidebar({ role, sidebarOpen, setSidebarOpen, mobileHidden = fa
   const currentRole = role || "member";
   const menu = dashboardMenus[currentRole] || dashboardMenus.member;
   const { logout: authLogout } = useAuth();
+  const location = useLocation();
   const [moreOpen, setMoreOpen] = useState(false);
 
   const mobilePrimaryItems = (() => {
     const preferred = currentRole === "member"
-      ? ["Dashboard", "Accounts", "Support", "Chat"]
+      ? ["Dashboard", "My Account", "Money & Contributions", "Support & Claims"]
       : currentRole === "admin"
-        ? ["Dashboard", "Members", "Accounts", "Chat"]
-        : ["Dashboard", "Members", "Accounts", "Audit"];
-    return preferred
-      .map((title) => menu.find((item) => item.title === title))
-      .filter(Boolean);
+        ? ["Dashboard", "People & Operations", "Finance", "Communications"]
+        : ["Dashboard", "People & Access", "Finance & Assistance", "System & Diagnostics"];
+    return preferred.map((title) => menu.find((item) => item.title === title)).filter(Boolean);
   })();
 
   const mobileMoreItems = menu.filter(
@@ -70,7 +69,10 @@ function DashboardSidebar({ role, sidebarOpen, setSidebarOpen, mobileHidden = fa
               key={`${item.title}-${item.path}`}
               to={item.path}
               onClick={handleNavigation}
-              className={({ isActive }) => (isActive ? "sidebar-link active" : "sidebar-link")}
+              className={() => {
+                const active = location.pathname === item.path || (item.childPaths || []).some((prefix) => location.pathname === prefix || location.pathname.startsWith(`${prefix}/`));
+                return active ? "sidebar-link active" : "sidebar-link";
+              }}
             >
               <Icon size={20} strokeWidth={2} />
               <span>{item.title}</span>
