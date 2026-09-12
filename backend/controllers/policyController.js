@@ -11,7 +11,7 @@ const clean = (body = {}) => ({
   maxAmount: Number.isFinite(Number(body.maxAmount)) ? Math.max(0, Number(body.maxAmount)) : 0,
   minAmount: Number.isFinite(Number(body.minAmount)) ? Math.max(0, Number(body.minAmount)) : 0,
   interestRate: Number.isFinite(Number(body.interestRate)) ? Math.max(0, Number(body.interestRate)) : 0,
-  repaymentEnabled: Boolean(body.repaymentEnabled),
+  repaymentEnabled: Boolean(body.repaymentEnabled) && String(body.category || "support") === "loan" && String(body.slug ?? body.name).toLowerCase().trim() === "education-policy",
   repaymentMonths: Number.isFinite(Number(body.repaymentMonths)) ? Math.max(1, Math.min(120, Number(body.repaymentMonths))) : 12,
   communityAssistanceEnabled: Boolean(body.communityAssistanceEnabled),
   applicationPath: String(body.applicationPath ?? "/member/support").trim() || "/member/support",

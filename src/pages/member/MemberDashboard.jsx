@@ -155,7 +155,7 @@ export default function MemberDashboard() {
             <div className="member-quick-grid">
               <Quick to="/member/profile" title="Profile" text="Update your required information." icon={<UserRound />} />
               <Quick to="/member/dependents" title="Dependants" text="Manage your family records." icon={<Users />} />
-              <Quick to="/member/accounts" title="Accounts" text="Manage your personal contributions, payments, support, loans and account security." icon={<WalletCards />} />
+              <Quick to="/member/accounts" title="Accounts" text="Manage your payroll contribution records, support payments and account security." icon={<WalletCards />} />
               <Quick to="/member/support" title="Support" text="Submit or follow a support request." icon={<HandHeart />} />
               <Quick to="/member/messages" title="Chat" text="Message members and leaders." icon={<MessageCircle />} />
               <Quick to="/member/notifications" title="Notifications" text="See your latest updates." icon={<Bell />} />

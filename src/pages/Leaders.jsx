@@ -1,7 +1,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Users, Search, BadgeCheck, Sparkles } from "lucide-react";
-import api, { UPLOAD_URL } from "../services/api";
+import api, { resolveUploadUrl } from "../services/api";
 import "./Leaders.css";
 
 function Leaders() {
@@ -67,7 +67,7 @@ function Leaders() {
 
       <div className="leaders-grid">
         {filteredLeaders.map((leader) => {
-          const image = leader.imageUrl ? (leader.imageUrl.startsWith("http") ? leader.imageUrl : `${UPLOAD_URL}${leader.imageUrl}`) : "/default-avatar.svg";
+          const image = leader.imageUrl ? (resolveUploadUrl(leader.imageUrl)) : "/default-avatar.svg";
           return (
             <div className="leader-card" key={leader._id}>
               <div className="leader-image"><img src={image} alt={leader.name} loading="lazy" /></div>

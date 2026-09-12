@@ -253,8 +253,8 @@ export default function Support() {
         attachFiles(formData);
       } else {
         const selectedPolicy = policies.find((policy) => `policy:${policy.slug}` === form.type);
-        if (!form.customType?.trim() && !selectedPolicy?.name) {
-          throw new Error("Please select a valid support policy.");
+        if (!selectedPolicy?.name || !selectedPolicy.enabled) {
+          throw new Error("Please select an enabled support policy.");
         }
         if (!form.caseDescription?.trim() || Number(form.requestedAmount) <= 0) {
           throw new Error("Please complete the support description and amount.");
@@ -317,11 +317,11 @@ export default function Support() {
                 }}>
                   <option value="medical">Medical Support</option>
                   <option value="funeral">Funeral Support</option>
-                  <option value="education">Education Policy</option>
+                  {policies.some((policy) => policy.slug === "education-policy" && policy.enabled) && <option value="education">Education Policy</option>}
                   {policies.filter((policy) => !["medical-support", "funeral-support", "education-policy"].includes(policy.slug)).map((policy) => (
                     <option key={policy._id} value={`policy:${policy.slug}`}>{policy.name}</option>
                   ))}
-                  <option value="other">Other Support</option>
+                  
                 </select>
                 {policies.find((policy) => `policy:${policy.slug}` === form.type) && (
                   <small className="support-policy-hint">{policies.find((policy) => `policy:${policy.slug}` === form.type)?.description}</small>

@@ -111,6 +111,15 @@ const supportRequestSchema = new mongoose.Schema(
 );
 
 supportRequestSchema.pre("save", function(next) {
+  // Repayment is not a generic property of Benevolent MIDAX support.
+  // Keep only the currently configured Education Policy as repayable here.
+  // Any future repayable support must be explicitly authorized and added to
+  // this allow-list/configuration after the governing scheme records are updated.
+  if (this.repaymentEnabled && String(this.policySlug || "") !== "education-policy") {
+    this.repaymentEnabled = false;
+    this.interestRate = 0;
+    this.repaymentMonths = 12;
+  }
   if (this.isNew || this.isModified("requestedAmount") || this.isModified("approvedAmount") || this.isModified("repaymentEnabled") || this.isModified("repaymentMonths") || this.isModified("interestRate")) {
     const principal = Number(this.approvedAmount || this.requestedAmount || 0);
     this.totalRepayment = this.repaymentEnabled ? principal + (principal * Number(this.interestRate || 0) / 100) : 0;

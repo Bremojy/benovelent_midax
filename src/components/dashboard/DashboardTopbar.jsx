@@ -13,7 +13,7 @@ import {
 import { useEffect, useState } from "react";
 import { dashboardMenus } from "../../config/dashboardMenu";
 import socket from "../../sockets/socket";
-import API, { UPLOAD_URL } from "../../services/api";
+import API, { resolveUploadUrl } from "../../services/api";
 
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
@@ -285,11 +285,7 @@ function DashboardTopbar({
           <div className="avatar">
             {user?.profileImage ? (
               <img
-                src={
-                  String(user.profileImage).startsWith("http")
-                    ? user.profileImage
-                    : `${UPLOAD_URL}${user.profileImage.startsWith("/") ? "" : "/"}${user.profileImage}`
-                }
+                src={resolveUploadUrl(user.profileImage)}
                 alt={user?.fullName || user?.name || "Profile"}
               />
             ) : (

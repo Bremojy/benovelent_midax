@@ -58,7 +58,7 @@ async function applyEducationRepayment(transaction) {
 async function applyGenericSupportRepayment(transaction) {
   const application = await SupportRequest.findOne({ _id: transaction.referenceId, member: transaction.member });
   if (!application) throw new Error("Support repayment record was not found.");
-  if (!application.repaymentEnabled) throw new Error("This support request is not repayable.");
+  if (!application.repaymentEnabled || String(application.policySlug || "") !== "education-policy") throw new Error("This support request is not an authorized repayable policy.");
   const amount = Number(transaction.amount);
   if (!Number.isInteger(amount) || amount < 1) throw new Error("Invalid repayment amount.");
   if (Array.isArray(application.timeline) && application.timeline.some((entry) => String(entry.paymentTransactionId || "") === String(transaction._id))) return application;
@@ -301,7 +301,7 @@ exports.stk = async (req, res) => {
     } else if (purpose === "support_repayment") {
       const application = await SupportRequest.findById(referenceId);
       if (!application || String(application.member) !== String(req.user._id)) return res.status(404).json({ success: false, message: "Support repayment record not found." });
-      if (!application.repaymentEnabled || !["Approved", "Disbursement Pending", "Paid"].includes(application.status)) return res.status(400).json({ success: false, message: "This support request is not open for repayment." });
+      if (!application.repaymentEnabled || String(application.policySlug || "") !== "education-policy" || !["Approved", "Disbursement Pending", "Paid"].includes(application.status)) return res.status(400).json({ success: false, message: "This support request is not an authorized repayable policy." });
       if (Number(application.balance) <= 0) return res.status(400).json({ success: false, message: "This support balance is already fully repaid." });
       if (amount > Number(application.balance)) return res.status(400).json({ success: false, message: "Repayment cannot exceed the current balance." });
       referenceModel = "SupportRequest";

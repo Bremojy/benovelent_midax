@@ -115,6 +115,9 @@ exports.create = async (req, res) => {
     const documentError = validateMinimumDocuments(attachments);
     if (documentError) return res.status(400).json({ success: false, message: documentError });
     const policy = policySlug ? await Policy.findOne({ slug: policySlug, enabled: true }).lean() : null;
+    if (!policy) {
+      return res.status(400).json({ success: false, code: "SUPPORT_POLICY_REQUIRED", message: "Select an enabled Benevolent MIDAX support policy before submitting a support request." });
+    }
     const policyMax = Number(policy?.maxAmount || 0);
     const policyMin = Number(policy?.minAmount || 0);
     if (policyMin > 0 && amount < policyMin) return res.status(400).json({ success:false, message:`Minimum amount for ${policy.name} is KSh ${policyMin.toLocaleString("en-KE")}.` });
@@ -128,9 +131,9 @@ exports.create = async (req, res) => {
       description: asText(description),
       requestedAmount: amount,
       approvedAmount: 0,
-      repaymentEnabled: Boolean(policy?.repaymentEnabled),
-      repaymentMonths: Number(policy?.repaymentMonths || 12),
-      interestRate: Number(policy?.interestRate || 0),
+      repaymentEnabled: Boolean(policy?.repaymentEnabled && policy?.category === "loan" && policy?.slug === "education-policy"),
+      repaymentMonths: Boolean(policy?.repaymentEnabled && policy?.category === "loan" && policy?.slug === "education-policy") ? Number(policy?.repaymentMonths || 12) : 12,
+      interestRate: Boolean(policy?.repaymentEnabled && policy?.category === "loan" && policy?.slug === "education-policy") ? Number(policy?.interestRate || 0) : 0,
       documents: attachments,
       timeline: [
         {
@@ -264,9 +267,10 @@ exports.memberUpdate = async (req, res) => {
     if (policy) {
       item.policySlug = policy.slug;
       item.policyName = policy.name;
-      item.repaymentEnabled = Boolean(policy.repaymentEnabled);
-      item.repaymentMonths = Number(policy.repaymentMonths || 12);
-      item.interestRate = Number(policy.interestRate || 0);
+      const canRepay = Boolean(policy.repaymentEnabled && policy.category === "loan" && policy.slug === "education-policy");
+      item.repaymentEnabled = canRepay;
+      item.repaymentMonths = canRepay ? Number(policy.repaymentMonths || 12) : 12;
+      item.interestRate = canRepay ? Number(policy.interestRate || 0) : 0;
     } else if (policyWasChanged) {
       item.policySlug = "";
       item.policyName = "";
