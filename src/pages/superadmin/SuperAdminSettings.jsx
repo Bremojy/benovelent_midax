@@ -74,10 +74,11 @@ function normalizeImagePath(src) {
   return resolveApiUrl(src);
 }
 
-export default function SuperAdminSettings() {
+export default function SuperAdminSettings({ initialTab = "website" }) {
   const { user } = useAuth();
 
-  const [activeTab, setActiveTab] = useState("website");
+  const initialTabValue = ["website", "carousel", "leaders", "gallery", "constitution", "settings", "notifications"].includes(initialTab) ? initialTab : "website";
+  const [activeTab, setActiveTab] = useState(initialTabValue);
   const [sections, setSections] = useState(() =>
     Object.fromEntries(SECTION_FIELDS.map((item) => [item.key, EMPTY_SECTION(item.key)]))
   );
@@ -305,7 +306,7 @@ export default function SuperAdminSettings() {
       setError("");
       const form = new FormData();
       form.append("image", uploadFile);
-      form.append("title", carouselForm.title || "Benovelent Midax");
+      form.append("title", carouselForm.title || "Benevolent Midax");
       form.append("description", carouselForm.description || "");
       form.append("buttonText", carouselForm.buttonText || "Discover More");
       form.append("buttonLink", carouselForm.buttonLink || "/about");

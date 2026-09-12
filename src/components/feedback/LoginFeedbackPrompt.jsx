@@ -75,7 +75,7 @@ export default function LoginFeedbackPrompt() {
       await submitFeedback(prompt._id, answers);
       if (!required) localStorage.setItem(`benovelentFeedbackPrompt:${prompt._id}`, String(Date.now()));
       setClosed(true);
-      toast.success("Thank you. Your feedback helps improve Benovelent Midax.");
+      toast.success("Thank you. Your feedback helps improve Benevolent Midax.");
     } catch (error) {
       toast.error(error.response?.data?.message || "Could not submit feedback.");
     } finally { setLoading(false); }

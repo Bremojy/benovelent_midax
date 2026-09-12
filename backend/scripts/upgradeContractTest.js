@@ -30,8 +30,8 @@ must(supportController.includes('exports.memberUpdate') && supportController.inc
 must(supportController.includes('At least two supporting documents are required.'), 'Minimum document rule missing.');
 must(supportController.includes('documents from at least two different categories'), 'Distinct document category rule missing.');
 must(supportRoutes.includes('router.put("/mine/:id"') && supportRoutes.includes('router.delete("/mine/:id"'), 'Member support edit/delete routes missing.');
-must(!menu.includes('{ title: "Chat", icon: MessageCircle, path: "/superadmin/messages" }'), 'SuperAdmin Chat remains in navigation.');
-must(app.includes('/superadmin/messages') && app.includes('Navigate to="/superadmin"'), 'Legacy SuperAdmin Chat redirect missing.');
+must(menu.includes('path: "/superadmin/messages"'), 'SuperAdmin Messages missing from navigation.');
+must(app.includes('path="/superadmin/messages"') && app.includes('<SuperAdminMessages />'), 'SuperAdmin Messages route is not wired to its page.');
 must(menu.includes('path: "/superadmin/feedback"'), 'SuperAdmin Feedback missing from navigation.');
 must(leaders.includes('router.get("/current"'), 'Current leadership endpoint missing.');
 must(leaders.includes('Admin.find') && leaders.includes('SuperAdmin.find'), 'Leadership endpoint does not combine administrator records.');

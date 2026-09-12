@@ -99,7 +99,7 @@ export default function AdminDashboard() {
         <section className="portal-hero admin-hero">
           <div className="portal-hero-copy">
             <span className="portal-kicker"><Sparkles size={14} /> OPERATIONS · PEOPLE · ACTION</span>
-            <h1>Run Benovelent MIDAX with clarity.</h1>
+            <h1>Run Benevolent MIDAX with clarity.</h1>
             <p>One live workspace for members, support, communication and daily administration.</p>
             <div className="portal-hero-actions">
               <Link className="portal-primary-btn" to="/admin/members"><Users size={17} /> Manage members</Link>

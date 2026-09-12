@@ -10,7 +10,7 @@ import "../member/Accounts.css";
 
 const today=new Date().toISOString().slice(0,10);
 const money=v=>new Intl.NumberFormat("en-KE",{style:"currency",currency:"KES",maximumFractionDigits:0}).format(Number(v||0));
-const TABS=[["constitution","Benovelent Constitution",Landmark],["mpesa","M-PESA Accounts",Smartphone],["community","Community M-PESA Support",HandHeart]];
+const TABS=[["constitution","Benevolent Constitution",Landmark],["mpesa","M-PESA Accounts",Smartphone],["community","Community M-PESA Support",HandHeart]];
 const blank={contributorType:"member",contributorId:"",employeeNumber:"",type:"contribution",category:"",amount:"",description:"",paymentMethod:"Payroll",referenceNumber:"",receiptNumber:"",transactionDate:today,notes:""};
 
 export default function AdminAccounts({ superAdmin=false }){

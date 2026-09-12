@@ -151,7 +151,7 @@ export default function SmartAssistant() {
     {showTeaser && !open && <button type="button" className="smart-assistant-teaser" onClick={() => { setOpen(true); setShowTeaser(false); }} aria-label="Open MIDAX help">
       <span className="teaser-dot"><Sparkles size={11} /></span><span><strong>Benevolent Assistant</strong><small>Need help navigating?</small></span><span className="teaser-close" onClick={(event) => { event.stopPropagation(); setShowTeaser(false); }} aria-hidden="true">×</span>
     </button>}
-    {open && <section className="smart-assistant-panel" aria-label="Benovelent MIDAX assistant">
+    {open && <section className="smart-assistant-panel" aria-label="Benevolent MIDAX assistant">
       <header className="smart-assistant-header"><div className="assistant-header-main"><span className="assistant-orb"><Bot size={19} /></span><div><strong>Benevolent Assistant</strong><span className="assistant-status"><i /> {roleName ? `${roleName} portal • ready` : "Public website • ready"}</span></div></div><div className="assistant-header-actions"><button type="button" onClick={clearChat} aria-label="Start a new chat" title="New chat"><RotateCcw size={16} /></button><button type="button" onClick={() => setOpen(false)} aria-label="Close assistant" title="Close"><X size={17} /></button></div></header>
       <div className="smart-assistant-privacy"><ShieldCheck size={14} /> Answers are based on the website and your authorised portal information.</div>
       <div className="smart-assistant-messages" role="log" aria-live="polite" aria-busy={typing}>

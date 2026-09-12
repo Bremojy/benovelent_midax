@@ -5,7 +5,7 @@ const app=read('src/App.jsx'), member=read('src/pages/member/Accounts.jsx'), adm
 const financeRoutes=read('backend/routes/financeRoutes.js'), finance=read('backend/controllers/financeController.js'), payments=read('backend/routes/paymentRoutes.js'), paymentCtrl=read('backend/controllers/paymentController.js');
 must(app.includes('path="/admin/accounts"')&&app.includes('<AdminAccounts />'),'Admin Accounts route missing.');
 must(app.includes('path="/superadmin/accounts"')&&app.includes('<SuperAdminAccounts />'),'SuperAdmin Accounts route must be separate.');
-must(member.includes('M-PESA Accounts')&&member.includes('Benovelent Constitution')&&member.includes('Community M-PESA Support'),'Member account tabs missing.');
+must(member.includes('M-PESA Accounts')&&member.includes('Benevolent Constitution')&&member.includes('Community M-PESA Support'),'Member account tabs missing.');
 must(member.includes('/payments/mine')&&member.includes('/finance/constitution-ledger')&&member.includes('MpesaTransactionButton'),'Member M-PESA/account ledger separation missing.');
 must(admin.includes('contributorType')&&admin.includes('/finance')&&admin.includes('/finance/${tx._id}/attachment'),'Admin constitution transaction controls missing.');
 must(admin.includes('Approve')&&admin.includes('Reject')&&admin.includes('Cancel'),'Admin M-PESA review controls missing.');

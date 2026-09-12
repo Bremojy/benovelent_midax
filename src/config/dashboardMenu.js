@@ -28,6 +28,8 @@ export const dashboardMenus = {
     { section: "Communication & Community", title: "Announcements", icon: Megaphone, path: "/admin/announcements" },
     { section: "Engagement", title: "Polls", icon: Vote, path: "/admin/polls" },
     { section: "Engagement", title: "Feedback", icon: FileText, path: "/admin/feedback" },
+    { section: "Communication & Content", title: "Website & Communications", icon: Newspaper, path: "/admin/website" },
+    { section: "Reports & Oversight", title: "Reports", icon: ClipboardList, path: "/admin/reports" },
     { section: "Settings", title: "Profile & Settings", icon: UserRound, path: "/admin/settings" },
   ],
   superadmin: [
@@ -37,6 +39,8 @@ export const dashboardMenus = {
     { section: "Finance & Support", title: "Accounts", icon: Wallet, path: "/superadmin/accounts" },
     { section: "Finance & Support", title: "Claims", icon: HandHeart, path: "/superadmin/claims" },
     { section: "Finance & Support", title: "Support", icon: HandHeart, path: "/superadmin/support" },
+    { section: "Communication & Community", title: "Messages", icon: MessageCircle, path: "/superadmin/messages" },
+    { section: "Website & Content", title: "Leaders", icon: Users, path: "/superadmin/leaders" },
     { section: "Website & Content", title: "News", icon: Newspaper, path: "/superadmin/news" },
     { section: "Website & Content", title: "Feedback", icon: FileText, path: "/superadmin/feedback" },
     { section: "Website & Content", title: "Policies", icon: FileText, path: "/superadmin/policies" },

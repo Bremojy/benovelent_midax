@@ -14,7 +14,7 @@ const FALLBACK_SLIDES = [
   {
     _id: "official-content-pending",
     imageUrl: "/hero.jpg",
-    title: "Benovelent Midax Fund Scheme",
+    title: "Benevolent Midax Fund Scheme",
     description: "Official carousel updates will appear here when published by the scheme team. Read the Constitution for the current rules and benefits.",
     buttonText: "Read the Constitution",
     buttonLink: "/constitution",
@@ -100,7 +100,7 @@ function Hero() {
   return (
     <section
       className="hero modern-hero"
-      aria-label="Benovelent Midax welcome carousel"
+      aria-label="Benevolent Midax welcome carousel"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
       onTouchStart={handleTouchStart}
@@ -128,7 +128,7 @@ function Hero() {
         <div className="modern-hero-copy" key={current?._id || currentSlide}>
           <div className="hero-welcome-pill">
             <HeartHandshake size={16} />
-            <span>WELCOME TO Benovelent MIDAX</span>
+            <span>WELCOME TO Benevolent MIDAX</span>
           </div>
 
           <p className="hero-label">COMMUNITY · COMPASSION · SUPPORT</p>

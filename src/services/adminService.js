@@ -129,7 +129,7 @@ export const getAdminMember = async (
 ) => {
   if (!memberId) {
     throw new Error(
-      "Benovelent MIDAX Number is required."
+      "Benevolent MIDAX Number is required."
     );
   }
 
@@ -180,7 +180,7 @@ export const updateAdminMember = async (
 ) => {
   if (!memberId) {
     throw new Error(
-      "Benovelent MIDAX Number is required."
+      "Benevolent MIDAX Number is required."
     );
   }
 
@@ -208,7 +208,7 @@ export const deleteAdminMember = async (
 ) => {
   if (!memberId) {
     throw new Error(
-      "Benovelent MIDAX Number is required."
+      "Benevolent MIDAX Number is required."
     );
   }
 
@@ -229,7 +229,7 @@ export const suspendAdminMember = async (
 ) => {
   if (!memberId) {
     throw new Error(
-      "Benovelent MIDAX Number is required."
+      "Benevolent MIDAX Number is required."
     );
   }
 
@@ -250,7 +250,7 @@ export const activateAdminMember = async (
 ) => {
   if (!memberId) {
     throw new Error(
-      "Benovelent MIDAX Number is required."
+      "Benevolent MIDAX Number is required."
     );
   }
 
@@ -271,7 +271,7 @@ export const restoreAdminMember = async (
 ) => {
   if (!memberId) {
     throw new Error(
-      "Benovelent MIDAX Number is required."
+      "Benevolent MIDAX Number is required."
     );
   }
 
@@ -291,7 +291,7 @@ export const resetAdminMemberPassword =
   async (memberId) => {
     if (!memberId) {
       throw new Error(
-        "Benovelent MIDAX Number is required."
+        "Benevolent MIDAX Number is required."
       );
     }
 

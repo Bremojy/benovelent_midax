@@ -255,7 +255,7 @@ export default function CallOverlay({
       throw new Error("Your browser does not support camera and microphone calls.");
     }
     if (typeof window !== "undefined" && !window.isSecureContext && !["localhost", "127.0.0.1"].includes(window.location.hostname)) {
-      throw new Error("Secure calling requires HTTPS. Open the Benovelent site over HTTPS and allow microphone/camera access.");
+      throw new Error("Secure calling requires HTTPS. Open the Benevolent site over HTTPS and allow microphone/camera access.");
     }
     try {
       return await navigator.mediaDevices.getUserMedia({

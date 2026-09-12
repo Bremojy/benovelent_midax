@@ -45,8 +45,8 @@ exports.createTransaction = async (req, res) => {
             return res.status(400).json({ success: false, message: "Select whether the contribution is from a member, admin/leader, or all members and admins." });
         }
         if (scope === "member") {
-            if (!memberId) return res.status(400).json({ success: false, message: "Benovelent MIDAX Number is required for a member contribution." });
-            if (!await Member.exists({ _id: memberId })) return res.status(404).json({ success: false, message: "Benovelent MIDAX Number not found." });
+            if (!memberId) return res.status(400).json({ success: false, message: "Benevolent MIDAX Number is required for a member contribution." });
+            if (!await Member.exists({ _id: memberId })) return res.status(404).json({ success: false, message: "Benevolent MIDAX Number not found." });
         } else if (scope === "admin") {
             memberId = null;
             const requesterRole = String(req.user?.role || "").toLowerCase();
@@ -60,10 +60,10 @@ exports.createTransaction = async (req, res) => {
         } else if (scope === "all") {
             memberId = null;
         } else if (memberId && !await Member.exists({ _id: memberId })) {
-            return res.status(404).json({ success: false, message: "Benovelent MIDAX Number not found." });
+            return res.status(404).json({ success: false, message: "Benevolent MIDAX Number not found." });
         }
         if (memberRequiredFor.has(type) && !memberId && type !== "contribution") {
-            return res.status(400).json({ success: false, message: "Benovelent MIDAX Number is required for this transaction type." });
+            return res.status(400).json({ success: false, message: "Benevolent MIDAX Number is required for this transaction type." });
         }
         let contributor = null;
         let contributorModel = null;
@@ -286,10 +286,10 @@ exports.updateTransaction = async (req, res) => {
             const employeeNumber = String(req.body.employeeNumber || "").trim();
             if (employeeNumber) {
                 const member = await Member.findOne({ memberNumber: employeeNumber }).select("_id").lean();
-                if (!member) return res.status(404).json({ success: false, message: "Benovelent MIDAX Number not found." });
+                if (!member) return res.status(404).json({ success: false, message: "Benevolent MIDAX Number not found." });
                 transaction.member = member._id;
             } else if (["contribution", "claim", "refund"].includes(transaction.type)) {
-                return res.status(400).json({ success: false, message: "Benovelent MIDAX Number is required for this transaction type." });
+                return res.status(400).json({ success: false, message: "Benevolent MIDAX Number is required for this transaction type." });
             } else {
                 transaction.member = null;
             }

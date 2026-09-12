@@ -50,7 +50,7 @@ function Leaders() {
         <Users size={60} className="leaders-icon" />
         <span className="leaders-eyebrow"><Sparkles size={14} /> FAMILY PLATFORM LEADERS</span>
         <h1>Meet Our Leadership</h1>
-        <p>Dedicated leaders committed to transparency, integrity and serving every member of Benovelent Midax.</p>
+        <p>Dedicated leaders committed to transparency, integrity and serving every member of Benevolent Midax.</p>
       </div>
 
       <div className="leaders-search">

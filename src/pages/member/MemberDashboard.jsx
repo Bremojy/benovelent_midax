@@ -110,7 +110,7 @@ export default function MemberDashboard() {
             <div className="member-identity-chip"><div className="member-avatar"><UserRound size={21} /></div><span>MEMBER PORTAL</span></div>
             <span className="portal-kicker"><Sparkles size={14} /> COMMUNITY · COMPASSION · SUPPORT</span>
             <h1>Welcome home, {firstName}.</h1>
-            <p>Your Benovelent MIDAX space for contributions, support, family information and community communication.</p>
+            <p>Your Benevolent MIDAX space for contributions, support, family information and community communication.</p>
             <div className="portal-hero-actions">
               <Link className="portal-primary-btn member-primary" to="/member/accounts"><WalletCards size={17} /> Open my accounts</Link>
               <Link className="portal-secondary-btn" to="/member/messages"><MessageCircle size={17} /> Messages</Link>

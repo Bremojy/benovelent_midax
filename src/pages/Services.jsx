@@ -23,7 +23,7 @@ export default function Services() {
             <span className="modern-kicker"><BookOpen size={14} /> SERVICES & CONSTITUTION</span>
             <h1>Support that feels modern, warm and family-centred.</h1>
             <p>
-              The Benovelent Constitution guides funeral and medical support, governance, accountability and member communication.
+              The Benevolent Constitution guides funeral and medical support, governance, accountability and member communication.
             </p>
             <div className="modern-hero-actions">
               <Link to="/constitution" className="modern-btn">View our Constitution <ArrowRight size={17} /></Link>

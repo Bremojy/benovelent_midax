@@ -37,7 +37,7 @@ function ContributionCard({
 
                     <p>
 
-                        Scheme-wide Benovelent MIDAX payroll contribution view
+                        Scheme-wide Benevolent MIDAX payroll contribution view
 
                     </p>
 

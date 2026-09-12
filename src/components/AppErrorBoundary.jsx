@@ -15,7 +15,7 @@ export default class AppErrorBoundary extends Component {
   }
 
   componentDidCatch(error, info) {
-    console.error("Benovelent UI error:", error, info);
+    console.error("Benevolent UI error:", error, info);
   }
 
   reset = () => {

@@ -22,7 +22,8 @@
 - **Overview:** Dashboard
 - **Benevolent Leadership & Members:** Members
 - **Benevolent Finance, Contributions & M-PESA:** Accounts, Claims, Support
-- **Communication & Community:** Chat, Notifications, Announcements
+- **Communication & Content:** Chat, Notifications, Announcements, Website & Communications
+- **Reports & Oversight:** Reports
 - **Engagement:** Polls, Feedback
 - **Settings:** Profile & Settings
 
@@ -30,7 +31,8 @@
 - **Overview:** Dashboard
 - **User Management:** Administrators / Leaders, Members
 - **Finance & Support:** Accounts, Claims, Support
-- **Website & Content:** News, Feedback, Policies
+- **Communication & Community:** Messages
+- **Website & Content:** Leaders, News, Feedback, Policies
 - **Engagement & Oversight:** Polls, Audit, Data Integrity, System, Constitution
 - **Settings:** Profile & Settings
 
@@ -38,7 +40,7 @@
 
 - **M-PESA:** Member M-PESA records remain visible in Accounts and the dedicated M-PESA Records page; community assistance contributions continue to use the existing M-PESA payment component and backend contracts. Admins retain the operational M-PESA verification and community-support finance controls in Accounts. The existing backend contract intentionally does **not** expose a personal Admin M-PESA contribution button; this prevents mixing leader finance controls with member self-payment until a dedicated leader-payment workflow is designed and tested.
 - **Contributions:** Ordinary Benevolent contributions remain represented by the existing payroll/finance ledger model. Admin/leader contributions are represented in the existing Admin Accounts ledger and are not treated as a separate organisation outside Benevolent.
-- **Chat:** Member and Admin chat remain connected to the existing conversation/message/Socket.IO layer. The existing self-chat protection stays intact. SuperAdmin remains outside the member/admin chat directory because the current system explicitly routes that legacy SuperAdmin messages URL back to the SuperAdmin portal.
+- **Chat:** Member and Admin chat remain connected to the existing conversation/message/Socket.IO layer. The existing self-chat protection stays intact. SuperAdmin now has a protected message centre route using the shared messaging component; it remains distinct from the ordinary member/admin recipient directory.
 - **Notifications & announcements:** Existing notification and announcement pages are surfaced in the navigation without changing their APIs.
 - **Profile/settings:** Admin and SuperAdmin profile editing remains inside their existing settings routes; no new duplicate profile backend is introduced.
 
@@ -89,6 +91,13 @@
 | Superadmin | `/superadmin/polls` | `Polls.jsx` | api | `/polls`<br>`/polls/${pollId}`<br>`/polls/${pollId}/results`<br>`/votes/${pollId}` | `POST /api/polls/` → `createPoll`<br>`GET /api/polls/` → `getPolls`<br>`GET /api/polls/:id` → `getPoll`<br>`PUT /api/polls/:id` → `updatePoll`<br>`DELETE /api/polls/:id` → `deletePoll`<br>`GET /api/polls/:id/results` → `getPollResults`<br>`POST /api/votes/:pollId` → `castVote`<br>`PUT /api/votes/:id` → `updateVote`<br>`DELETE /api/votes/:id` → `deleteVote` | pollController, voteController | Member, News, Notification, Poll, Vote |
 | Superadmin | `/superadmin/feedback` | `Feedback.jsx` | getFeedbackCollections, createFeedbackCollection, createBuiltInFeedback, deleteFeedbackCollection, submitFeedback, getFeedbackResponses, exportFeedbackResponses, importFeedbackResponses, publishFeedbackToNews | `/feedback`<br>`/feedback/${id}`<br>`/feedback/${id}/export`<br>`/feedback/${id}/import`<br>`/feedback/${id}/publish-news`<br>`/feedback/${id}/responses`<br>`/feedback/built-in` | `GET /api/feedback/` → `controller.list`<br>`POST /api/feedback/` → `controller.create`<br>`PUT /api/feedback/:id` → `controller.update`<br>`DELETE /api/feedback/:id` → `controller.remove`<br>`GET /api/feedback/:id/export` → `controller.exportResponses`<br>`POST /api/feedback/:id/import` → `controller.importResponses`<br>`POST /api/feedback/:id/publish-news` → `controller.publishToNews`<br>`POST /api/feedback/:id/responses` → `controller.submit`<br>`GET /api/feedback/:id/responses` → `controller.responses`<br>`POST /api/feedback/built-in` → `controller.ensureBuiltIn` | feedbackController | FeedbackCollection, Member, News |
 
+## Repaired previously orphaned routes
+
+| Admin | `/admin/website` | `admin/AdminWebsite.jsx` | React Router navigation index | `/news`, `/admin/feedback`, `/admin/settings` as linked destinations | Existing application pages | Existing page components | News, Feedback, Portal Settings |
+| Admin | `/admin/reports` | `admin/AdminReports.jsx` | getAdminDashboard, getContributionSummary | `/admin/dashboard`<br>`/admin/members/contribution-summary`<br>`/admin/members/recent` | Existing Admin dashboard/contribution routes | adminController, contributionController | Member, Contribution, Support/Claims, Finance |
+| Superadmin | `/superadmin/messages` | `superadmin/SuperAdminMessages.jsx` | API | `/member/chat-members`<br>`/conversations` | `GET /api/member/chat-members` → chat-member listing<br>`GET /api/conversations` → conversation listing | member/conversation controllers | Member, Conversation, Message |
+| Superadmin | `/superadmin/leaders` | `superadmin/SuperAdminSettings.jsx` (Leaders tab) | API | `/leaders`<br>`/leaders/:id`<br>`/leaders/upload` and related settings/website endpoints | Existing leaders and website routes | leaderController, websiteController | Leader, WebsiteContent |
+
 ## Protected legacy redirects
 
 | Route | Destination | Preservation reason |
@@ -101,21 +110,19 @@
 | `/admin/platform` | `/admin` | Retired platform destination compatibility |
 | `/member/platform` | `/member` | Retired platform destination compatibility |
 | `/superadmin/platform` | `/superadmin` | Retired platform destination compatibility |
-| `/superadmin/messages` | `/superadmin` | No separate SuperAdmin chat route |
 | `/superadmin/password` | `/superadmin/settings` | Settings URL compatibility |
 
-## Second deep revision checklist
+## September 2026 forensic remediation checklist
 
-- [x] All grouped navigation entries retain their original destination paths.
-- [x] All grouped navigation destinations still exist in `App.jsx`.
-- [x] Frontend API literals still map to backend routes/app-level endpoints.
-- [x] Existing desktop sidebar, mobile bottom navigation and drawer contracts pass.
-- [x] Authentication/security contracts pass.
-- [x] Chat/call/realtime contracts pass where their dependency-free tests are available.
-- [x] Legacy redirects remain present.
-- [x] Navigation grouping is additive and does not rename/delete a business function.
-- [x] Static integrity and source-quality checks pass after the final patch.
+- [x] Broken/orphaned Admin Website page is now reachable at `/admin/website`.
+- [x] Broken/orphaned Admin Reports page is now reachable at `/admin/reports`.
+- [x] SuperAdmin Messages now opens its actual message centre instead of redirecting to the dashboard.
+- [x] The existing SuperAdmin Settings page can open directly on its Leaders section through `/superadmin/leaders`.
+- [x] Navigation entries were added for those repaired destinations and all menu routes map to `App.jsx`.
+- [x] Product branding typo `Benovelent` was removed from source UI/backend messages in favour of `Benevolent MIDAX`.
+- [x] Dependency-free contract/regression suite passes after the remediation.
+- [ ] Full Vite production build and dependency-backed runtime validation remain environment-blocked because npm registry DNS is unavailable in this execution environment.
 
 ## Test note
 
-The archive does not include installed `node_modules`, so a fresh Vite production build and live MongoDB/Render/Vercel exercise are not executed from the ZIP. Dependency-free source/contract tests were run locally. One pre-existing account-separation contract and one pre-existing chat-security regression test fail against the original ZIP as well; those were not altered in this UI-only revision. Vercel asset verification also correctly requires a generated `dist/` directory, which is not present in the source ZIP.
+The repository contains package lockfiles and does not include installed dependencies. Offline lockfile validation passed, but `npm ci` could not complete because `registry.npmjs.org` was not resolvable from this environment (`EAI_AGAIN`). The initial build therefore could not start Vite because the dependency tree was incomplete. No production M-PESA transaction, MongoDB/Render/Vercel authenticated browser session, WebRTC media session, or background mobile-notification session was fabricated or marked as verified.

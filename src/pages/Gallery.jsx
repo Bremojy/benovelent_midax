@@ -53,7 +53,7 @@ function Gallery() {
           <h1>Our Journey Together</h1>
 
           <p>
-            Moments of unity, compassion, leadership and support shared through Benovelent Midax.
+            Moments of unity, compassion, leadership and support shared through Benevolent Midax.
           </p>
         </div>
       </section>
@@ -67,7 +67,7 @@ function Gallery() {
               <div className="gallery-card" key={index}>
                 <img
                   src={img.startsWith("/uploads/") || img.startsWith("http") ? resolveApiUrl(img) : img}
-                  alt="Benovelent Midax community moment"
+                  alt="Benevolent Midax community moment"
                   onError={(e) => {
                     e.currentTarget.src = "/gallery-placeholder.svg";
                   }}

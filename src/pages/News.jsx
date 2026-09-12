@@ -107,7 +107,7 @@ function News() {
       <section className={`news-video-hero ${videoFailed ? "video-failed" : ""}`}>
         {!videoFailed && <video className="news-video" autoPlay={!shouldSkipBackgroundVideo} muted loop playsInline preload={shouldSkipBackgroundVideo ? "none" : "metadata"} poster="/hero.jpg" onError={() => setVideoFailed(true)} aria-hidden="true">{newsVideoSources.map((src) => <source key={src} src={src} type="video/mp4" />)}</video>}
         <div className="news-video-overlay" />
-        <div className="news-header"><Newspaper size={55} className="news-icon" /><span className="news-kicker">Benovelent MIDAX • COMMUNITY CENTRE</span><h1>News, events & resources in one place.</h1><p>Stay informed about community updates, upcoming activities and the documents that help members understand the scheme.</p></div>
+        <div className="news-header"><Newspaper size={55} className="news-icon" /><span className="news-kicker">Benevolent MIDAX • COMMUNITY CENTRE</span><h1>News, events & resources in one place.</h1><p>Stay informed about community updates, upcoming activities and the documents that help members understand the scheme.</p></div>
       </section>
 
       <div className="news-content-wrap">

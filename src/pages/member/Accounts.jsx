@@ -9,7 +9,7 @@ import "../../styles/portalModule.css";
 import "./Accounts.css";
 
 const money = (v) => new Intl.NumberFormat("en-KE", { style: "currency", currency: "KES", maximumFractionDigits: 0 }).format(Number(v || 0));
-const TABS = [["mpesa", "M-PESA Accounts", Smartphone], ["constitution", "Benovelent Constitution", Landmark], ["community", "Community M-PESA Support", HandHeart]];
+const TABS = [["mpesa", "M-PESA Accounts", Smartphone], ["constitution", "Benevolent Constitution", Landmark], ["community", "Community M-PESA Support", HandHeart]];
 
 export default function MemberAccounts() {
   const [tab, setTab] = useState("mpesa");
@@ -49,7 +49,7 @@ export default function MemberAccounts() {
   const successful = payments.filter((p) => p.status === "successful").reduce((n, p) => n + Number(p.amount || 0), 0);
   const pending = payments.filter((p) => ["pending", "initiated", "processing", "unknown"].includes(p.status)).reduce((n, p) => n + Number(p.amount || 0), 0);
   return <DashboardLayout><main className="portal-page account-page">
-    <header className="portal-module-header account-hero"><div><span>PERSONAL FINANCIAL CENTRE</span><h1>Accounts</h1><p>M-PESA payments, the Benovelent Constitution ledger, and community support — kept separate by purpose.</p></div><div className="portal-actions"><button className="portal-btn secondary" onClick={loadBase} disabled={busy}><RefreshCw size={16}/> Refresh</button></div></header>
+    <header className="portal-module-header account-hero"><div><span>PERSONAL FINANCIAL CENTRE</span><h1>Accounts</h1><p>M-PESA payments, the Benevolent Constitution ledger, and community support — kept separate by purpose.</p></div><div className="portal-actions"><button className="portal-btn secondary" onClick={loadBase} disabled={busy}><RefreshCw size={16}/> Refresh</button></div></header>
     {message && <div className="portal-alert success">{message}</div>}{error && <div className="portal-alert error">{error}</div>}
     <nav className="account-tabs" aria-label="Account sections">{TABS.map(([id,label,Icon]) => <button key={id} className={tab===id?"active":""} onClick={() => {setTab(id);setMessage("");setError("");}}><Icon size={17}/>{label}</button>)}</nav>
 

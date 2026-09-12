@@ -184,7 +184,7 @@ exports.submit = async (req, res) => {
 exports.ensureBuiltIn = async (req, res) => {
   const title = "Benevolent Website Experience Check-in";
   const existing = await FeedbackCollection.findOne({
-    $or: [{ title }, { title: "Benovelent Website Experience Check-in" }],
+    $or: [{ title }, { title: "Benevolent Website Experience Check-in" }],
   });
   if (existing && existing.title !== title) {
     existing.title = title;

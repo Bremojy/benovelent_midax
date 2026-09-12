@@ -18,9 +18,9 @@ const expectedFiles = [
   "src/pages/Constitution.jsx","src/pages/Gallery.jsx","src/pages/News.jsx","src/pages/Contact.jsx","src/pages/Login.jsx",
   "src/pages/member/MemberDashboard.jsx","src/pages/member/Profile.jsx","src/pages/member/Contributions.jsx",
   "src/pages/member/Claims.jsx","src/pages/member/Support.jsx","src/pages/member/Dependents.jsx","src/pages/member/Settings.jsx",
-  "src/pages/admin/AdminDashboard.jsx","src/pages/admin/AdminMembers.jsx","src/pages/admin/AdminFinance.jsx",
+  "src/pages/admin/AdminDashboard.jsx","src/pages/admin/AdminMembers.jsx","src/pages/admin/AdminFinance.jsx","src/pages/admin/AdminWebsite.jsx","src/pages/admin/AdminReports.jsx",
   "src/pages/admin/AdminClaims.jsx","src/pages/admin/AdminSupport.jsx","src/pages/admin/AdminMessages.jsx",
-  "src/pages/superadmin/SuperAdminDashboard.jsx","src/pages/superadmin/SuperAdminAdmins.jsx","src/pages/superadmin/SuperAdminAudit.jsx",
+  "src/pages/superadmin/SuperAdminDashboard.jsx","src/pages/superadmin/SuperAdminAdmins.jsx","src/pages/superadmin/SuperAdminAudit.jsx","src/pages/superadmin/SuperAdminMessages.jsx",
   "src/pages/superadmin/SuperAdminPolicies.jsx","src/pages/superadmin/SuperAdminSettings.jsx","src/pages/superadmin/SuperAdminSystem.jsx",
   "src/pages/superadmin/SuperAdminDataIntegrity.jsx",
 ];

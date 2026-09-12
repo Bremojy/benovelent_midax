@@ -488,7 +488,7 @@ exports.createMember = async (req, res) => {
       `Hello ${member.fullName},`,
       "",
       "Your Benevolent Midax member account has been created.",
-      `Benovelent MIDAX Number: ${member.memberNumber}`,
+      `Benevolent MIDAX Number: ${member.memberNumber}`,
       `Member Email: ${member.email}`,
       `Username: ${member.username || member.email || member.phone}`,
       `Temporary Password: ${temporaryPassword}`,
@@ -502,7 +502,7 @@ exports.createMember = async (req, res) => {
         <p>Hello ${member.fullName},</p>
         <p>Your Benevolent Midax member account has been created.</p>
         <ul>
-          <li><strong>Benovelent MIDAX Number:</strong> ${member.memberNumber}</li>
+          <li><strong>Benevolent MIDAX Number:</strong> ${member.memberNumber}</li>
           <li><strong>Member Email:</strong> ${member.email}</li>
           <li><strong>Username:</strong> ${member.username || member.email || member.phone}</li>
           <li><strong>Temporary Password:</strong> ${temporaryPassword}</li>

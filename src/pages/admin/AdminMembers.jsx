@@ -531,7 +531,7 @@ function AdminMembers() { const { role }=useAuth(); const isSuperAdmin=role==="s
 
             <p>
               Create and manage
-              Benovelent Midax member
+              Benevolent Midax member
               accounts.
             </p>
           </div>
@@ -1371,7 +1371,7 @@ function MemberFormModal({
 
             {editing ? (
               <FormField
-                label="Benovelent MIDAX Number"
+                label="Benevolent MIDAX Number"
                 name="memberNumber"
                 value={form.memberNumber}
                 onChange={handleChange}
@@ -1379,8 +1379,8 @@ function MemberFormModal({
                 title="This Benevolent MIDAX Number is permanent and cannot be changed."
               />
             ) : (
-              <div className="admin-form-field" aria-label="Benovelent MIDAX Number">
-                <label>Benovelent MIDAX Number</label>
+              <div className="admin-form-field" aria-label="Benevolent MIDAX Number">
+                <label>Benevolent MIDAX Number</label>
                 <div className="admin-readonly-field">Generated automatically after member creation (e.g. BM001)</div>
               </div>
             )}
@@ -1625,7 +1625,7 @@ function MemberDetailsModal({
         <div className="admin-member-modal-body admin-member-modal-body-grid">
 
           <MemberDetail label="Full Name" value={member.fullName} />
-          <MemberDetail label="Benovelent MIDAX Number" value={member.memberNumber} />
+          <MemberDetail label="Benevolent MIDAX Number" value={member.memberNumber} />
           <MemberDetail label="Username" value={member.username} />
           <MemberDetail label="Email" value={member.email} />
           <MemberDetail label="Phone" value={member.phone} />
@@ -1724,7 +1724,7 @@ function CredentialsModal({
 }) {
   const handleCopy = async () => {
     const text = `
-Benovelent Midax Member Account
+Benevolent Midax Member Account
 
 Name: ${result.fullName || "—"}
 Member Number: ${

@@ -813,7 +813,7 @@ function SuperAdminAdmins() {
 
             <p>
               Create and manage administrators
-              who have access to the Benovelent
+              who have access to the Benevolent
               Midax administration portal.
             </p>
 

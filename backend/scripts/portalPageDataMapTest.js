@@ -10,8 +10,8 @@ const menuEntries = [...menuSource.matchAll(/section:\s*"([^"]+)",\s*title:\s*"(
 
 const expectedRoutes = [
   "/member","/member/profile","/member/dependents","/member/benefits","/member/accounts","/member/mpesa-records","/member/support","/member/claims","/member/messages","/member/announcements","/member/notifications","/member/polls","/member/feedback","/member/settings",
-  "/admin","/admin/members","/admin/accounts","/admin/claims","/admin/support","/admin/messages","/admin/notifications","/admin/announcements","/admin/polls","/admin/feedback","/admin/settings",
-  "/superadmin","/superadmin/admins","/superadmin/members","/superadmin/accounts","/superadmin/claims","/superadmin/support","/superadmin/news","/superadmin/feedback","/superadmin/policies","/superadmin/polls","/superadmin/audit","/superadmin/data-integrity","/superadmin/system","/superadmin/constitution","/superadmin/settings"
+  "/admin","/admin/members","/admin/accounts","/admin/claims","/admin/support","/admin/messages","/admin/notifications","/admin/announcements","/admin/polls","/admin/feedback","/admin/settings","/admin/website","/admin/reports",
+  "/superadmin","/superadmin/admins","/superadmin/members","/superadmin/accounts","/superadmin/claims","/superadmin/support","/superadmin/messages","/superadmin/news","/superadmin/leaders","/superadmin/feedback","/superadmin/policies","/superadmin/polls","/superadmin/audit","/superadmin/data-integrity","/superadmin/system","/superadmin/constitution","/superadmin/settings"
 ];
 
 const appRoutes = new Set([...appSource.matchAll(/path="([^"]+)"/g)].map(([, route]) => route));

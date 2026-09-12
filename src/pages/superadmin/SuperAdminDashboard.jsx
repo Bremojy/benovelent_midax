@@ -70,7 +70,7 @@ export default function SuperAdminDashboard() {
         <section className="portal-hero superadmin-hero">
           <div className="portal-hero-copy">
             <span className="portal-kicker"><Sparkles size={14} /> GOVERNANCE · INTELLIGENCE · CONTROL</span>
-            <h1>The Benovelent MIDAX control room.</h1>
+            <h1>The Benevolent MIDAX control room.</h1>
             <p>See the whole platform at a glance, protect the data, and move quickly when something needs your attention.</p>
             <div className="portal-hero-actions">
               <a className="portal-primary-btn super-primary" href="/superadmin/data-integrity"><DatabaseZap size={17} /> Data integrity</a>
@@ -120,12 +120,12 @@ export default function SuperAdminDashboard() {
           </article>
 
           <article className="portal-panel modern-panel">
-            <div className="panel-heading"><div><span className="panel-kicker">APP INSTALLATION</span><h2>Benovelent MIDAX app status.</h2><p>Keep the installation experience visible and healthy.</p></div><button className="panel-link button-link" onClick={() => window.dispatchEvent(new Event("benovelent:open-install"))}>Install / Help <ArrowUpRight size={16} /></button></div>
+            <div className="panel-heading"><div><span className="panel-kicker">APP INSTALLATION</span><h2>Benevolent MIDAX app status.</h2><p>Keep the installation experience visible and healthy.</p></div><button className="panel-link button-link" onClick={() => window.dispatchEvent(new Event("benovelent:open-install"))}>Install / Help <ArrowUpRight size={16} /></button></div>
             <div className="pwa-status-modern">
               <div><span>Display mode</span><strong>{window.matchMedia?.("(display-mode: standalone)")?.matches ? "Installed" : "Browser"}</strong></div>
               <div><span>Service worker</span><strong>{"serviceWorker" in navigator ? "Supported" : "Unavailable"}</strong></div>
               <div><span>Manifest</span><strong>Configured</strong></div>
-              <div><span>App name</span><strong>Benovelent MIDAX</strong></div>
+              <div><span>App name</span><strong>Benevolent MIDAX</strong></div>
             </div>
           </article>
         </section>
