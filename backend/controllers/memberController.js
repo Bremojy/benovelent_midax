@@ -17,6 +17,8 @@ const EducationSupport = require("../models/EducationSupport");
 const Policy = require("../models/Policy");
 const { resolveStoredFileUrl } = require("../utils/uploadUrl");
 const { ensureChatProfile } = require("../utils/chatProfile");
+const { getCurrentBookBalance } = require("../services/financeLedgerService");
+const { getUsers: getLiveUsers } = require("../sockets/onlineUsers");
 
 const calculateProfileCompletion =
 require("../utils/calculateProfileCompletion");
@@ -52,7 +54,12 @@ function coerceProfileObject(value, fallback = {}) {
 exports.getDashboard = async (req, res) => {
     const cacheKey = `member:${req.user._id}:dashboard`;
     const cached = await redisCache.getJson(cacheKey);
-    if (cached !== null) return res.json(cached);
+    if (cached !== null) {
+        const live = getLiveUsers().some((user) => String(user.userId) === String(req.user._id));
+        if (cached?.dashboard?.statistics) cached.dashboard.statistics.online = live;
+        if (cached?.dashboard?.member) cached.dashboard.member.online = live;
+        return res.json(cached);
+    }
     const __originalJson = res.json.bind(res);
     res.json = (body) => { redisCache.setJson(cacheKey, body, 15).catch(() => {}); return __originalJson(body); };
 
@@ -205,7 +212,7 @@ exports.getDashboard = async (req, res) => {
 
             dashboard:{
 
-                member,
+                member: { ...member, online: getLiveUsers().some((user) => String(user.userId) === String(member._id)) },
 
                 profileCompletion:profile,
 
@@ -233,7 +240,7 @@ exports.getDashboard = async (req, res) => {
                         member.verified,
 
                     online:
-                        member.online
+                        getLiveUsers().some((user) => String(user.userId) === String(member._id))
 
                 },
 
@@ -845,7 +852,12 @@ exports.changePassword = async (req, res) => {
 exports.getSummary = async (req, res) => {
     const cacheKey = `member:${req.user._id}:summary`;
     const cached = await redisCache.getJson(cacheKey);
-    if (cached !== null) return res.json(cached);
+    if (cached !== null) {
+        const live = getLiveUsers().some((user) => String(user.userId) === String(req.user._id));
+        if (cached?.dashboard?.statistics) cached.dashboard.statistics.online = live;
+        if (cached?.dashboard?.member) cached.dashboard.member.online = live;
+        return res.json(cached);
+    }
     const __originalJson = res.json.bind(res);
     res.json = (body) => { redisCache.setJson(cacheKey, body, 30).catch(() => {}); return __originalJson(body); };
 
@@ -1031,7 +1043,12 @@ exports.getProfileStatus = async (req, res) => {
 exports.getSettings = async (req, res) => {
     const cacheKey = `member:${req.user._id}:settings`;
     const cached = await redisCache.getJson(cacheKey);
-    if (cached !== null) return res.json(cached);
+    if (cached !== null) {
+        const live = getLiveUsers().some((user) => String(user.userId) === String(req.user._id));
+        if (cached?.dashboard?.statistics) cached.dashboard.statistics.online = live;
+        if (cached?.dashboard?.member) cached.dashboard.member.online = live;
+        return res.json(cached);
+    }
     const __originalJson = res.json.bind(res);
     res.json = (body) => { redisCache.setJson(cacheKey, body, 30).catch(() => {}); return __originalJson(body); };
 
@@ -1446,7 +1463,7 @@ exports.getChatMembers = async (req, res) => {
             if (department && department !== "all") memberFilter.department = department;
             if (position && position !== "all") memberFilter.position = position;
             if (status && status !== "all") memberFilter.status = status;
-            if (online === "true" || online === "false") memberFilter.online = online === "true";
+
             if (verified === "true" || verified === "false") memberFilter.verified = verified === "true";
         }
         if (actorEmail || actorPhone) {
@@ -1470,7 +1487,7 @@ exports.getChatMembers = async (req, res) => {
             if (department && department !== "all") adminFilter.department = department;
             if (position && position !== "all") adminFilter.position = position;
             if (status && status !== "all") adminFilter.status = status;
-            if (online === "true" || online === "false") adminFilter.online = online === "true";
+
         }
 
         if (keyword) {
@@ -1502,6 +1519,8 @@ exports.getChatMembers = async (req, res) => {
                 ...(adminFilter.$and || []),
             ];
         }
+
+        const liveUserIds = new Set(getLiveUsers().map((user) => String(user.userId)));
 
         const [members, adminRecords, conversations] = await Promise.all([
             Member.find({ ...memberFilter, role: "member" })
@@ -1551,7 +1570,7 @@ exports.getChatMembers = async (req, res) => {
                 fullName: normalizeDisplayName(user, role === "admin" ? "Leader" : "Member"),
                 role,
                 roleLabel: role === "superadmin" ? "SuperAdmin" : role === "admin" ? "Leader" : "Member",
-                online: Boolean(user.online),
+                online: liveUserIds.has(contactId),
                 conversationId: conversationMap.get(contactId) || null,
             };
         };
@@ -1667,7 +1686,9 @@ exports.getChatMembers = async (req, res) => {
             }
         });
 
-        const responseMembers = Array.from(unique.values()).sort((a, b) => {
+        const presenceFiltered = Array.from(unique.values()).filter((contact) => online === "" || liveUserIds.has(String(contact._id)) === (online === "true"));
+
+        const responseMembers = presenceFiltered.sort((a, b) => {
                 const order = { superadmin: 0, admin: 1, member: 2 };
                 const aRank = order[String(a.role || "member").toLowerCase()] ?? 2;
                 const bRank = order[String(b.role || "member").toLowerCase()] ?? 2;
@@ -1712,7 +1733,12 @@ exports.getChatMembers = async (req, res) => {
 exports.getCommunityStats = async (req,res)=>{
     const cacheKey = `public:community:stats`;
     const cached = await redisCache.getJson(cacheKey);
-    if (cached !== null) return res.json(cached);
+    if (cached !== null) {
+        const live = getLiveUsers().some((user) => String(user.userId) === String(req.user._id));
+        if (cached?.dashboard?.statistics) cached.dashboard.statistics.online = live;
+        if (cached?.dashboard?.member) cached.dashboard.member.online = live;
+        return res.json(cached);
+    }
     const __originalJson = res.json.bind(res);
     res.json = (body) => { redisCache.setJson(cacheKey, body, 30).catch(() => {}); return __originalJson(body); };
-try{const MemberModel=require("../models/Member");const Admin=require("../models/Admin");const Finance=require("../models/Finance");const [totalMembers,activeMembers,suspendedMembers,totalLeaders,book,medicalClaims,funeralClaims,educationClaims]=await Promise.all([MemberModel.countDocuments({isDeleted:false}),MemberModel.countDocuments({status:"active",isDeleted:false}),MemberModel.countDocuments({status:"suspended",isDeleted:false}),Admin.countDocuments({status:{$ne:"deleted"}}),Finance.aggregate([{ $match:{status:{$in:["approved","completed"]}}},{ $group:{_id:null,total:{$sum:{$cond:[{$in:["$type",["contribution","income"]]},"$amount",{$multiply:["$amount",-1]}]}}}}]),require("../models/MedicalSupport").countDocuments({status:{$in:["Approved","Paid","Completed","Closed"]}}),require("../models/FuneralSupport").countDocuments({status:{$in:["Approved","Paid","Completed","Closed"]}}),require("../models/EducationSupport").countDocuments({status:{$in:["Approved","Paid","Completed","Closed"]}})]);res.json({success:true,stats:{totalMembers,activeMembers,suspendedMembers,totalLeaders,bookBalance:Number(book?.[0]?.total||0),approvedClaims:medicalClaims+funeralClaims+educationClaims}})}catch(e){res.status(500).json({success:false,message:e.message})}};
+try{const MemberModel=require("../models/Member");const Admin=require("../models/Admin");const [totalMembers,activeMembers,suspendedMembers,totalLeaders,book,medicalClaims,funeralClaims,educationClaims]=await Promise.all([MemberModel.countDocuments({isDeleted:false}),MemberModel.countDocuments({status:"active",isDeleted:false}),MemberModel.countDocuments({status:"suspended",isDeleted:false}),Admin.countDocuments({status:{$ne:"deleted"}}),getCurrentBookBalance(),require("../models/MedicalSupport").countDocuments({status:{$in:["Approved","Paid","Completed","Closed"]}}),require("../models/FuneralSupport").countDocuments({status:{$in:["Approved","Paid","Completed","Closed"]}}),require("../models/EducationSupport").countDocuments({status:{$in:["Approved","Paid","Completed","Closed"]}})]);res.json({success:true,stats:{totalMembers,activeMembers,suspendedMembers,totalLeaders,bookBalance:Number(book?.balance||0),approvedClaims:medicalClaims+funeralClaims+educationClaims}})}catch(e){res.status(500).json({success:false,message:e.message})}};

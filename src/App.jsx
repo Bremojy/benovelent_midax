@@ -183,6 +183,7 @@ const Benefits = lazy(
       "./pages/member/Benefits"
     )
 );
+const Contributions = lazy(() => import("./pages/member/Contributions"));
 const Dependents = lazy(() => import("./pages/member/Dependents"));
 const MpesaRecords = lazy(() => import("./pages/member/MpesaRecords"));
 
@@ -220,7 +221,6 @@ const SuperAdminConstitution = lazy(() => import("./pages/superadmin/SuperAdminC
 const SuperAdminNotifications = lazy(() => import("./pages/superadmin/SuperAdminNotifications"));
 const SuperAdminNews = lazy(() => import("./pages/superadmin/SuperAdminNews"));
 const SuperAdminPolicies = lazy(() => import("./pages/superadmin/SuperAdminPolicies"));
-const SuperAdminMessages = lazy(() => import("./pages/superadmin/SuperAdminMessages"));
 
 
 // =====================================================
@@ -529,6 +529,7 @@ function AppContent() {
           <Route path="/admin/settings" element={<ProtectedRoute allowedRoles={["admin"]}><PortalSettings /></ProtectedRoute>} />
           <Route path="/admin/website" element={<ProtectedRoute allowedRoles={["admin"]}><AdminWebsite /></ProtectedRoute>} />
           <Route path="/admin/reports" element={<ProtectedRoute allowedRoles={["admin"]}><AdminReports /></ProtectedRoute>} />
+          <Route path="/superadmin/reports" element={<ProtectedRoute allowedRoles={["superadmin"]}><AdminReports /></ProtectedRoute>} />
           <Route path="/admin/polls" element={<ProtectedRoute allowedRoles={["admin"]}><Polls mode="admin" /></ProtectedRoute>} />
           <Route path="/admin/feedback" element={<ProtectedRoute allowedRoles={["admin"]}><Feedback /></ProtectedRoute>} />
 
@@ -567,7 +568,7 @@ function AppContent() {
 
           <Route path="/member/accounts" element={<ProtectedRoute allowedRoles={["member"]}><MemberAccounts /></ProtectedRoute>} />
 
-          <Route path="/member/contributions" element={<ProtectedRoute allowedRoles={["member"]}><Navigate to="/member/accounts" replace /></ProtectedRoute>} />
+          <Route path="/member/contributions" element={<ProtectedRoute allowedRoles={["member"]}><Contributions /></ProtectedRoute>} />
 
           <Route
             path="/member/claims"
@@ -702,8 +703,7 @@ function AppContent() {
           />
 
           <Route path="/superadmin/platform" element={<ProtectedRoute allowedRoles={["superadmin"]}><Navigate to="/superadmin" replace /></ProtectedRoute>} />
-          <Route path="/superadmin/messages" element={<ProtectedRoute allowedRoles={["superadmin"]}><SuperAdminMessages /></ProtectedRoute>} />
-          <Route path="/superadmin/members" element={<ProtectedRoute allowedRoles={["superadmin"]}><AdminMembers /></ProtectedRoute>} />
+                    <Route path="/superadmin/members" element={<ProtectedRoute allowedRoles={["superadmin"]}><AdminMembers /></ProtectedRoute>} />
           <Route path="/superadmin/accounts" element={<ProtectedRoute allowedRoles={["superadmin"]}><SuperAdminAccounts /></ProtectedRoute>} />
           <Route path="/superadmin/finance" element={<Navigate to="/superadmin/accounts" replace />} />
           <Route path="/superadmin/audit" element={<ProtectedRoute allowedRoles={["superadmin"]}><SuperAdminAudit /></ProtectedRoute>} />

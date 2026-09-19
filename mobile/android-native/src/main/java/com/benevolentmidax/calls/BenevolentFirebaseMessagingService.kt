@@ -11,6 +11,7 @@ class BenevolentFirebaseMessagingService : FirebaseMessagingService() {
     override fun onMessageReceived(message: RemoteMessage) {
         val data = message.data
         if (data["type"] !in setOf("incoming_call", "audio_call", "video_call")) return
+        if (data["role"] == "superadmin") return
         IncomingCallNotification.show(this, CallData(
             callId = data["callId"] ?: System.currentTimeMillis().toString(),
             callerName = data["callerName"] ?: "Benevolent MIDAX",

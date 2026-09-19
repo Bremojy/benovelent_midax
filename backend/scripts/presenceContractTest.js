@@ -1,0 +1,17 @@
+'use strict';
+const { read, walk, assert, pass } = require('./testUtils');
+const { addUser, touchUser, getUsers, cleanupStale } = require('../sockets/onlineUsers');
+const context = read('src/context/SocketContext.jsx');
+const messageCenter = read('src/components/chat/MessageCenterPage.jsx');
+const srcFiles = walk(`${require('path').resolve(__dirname, '../..')}/src`, ['.js', '.jsx']);
+const source = srcFiles.map((f) => read(f.replace(`${require('path').resolve(__dirname, '../..')}/`, ''))).join('\n');
+assert((source.match(/presence-heartbeat/g) || []).length <= 3, 'presence heartbeat emission/listener should not be duplicated throughout frontend');
+assert(/presence-heartbeat/.test(context) && /user-online/.test(context), 'SocketContext must own presence initialization/heartbeat');
+assert(!/socket\.emit\(["']user-online/.test(messageCenter) && !/socket\.emit\(["']presence-heartbeat/.test(messageCenter), 'MessageCenter must not initialize duplicate presence');
+const socketId = `presence-test-${Date.now()}`;
+addUser('member-test', socketId, 'member', 'member-owner-test');
+let users = getUsers();
+assert(users.some((u) => u.userId === 'member-test' && u.portalOwnerId === 'member-owner-test' && u.online === true), 'active socket must be online and retain portal owner identity');
+assert(touchUser(socketId)?.online === true, 'heartbeat must refresh live presence');
+cleanupStale();
+pass('single-client presence initialization and live heartbeat semantics verified');

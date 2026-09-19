@@ -1,0 +1,23 @@
+'use strict';
+const { ROOT, read, exists, walk, assert, pass } = require('./testUtils');
+const app = read('src/App.jsx');
+assert(exists('src/pages/member/Contributions.jsx'), 'Member Contributions page missing');
+assert(/pages\/member\/Contributions/.test(app) && /\/member\/contributions/.test(app), 'Member Contributions route/import missing');
+assert(/\/superadmin\/reports/.test(app), 'SuperAdmin reports route missing');
+assert(!exists('src/pages/' + 'superadmin/' + 'SuperAdmin' + 'Messages.jsx'), 'SuperAdmin chat page must be removed');
+const sw = read('public/sw.js');
+const staleChatRoute = '/superadmin' + '/messages';
+assert(!sw.includes(staleChatRoute), 'service worker contains removed SuperAdmin chat link');
+const accounts = read('src/pages/member/Accounts.jsx');
+const tabs = accounts.match(/const TABS = (\[[\s\S]*?\]);/);
+assert(tabs, 'Member Accounts tab configuration is missing');
+const tabText = tabs[1];
+const sections = ['Benevolent Constitution','M-Pesa Accounts','Community M-Pesa Support'];
+let last = -1;
+for (const section of sections) { const i = tabText.indexOf(section); assert(i > last, `Accounts section order is wrong around ${section}`); last = i; }
+const finance = read('backend/services/financeLedgerService.js');
+assert(/calculateEntries\(openingRows, 0\)/.test(finance) && /openingBalance: opening/.test(finance), 'ledger opening balance must derive from historical transactions');
+assert(/getCurrentBookBalance/.test(finance), 'authoritative live book balance function missing');
+const adminReports = read('src/pages/admin/AdminReports.jsx');
+assert(/Save Draft/.test(adminReports) && /Publish to News/.test(adminReports) && /PREVIEW/.test(adminReports), 'minutes-to-news workspace must support preview/draft/publish');
+pass('repository integrity requirements verified');

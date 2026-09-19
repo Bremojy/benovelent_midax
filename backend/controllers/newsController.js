@@ -8,12 +8,13 @@ const invalidatePublicNewsCache = async () => {
     await redisCache.invalidatePrefix("public:news");
 };
 
-const notifyPublishedNews = async ({ news, actorId }) => {
+const notifyPublishedNews = async ({ news, actorId, actorModel = "Admin" }) => {
     const members = await Member.find({ status: "active", isDeleted: false }).select("_id");
     if (members.length > 0) {
         await Notification.insertMany(members.map((member) => ({
             recipient: member._id,
             sender: actorId,
+            senderModel: actorModel,
             title: "New Announcement",
             message: news.title,
             type: "news",
@@ -76,7 +77,10 @@ exports.createNews = async (req, res) => {
             published,
             publishDate,
             expiryDate,
-            poll
+            poll,
+            sourceModel,
+            sourceId,
+            status
         } = req.body;
 
         if (!title || !content) {
@@ -114,6 +118,10 @@ exports.createNews = async (req, res) => {
 
         }
 
+        const isPublished = published === true || published === "true";
+        const requestedStatus = String(status || "").trim().toLowerCase();
+        const publicationStatus = isPublished ? "published" : (requestedStatus === "archived" ? "archived" : "draft");
+
         const news = await News.create({
 
             title,
@@ -140,20 +148,25 @@ exports.createNews = async (req, res) => {
 
             allowComments,
 
-            published: published === true || published === "true",
+            published: isPublished,
+            status: publicationStatus,
 
-            publishDate: (published === true || published === "true") ? (publishDate || new Date()) : null,
+            publishDate: isPublished ? (publishDate || new Date()) : null,
 
             expiryDate,
 
             poll,
 
-            author: req.user._id
+            sourceModel: sourceModel || "",
+            sourceId: sourceId || "",
+
+            author: req.user._id,
+            authorModel: String(req.user?.role || "admin").toLowerCase() === "superadmin" ? "SuperAdmin" : "Admin"
 
         });
 
         if (news.published !== false && news.status === "published") {
-            await notifyPublishedNews({ news, actorId: req.user._id });
+            await notifyPublishedNews({ news, actorId: req.user._id, actorModel: String(req.user?.role || "admin").toLowerCase() === "superadmin" ? "SuperAdmin" : "Admin" });
         }
         await invalidatePublicNewsCache();
 
@@ -424,7 +437,7 @@ exports.updateNews = async (req, res) => {
         await news.save();
 
         if (!wasPublished && news.published && news.status === "published") {
-            await notifyPublishedNews({ news, actorId: req.user._id });
+            await notifyPublishedNews({ news, actorId: req.user._id, actorModel: String(req.user?.role || "admin").toLowerCase() === "superadmin" ? "SuperAdmin" : "Admin" });
         }
         await invalidatePublicNewsCache();
         await news.populate("author", "fullName profileImage");
@@ -533,7 +546,7 @@ exports.publishNews = async (req, res) => {
         news.publishDate = new Date();
 
         await news.save();
-        await notifyPublishedNews({ news, actorId: req.user._id });
+        await notifyPublishedNews({ news, actorId: req.user._id, actorModel: String(req.user?.role || "admin").toLowerCase() === "superadmin" ? "SuperAdmin" : "Admin" });
         await invalidatePublicNewsCache();
 
         await news.populate("author", "fullName profileImage");

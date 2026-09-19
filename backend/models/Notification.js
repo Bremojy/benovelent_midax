@@ -70,6 +70,13 @@ senderModel: {
         default:""
     },
 
+    eventId:{
+        type:String,
+        default:"",
+        trim:true,
+        maxlength:220
+    },
+
     icon:{
         type:String,
         default:"notifications"
@@ -109,6 +116,7 @@ notificationSchema.index({recipient:1,read:1});
 notificationSchema.index({createdAt:-1});
 notificationSchema.index({recipient:1,createdAt:-1});
 notificationSchema.index({recipient:1,read:1,createdAt:-1});
+notificationSchema.index({eventId:1},{unique:true,sparse:true});
 
 const fanoutCreatedNotification = async (notification) => {
   if (!notification?.recipient) return;
@@ -160,49 +168,61 @@ const NotificationModel = mongoose.models.Notification || mongoose.model("Notifi
 if (!NotificationModel.__midaxNotificationLifecycle) {
   const originalCreate = NotificationModel.create.bind(NotificationModel);
   const originalInsertMany = NotificationModel.insertMany.bind(NotificationModel);
-  const notificationFingerprint = (doc) => JSON.stringify({
-    recipient: doc?.recipient ? String(doc.recipient) : "",
-    recipientModel: doc?.recipientModel || "Member",
-    type: doc?.type || "system",
-    referenceModel: doc?.referenceModel || "",
-    referenceId: doc?.referenceId ? String(doc.referenceId) : "",
-    title: String(doc?.title || "").trim(),
-    message: String(doc?.message || "").trim(),
-  });
-  const fingerprintQueryFor = (doc) => ({
-    recipient: doc.recipient,
-    recipientModel: doc.recipientModel || "Member",
-    type: doc.type || "system",
-    referenceModel: doc.referenceModel || "",
-    referenceId: doc.referenceId || null,
-    title: doc.title,
-    message: doc.message,
-    createdAt: { $gte: new Date(Date.now() - 10_000) },
-  });
+  const { buildNotificationEventId: buildEventId } = require("../services/notificationIdentity");
+  NotificationModel.buildEventId = buildEventId;
+
   NotificationModel.create = async function createWithLifecycle(doc, ...rest) {
     if (Array.isArray(doc)) return NotificationModel.insertMany(doc, ...rest);
     if (!doc?.recipient || !doc?.title || !doc?.message) return originalCreate(doc, ...rest);
-    const existing = await NotificationModel.findOne(fingerprintQueryFor(doc)).sort({ createdAt: -1 });
-    if (existing) return existing;
-    const created = await originalCreate(doc, ...rest);
-    await fanoutCreatedNotification(created);
-    return created;
+    const next = { ...doc, eventId: buildEventId(doc) };
+    if (next.eventId) {
+      const existing = await NotificationModel.findOne({ eventId: next.eventId }).select("_").lean();
+      if (existing?._id) return NotificationModel.findById(existing._id);
+    }
+    try {
+      const created = await originalCreate(next, ...rest);
+      await fanoutCreatedNotification(created);
+      return created;
+    } catch (error) {
+      if (error?.code === 11000 && next.eventId) {
+        const existing = await NotificationModel.findOne({ eventId: next.eventId });
+        if (existing) return existing;
+      }
+      throw error;
+    }
   };
+
   NotificationModel.insertMany = async function insertManyWithLifecycle(docs, ...rest) {
     const source = Array.isArray(docs) ? docs : [];
     if (!source.length) return originalInsertMany(source, ...rest);
-    const seen = new Set(), fresh = [], threshold = new Date(Date.now() - 10_000);
+    const fresh = [];
+    const seen = new Set();
     for (const doc of source) {
-      const key = notificationFingerprint(doc);
+      if (!doc?.recipient || !doc?.title || !doc?.message) { fresh.push(doc); continue; }
+      const next = { ...doc, eventId: buildEventId(doc) };
+      const key = next.eventId || JSON.stringify(next);
       if (seen.has(key)) continue;
       seen.add(key);
-      if (!doc?.recipient || !doc?.title || !doc?.message) { fresh.push(doc); continue; }
-      const existing = await NotificationModel.findOne({ ...fingerprintQueryFor(doc), createdAt: { $gte: threshold } }).select("_id").lean();
-      if (!existing) fresh.push(doc);
+      if (next.eventId) {
+        const existing = await NotificationModel.findOne({ eventId: next.eventId }).select("_id").lean();
+        if (existing?._id) continue;
+      }
+      fresh.push(next);
     }
     if (!fresh.length) return [];
-    const inserted = await originalInsertMany(fresh, ...rest);
-    for (const notification of inserted || []) await fanoutCreatedNotification(notification);
+    const inserted = [];
+    for (const doc of fresh) {
+      try {
+        const result = await NotificationModel.create(doc);
+        if (result) inserted.push(result);
+      } catch (error) {
+        if (error?.code === 11000 && doc.eventId) {
+          const existing = await NotificationModel.findOne({ eventId: doc.eventId });
+          if (existing) continue;
+        }
+        throw error;
+      }
+    }
     return inserted;
   };
   NotificationModel.__midaxNotificationLifecycle = true;

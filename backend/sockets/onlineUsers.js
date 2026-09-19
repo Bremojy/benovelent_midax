@@ -3,7 +3,7 @@ const onlineUsers = new Map();
 
 exports.PRESENCE_TIMEOUT_MS = PRESENCE_TIMEOUT_MS;
 
-exports.addUser = (userId, socketId, role = "member") => {
+exports.addUser = (userId, socketId, role = "member", portalOwnerId = "") => {
   if (!userId || !socketId) return;
   const key = String(userId);
   const now = new Date();
@@ -13,8 +13,10 @@ exports.addUser = (userId, socketId, role = "member") => {
     connectedAt: now,
     lastSeen: now,
     lastHeartbeat: now,
+    portalOwnerId: portalOwnerId ? String(portalOwnerId) : String(userId),
   };
   existing.role = String(role || existing.role || "member").toLowerCase();
+  existing.portalOwnerId = String(portalOwnerId || existing.portalOwnerId || userId);
   existing.sockets.add(String(socketId));
   existing.connectedAt = existing.connectedAt || now;
   existing.lastSeen = now;
@@ -64,6 +66,7 @@ exports.getUsers = () => {
     .filter(([, value]) => (now - new Date(value?.lastHeartbeat || value?.lastSeen || 0).getTime()) <= PRESENCE_TIMEOUT_MS)
     .map(([userId, value]) => ({
       userId,
+      portalOwnerId: value.portalOwnerId || userId,
       role: value.role,
       socketId: value.sockets?.values?.().next?.().value || "",
       connectedAt: value.connectedAt,

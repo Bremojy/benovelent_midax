@@ -22,6 +22,7 @@ import {
 } from "../../services/adminService";
 
 import "./AdminMembers.css";
+import DependentManagementPanel from "../../components/admin/DependentManagementPanel";
 
 function AdminMembers() { const { role }=useAuth(); const isSuperAdmin=role==="superadmin";
   // ========================================
@@ -1546,9 +1547,6 @@ function MemberDetailsModal({
   const nationalFront = resolveUploadUrl(safeDocs?.nationalIdFront || "");
   const nationalBack = resolveUploadUrl(safeDocs?.nationalIdBack || "");
   const signature = resolveUploadUrl(safeDocs?.signature || "");
-  const [dependents, setDependents] = useState([]);
-  useEffect(() => { if (!member?._id) return; API.get(`/dependents/admin/member/${member._id}`).then(({data}) => setDependents(data?.dependents || [])).catch(() => setDependents([])); }, [member?._id]);
-
   const documentLinks = [
     { label: "Profile Photo", src: member?.profileImage || safeDocs?.profilePhoto },
     { label: "Cover Image", src: member?.coverImage || safeDocs?.coverImage },
@@ -1656,6 +1654,8 @@ function MemberDetailsModal({
           <MemberDetail label="Signature" value={signature ? "Uploaded" : "—"} />
 
         </div>
+
+        <DependentManagementPanel member={member} />
 
         <div className="admin-member-uploads">
           {profileImage && (

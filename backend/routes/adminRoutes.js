@@ -27,6 +27,8 @@ const {
 // ADMIN CONTROLLER
 // =======================================
 
+const { getManagementReports, exportManagementReportsPdf, exportManagementReportsCsv } = require("../controllers/reportController");
+
 const {
   getDashboard,
   getMembers,
@@ -63,6 +65,10 @@ router.get(
   isAdmin,
   getDashboard
 );
+
+router.get("/reports/export.pdf", protect, isAdminOrSuperAdmin, exportManagementReportsPdf);
+router.get("/reports/export.csv", protect, isAdminOrSuperAdmin, exportManagementReportsCsv);
+router.get("/reports", protect, isAdminOrSuperAdmin, getManagementReports);
 
 // =======================================
 // ADMIN PROFILE / SECURITY / PREFERENCES

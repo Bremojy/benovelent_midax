@@ -112,11 +112,6 @@ function MessageCenterPage({
     };
 
     const handleConnect = () => {
-      activeSocket.emit("user-online", {
-        userId: actorId,
-        role: currentUser?.role || authUser?.role || "member",
-      });
-      activeSocket.emit("presence-heartbeat");
       setBanner((current) =>
         current === "Chat is reconnecting. Messaging stays available; calls will work once the secure call connection is ready."
           ? ""
@@ -214,7 +209,6 @@ function MessageCenterPage({
     activeSocket.on("missed-call", handleMissedCall);
     activeSocket.on("call-error", handleCallError);
     activeSocket.on("online-users", handlePresence);
-    activeSocket.on("presence-required", handleConnect);
     setSocket(activeSocket);
 
     if (!activeSocket.connected) activeSocket.connect();
@@ -229,7 +223,6 @@ function MessageCenterPage({
       activeSocket.off("missed-call", handleMissedCall);
       activeSocket.off("call-error", handleCallError);
       activeSocket.off("online-users", handlePresence);
-      activeSocket.off("presence-required", handleConnect);
     };
   }, [actorId, currentUser?.role, authUser?.role, contextSocket]);
 

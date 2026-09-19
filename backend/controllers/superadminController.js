@@ -21,6 +21,7 @@ const createAuditLog = require("../utils/createAuditLog");
 const { deleteAdminPermanently } = require("../utils/permanentAccountDeletion");
 const generateTemporaryPassword = require("../utils/generateTemporaryPassword");
 const mongoose = require("mongoose");
+const { getUsers: getLiveUsers } = require("../sockets/onlineUsers");
 
 
 // ======================================================
@@ -889,6 +890,7 @@ exports.updateSettings = async (req, res) => {
 exports.getSystemStatus = async (_req, res) => {
   try {
     const mongoose = require("mongoose");
+const { getUsers: getLiveUsers } = require("../sockets/onlineUsers");
     const { getSystemSettings } = require("../services/systemSettings");
     const [settings, redis] = await Promise.all([getSystemSettings(), require("../services/redisCache").health()]);
     const uploads = require("../config/uploadConfig");
@@ -915,7 +917,7 @@ exports.getPortalOverview = async (req, res) => {
     ] = await Promise.all([
       Member.countDocuments({ role: "member", isDeleted: false }),
       Member.countDocuments({ role: "member", status: "active", isDeleted: false }),
-      Member.countDocuments({ role: "member", online: true, isDeleted: false }),
+      Promise.resolve(getLiveUsers().filter((user) => user.role === "member").length),
       Admin.countDocuments({ status: { $ne: "deleted" } }),
       Admin.countDocuments({ status: "active" }),
       SuperAdmin.countDocuments({ status: { $nin: ["inactive", "deleted"] } }),
@@ -924,7 +926,7 @@ exports.getPortalOverview = async (req, res) => {
       EducationSupport.countDocuments({ status: "Pending" }),
       SupportRequest.countDocuments({ status: { $in: ["Pending", "Under Review"] } }),
       Finance.countDocuments({ type: "claim", status: { $in: ["approved", "completed"] } }),
-      Finance.aggregate([{ $match: { status: { $in: ["approved", "completed"] } } }, { $group: { _id: null, total: { $sum: { $cond: [{ $in: ["$type", ["contribution", "income"]] }, "$amount", { $multiply: ["$amount", -1] }] } } } }]),
+      getCurrentBookBalance(),
       News.countDocuments({ published: true, status: "published" }),
       Conversation.countDocuments({}),
       Message.countDocuments({}),
@@ -946,7 +948,7 @@ exports.getPortalOverview = async (req, res) => {
         leadership: { administrators: admins, activeAdministrators: activeAdmins, superadmins },
         support: { pending: Number(pendingFuneral) + Number(pendingMedical) + Number(pendingEducation) + Number(pendingGeneral), funeral: pendingFuneral, medical: pendingMedical, education: pendingEducation, general: pendingGeneral, approvedClaims },
         finance: {
-          bookBalance: Number(bookBalance?.[0]?.total || 0),
+          bookBalance: Number(bookBalance?.balance || 0),
           contributionCollected: Number(contributionPulse?.[0]?.collected || 0),
           contributionExpected: Number(contributionPulse?.[0]?.expected || 0),
           contributionMembersCharged: contributionPulse?.[0]?.members?.length || 0,

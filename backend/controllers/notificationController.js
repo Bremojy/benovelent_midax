@@ -7,6 +7,8 @@ const { getPublicKey } = require("../services/pushService");
 const { getIO } = require("../sockets/socket");
 const { sendPushForNotification } = require("../services/pushService");
 const redisCache = require("../services/redisCache");
+const Broadcast = require("../models/Broadcast");
+const crypto = require("crypto");
 const invalidateNotificationCaches = async (recipient) => {
   if (!recipient) return;
   await redisCache.invalidateMany([`notifications:${String(recipient)}:unread`]);
@@ -292,66 +294,52 @@ BROADCAST TO MEMBERS
 ===================================================== */
 
 exports.broadcastToMembers = async (req, res) => {
+  const body = req.body || {};
+  const requestId = String(body.requestId || req.headers["x-request-id"] || crypto.randomUUID()).trim();
+  let record;
   try {
-    const {
-      title,
-      message,
-      smsText,
-      emailHtml,
-      broadcastSms = false,
-      inApp = true,
-    } = req.body || {};
+    const { title, message, smsText, emailHtml, broadcastSms = false, inApp = true } = body;
+    if (!title?.trim() || !message?.trim()) return res.status(400).json({ success: false, message: "Title and message are required." });
 
-    if (!title?.trim() || !message?.trim()) {
-      return res.status(400).json({
-        success: false,
-        message: "Title and message are required.",
+    const existing = await Broadcast.findOne({ requestId }).lean();
+    if (existing?.status === "completed") {
+      return res.status(200).json({
+        success: true,
+        duplicate: true,
+        message: "This broadcast was already processed.",
+        result: { membersCount: existing.targetedUsers, emailResult: { sent: existing.emailSent }, smsResult: { sent: existing.smsSent } },
+        inAppNotifications: existing.inAppSent,
       });
     }
 
+    record = existing ? await Broadcast.findById(existing._id) : await Broadcast.create({ requestId, sender: req.user._id, senderModel: senderModelFromUser(req.user), title: title.trim(), message: message.trim(), smsEnabled: Boolean(broadcastSms) });
     const contactableMembers = await getActiveMembers({ includeEmails: true });
-    const inAppMembers = inApp
-      ? await Member.find({ role: "member", status: "active", isDeleted: false }).select("_id").lean()
-      : [];
+    const inAppMembers = inApp ? await Member.find({ role: "member", status: "active", isDeleted: false }).select("_id").lean() : [];
     const senderModel = senderModelFromUser(req.user);
 
+    let inAppSent = 0;
     if (inApp && inAppMembers.length) {
-      await Notification.insertMany(
-        inAppMembers.map((member) => ({
-          recipient: member._id,
-          recipientModel: "Member",
-          sender: req.user._id,
-          senderModel,
-          title: title.trim(),
-          message: message.trim(),
-          type: "announcement",
-          icon: "campaign",
-          read: false,
-        }))
-      );
+      const notifications = inAppMembers.map((member) => ({
+        recipient: member._id, recipientModel: "Member", sender: req.user._id, senderModel,
+        title: title.trim(), message: message.trim(), type: "announcement", icon: "campaign", read: false,
+        eventId: `broadcast:${requestId}:${String(member._id)}`, referenceId: record._id, referenceModel: "Broadcast",
+        metadata: { broadcastId: String(record._id), requestId },
+      }));
+      const inserted = await Notification.insertMany(notifications);
+      inAppSent = inserted.length;
     }
 
-    const result = await notifyMembers({
-      subject: title.trim(),
-      text: message.trim(),
-      html: emailHtml || `<h2>${title.trim()}</h2><p>${message.trim().replace(/\n/g, "<br>")}</p>`,
-      smsText: smsText || message.trim(),
-      broadcastSms: Boolean(broadcastSms),
-      members: contactableMembers,
-    });
+    const result = await notifyMembers({ subject: title.trim(), text: message.trim(), html: emailHtml || `<h2>${title.trim()}</h2><p>${message.trim().replace(/\n/g, "<br>")}</p>`, smsText: smsText || message.trim(), broadcastSms: Boolean(broadcastSms), members: contactableMembers });
+    const emailSent = Number(result?.emailResult?.sent || 0);
+    const emailAttempted = Number(result?.emailResult?.attempted || contactableMembers.length || 0);
+    const smsSent = Number(result?.smsResult?.sent || 0);
 
-    return res.status(201).json({
-      success: true,
-      message: "Broadcast sent successfully.",
-      result,
-      inAppNotifications: inApp ? inAppMembers.length : 0,
-    });
+    await Broadcast.findByIdAndUpdate(record._id, { targetedUsers: inApp ? inAppMembers.length : contactableMembers.length, inAppSent, emailSent, emailAttempted, smsSent, completedAt: new Date(), status: "completed", error: "" });
+    return res.status(201).json({ success: true, message: "Broadcast sent successfully.", result, inAppNotifications: inAppSent, broadcast: { requestId, targetedUsers: inApp ? inAppMembers.length : contactableMembers.length, inAppSent, emailSent, emailAttempted, smsSent } });
   } catch (error) {
     console.error("Broadcast notification error:", error);
-    return res.status(500).json({
-      success: false,
-      message: error.message || "Unable to broadcast message.",
-    });
+    if (record?._id) await Broadcast.findByIdAndUpdate(record._id, { status: "failed", error: String(error.message || error).slice(0, 2000) }).catch(() => {});
+    return res.status(500).json({ success: false, message: error.message || "Unable to broadcast message.", requestId });
   }
 };
 

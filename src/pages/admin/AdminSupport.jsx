@@ -73,7 +73,7 @@ export default function AdminSupport() {
     try {
       setSending(true);
       const payload = broadcast
-        ? { title: form.title, message: form.message, smsText: form.message, broadcastSms: smsEnabled, inApp: true }
+        ? { requestId: globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`, title: form.title, message: form.message, smsText: form.message, broadcastSms: smsEnabled, inApp: true }
         : { recipient: form.recipient, recipientModel: "Member", title: form.title, message: form.message, type: "system", senderModel: "Admin" };
 
       if (!broadcast && !form.recipient) {

@@ -67,6 +67,8 @@ async function deliverCallNotification({ recipient, caller, callType, title, mes
     suppressPush: true,
     referenceId: undefined,
     referenceModel: "Call",
+    eventId: `call:${String(callId)}:${String(recipient.user._id)}`,
+    metadata: { callId: String(callId), callType, missed },
   });
   await sendPushToRecipient({
     recipient: recipient.user._id,
@@ -163,7 +165,14 @@ async function markMissedCall(callId, reason = "missed") {
 
 async function getAuthorizedConversation(socket, conversationId) {
   if (!isChatRole(socket.data?.role) || !mongooseIsValid(conversationId) || !socket.data?.chatId) return null;
-  return Conversation.findOne({ _id: conversationId, participants: socket.data.chatId, active: { $ne: false } });
+  const conversation = await Conversation.findOne({ _id: conversationId, participants: socket.data.chatId, active: { $ne: false } }).lean();
+  if (!conversation) return null;
+  const forbidden = await Member.exists({
+    _id: { $in: conversation.participants },
+    $or: [{ role: "superadmin" }, { portalOwnerRole: "superadmin" }]
+  });
+  if (forbidden) return null;
+  return conversation;
 }
 function mongooseIsValid(value) {
   return !!value && require("mongoose").isValidObjectId(value);
@@ -181,7 +190,7 @@ module.exports = (io, socket) => {
       socket.data.userId = String(actor.user._id);
       socket.data.chatId = String(actor.chatId);
       socket.data.role = actor.role;
-      addUser(actor.chatId, socket.id, actor.role);
+      addUser(actor.chatId, socket.id, actor.role, actor.portalOwnerId || actor.user._id);
       socket.join(String(actor.chatId));
       if (String(actor.user._id) !== String(actor.chatId)) socket.join(String(actor.user._id));
       await savePresence(actor, true, socket.id);

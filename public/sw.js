@@ -95,7 +95,7 @@ self.addEventListener("push", (event) => {
         role: payload?.data?.role || incomingPayload?.role || "member",
       };
       await savePendingCall(callId, { ...payload, data: callData });
-      const base = callData.role === "admin" ? "/admin/messages" : callData.role === "superadmin" ? "/superadmin/messages" : "/member/messages";
+      const base = callData.role === "admin" ? "/admin/messages" : "/member/messages";
       options.data = { ...callData, link: `${base}?incomingPushCall=${encodeURIComponent(callId)}` };
     }
     await self.registration.showNotification(title, options);
@@ -110,10 +110,9 @@ self.addEventListener("notificationclick", (event) => {
   const callId = callIdValue ? encodeURIComponent(callIdValue) : "";
   let link = data.link || "/";
   if (data.incomingCall && callId) {
-    const base = data.role === "admin" ? "/admin/messages" : data.role === "superadmin" ? "/superadmin/messages" : "/member/messages";
+    const base = data.role === "admin" ? "/admin/messages" : "/member/messages";
     link = `${base}?incomingPushCall=${callId}&callAction=${encodeURIComponent(action)}`;
   } else if (data.role === "admin") link = "/admin/messages";
-  else if (data.role === "superadmin") link = "/superadmin/messages";
 
   event.waitUntil((async () => {
     if (callIdValue) await removePendingCall(callIdValue);

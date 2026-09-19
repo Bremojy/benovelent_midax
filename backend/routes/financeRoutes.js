@@ -15,6 +15,9 @@ const {
   hideTransaction,
   constitutionLedger,
   uploadAttachment,
+  exportConstitutionLedger,
+  exportConstitutionLedgerCsv,
+  getBookBalance,
 } = require("../controllers/financeController");
 
 const { verifyToken: protect } = require("../middleware/authMiddleware");
@@ -32,8 +35,11 @@ router.post("/", protect, isAdminOrSuperAdmin, createTransaction);
 router.get("/", protect, isAdminOrSuperAdmin, getTransactions);
 
 // Finance dashboards / constitutional ledger
+router.get("/book-balance", protect, getBookBalance);
 router.get("/constitution-ledger", protect, constitutionLedger);
 router.get("/ledger", protect, getLedger);
+router.get("/constitution-ledger/export.pdf", protect, exportConstitutionLedger);
+router.get("/constitution-ledger/export.csv", protect, exportConstitutionLedgerCsv);
 router.get("/summary/dashboard", protect, isAdminOrSuperAdmin, getFinanceSummary);
 
 // Get member transaction history

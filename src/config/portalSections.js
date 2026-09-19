@@ -212,8 +212,18 @@ export const portalSections = {
         ["News", "Manage public news and events content.", "/superadmin/news", Newspaper],
         ["Leaders", "Manage public leadership presentation.", "/superadmin/leaders", Users],
         ["Policies", "Publish and maintain policy content.", "/superadmin/policies", FileText],
-        ["Messages", "Review system and leadership communications.", "/superadmin/messages", MessageCircle],
         ["Feedback", "Review member feedback collections.", "/superadmin/feedback", FileText],
+      ],
+    },
+    {
+      key: "reports",
+      title: "Reports & Records",
+      eyebrow: "REPORTS & OVERSIGHT",
+      description: "Review financial, member, contribution, support, dependent and activity reports using the same figures as Accounts.",
+      icon: BarChart3,
+      path: "/superadmin/reports",
+      links: [
+        ["Reports Centre", "Open management reports and period filters.", "/superadmin/reports", BarChart3],
       ],
     },
     {

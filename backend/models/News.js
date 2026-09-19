@@ -76,8 +76,14 @@ const newsSchema = new mongoose.Schema(
 
     author:{
         type:mongoose.Schema.Types.ObjectId,
-        ref:"Admin",
-        required:true
+        required:true,
+        refPath:"authorModel"
+    },
+
+    authorModel:{
+        type:String,
+        enum:["Admin","SuperAdmin"],
+        default:"Admin"
     },
 
     poll:{

@@ -75,7 +75,7 @@ exports.createConversation = async (req, res) => {
 
         await conversation.populate(
             "participants",
-            "fullName profileImage online lastSeen"
+            "fullName profileImage online lastSeen role portalOwnerRole"
         );
 
         return res.status(201).json({
@@ -116,7 +116,7 @@ deletedFor: {$ne: currentUserId}
 
 "participants",
 
-"fullName profileImage online lastSeen"
+"fullName profileImage online lastSeen role portalOwnerRole"
 
 )
 
@@ -134,7 +134,13 @@ updatedAt:-1
 
 const visibleConversations = conversations.filter((conversation) => {
     const partnerIds = getConversationPartnerIds(conversation, currentUserId);
-    return partnerIds.length > 0 && partnerIds.some((id) => String(id) !== String(currentUserId));
+    if (!partnerIds.length) return false;
+    return conversation.participants.some((participant) => {
+        const id = String(participant?._id || participant);
+        if (id === currentUserId) return true;
+        const role = String(participant?.role || participant?.portalOwnerRole || "member").toLowerCase();
+        return role === "member" || role === "admin";
+    });
 });
 
 res.json({
@@ -184,11 +190,20 @@ if (!conversation || !(conversation.participants || []).some((participant) => St
     return res.status(404).json({ success:false, message:"Conversation not found." });
 }
 
+await conversation.populate("participants", "fullName profileImage online lastSeen role portalOwnerRole");
+const hasForbiddenPartner = conversation.participants.some((participant) => {
+    const role = String(participant?.role || participant?.portalOwnerRole || "").toLowerCase();
+    return role === "superadmin" || role === "super_admin";
+});
+if (hasForbiddenPartner) {
+    return res.status(403).json({ success:false, message:"SuperAdmin is not available as a chat participant." });
+}
+
 await conversation.populate(
 
 "participants",
 
-"fullName profileImage online lastSeen"
+"fullName profileImage online lastSeen role portalOwnerRole"
 
 );
 

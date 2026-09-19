@@ -18,6 +18,8 @@ const { resolveStoredFileUrl } = require("../utils/uploadUrl");
 const { deleteMemberPermanently } = require("../utils/permanentAccountDeletion");
 const generateTemporaryPassword = require("../utils/generateTemporaryPassword");
 const { createNotification } = require("../services/notificationService");
+const { getCurrentBookBalance } = require("../services/financeLedgerService");
+const { getUsers: getLiveUsers } = require("../sockets/onlineUsers");
 
 /* =====================================================
    ADMIN DASHBOARD
@@ -44,7 +46,7 @@ exports.getDashboard = async (req, res) => {
         .sort({ createdAt: -1 })
         .lean(),
       Admin.countDocuments({ status: { $ne: "deleted" } }),
-      Finance.aggregate([{ $match: { status: { $in: ["approved", "completed"] } } }, { $group: { _id: null, total: { $sum: { $cond: [{ $in: ["$type", ["contribution", "income"]] }, "$amount", { $multiply: ["$amount", -1] }] } } } }]),
+      getCurrentBookBalance(),
       Finance.countDocuments({ type: "claim", status: { $in: ["approved", "completed"] } }),
       FuneralSupport.countDocuments({ status: { $in: ["Pending", "Under Review"] } }),
       MedicalSupport.countDocuments({ status: { $in: ["Pending", "Under Review"] } }),
@@ -56,16 +58,17 @@ exports.getDashboard = async (req, res) => {
       FeedbackCollection.aggregate([{ $unwind: "$responses" }, { $count: "count" }]),
     ]);
 
+    const liveMemberIds = new Set(getLiveUsers().filter((user) => user.role === "member").map((user) => String(user.userId)));
     const hydratedMembers = members.map((member) => {
       const completion = calculateProfileCompletion(member);
-      return { ...member, profileCompletion: completion.percentage, profileCompleted: completion.percentage === 100, missingFields: completion.missingFields };
+      return { ...member, online: liveMemberIds.has(String(member._id)), profileCompletion: completion.percentage, profileCompleted: completion.percentage === 100, missingFields: completion.missingFields };
     });
 
     const totalMembers = hydratedMembers.length;
     const activeMembers = hydratedMembers.filter((m) => m.status === "active").length;
     const inactiveMembers = hydratedMembers.filter((m) => m.status === "inactive").length;
     const suspendedMembers = hydratedMembers.filter((m) => m.status === "suspended").length;
-    const onlineMembers = hydratedMembers.filter((m) => m.online === true).length;
+    const onlineMembers = liveMemberIds.size;
     const verifiedMembers = hydratedMembers.filter((m) => m.verified === true).length;
     const completedProfiles = hydratedMembers.filter((m) => m.profileCompleted).length;
     const incompleteProfiles = totalMembers - completedProfiles;
@@ -83,7 +86,7 @@ exports.getDashboard = async (req, res) => {
         completedProfiles,
         incompleteProfiles,
         totalLeaders,
-        bookBalance: Number(bookBalance?.[0]?.total || 0),
+        bookBalance: Number(bookBalance?.balance || 0),
         approvedClaims,
         pendingSupport: {
           total: Number(pendingFuneral) + Number(pendingMedical) + Number(pendingEducation) + Number(pendingSupportRequests),
@@ -121,11 +124,13 @@ exports.getColleagues = async (req, res) => {
       .select("-password -resetPasswordToken -resetPasswordExpires -failedLoginAttempts")
       .sort({ lastLogin: -1, createdAt: -1 })
       .lean();
+    const liveAdminIds = new Set(getLiveUsers().filter((user) => user.role === "admin").flatMap((user) => [String(user.userId), String(user.portalOwnerId || "")].filter(Boolean)));
+    const liveColleagues = colleagues.map((colleague) => ({ ...colleague, online: liveAdminIds.has(String(colleague._id)) }));
 
     res.json({
       success: true,
-      count: colleagues.length,
-      colleagues,
+      count: liveColleagues.length,
+      colleagues: liveColleagues,
     });
   } catch (error) {
     console.error(error);
@@ -167,10 +172,12 @@ exports.getMembers = async (req, res) => {
       .limit(limit)
       .lean();
 
+    const liveMemberIds = new Set(getLiveUsers().filter((user) => user.role === "member").map((user) => String(user.userId)));
     const members = rawMembers.map((member) => {
       const completion = calculateProfileCompletion(member);
       return {
         ...member,
+        online: liveMemberIds.has(String(member._id)),
         profileCompletion: completion.percentage,
         profileCompleted: completion.percentage === 100,
         verificationPending: completion.percentage === 100 && !member.verified,
@@ -1077,10 +1084,12 @@ exports.getRecentMembers = async (req, res) => {
       .limit(10)
       .lean();
 
+    const liveMemberIds = new Set(getLiveUsers().filter((user) => user.role === "member").map((user) => String(user.userId)));
     const liveMembers = members.map((member) => {
       const completion = calculateProfileCompletion(member);
       return {
         ...member,
+        online: liveMemberIds.has(String(member._id)),
         profileCompletion: completion.percentage,
         profileCompleted: completion.percentage === 100,
         missingFields: completion.missingFields,
@@ -1140,10 +1149,7 @@ exports.getStatistics = async (req, res) => {
         isDeleted: false,
       }),
 
-      Member.countDocuments({
-        online: true,
-        isDeleted: false,
-      }),
+      Promise.resolve(getLiveUsers().filter((user) => user.role === "member").length),
 
       Member.countDocuments({
         verified: true,
@@ -1228,13 +1234,17 @@ exports.filterMembers = async (req, res) => {
     if (verified !== undefined)
       query.verified = verified === "true";
 
-    if (online !== undefined)
-      query.online = online === "true";
+    // Presence is derived from active socket + heartbeat, never MongoDB's persisted online flag.
 
-    const members = await Member.find(query)
+
+    const rawMembers = await Member.find(query)
       .select("-password")
       .sort({ fullName: 1 })
       .lean();
+    const liveMemberIds = new Set(getLiveUsers().filter((user) => user.role === "member").map((user) => String(user.userId)));
+    const members = rawMembers
+      .map((member) => ({ ...member, online: liveMemberIds.has(String(member._id)) }))
+      .filter((member) => online === undefined || member.online === (online === "true"));
 
     res.json({
 

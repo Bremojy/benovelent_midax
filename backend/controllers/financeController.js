@@ -5,6 +5,8 @@ const Notification = require("../models/Notification");
 const Contribution = require("../models/Contribution");
 const redisCache = require("../services/redisCache");
 const { resolveStoredFileUrl } = require("../utils/uploadUrl");
+const { getLedger: getAuthoritativeLedger, getCurrentBookBalance, invalidateFinanceCache } = require("../services/financeLedgerService");
+const { buildPdf } = require("../utils/simplePdf");
 
 /* =====================================================
    GENERATE TRANSACTION NUMBER
@@ -103,7 +105,7 @@ exports.createTransaction = async (req, res) => {
                 type: "finance", referenceId: transaction._id, referenceModel: "Finance"
             });
         }
-        await redisCache.invalidatePrefix("finance:list");
+        await invalidateFinanceCache();
         return res.status(201).json({ success: true, message: "Transaction created successfully.", transaction });
     } catch (error) {
         console.error(error);
@@ -353,7 +355,7 @@ exports.updateTransaction = async (req, res) => {
             }
         }
 
-        await redisCache.invalidatePrefix("finance:list");
+        await invalidateFinanceCache();
         res.json({
 
             success: true,
@@ -410,7 +412,7 @@ exports.hideTransaction = async (req, res) => {
                 type: "finance", referenceId: transaction._id, referenceModel: "Finance"
             });
         }
-        await redisCache.invalidatePrefix("finance:list");
+        await invalidateFinanceCache();
         return res.json({ success: true, hidden: transaction.hidden, message: transaction.hidden ? "Transaction hidden from the community ledger." : "Transaction restored to the community ledger.", transaction });
     } catch (error) {
         return res.status(500).json({ success: false, message: error.message });
@@ -472,7 +474,7 @@ exports.deleteTransaction = async (req, res) => {
                 type: "finance", referenceId: transaction._id, referenceModel: "Finance"
             });
         }
-        await redisCache.invalidatePrefix("finance:list");
+        await invalidateFinanceCache();
         return res.json({
             success: true,
             message: role === "superadmin" ? "Transaction permanently deleted successfully." : "Transaction removed from the Accounts ledger. Permanent deletion is reserved for SuperAdmin.",
@@ -711,163 +713,88 @@ exports.getMemberTransactions = async (req, res) => {
 ===================================================== */
 
 exports.getLedger = async (req, res) => {
-    const cacheKey = `finance:ledger:${String(req.user?._id || "all")}:${String(req.query?.year || new Date().getFullYear())}`;
-    const cached = await redisCache.getJson(cacheKey);
-    if (cached !== null) return res.json(cached);
-    const __originalJson = res.json.bind(res);
-    res.json = (body) => { redisCache.setJson(cacheKey, body, 20).catch(() => {}); return __originalJson(body); };
-
   try {
     const year = Number(req.query.year) || new Date().getFullYear();
-    const filter = {
-      transactionDate: {
-        $gte: new Date(`${year}-01-01T00:00:00.000Z`),
-        $lt: new Date(`${year + 1}-01-01T00:00:00.000Z`),
-      },
-      status: { $in: ["approved", "completed"] },
-    };
-    if (String(req.user?.role || "").toLowerCase() === "member") filter.member = req.user._id;
-    if (!(String(req.user?.role || "").toLowerCase() === "superadmin" && String(req.query.includeHidden || "false").toLowerCase() === "true")) filter.hidden = { $ne: true };
-
-    const rows = await Finance.find(filter)
-      .populate("member", "fullName memberNumber")
-      .populate("approvedBy", "fullName")
-      .sort({ transactionDate: 1, createdAt: 1 })
-      .lean();
-
-    let balance = 0;
-    const creditTypes = new Set(["contribution", "income", "refund"]);
-    const entries = rows.map((row) => {
-      const credit = creditTypes.has(row.type) ? Number(row.amount || 0) : 0;
-      const debit = credit ? 0 : Number(row.amount || 0);
-      balance += credit - debit;
-      return {
-        ...row,
-        employeeNumber: row.member?.memberNumber || "",
-        debit,
-        credit,
-        runningBalance: balance,
-      };
+    const role = String(req.user?.role || "").toLowerCase();
+    const ledger = await getAuthoritativeLedger({
+      startDate: `${year}-01-01`,
+      endDate: `${year}-12-31`,
+      memberId: role === "member" ? req.user._id : null,
+      includeHidden: role === "superadmin" && String(req.query.includeHidden || "false").toLowerCase() === "true",
     });
-
-    const totals = entries.reduce((acc, row) => ({
-      credit: acc.credit + row.credit,
-      debit: acc.debit + row.debit,
-    }), { credit: 0, debit: 0 });
-
-    return res.json({
-      success: true,
-      year,
-      entries,
-      totals: { ...totals, balance: totals.credit - totals.debit },
-    });
+    return res.json({ success: true, year, ...ledger });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
   }
 };
+
 /* =====================================================
    FINANCE DASHBOARD SUMMARY
 ===================================================== */
 
 exports.getFinanceSummary = async (req, res) => {
-    const cacheKey = `finance:summary:${String(req.user?.role || "user")}`;
-    const cached = await redisCache.getJson(cacheKey);
-    if (cached !== null) return res.json(cached);
-    const __originalJson = res.json.bind(res);
-    res.json = (body) => { redisCache.setJson(cacheKey, body, 20).catch(() => {}); return __originalJson(body); };
-
-
-    try {
-
-        const transactions = await Finance.find();
-
-        let totalIncome = 0;
-        let totalExpenses = 0;
-        let totalContributions = 0;
-        let totalClaims = 0;
-
-        transactions.forEach(transaction => {
-
-            switch (transaction.type) {
-
-                case "income":
-                    totalIncome += transaction.amount;
-                    break;
-
-                case "expense":
-                    totalExpenses += transaction.amount;
-                    break;
-
-                case "contribution":
-                    totalContributions += transaction.amount;
-                    break;
-
-                case "claim":
-                    totalClaims += transaction.amount;
-                    break;
-
-            }
-
-        });
-
-        res.json({
-
-            success: true,
-
-            summary: {
-
-                totalTransactions: transactions.length,
-
-                totalIncome,
-
-                totalExpenses,
-
-                totalContributions,
-
-                totalClaims,
-
-                balance:
-                    totalIncome +
-                    totalContributions -
-                    totalExpenses -
-                    totalClaims
-
-            }
-
-        });
-
-    }
-
-    catch (error) {
-
-        console.error(error);
-
-        res.status(500).json({
-
-            success: false,
-
-            message: error.message
-
-        });
-
-    }
-
+  try {
+    const year = Number(req.query?.year) || new Date().getFullYear();
+    const ledger = await getAuthoritativeLedger({ startDate: `${year}-01-01`, endDate: `${year}-12-31` });
+    const totalTransactions = ledger.entries.length;
+    const [contributions, claims, expenses, income] = await Promise.all([
+      Finance.aggregate([{ $match: validFinancePeriodMatch(year, "contribution") }, { $group: { _id: null, total: { $sum: "$amount" } } }]),
+      Finance.aggregate([{ $match: validFinancePeriodMatch(year, "claim") }, { $group: { _id: null, total: { $sum: "$amount" } } }]),
+      Finance.aggregate([{ $match: validFinancePeriodMatch(year, "expense") }, { $group: { _id: null, total: { $sum: "$amount" } } }]),
+      Finance.aggregate([{ $match: validFinancePeriodMatch(year, "income") }, { $group: { _id: null, total: { $sum: "$amount" } } }]),
+    ]);
+    return res.json({
+      success: true,
+      summary: {
+        totalTransactions,
+        totalIncome: Number(income?.[0]?.total || 0),
+        totalExpenses: Number(expenses?.[0]?.total || 0),
+        totalContributions: Number(contributions?.[0]?.total || 0),
+        totalClaims: Number(claims?.[0]?.total || 0),
+        openingBalance: ledger.openingBalance,
+        closingBalance: ledger.closingBalance,
+        currentBookBalance: ledger.currentBookBalance,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
 };
 
-
+const validFinancePeriodMatch = (year, type) => ({
+  transactionDate: { $gte: new Date(`${year}-01-01T00:00:00.000Z`), $lte: new Date(`${year}-12-31T23:59:59.999Z`) },
+  type,
+  status: { $in: ["approved", "completed"] },
+  hidden: { $ne: true },
+});
 
 exports.getMemberAccounts = async (req, res) => {
-  // Legacy endpoint kept for older clients. It now returns only the constitution
-  // ledger, never the scheme-wide contribution/support dashboard.
-  const startDate = String(req.query?.startDate || "").trim();
-  const endDate = String(req.query?.endDate || "").trim();
-  if (!startDate || !endDate) return res.status(400).json({ success: false, code: "DATE_FILTER_REQUIRED", message: "Select an opening and closing date for the constitution ledger." });
-  return exports.constitutionLedger(req, res);
+  try {
+    const role = String(req.user?.role || "").toLowerCase();
+    const startDate = String(req.query?.startDate || "").trim();
+    const endDate = String(req.query?.endDate || "").trim();
+    if (!startDate || !endDate) return res.status(400).json({ success: false, code: "DATE_FILTER_REQUIRED", message: "Select an opening and closing date for the constitution ledger." });
+    const ledger = await getAuthoritativeLedger({
+      startDate,
+      endDate,
+      memberId: role === "member" ? req.user._id : null,
+      includeHidden: role === "superadmin" && String(req.query.includeHidden || "false").toLowerCase() === "true",
+    });
+    return res.json({ success: true, ...ledger });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
 };
 
-/* =====================================================
-   CONSTITUTION LEDGER (MEMBER + ADMIN + SUPERADMIN)
-===================================================== */
+exports.getBookBalance = async (req, res) => {
+  try {
+    const book = await getCurrentBookBalance();
+    return res.json({ success: true, ...book });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 exports.constitutionLedger = async (req, res) => {
   try {
     const role = String(req.user?.role || "").toLowerCase();
@@ -876,50 +803,72 @@ exports.constitutionLedger = async (req, res) => {
     if (role === "member" && (!startDate || !endDate)) {
       return res.status(400).json({ success: false, code: "DATE_FILTER_REQUIRED", message: "Select a start and end date before loading the constitution ledger." });
     }
-    const start = startDate ? new Date(`${startDate}T00:00:00.000Z`) : new Date(`${new Date().getFullYear()}-01-01T00:00:00.000Z`);
-    const end = endDate ? new Date(`${endDate}T23:59:59.999Z`) : new Date(`${new Date().getFullYear()}-12-31T23:59:59.999Z`);
-    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || start > end) {
-      return res.status(400).json({ success: false, message: "Enter a valid date range." });
-    }
-    const filter = {
-      transactionDate: { $gte: start, $lte: end },
-      status: { $in: ["approved", "completed"] },
-      hidden: { $ne: true },
-    };
-    const rows = await Finance.find(filter)
-      .populate("member", "fullName memberNumber")
-      .populate("contributor", "fullName memberNumber")
-      .sort({ transactionDate: 1, createdAt: 1 })
-      .lean();
-    let balance = 0;
-    const creditTypes = new Set(["contribution", "income", "refund"]);
-    const entries = rows.map((row) => {
-      const credit = creditTypes.has(row.type) ? Number(row.amount || 0) : 0;
-      const debit = credit ? 0 : Number(row.amount || 0);
-      balance += credit - debit;
-      return {
-        _id: row._id,
-        transactionNumber: row.transactionNumber,
-        date: row.transactionDate || row.createdAt,
-        type: row.type,
-        category: row.category || "",
-        description: row.description || "",
-        paymentMethod: row.paymentMethod || "",
-        referenceNumber: row.referenceNumber || row.receiptNumber || "",
-        contributorType: row.contributorType || (row.member ? "member" : ""),
-        contributorName: row.contributorName || row.member?.fullName || row.contributor?.fullName || (row.member?.memberNumber ? `Member ${row.member.memberNumber}` : ""),
-        member: row.member ? { _id: row.member._id, fullName: row.member.fullName, memberNumber: row.member.memberNumber } : null,
-        debit,
-        credit,
-        runningBalance: balance,
-        attachment: row.attachment || { url: "", name: "", type: "" },
-        notes: row.notes || "",
-      };
+    const ledger = await getAuthoritativeLedger({
+      startDate: startDate || `${new Date().getFullYear()}-01-01`,
+      endDate: endDate || `${new Date().getFullYear()}-12-31`,
+      includeHidden: role === "superadmin" && String(req.query.includeHidden || "false").toLowerCase() === "true",
     });
-    const totals = entries.reduce((a, row) => ({ credit: a.credit + row.credit, debit: a.debit + row.debit }), { credit: 0, debit: 0 });
-    return res.json({ success: true, startDate, endDate, entries, totals: { ...totals, balance: totals.credit - totals.debit } });
+    return res.json({ success: true, ...ledger });
   } catch (error) {
     console.error("Constitution ledger error:", error);
+    return res.status(400).json({ success: false, message: error.message });
+  }
+};
+
+
+exports.exportConstitutionLedger = async (req, res) => {
+  try {
+    const role = String(req.user?.role || "").toLowerCase();
+    const startDate = String(req.query?.startDate || "").trim();
+    const endDate = String(req.query?.endDate || "").trim();
+    if (!startDate || !endDate) return res.status(400).json({ success: false, message: "Start and end dates are required." });
+    const ledger = await getAuthoritativeLedger({ startDate, endDate });
+    const rows = [
+      "Benevolent Constitution",
+      `Date range: ${ledger.startDate} to ${ledger.endDate}`,
+      `Generated: ${new Date().toISOString()}`,
+      `Opening balance: KES ${ledger.openingBalance.toFixed(2)}`,
+      `Money in: KES ${ledger.totals.credit.toFixed(2)}`,
+      `Money out: KES ${ledger.totals.debit.toFixed(2)}`,
+      `Closing balance: KES ${ledger.closingBalance.toFixed(2)}`,
+      `Current live book balance: KES ${ledger.currentBookBalance.toFixed(2)}`,
+      "Report reference: BENE-LEDGER-" + new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14),
+      "",
+      "DATE | TRANSACTION | DESCRIPTION | CATEGORY | AMOUNT | DIRECTION | STATUS | RUNNING BALANCE",
+      ...ledger.entries.map((entry) => `${new Date(entry.date).toISOString().slice(0,10)} | ${entry.transactionNumber} | ${entry.description || "-"} | ${entry.category || "-"} | KES ${entry.amount.toFixed(2)} | ${entry.direction} | ${entry.status} | KES ${entry.runningBalance.toFixed(2)}`),
+    ];
+    const pdf = buildPdf({ title: "Benevolent Constitution Ledger", subtitle: `A4 ledger report • ${ledger.startDate} to ${ledger.endDate}`, lines: rows });
+    res.set({ "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="benevolent-constitution-ledger-${ledger.startDate}-${ledger.endDate}.pdf"`, "Content-Length": pdf.length });
+    return res.send(pdf);
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+exports.exportConstitutionLedgerCsv = async (req, res) => {
+  try {
+    const role = String(req.user?.role || "").toLowerCase();
+    const startDate = String(req.query?.startDate || "").trim();
+    const endDate = String(req.query?.endDate || "").trim();
+    if (!startDate || !endDate) return res.status(400).json({ success: false, message: "Start and end dates are required." });
+    const ledger = await getAuthoritativeLedger({ startDate, endDate });
+    const escape = (value) => `"${String(value ?? "").replace(/"/g, '""')}"`;
+    const lines = [
+      ["Benevolent Constitution Ledger"],
+      ["Date range", ledger.startDate, ledger.endDate],
+      ["Opening balance", ledger.openingBalance],
+      ["Money in", ledger.totals.credit],
+      ["Money out", ledger.totals.debit],
+      ["Closing balance", ledger.closingBalance],
+      ["Current live book balance", ledger.currentBookBalance],
+      [],
+      ["Transaction date", "Transaction/reference", "Description", "Category", "Amount", "Direction", "Status", "Running balance"],
+      ...ledger.entries.map((entry) => [new Date(entry.date).toISOString(), entry.transactionNumber, entry.description, entry.category, entry.amount, entry.direction, entry.status, entry.runningBalance]),
+    ].map((row) => row.map(escape).join(","));
+    const csv = lines.join("\r\n");
+    res.set({ "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": `attachment; filename="benevolent-constitution-ledger-${startDate}-${endDate}.csv"` });
+    return res.send(csv);
+  } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
   }
 };

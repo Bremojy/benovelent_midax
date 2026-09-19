@@ -40,7 +40,12 @@ class IncomingCallActivity : AppCompatActivity() {
     private fun launchWeb(action: String) {
         val base = "https://benovelent-midax.vercel.app"
         val role = intent.getStringExtra("role") ?: "member"
-        val portal = when (role) { "admin" -> "/admin/messages"; "superadmin" -> "/superadmin/messages"; else -> "/member/messages" }
+        if (role == "superadmin") {
+            IncomingCallNotification.cancel(this, callId)
+            finish()
+            return
+        }
+        val portal = if (role == "admin") "/admin/messages" else "/member/messages"
         val url = "$base$portal?incomingNativeCall=${android.net.Uri.encode(callId)}&callAction=$action"
         val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
         startActivity(intent)

@@ -18,6 +18,11 @@ class BenevolentCallPlugin : Plugin() {
     @com.getcapacitor.annotation.PluginMethod
     fun startIncomingCall(call: PluginCall) {
         val data = CallData.from(call)
+        if (data.role == "superadmin") {
+            IncomingCallNotification.cancel(context, data.callId)
+            call.resolve(JSObject().put("accepted", false).put("reason", "superadmin_call_disabled"))
+            return
+        }
         IncomingCallNotification.show(context, data)
         call.resolve()
     }

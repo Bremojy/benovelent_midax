@@ -1,0 +1,11 @@
+'use strict';
+const { read, assert, pass } = require('./testUtils');
+const controller = read('backend/controllers/paymentController.js');
+const routes = read('backend/routes/paymentRoutes.js');
+const model = read('backend/models/MpesaTransaction.js');
+for (const token of ['idempotency', 'pending', 'success', 'callback', 'reconcile']) assert(controller.toLowerCase().includes(token), `M-Pesa controller missing ${token} handling`);
+assert(/x-idempotency-key|idempotencyKey/.test(controller + routes), 'M-Pesa STK flow must use idempotency');
+assert(/status:\s*\{?\s*type:\s*String/.test(model) && /pending/.test(model) && /successful|success/.test(model), 'M-Pesa transaction model must distinguish pending/success');
+assert(/\/stk/.test(routes) && /\/callback/.test(routes), 'M-Pesa STK and callback routes must exist');
+assert(/reconcil/.test(controller.toLowerCase()), 'callback/reconciliation logic must be present');
+pass('M-Pesa STK idempotency/pending/callback contracts verified');
