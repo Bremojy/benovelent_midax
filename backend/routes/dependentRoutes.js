@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 const {
   addDependent, getDependents, getDependent, updateDependent, deleteDependent, verifyDependent, getAllDependents, getDependentsForMember,
-  createEditRequest, getMyEditRequests, getAdminEditRequests, reviewEditRequest,
+  createEditRequest, getMyEditRequests, getAdminEditRequests, reviewEditRequest, completeEditRequest,
   uploadDependentDocuments, getDependentDocuments, getDependentDocumentFile, getEditRequestFile, verifyDependentDocument, deleteDependentDocument,
 } = require("../controllers/dependentController");
 const { verifyToken: protect } = require("../middleware/authMiddleware");
@@ -20,9 +20,11 @@ router.get("/edit-requests/mine", protect, isMember, getMyEditRequests);
 router.get("/edit-requests/admin", protect, isAdminOrSuperAdmin, getAdminEditRequests);
 router.get("/edit-requests/:id/files/:index", protect, getEditRequestFile);
 router.post("/edit-requests/:id/review", protect, isAdminOrSuperAdmin, reviewEditRequest);
+router.post("/edit-requests/:id/complete", protect, isMember, completeEditRequest);
 router.get("/admin/member/:memberId", protect, admin, getDependentsForMember);
 router.get("/admin", protect, admin, getAllDependents);
 router.put("/:id/verify", protect, admin, verifyDependent);
+router.post("/:id/documents/replace", protect, setUploadType("dependent-documents"), uploadArray("documents", 1), uploadDependentDocuments);
 router.post("/:id/documents", protect, setUploadType("dependent-documents"), uploadArray("documents", 10), uploadDependentDocuments);
 router.get("/:id/documents", protect, getDependentDocuments);
 router.get("/:id/documents/:documentId/file", protect, getDependentDocumentFile);

@@ -60,13 +60,19 @@ exports.updateStage = async (req, res) => {
     if (req.body?.approvedAmount !== undefined) result.claim.approvedAmount = Math.max(0, Number(req.body.approvedAmount) || 0);
     if (req.body?.interestRate !== undefined && "interestRate" in result.claim) result.claim.interestRate = Math.max(0, Number(req.body.interestRate) || 0);
     if (req.body?.repaymentPeriodMonths !== undefined && "repaymentPeriodMonths" in result.claim) result.claim.repaymentPeriodMonths = Math.max(1, Number(req.body.repaymentPeriodMonths) || 12);
-    if (nextStatus === "Approved" && result.key === "support" && result.claim.policySlug) {
-      const Policy = require("../models/Policy"); const policy = await Policy.findOne({ slug: result.claim.policySlug, enabled: true }).lean();
-      if (policy?.repaymentEnabled) {
-        result.claim.repaymentEnabled = true;
-        result.claim.interestRate = Number(policy.interestRate || 0);
-        result.claim.repaymentMonths = Number(policy.repaymentMonths || 12);
-      }
+    if (nextStatus === "Approved" && result.key === "support") {
+      const Policy = require("../models/Policy");
+      const policy = result.claim.policySlug
+        ? await Policy.findOne({ slug: result.claim.policySlug, enabled: true }).lean()
+        : null;
+      const educationRepayable = Boolean(
+        policy?.repaymentEnabled &&
+        policy?.category === "loan" &&
+        policy?.slug === "education-policy"
+      );
+      result.claim.repaymentEnabled = educationRepayable;
+      result.claim.interestRate = educationRepayable ? Number(policy.interestRate || 0) : 0;
+      result.claim.repaymentMonths = educationRepayable ? Number(policy.repaymentMonths || 12) : 12;
     }
     if (nextStatus === "Approved") result.claim.approvedAmount = Number(result.claim.approvedAmount || result.claim.requestedAmount || 0);
     result.claim.status = nextStatus;

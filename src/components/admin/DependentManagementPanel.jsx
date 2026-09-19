@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { confirmAction } from "../../utils/modernDialog";
 import API, { resolveUploadUrl } from "../../services/api";
 
@@ -8,7 +8,7 @@ const editFields = [
   ["email", "Email", "email"], ["county", "County", "text"], ["address", "Address", "text"],
 ];
 const relationshipOptions = ["Spouse", "Son", "Daughter", "Father", "Mother", "Brother", "Sister", "Guardian", "Other"];
-const docTypes = [["dependent-id-front", "Dependent ID — Front"], ["dependent-id-back", "Dependent ID — Back"], ["birth-certificate", "Birth Certificate"], ["supporting-document", "Supporting Document"], ["profile-photo", "Profile Photo"], ["other", "Other"]];
+const docTypes = [["dependent-id", "Dependent ID"], ["dependent-id-front", "Dependent ID — Front"], ["dependent-id-back", "Dependent ID — Back"], ["birth-certificate", "Birth Certificate"], ["supporting-document", "Supporting Document"], ["profile-photo", "Profile Photo"], ["other", "Other"]];
 
 export default function DependentManagementPanel({ member }) {
   const [dependents, setDependents] = useState([]);
@@ -20,6 +20,9 @@ export default function DependentManagementPanel({ member }) {
   const [editForm, setEditForm] = useState({});
   const [docType, setDocType] = useState("dependent-id");
   const [docFiles, setDocFiles] = useState({});
+  const [expandedDocs, setExpandedDocs] = useState({});
+  const [replaceFor, setReplaceFor] = useState(null);
+  const replaceInputRef = useRef(null);
 
   const load = async () => {
     if (!member?._id) return;
@@ -84,6 +87,17 @@ export default function DependentManagementPanel({ member }) {
     } catch (err) { setError(err.response?.data?.message || err.message || "Unable to upload documents."); }
     finally { setBusy(""); }
   };
+  const replaceDocument = async (dependentId, documentId, file) => {
+    if (!file) return;
+    try {
+      setBusy(`replace:${documentId}`); setError("");
+      const fd = new FormData(); fd.append("documentType", "other"); fd.append("replaceDocumentId", documentId); fd.append("documents", file);
+      const { data } = await API.post(`/dependents/${dependentId}/documents/replace`, fd, { headers: { "Content-Type": "multipart/form-data" } });
+      if (!data?.success) throw new Error(data?.message || "Unable to replace document.");
+      setReplaceFor(null); await load();
+    } catch (err) { setError(err.response?.data?.message || err.message || "Unable to replace document."); }
+    finally { setBusy(""); }
+  };
   const verifyDoc = async (dependentId, documentId, status) => {
     try {
       setBusy(`doc:${documentId}`); setError("");
@@ -110,11 +124,13 @@ export default function DependentManagementPanel({ member }) {
       {dependents.map((d) => <article key={d._id} style={{ padding: 14, borderRadius: 14, background: "rgba(15,23,42,.035)" }}>
         {editing === d._id ? <form onSubmit={update} style={{ display: "grid", gap: 10 }}><div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(170px,1fr))", gap: 10 }}>{editFields.map(([key, label, type]) => <label key={key}><span style={{ display: "block", fontSize: 12, marginBottom: 4 }}>{label}</span>{type === "select" ? <select value={editForm[key] || ""} onChange={(e)=>setEditForm((f)=>({...f,[key]:e.target.value}))}><option value="">Select</option>{relationshipOptions.map((x)=><option key={x}>{x}</option>)}</select> : type === "gender" ? <select value={editForm[key] || ""} onChange={(e)=>setEditForm((f)=>({...f,[key]:e.target.value}))}><option value="">Select</option><option>Male</option><option>Female</option><option>Other</option></select> : <input type={type} value={editForm[key] || ""} onChange={(e)=>setEditForm((f)=>({...f,[key]:e.target.value}))} />}</label>)}</div><div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}><button type="submit" className="support-mini-button" disabled={busy===`edit:${d._id}`}>{busy===`edit:${d._id}` ? "Saving…" : "Save Managed Changes"}</button><button type="button" className="support-mini-button" onClick={()=>setEditing(null)}>Cancel</button></div></form> : <>
           <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "flex-start", flexWrap: "wrap" }}><div><strong>{d.fullName}</strong><div style={{ opacity: .72, marginTop: 3 }}>{d.relationship} • {d.gender} • {d.verified ? "Verified" : "Pending verification"}</div></div><div style={{ display: "flex", gap: 7, flexWrap: "wrap" }}><button type="button" className="support-mini-button" onClick={()=>beginEdit(d)}>Edit</button>{!d.verified && <button type="button" className="support-mini-button" disabled={busy===`verify:${d._id}`} onClick={()=>verify(d._id)}>{busy===`verify:${d._id}` ? "Verifying…" : "Verify"}</button>}<button type="button" className="support-mini-button danger" disabled={busy===`delete:${d._id}`} onClick={()=>archive(d)}>{busy===`delete:${d._id}` ? "Archiving…" : "Archive"}</button></div></div>
-          <div style={{ marginTop: 10, display: "grid", gap: 6 }}>{d.documents?.length ? d.documents.map((doc)=><div key={doc._id} style={{ display: "flex", gap: 8, justifyContent: "space-between", alignItems: "center", flexWrap: "wrap" }}><a href={doc.downloadUrl || resolveUploadUrl(doc.url)} target="_blank" rel="noreferrer"><strong>{doc.filename || doc.documentType}</strong></a><span style={{ opacity: .72 }}>{doc.verificationStatus || "pending"}</span><div style={{ display: "flex", gap: 5 }}><button type="button" className="support-mini-button" disabled={busy===`doc:${doc._id}`} onClick={()=>verifyDoc(d._id, doc._id, "verified")}>Verify</button><button type="button" className="support-mini-button" disabled={busy===`doc:${doc._id}`} onClick={()=>verifyDoc(d._id, doc._id, "rejected")}>Reject</button></div></div>) : <span style={{ opacity: .65 }}>No documents uploaded.</span>}</div>
-          <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "180px 1fr auto", gap: 8, alignItems: "end" }}><label><span style={{ display:"block",fontSize:12,marginBottom:4 }}>Document type</span><select value={docType} onChange={(e)=>setDocType(e.target.value)}>{docTypes.map(([v,l])=><option key={v} value={v}>{l}</option>)}</select></label><label><span style={{ display:"block",fontSize:12,marginBottom:4 }}>Choose file(s)</span><input type="file" multiple onChange={(e)=>setDocFiles((old)=>({...old,[d._id]:Array.from(e.target.files || [])}))} /></label><button type="button" className="support-mini-button" disabled={busy===`upload:${d._id}`} onClick={()=>upload(d._id)}>{busy===`upload:${d._id}` ? "Uploading…" : "Upload"}</button></div>
+          <div style={{ marginTop: 10 }}><button type="button" className="support-mini-button" onClick={()=>setExpandedDocs((old)=>({...old,[d._id]:!old[d._id]}))}>{expandedDocs[d._id] ? "Hide Documents" : `View Documents (${d.documents?.length || 0})`}</button></div>
+          {expandedDocs[d._id] && <div style={{ marginTop: 10, display: "grid", gap: 6 }}>{d.documents?.length ? d.documents.map((doc)=><div key={doc._id} style={{ display: "flex", gap: 8, justifyContent: "space-between", alignItems: "center", flexWrap: "wrap" }}><a href={doc.downloadUrl || resolveUploadUrl(doc.url)} target="_blank" rel="noreferrer"><strong>{doc.filename || doc.documentType}</strong></a><span style={{ opacity: .72 }}>{doc.verificationStatus || "pending"}</span><div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}><button type="button" className="support-mini-button" disabled={busy===`doc:${doc._id}`} onClick={()=>verifyDoc(d._id, doc._id, "verified")}>Verify</button><button type="button" className="support-mini-button" disabled={busy===`doc:${doc._id}`} onClick={()=>verifyDoc(d._id, doc._id, "rejected")}>Reject</button><button type="button" className="support-mini-button" disabled={busy===`replace:${doc._id}`} onClick={()=>{setReplaceFor({dependentId:d._id,documentId:doc._id}); setTimeout(()=>replaceInputRef.current?.click(),0);}}>{busy===`replace:${doc._id}` ? "Replacing…" : "Replace"}</button></div></div>) : <span style={{ opacity: .65 }}>No documents uploaded.</span>}</div>}
+          <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "180px 1fr auto", gap: 8, alignItems: "end" }}><label><span style={{ display:"block",fontSize:12,marginBottom:4 }}>Document type</span><select value={docType} onChange={(e)=>setDocType(e.target.value)}>{docTypes.map(([v,l])=><option key={v} value={v}>{l}</option>)}</select></label><label><span style={{ display:"block",fontSize:12,marginBottom:4 }}>Choose file(s)</span><input type="file" multiple onChange={(e)=>setDocFiles((old)=>({...old,[d._id]:Array.from(e.target.files || [])}))} /></label><button type="button" className="support-mini-button" disabled={busy===`upload:${d._id}`} onClick={()=>upload(d._id)}>{busy===`upload:${d._id}` ? "Uploading…" : "Add Document(s)"}</button></div>
         </>}
       </article>)}
     </div>}
+    <input ref={replaceInputRef} type="file" style={{ display: "none" }} accept="*/*" onChange={(e)=>{ const file=e.target.files?.[0]; if (replaceFor && file) replaceDocument(replaceFor.dependentId, replaceFor.documentId, file); e.target.value=""; }} />
     <div style={{ marginTop: 20, paddingTop: 16, borderTop: "1px solid rgba(15,23,42,.08)" }}><span style={{ fontSize: 11, letterSpacing: ".14em", fontWeight: 700, opacity: .65 }}>EDIT REQUESTS</span><h3 style={{ margin: "5px 0 10px" }}>Member Requests</h3>{requests.length ? <div style={{ display: "grid", gap: 8 }}>{requests.map((r)=><div key={r._id} style={{ padding: 10, border: "1px solid rgba(15,23,42,.08)", borderRadius: 10 }}><div style={{ display:"flex",justifyContent:"space-between",gap:8,flexWrap:"wrap" }}><strong>{r.dependent?.fullName || "Dependent"}</strong><span>{r.status}</span></div><p style={{ margin:"5px 0",opacity:.75 }}>{r.reason}</p>{r.supportingFiles?.length ? <div style={{display:"grid",gap:4,marginBottom:8}}><small style={{opacity:.65}}>Supporting files</small>{r.supportingFiles.map((file)=><a key={file.url} href={file.downloadUrl || resolveUploadUrl(file.url)} target="_blank" rel="noreferrer">{file.fileName || "Supporting file"}</a>)}</div> : null}{r.status === "pending" && <div style={{ display:"flex",gap:7 }}><button type="button" className="support-mini-button" disabled={busy===`request:${r._id}`} onClick={()=>review(r._id,"approved")}>Approve</button><button type="button" className="support-mini-button danger" disabled={busy===`request:${r._id}`} onClick={()=>review(r._id,"rejected")}>Reject</button></div>}</div>)}</div> : <p style={{ opacity: .7, margin: 0 }}>No edit requests for this member.</p>}</div>
   </section>;
 }

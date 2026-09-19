@@ -24,6 +24,7 @@ const serializeDocument = (doc, dependentId) => {
 };
 
 const serializeDocuments = (docs, dependentId) => (Array.isArray(docs) ? docs : []).map((doc) => serializeDocument(doc, dependentId));
+const activeDocumentQuery = (extra = {}) => ({ ...extra, $or: [{ active: true }, { active: { $exists: false } }] });
 
 function safeLocalDocumentPath(document, storageFolder = "dependent-documents") {
   const uploadRoot = uploadConfig.uploadRoot;
@@ -113,7 +114,7 @@ exports.addDependent = async (req, res) => {
 exports.getDependents = async (req, res) => {
   try {
     const dependents = await Dependent.find({ member: req.user._id, active: true }).sort({ relationship: 1, fullName: 1 }).lean();
-    const withDocs = await Promise.all(dependents.map(async (dependent) => ({ ...dependent, documents: serializeDocuments(await DependentDocument.find({ dependent: dependent._id }).sort({ createdAt: -1 }).lean(), dependent._id) })));
+    const withDocs = await Promise.all(dependents.map(async (dependent) => ({ ...dependent, documents: serializeDocuments(await DependentDocument.find(activeDocumentQuery({ dependent: dependent._id })).sort({ createdAt: -1 }).lean(), dependent._id) })));
     res.json({ success: true, total: withDocs.length, dependents: withDocs });
   } catch (error) { res.status(500).json({ success: false, message: error.message }); }
 };
@@ -124,7 +125,7 @@ exports.getDependent = async (req, res) => {
     if (!dependent) return res.status(404).json({ success: false, message: "Dependent not found." });
     const role = String(req.user?.role || "").toLowerCase();
     if (role === "member" && String(dependent.member) !== String(req.user._id)) return res.status(403).json({ success: false, message: "Access denied." });
-    const documents = serializeDocuments(await DependentDocument.find({ dependent: dependent._id }).sort({ createdAt: -1 }).lean(), dependent._id);
+    const documents = serializeDocuments(await DependentDocument.find(activeDocumentQuery({ dependent: dependent._id })).sort({ createdAt: -1 }).lean(), dependent._id);
     res.json({ success: true, dependent: { ...dependent, documents } });
   } catch (error) { res.status(500).json({ success: false, message: error.message }); }
 };
@@ -241,18 +242,43 @@ exports.reviewEditRequest = async (req, res) => {
     if (!["approved", "rejected"].includes(decision)) return res.status(400).json({ success: false, message: "Choose approve or reject." });
     const reviewNotes = String(req.body?.reviewNotes || "").trim();
     if (decision === "approved") {
-      const dependent = await Dependent.findById(request.dependent);
+      const dependent = await Dependent.findById(request.dependent).select("_id active").lean();
       if (!dependent || !dependent.active) return res.status(404).json({ success: false, message: "Dependent is no longer active." });
       const changes = validateChanges(request.requestedChanges || {});
-      Object.entries(changes).forEach(([field, value]) => { dependent[field] = value; });
-      dependent.verified = false; dependent.verifiedBy = null; dependent.verifiedAt = null;
-      await dependent.save();
-      await redisCache.invalidateMany([`member:${dependent.member}:dashboard`, `member:${dependent.member}:dependents`]);
+      request.approvedChanges = changes;
+    } else {
+      request.approvedChanges = null;
     }
     request.status = decision; request.reviewer = req.user._id; request.reviewerModel = ADMIN_MODEL_FROM_ROLE(req.user.role); request.reviewNotes = reviewNotes; request.reviewedAt = new Date(); await request.save();
-    await createNotification({ recipient: request.member, recipientModel: "Member", sender: req.user._id, senderModel: ADMIN_MODEL_FROM_ROLE(req.user.role), title: `Dependent edit request ${decision}`, message: decision === "approved" ? "Your dependent edit request was approved and the record was updated." : "Your dependent edit request was rejected." , type: "system", referenceId: request._id, referenceModel: "DependentEditRequest", link: "/member/dependents" });
-    await createAuditLog({ user: req.user._id, userRole: String(req.user.role || "admin").toLowerCase(), action: decision.toUpperCase(), module: "DependentEditRequest", description: `${decision} dependent edit request ${request._id}`, req, metadata: { requestId: String(request._id) } });
-    res.json({ success: true, message: `Dependent edit request ${decision}.`, request });
+    await createNotification({ recipient: request.member, recipientModel: "Member", sender: req.user._id, senderModel: ADMIN_MODEL_FROM_ROLE(req.user.role), title: `Dependent edit request ${decision}`, message: decision === "approved" ? "Your dependent edit request was approved. Open Dependents and choose 'Apply Approved Change' to complete the authorized update." : "Your dependent edit request was rejected.", type: "system", referenceId: request._id, referenceModel: "DependentEditRequest", link: "/member/dependents" });
+    await createAuditLog({ user: req.user._id, userRole: String(req.user.role || "admin").toLowerCase(), action: decision.toUpperCase(), module: "DependentEditRequest", description: `${decision} dependent edit request ${request._id}`, req, metadata: { requestId: String(request._id), approvedFields: decision === "approved" ? Object.keys(request.approvedChanges || {}) : [] } });
+    res.json({ success: true, message: decision === "approved" ? "Dependent edit request approved. The member must now apply the approved change." : "Dependent edit request rejected.", request });
+  } catch (error) { res.status(400).json({ success: false, message: error.message }); }
+};
+
+exports.completeEditRequest = async (req, res) => {
+  try {
+    const request = await DependentEditRequest.findOne({ _id: req.params.id, member: req.user._id });
+    if (!request) return res.status(404).json({ success: false, message: "Edit request not found." });
+    if (request.status !== "approved") return res.status(409).json({ success: false, message: "Only an approved edit request can be applied." });
+    const dependent = await Dependent.findOne({ _id: request.dependent, member: req.user._id, active: true });
+    if (!dependent) return res.status(404).json({ success: false, message: "Dependent is no longer active or does not belong to you." });
+    const changes = validateChanges(request.approvedChanges || {});
+    if (!Object.keys(changes).length) return res.status(409).json({ success: false, message: "This approved request has no authorized changes to apply." });
+    Object.entries(changes).forEach(([field, value]) => { dependent[field] = value; });
+    dependent.verified = false; dependent.verifiedBy = null; dependent.verifiedAt = null;
+    await dependent.save();
+    request.status = "completed";
+    request.completedBy = req.user._id;
+    request.completedByModel = "Member";
+    request.completedAt = new Date();
+    await request.save();
+    await redisCache.invalidateMany([`member:${dependent.member}:dashboard`, `member:${dependent.member}:dependents`]);
+    await createNotification({ recipient: request.member, recipientModel: "Member", sender: req.user._id, senderModel: "Member", title: "Dependent edit completed", message: `${dependent.fullName} was updated using your approved edit request. The record now requires verification.`, type: "system", referenceId: request._id, referenceModel: "DependentEditRequest", link: "/member/dependents" });
+    await createAuditLog({ user: req.user._id, userRole: "member", action: "COMPLETE", module: "DependentEditRequest", description: `Applied approved changes to dependent ${dependent.fullName}`, req, metadata: { requestId: String(request._id), dependentId: String(dependent._id), appliedFields: Object.keys(changes) } });
+    const safeRequest = request.toObject();
+    safeRequest.supportingFiles = (safeRequest.supportingFiles || []).map((file, index) => ({ ...file, url: undefined, downloadUrl: `/api/dependents/edit-requests/${String(request._id)}/files/${index}` }));
+    res.json({ success: true, message: "Approved dependent changes applied successfully. The record now requires verification.", request: safeRequest, dependent });
   } catch (error) { res.status(400).json({ success: false, message: error.message }); }
 };
 
@@ -264,10 +290,27 @@ exports.uploadDependentDocuments = async (req, res) => {
     if (role === "member" && String(dependent.member) !== String(req.user._id)) return res.status(403).json({ success: false, message: "Access denied." });
     const files = Array.isArray(req.files) ? req.files : [];
     if (!files.length) return res.status(400).json({ success: false, message: "Choose at least one document." });
+    const documentType = String(req.body?.documentType || "other");
+    const replacementId = String(req.body?.replaceDocumentId || "").trim();
+    if (replacementId && files.length !== 1) return res.status(400).json({ success: false, message: "Replacing a document requires exactly one new file." });
+    let previousDocument = null;
+    if (replacementId) {
+      previousDocument = await DependentDocument.findOne({ _id: replacementId, dependent: dependent._id });
+      if (!previousDocument) return res.status(404).json({ success: false, message: "The document to replace was not found." });
+      if (previousDocument.active === false) return res.status(409).json({ success: false, message: "That document has already been replaced or removed." });
+    }
     const uploadedByModel = role === "superadmin" ? "SuperAdmin" : role === "admin" ? "Admin" : "Member";
-    const documents = await DependentDocument.insertMany(files.map((file) => ({ dependent: dependent._id, member: dependent.member, documentType: String(req.body?.documentType || "other"), filename: String(file.originalname || file.filename || "document").slice(0, 180), storageFilename: String(file.filename || "").slice(0, 240), mimeType: String(file.mimetype || "application/octet-stream"), url: resolveStoredFileUrl(file, `/uploads/${req.uploadType || "dependent-documents"}`), uploadedBy: req.user._id, uploadedByModel })));
-    await createAuditLog({ user: req.user._id, userRole: role, action: "UPLOAD", module: "DependentDocument", description: `Uploaded ${documents.length} dependent document(s)`, req, metadata: { dependentId: String(dependent._id) } });
-    res.status(201).json({ success: true, message: `${documents.length} document(s) uploaded successfully.`, documents: serializeDocuments(documents, dependent._id) });
+    const documents = await DependentDocument.insertMany(files.map((file) => ({
+      dependent: dependent._id, member: dependent.member, documentType: replacementId && previousDocument ? previousDocument.documentType : documentType,
+      filename: String(file.originalname || file.filename || "document").slice(0, 180), storageFilename: String(file.filename || "").slice(0, 240),
+      mimeType: String(file.mimetype || "application/octet-stream"), url: resolveStoredFileUrl(file, `/uploads/${req.uploadType || "dependent-documents"}`),
+      uploadedBy: req.user._id, uploadedByModel, replacementOf: previousDocument?._id || null,
+    })));
+    if (previousDocument) {
+      previousDocument.active = false; previousDocument.replacedAt = new Date(); previousDocument.replacedBy = req.user._id; await previousDocument.save();
+    }
+    await createAuditLog({ user: req.user._id, userRole: role, action: replacementId ? "REPLACE" : "UPLOAD", module: "DependentDocument", description: replacementId ? `Replaced dependent document ${replacementId}` : `Uploaded ${documents.length} dependent document(s)`, req, metadata: { dependentId: String(dependent._id), documentType, replacedDocumentId: replacementId || null, newDocumentIds: documents.map((d) => String(d._id)) } });
+    res.status(201).json({ success: true, message: replacementId ? "Document replaced successfully." : `${documents.length} document(s) uploaded successfully.`, documents: serializeDocuments(documents, dependent._id) });
   } catch (error) { res.status(400).json({ success: false, message: error.message }); }
 };
 
@@ -277,7 +320,7 @@ exports.getDependentDocuments = async (req, res) => {
     if (!dependent) return res.status(404).json({ success: false, message: "Dependent not found." });
     const role = String(req.user?.role || "").toLowerCase();
     if (role === "member" && String(dependent.member) !== String(req.user._id)) return res.status(403).json({ success: false, message: "Access denied." });
-    const documents = await DependentDocument.find({ dependent: dependent._id }).sort({ createdAt: -1 }).lean();
+    const documents = await DependentDocument.find(activeDocumentQuery({ dependent: dependent._id })).sort({ createdAt: -1 }).lean();
     res.json({ success: true, documents: serializeDocuments(documents, dependent._id) });
   } catch (error) { res.status(500).json({ success: false, message: error.message }); }
 };
@@ -289,7 +332,7 @@ exports.getDependentDocumentFile = async (req, res) => {
     const role = String(req.user?.role || "").toLowerCase();
     if (role === "member" && String(dependent.member) !== String(req.user._id)) return res.status(403).json({ success: false, message: "Access denied." });
     if (!['member', 'admin', 'superadmin'].includes(role)) return res.status(403).json({ success: false, message: "Access denied." });
-    const document = await DependentDocument.findOne({ _id: req.params.documentId, dependent: dependent._id }).lean();
+    const document = await DependentDocument.findOne(activeDocumentQuery({ _id: req.params.documentId, dependent: dependent._id })).lean();
     if (!document) return res.status(404).json({ success: false, message: "Document not found." });
     await streamStoredDocument(res, document);
   } catch (error) {
@@ -342,6 +385,6 @@ exports.getAllDependents = async (req, res) => {
 };
 
 exports.getDependentsForMember = async (req, res) => {
-  try { const member = await Member.findById(req.params.memberId).select("_id").lean(); if (!member) return res.status(404).json({success:false,message:"Member not found."}); const dependents = await Dependent.find({ member: member._id, active:true }).sort({createdAt:-1}).lean(); const docs=await DependentDocument.find({member:member._id}).sort({createdAt:-1}).lean(); const byDependent=new Map(); docs.forEach((d)=>{const key=String(d.dependent);if(!byDependent.has(key))byDependent.set(key,[]);byDependent.get(key).push(d);}); res.json({success:true,dependents:dependents.map(d=>({...d,documents:serializeDocuments(byDependent.get(String(d._id))||[], d._id)}))}); }
+  try { const member = await Member.findById(req.params.memberId).select("_id").lean(); if (!member) return res.status(404).json({success:false,message:"Member not found."}); const dependents = await Dependent.find({ member: member._id, active:true }).sort({createdAt:-1}).lean(); const docs=await DependentDocument.find(activeDocumentQuery({member:member._id})).sort({createdAt:-1}).lean(); const byDependent=new Map(); docs.forEach((d)=>{const key=String(d.dependent);if(!byDependent.has(key))byDependent.set(key,[]);byDependent.get(key).push(d);}); res.json({success:true,dependents:dependents.map(d=>({...d,documents:serializeDocuments(byDependent.get(String(d._id))||[], d._id)}))}); }
   catch (error) { res.status(500).json({success:false,message:error.message}); }
 };

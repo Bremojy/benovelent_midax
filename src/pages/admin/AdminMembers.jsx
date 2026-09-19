@@ -902,6 +902,17 @@ function AdminMembers() { const { role }=useAuth(); const isSuperAdmin=role==="s
 
                               <button
                                 type="button"
+                                className="view-member-button"
+                                onClick={() =>
+                                  setSelectedMember(member)
+                                }
+                                aria-label={`View dependents for ${member.fullName || "member"}`}
+                              >
+                                View Dependents
+                              </button>
+
+                              <button
+                                type="button"
                                 className={`status-member-button ${status}`}
                                 disabled={
                                   changingStatus

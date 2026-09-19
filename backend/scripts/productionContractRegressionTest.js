@@ -17,6 +17,8 @@ const accountsPages = [read('src/pages/member/Accounts.jsx'), read('src/pages/ad
 const adminMessages = read('src/pages/admin/AdminMessages.jsx');
 const messageCenter = read('src/components/chat/MessageCenterPage.jsx');
 const adminSupport = read('src/pages/admin/AdminSupport.jsx');
+const adminMembers = read('src/pages/admin/AdminMembers.jsx');
+const memberDependents = read('src/pages/member/Dependents.jsx');
 
 assert(/socket\.on\(["']user-online/.test(presence) && /socket\.on\(["']presence-heartbeat/.test(presence), 'central presence service owns online/heartbeat events');
 assert(/goOnline\(\);/.test(presence), 'presence becomes live immediately after authenticated socket registration');
@@ -26,6 +28,10 @@ assert(/role === 'superadmin'[\s\S]*chatId: String\(user\._id\)[\s\S]*chatProfil
 assert(/dependent-id-front/.test(dependentModel) && /dependent-id-back/.test(dependentModel) && /storageFilename/.test(dependentModel), 'dependent document model accepts front/back ID types and persistent storage filenames');
 assert(/router\.put\("\/:id", protect, isAdminOrSuperAdmin/.test(dependentRoutes), 'member direct dependent PUT is route-blocked');
 assert(/router\.delete\("\/:id", protect, isAdminOrSuperAdmin/.test(dependentRoutes), 'member direct dependent DELETE is route-blocked');
+assert(/edit-requests\/:id\/complete/.test(dependentRoutes) && /exports\.completeEditRequest/.test(dependentController), 'approved dependent changes have a member-scoped completion endpoint');
+assert(/status = \"completed\"/.test(dependentController), 'dependent edit completion is auditable and explicitly recorded');
+assert(/View Dependents/.test(adminMembers), 'admin/superadmin member rows expose a direct View Dependents action');
+assert(/Apply Approved Change/.test(memberDependents), 'members can complete only an approved dependent edit request');
 assert(/downloadUrl/.test(dependentController) && /exports\.getDependentDocumentFile/.test(dependentController), 'dependent document storage URLs are replaced by protected download endpoints');
 assert(/Promise\.all\(/.test(memberMessages) && !/Promise\.allSettled/.test(memberMessages), 'member chat loader propagates API failures');
 assert(/Promise\.all\(/.test(adminMessages) && !/Promise\.allSettled/.test(adminMessages), 'admin chat loader propagates API failures');

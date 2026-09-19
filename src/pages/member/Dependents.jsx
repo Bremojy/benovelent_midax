@@ -119,6 +119,21 @@ export default function Dependents() {
 
   const selectedRequestDependent = useMemo(() => dependents.find((d) => String(d._id) === String(requestDependent)), [dependents, requestDependent]);
 
+  const applyApprovedRequest = async (requestId) => {
+    try {
+      setRequestSaving(true);
+      setError("");
+      const { data } = await API.post(`/dependents/edit-requests/${requestId}/complete`);
+      if (!data?.success) throw new Error(data?.message || "Unable to apply the approved dependent change.");
+      await Promise.all([loadDependents(), loadRequests()]);
+      setSuccess(data.message || "Approved dependent change applied successfully.");
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || "Unable to apply the approved dependent change.");
+    } finally {
+      setRequestSaving(false);
+    }
+  };
+
   return (
     <DashboardLayout>
       <div className="member-support-page">
@@ -205,7 +220,7 @@ export default function Dependents() {
 
             <div className="support-divider" />
             <div className="support-section-heading"><span>REVIEW HISTORY</span><h2>Edit Requests</h2></div>
-            {requests.length === 0 ? <p className="support-muted">No dependent edit requests submitted.</p> : <div className="support-list">{requests.map((r)=><div className="support-item" key={r._id}><div><strong>{r.dependent?.fullName || "Dependent"}</strong><span>{r.status} • {r.reason}</span></div><div className="support-item-right"><span>{r.createdAt ? new Date(r.createdAt).toLocaleDateString() : ""}</span></div></div>)}</div>}
+            {requests.length === 0 ? <p className="support-muted">No dependent edit requests submitted.</p> : <div className="support-list">{requests.map((r)=>{ const status = String(r.status || "pending").toLowerCase(); return <div className="support-item" key={r._id}><div><strong>{r.dependent?.fullName || "Dependent"}</strong><span>{status === "pending" ? "Pending" : status === "approved" ? "Approved" : status === "rejected" ? "Rejected" : status === "completed" ? "Completed" : r.status} • {r.reason}</span></div><div className="support-item-right" style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}><span>{r.createdAt ? new Date(r.createdAt).toLocaleDateString() : ""}</span>{status === "approved" && <button type="button" className="support-mini-button" disabled={requestSaving} onClick={()=>applyApprovedRequest(r._id)}>{requestSaving ? "Applying..." : "Apply Approved Change"}</button>}</div></div>})}</div>}
           </section>
         </div>
       </div>

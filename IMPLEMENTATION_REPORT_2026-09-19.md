@@ -94,7 +94,7 @@ The final `npm test` completed successfully and reported:
 - SuperAdmin chat regression: PASS
 - production contract regression: PASS
 
-A second full repository test run after the final changes also passed.
+The final full repository test run after the final changes also passed, including the education-only repayment guardrail test and dependent document replacement contract.
 
 ## K. Tests that could not be run and why
 - `npm run lint` could not run because `oxlint` was not installed in the incomplete local `node_modules` tree (exit 127).
@@ -117,7 +117,7 @@ The following require a real browser/deployed environment and were not falsely m
 TURN configuration is consumed by code, but the production TURN deployment itself could not be verified here.
 
 ## M. SuperAdmin chat stale-reference confirmation
-No stale `/superadmin/messages` or `SuperAdminMessages` references remain in application source, public service-worker code, route/menu configuration, or backend chat authorization. The only remaining token occurrence is inside the intentionally written regression-test matcher that verifies its absence.
+No stale SuperAdmin chat route/component references remain in application source, public service-worker code, route/menu configuration, or backend chat authorization. The only remaining literal is inside the intentionally written regression-test matcher that verifies its absence.
 
 SuperAdmin data-integrity tools still mention legacy chat records because they are administrative data-integrity controls, not a SuperAdmin chat workflow.
 
@@ -134,7 +134,7 @@ Direct existing-dependent `PUT /dependents/:id` and `DELETE /dependents/:id` are
 The Members workflow includes the shared dependent-management component with authorized fetch, edit, verification, document upload/verification/removal, and edit-request review. Route/middleware and dependent regression contracts pass. Live UI behavior against production remains environment-dependent.
 
 ## R. Frontend/backend route mismatch status
-The repository-wide route contract test passed for 283 discovered frontend API calls, and menu-route verification passed for 66 linked portal paths. `/api/health` is implemented intentionally, and no known frontend/backend route mismatch remains in the audited source.
+The repository-wide route contract test passed for 285 discovered frontend API calls, and menu-route verification passed for 66 linked portal paths. `/api/health` is implemented intentionally, and no known frontend/backend route mismatch remains in the audited source.
 
 ## Final regression notes
 - No fake records were added.
