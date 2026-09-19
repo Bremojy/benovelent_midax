@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, ExternalLink, MessageSquarePlus, Star, Trash
 import { getFeedbackCollections, createFeedbackCollection, deleteFeedbackCollection, submitFeedback, getFeedbackResponses, createBuiltInFeedback, exportFeedbackResponses, importFeedbackResponses, publishFeedbackToNews } from "../services/feedbackService";
 import { useLocation, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
+import { openPrintDocument, escapePrintHtml } from "../utils/printHead";
 
 const questionTypes = ["short_text", "long_text", "email", "number", "rating", "single_choice", "multiple_choice"];
 
@@ -134,7 +135,16 @@ export default function Feedback() {
 
     {active?.showResponses && <div className="feedback-modal-backdrop" onMouseDown={closeForm}>
       <div className="feedback-modal feedback-responses-modal" role="dialog" aria-modal="true" aria-label="Feedback responses" onMouseDown={e => e.stopPropagation()}>
-        <div className="feedback-responses-head"><div><span>COLLECTED RESPONSES</span><h2>{active.title}</h2><p>{responses.length} response{responses.length === 1 ? "" : "s"} captured.</p></div><div className="feedback-response-head-actions"><button type="button" className="btn btn-secondary" onClick={() => window.print()}><Printer size={15}/> Print</button><button type="button" className="icon-btn" onClick={closeForm}><X /></button></div></div>
+        <div className="feedback-responses-head"><div><span>COLLECTED RESPONSES</span><h2>{active.title}</h2><p>{responses.length} response{responses.length === 1 ? "" : "s"} captured.</p></div><div className="feedback-response-head-actions"><button type="button" className="btn btn-secondary" onClick={() => {
+          const rows = responses.map((r) => {
+            const answers = Object.entries(r.answers || {}).map(([qid, value]) => {
+              const question = (active.questions || []).find(q => q.id === qid);
+              return `<div><strong>${escapePrintHtml(question?.label || qid)}</strong><p>${escapePrintHtml(Array.isArray(value) ? value.join(", ") : String(value ?? "—"))}</p></div>`;
+            }).join("");
+            return `<article><h3>${escapePrintHtml(r.anonymous ? "Anonymous response" : (r.member?.fullName || "Portal response"))}</h3><p>${escapePrintHtml(r.createdAt ? new Date(r.createdAt).toLocaleString() : "Submitted")}</p>${answers || "<p>No answer data recorded.</p>"}</article>`;
+          }).join("");
+          openPrintDocument({ title: "Feedback Responses", subtitle: active.title || "Collected community responses", bodyHtml: `<p>Total responses: ${responses.length}</p>${rows || "<p>No responses yet.</p>"}` });
+        }}><Printer size={15}/> Print</button><button type="button" className="icon-btn" onClick={closeForm}><X /></button></div></div>
         {responses.length ? <div className="response-list">{responses.map((r, index) => { const answerEntries = Object.entries(r.answers || {}); return <article className="response-card" key={r._id || index}>
           <div className="response-card-head"><div className="response-person"><span className="response-avatar"><UserRound size={17}/></span><div><strong>{r.anonymous ? "Anonymous response" : (r.member?.fullName || (r.respondentRole === "superadmin" ? "Super Admin response" : r.respondentRole === "admin" ? "Administrator response" : "Member response"))}</strong><span>{r.anonymous ? "Anonymous response" : (r.member?.memberNumber || (r.respondentRole === "superadmin" ? "Super Admin portal" : r.respondentRole === "admin" ? "Administrator portal" : "Member portal"))}</span></div></div><span className="response-time"><Clock3 size={14}/>{r.createdAt ? new Date(r.createdAt).toLocaleString() : "Submitted"}</span></div>
           <div className="response-answer-list">{answerEntries.length ? answerEntries.map(([qid, value]) => { const question = (active.questions || []).find(q => q.id === qid); return <div className="response-answer" key={qid}><span className="response-question"><MessageCircle size={14}/>{question?.label || qid}</span><p>{Array.isArray(value) ? value.join(", ") : String(value ?? "—")}</p></div>; }) : <p className="response-empty">No answer data recorded.</p>}</div>

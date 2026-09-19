@@ -9,7 +9,7 @@
     "lint": "oxlint",
     "preview": "node node_modules/vite/bin/vite.js preview",
     "vercel-build": "npm run build && node scripts/verify-vercel-assets.mjs",
-    "test": "npm run test:package && npm run test:backend-syntax && npm run test:frontend-imports && npm run test:integrity && npm run test:routes && npm run test:menu-routes && npm run test:finance && npm run test:notification && npm run test:dependent && npm run test:report && npm run test:mpesa && npm run test:presence && npm run test:superadmin-chat && npm run test:production-contracts && npm run business-policy",
+    "test": "npm run test:package && npm run test:backend-syntax && npm run test:frontend-imports && npm run test:integrity && npm run test:routes && npm run test:menu-routes && npm run test:finance && npm run test:notification && npm run test:dependent && npm run test:report && npm run test:mpesa && npm run test:presence && npm run test:superadmin-chat && npm run test:production-contracts && npm run test:latest-fixes && npm run business-policy",
     "test:package": "node backend/scripts/packageContractTest.js",
     "test:backend-syntax": "node backend/scripts/backendSyntaxTest.js",
     "test:integrity": "node backend/scripts/staticIntegrityTest.js",
@@ -25,7 +25,8 @@
     "test:frontend-imports": "node backend/scripts/frontendImportTest.js",
     "test:menu-routes": "node backend/scripts/menuRouteContractTest.js",
     "test:production-contracts": "node backend/scripts/productionContractRegressionTest.js",
-    "business-policy": "node backend/scripts/businessPolicyContractTest.js"
+    "business-policy": "node backend/scripts/businessPolicyContractTest.js",
+    "test:latest-fixes": "node backend/scripts/latestFixRegressionTest.js"
   },
   "dependencies": {
     "axios": "^1.18.1",

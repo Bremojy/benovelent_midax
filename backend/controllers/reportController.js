@@ -67,7 +67,7 @@ const buildManagementReports = async ({ startDate, endDate } = {}) => {
 
 const csv = (report) => {
   const lines = [
-    ["Benevolent Constitution Management Report"], ["Period", report.period.startDate, report.period.endDate], ["Generated At", report.generatedAt], [],
+    ["Benevolent Constitution Management Report"], ["Midax Petroleum Marketing"], ["P.O. Box 7432 - 00300 Nairobi"], ["Website", "www.midax.co.ke"], ["Email", "marketing@midax.co.ke / info@midax.co.ke"], ["Services", "Fuels | Lubricants | LPG Gas | Service | Carwash"], ["Period", report.period.startDate, report.period.endDate], ["Generated At", report.generatedAt], [],
     ["FINANCIAL"], ["Opening Balance", report.financial.openingBalance], ["Money In", report.financial.moneyIn], ["Money Out", report.financial.moneyOut], ["Closing Balance", report.financial.closingBalance], ["Current Book Balance", report.financial.currentBookBalance], ["Transactions", report.financial.transactions], ["Contributions", report.financial.contributions], ["Support Payments", report.financial.supportPayments], ["Claims", report.financial.claims], [],
     ["MEMBERS"], ["Total", report.members.total], ["Active", report.members.active], ["Inactive", report.members.inactive], ["Suspended", report.members.suspended], ["Administrators", report.members.administrators], [],
     ["CONTRIBUTIONS"], ["Expected", report.contributions.expected], ["Paid", report.contributions.paid], ["Outstanding", report.contributions.outstanding], ["Members Charged", report.contributions.membersCharged], [],

@@ -297,14 +297,15 @@ export default function AdminFinance() {
 
   const removeTransaction = async (transaction) => {
     if (!isSuperAdmin) {
-      setError("Permanent deletion is reserved for SuperAdmin. You can edit transactions; visibility controls are restricted to SuperAdmin.");
+      setError("Permanent finance deletion is reserved for SuperAdmin.");
       return;
     }
-    if (!await confirmAction("Delete this transaction permanently?")) return;
+    if (!await confirmAction("Delete this transaction? Approved/settled or contribution-linked records are archived with an audit trail; only eligible unsettled records are physically deleted.")) return;
     try {
       setSaving(true);
-      await API.delete(`/finance/${transaction._id}`);
-      setMessage("Transaction deleted.");
+      const { data } = await API.delete(`/finance/${transaction._id}`);
+      if (!data?.success) throw new Error(data?.message || "Unable to delete transaction.");
+      setMessage(data.message || (data.action === "archived" ? "Transaction archived successfully." : "Transaction deleted successfully."));
       await load();
     } catch (err) {
       setError(err.response?.data?.message || err.message || "Unable to delete transaction.");

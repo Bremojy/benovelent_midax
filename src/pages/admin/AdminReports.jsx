@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { BarChart3, ClipboardList, Download, FileText, HandHeart, Landmark, Paperclip, Printer, RefreshCw, Users, Wallet } from "lucide-react";
 import DashboardLayout from "../../layouts/DashboardLayout";
 import API from "../../services/api";
+import { openPrintDocument, escapePrintHtml } from "../../utils/printHead";
 import "../../styles/portal-redesign.css";
 
 const money = (value) => new Intl.NumberFormat("en-KE", { style: "currency", currency: "KES", maximumFractionDigits: 0 }).format(Number(value || 0));
@@ -27,6 +28,23 @@ export default function AdminReports() {
     finally { setLoading(false); }
   };
   useEffect(() => { load(); }, []);
+
+  const printReport = () => {
+    if (!report) return;
+    const f = report.financial || {};
+    const m = report.members || {};
+    const c = report.contributions || {};
+    const support = report.support || {};
+    const d = report.dependents || {};
+    const a = report.activity || {};
+    const rows = (report.ledger?.entries || []).map((row) => `<tr><td>${escapePrintHtml(row.date || "—")}</td><td>${escapePrintHtml(row.transactionNumber || row.referenceNumber || "—")}</td><td>${escapePrintHtml(row.description || "—")}</td><td>${escapePrintHtml(row.category || "—")}</td><td>${escapePrintHtml(row.direction || "—")}</td><td>${escapePrintHtml(money(row.amount))}</td><td>${escapePrintHtml(money(row.runningBalance))}</td><td>${escapePrintHtml(row.status || "—")}</td></tr>`).join("");
+    openPrintDocument({
+      title: "Management Reports",
+      subtitle: `${report.period?.startDate || ""} to ${report.period?.endDate || ""}`,
+      extraStyles: `.summary{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:18px}.summary div{border:1px solid #ddd;padding:10px}.summary strong,.summary span{display:block}.summary span{font-size:11px;color:#666;margin-top:4px}.print-table{font-size:9px}.print-table th,.print-table td{padding:5px}`,
+      bodyHtml: `<div class="summary"><div><strong>${escapePrintHtml(money(f.openingBalance))}</strong><span>Opening balance</span></div><div><strong>${escapePrintHtml(money(f.moneyIn))}</strong><span>Money in</span></div><div><strong>${escapePrintHtml(money(f.moneyOut))}</strong><span>Money out</span></div><div><strong>${escapePrintHtml(money(f.closingBalance))}</strong><span>Closing balance</span></div><div><strong>${escapePrintHtml(money(f.currentBookBalance))}</strong><span>Current book balance</span></div><div><strong>${escapePrintHtml(String(f.transactions || 0))}</strong><span>Transactions</span></div></div><p>Members: ${escapePrintHtml(m.total || 0)} · Active: ${escapePrintHtml(m.active || 0)} · Contributions paid: ${escapePrintHtml(money(c.paid))} · Outstanding: ${escapePrintHtml(money(c.outstanding))} · Support requested: ${escapePrintHtml(money(support.requested))} · Dependents: ${escapePrintHtml(d.total || 0)} · Audit events: ${escapePrintHtml(a.auditEvents || 0)}</p><h2>Authoritative Ledger</h2><table class="print-table"><thead><tr><th>Date</th><th>Transaction</th><th>Description</th><th>Category</th><th>Direction</th><th>Amount</th><th>Running balance</th><th>Status</th></tr></thead><tbody>${rows || '<tr><td colspan="8">No ledger entries for this period.</td></tr>'}</tbody></table>`,
+    });
+  };
 
   const setPreset = (name) => {
     const end = isoToday();
@@ -57,7 +75,7 @@ export default function AdminReports() {
   ], [report]);
 
   return <DashboardLayout><main className="portal-page report-page">
-    <header className="portal-module-header"><div><span>REPORTS & RECORDS</span><h1>Management Reports</h1><p>Filter the Benevolent Constitution record by period, then print or download the same authoritative figures used by Accounts.</p></div><div className="portal-actions"><button className="portal-btn secondary" type="button" onClick={()=>load()} disabled={loading}><RefreshCw size={16}/> {loading?"Refreshing…":"Refresh"}</button><button className="portal-btn" type="button" onClick={()=>window.print()} disabled={!report}><Printer size={16}/> Print</button><button className="portal-btn secondary" type="button" onClick={()=>download("pdf")} disabled={!report || exporting}>{exporting==="pdf"?"Preparing…":<><Download size={16}/> PDF</>}</button><button className="portal-btn secondary" type="button" onClick={()=>download("csv")} disabled={!report || exporting}>{exporting==="csv"?"Preparing…":<><Download size={16}/> CSV</>}</button></div></header>
+    <header className="portal-module-header"><div><span>REPORTS & RECORDS</span><h1>Management Reports</h1><p>Filter the Benevolent Constitution record by period, then print or download the same authoritative figures used by Accounts.</p></div><div className="portal-actions"><button className="portal-btn secondary" type="button" onClick={()=>load()} disabled={loading}><RefreshCw size={16}/> {loading?"Refreshing…":"Refresh"}</button><button className="portal-btn" type="button" onClick={printReport} disabled={!report}><Printer size={16}/> Print</button><button className="portal-btn secondary" type="button" onClick={()=>download("pdf")} disabled={!report || exporting}>{exporting==="pdf"?"Preparing…":<><Download size={16}/> PDF</>}</button><button className="portal-btn secondary" type="button" onClick={()=>download("csv")} disabled={!report || exporting}>{exporting==="csv"?"Preparing…":<><Download size={16}/> CSV</>}</button></div></header>
     {error && <div className="portal-alert error">{error}</div>}
     <section className="portal-panel"><div className="account-panel-head"><div><span>REPORT PERIOD</span><h2>Choose a reporting window</h2><p>Totals are calculated for the selected range. The current book balance remains the live balance as of generation time.</p></div><BarChart3 size={22}/></div><div className="report-period-controls"><div className="report-presets">{[["today","Today"],["week","This week"],["month","This month"],["prev-month","Previous month"],["quarter","This quarter"],["year","This year"]].map(([k,l])=><button key={k} type="button" className="portal-btn secondary compact" onClick={()=>setPreset(k)}>{l}</button>)}</div><div className="date-filter-row"><label>From<input type="date" value={dates.start} onChange={(e)=>setDates(d=>({...d,start:e.target.value}))}/></label><label>To<input type="date" value={dates.end} onChange={(e)=>setDates(d=>({...d,end:e.target.value}))}/></label><button className="portal-btn" type="button" onClick={()=>load()} disabled={loading}>Load report</button></div></div></section>
 

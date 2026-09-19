@@ -14,6 +14,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import api, { resolveUploadUrl, resolveApiUrl } from "../services/api";
+import { openPrintDocument, escapePrintHtml } from "../utils/printHead";
 import "./News.css";
 
 const newsVideoSources = ["/videos/benevolent-news-loop.mp4", "/videos/benevolent-community-loop.mp4"];
@@ -106,7 +107,14 @@ function News() {
     } catch (e) { console.error(e); } finally { setReportBusy(false); }
   };
 
-  const printSelectedNews = () => { window.print(); };
+  const printSelectedNews = () => {
+    if (!selectedNews) return;
+    openPrintDocument({
+      title: selectedNews.title || "Community News",
+      subtitle: `${selectedNews.category || "News"} • ${formatDate(selectedNews.publishDate || selectedNews.createdAt)}`,
+      bodyHtml: `<p>${escapePrintHtml(selectedNews.summary || "")}</p><div style="white-space:pre-wrap;line-height:1.65">${escapePrintHtml(selectedNews.content || "")}</div>`,
+    });
+  };
 
   return (
     <main className="news-page newsroom-v8">

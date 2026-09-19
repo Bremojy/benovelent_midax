@@ -133,3 +133,18 @@ export function printHeadStyles() {
     </style>
   `;
 }
+
+
+export function escapePrintHtml(value) {
+  return escapeHtml(value);
+}
+
+export function openPrintDocument({ title = "Benevolent Midax Report", subtitle = "", bodyHtml = "", extraStyles = "" } = {}) {
+  const popup = window.open("", "_blank", "width=1200,height=850");
+  if (!popup) return false;
+  popup.document.open();
+  popup.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${escapeHtml(title)}</title>${printHeadStyles()}<style>${extraStyles}</style></head><body>${buildPrintHeadHtml({ title, subtitle })}${bodyHtml}<script>window.addEventListener('load',()=>setTimeout(()=>window.print(),100));</script></body></html>`);
+  popup.document.close();
+  popup.focus();
+  return true;
+}

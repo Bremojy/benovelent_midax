@@ -7,6 +7,7 @@ const redisCache = require("../services/redisCache");
 const { resolveStoredFileUrl } = require("../utils/uploadUrl");
 const { getLedger: getAuthoritativeLedger, getCurrentBookBalance, invalidateFinanceCache } = require("../services/financeLedgerService");
 const { buildPdf } = require("../utils/simplePdf");
+const createAuditLog = require("../utils/createAuditLog");
 
 /* =====================================================
    GENERATE TRANSACTION NUMBER
@@ -438,31 +439,36 @@ exports.deleteTransaction = async (req, res) => {
         }
 
         const linkedContribution = await Contribution.findOne({ finance: transaction._id }).select("_id month year").lean();
-        if (linkedContribution) {
-            return res.status(409).json({
-                success: false,
-                code: "LINKED_CONTRIBUTION",
-                message: "This transaction is linked to a contribution. Edit it from the contribution record or delete the contribution first to keep the financial ledger consistent.",
-            });
-        }
-
         const affectedMember = transaction.member;
-        if (role === "superadmin") {
-            const protectedSettled = transaction.reconciled === true || ["approved", "completed"].includes(String(transaction.status || "").toLowerCase());
-            if (protectedSettled) {
-                return res.status(409).json({
-                    success: false,
-                    code: "SETTLED_FINANCE_PROTECTED",
-                    message: "Settled or approved financial history cannot be permanently deleted. Use the visibility/audit controls instead so the ledger remains traceable.",
-                });
-            }
+        const protectedSettled = transaction.reconciled === true || ["approved", "completed"].includes(String(transaction.status || "").toLowerCase());
+        let action = "deleted";
+
+        // A finance delete is always an executed operation. For an approved/settled
+        // record or a transaction linked to a contribution, execute it as an auditable
+        // visibility archive instead of returning a misleading 409. Unsettled, unlinked
+        // records can still be physically deleted by SuperAdmin.
+        if (role === "superadmin" && !protectedSettled && !linkedContribution) {
             await transaction.deleteOne();
+            action = "deleted";
         } else {
             transaction.hidden = true;
             transaction.hiddenAt = new Date();
             transaction.hiddenBy = req.user._id;
             await transaction.save();
+            action = "archived";
         }
+
+        await createAuditLog({
+            user: req.user._id,
+            userRole: req.user.role,
+            action: action === "deleted" ? "FINANCE_TRANSACTION_DELETED" : "FINANCE_TRANSACTION_ARCHIVED",
+            module: "FINANCE",
+            description: action === "deleted"
+                ? `SuperAdmin permanently deleted finance transaction ${transaction._id}.`
+                : `Finance transaction ${transaction._id} was archived from the operational ledger by ${role === "superadmin" ? "SuperAdmin" : "Admin"}.`,
+            req,
+            metadata: { transactionId: transaction._id, status: transaction.status, type: transaction.type, amount: transaction.amount, linkedContribution: Boolean(linkedContribution), protectedSettled },
+        });
         if (affectedMember) {
             await Notification.create({
                 recipient: affectedMember,
@@ -477,7 +483,10 @@ exports.deleteTransaction = async (req, res) => {
         await invalidateFinanceCache();
         return res.json({
             success: true,
-            message: role === "superadmin" ? "Transaction permanently deleted successfully." : "Transaction removed from the Accounts ledger. Permanent deletion is reserved for SuperAdmin.",
+            action,
+            message: action === "deleted"
+                ? "Transaction permanently deleted successfully."
+                : "Transaction archived successfully and removed from the operational ledger. The audit record is retained.",
         });
     } catch (error) {
         console.error(error);
@@ -834,6 +843,9 @@ exports.exportConstitutionLedger = async (req, res) => {
       `Closing balance: KES ${ledger.closingBalance.toFixed(2)}`,
       `Current live book balance: KES ${ledger.currentBookBalance.toFixed(2)}`,
       "Report reference: BENE-LEDGER-" + new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14),
+      "Midax Petroleum Marketing | P.O. Box 7432 - 00300 Nairobi | www.midax.co.ke",
+      "Email: marketing@midax.co.ke / info@midax.co.ke",
+      "Services: Fuels | Lubricants | LPG Gas | Service | Carwash",
       "",
       "DATE | TRANSACTION | DESCRIPTION | CATEGORY | AMOUNT | DIRECTION | STATUS | RUNNING BALANCE",
       ...ledger.entries.map((entry) => `${new Date(entry.date).toISOString().slice(0,10)} | ${entry.transactionNumber} | ${entry.description || "-"} | ${entry.category || "-"} | KES ${entry.amount.toFixed(2)} | ${entry.direction} | ${entry.status} | KES ${entry.runningBalance.toFixed(2)}`),

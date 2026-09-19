@@ -1,4 +1,6 @@
 const mongoose = require("mongoose");
+const fs = require("fs");
+const path = require("path");
 const crypto = require("crypto");
 const Member = require("../models/Member");
 const Admin = require("../models/Admin");
@@ -683,6 +685,20 @@ const renderHumanRecord = (document) => {
     return `<table class="record"><tbody>${rows || `<tr><td>No readable fields.</td></tr>`}</tbody></table>`;
 };
 
+const getPrintLetterheadDataUri = () => {
+    try {
+        const candidates = [
+            path.join(__dirname, "..", "assets", "print-letterhead.png"),
+            path.join(__dirname, "..", "..", "public", "print-letterhead.png"),
+        ];
+        const file = candidates.find((item) => fs.existsSync(item));
+        if (!file) return "";
+        return `data:image/png;base64,${fs.readFileSync(file).toString("base64")}`;
+    } catch (_) {
+        return "";
+    }
+};
+
 const buildHumanBackupHtml = async ({ autoPrint = false } = {}) => {
     if (mongoose.connection.readyState !== 1 || !mongoose.connection.db) {
         const error = new Error("Database is not currently connected.");
@@ -732,6 +748,7 @@ const buildHumanBackupHtml = async ({ autoPrint = false } = {}) => {
     }
 
     const timestamp = new Date();
+    const letterheadDataUri = getPrintLetterheadDataUri();
     const safe = (value) => String(value ?? "").replace(/[&<>\"']/g, (character) => ({
         "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;",
     }[character]));
@@ -740,8 +757,9 @@ const buildHumanBackupHtml = async ({ autoPrint = false } = {}) => {
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Benevolent Midax — Human Database Backup</title>
 <style>
-@page{size:A4;margin:14mm}*{box-sizing:border-box}body{margin:0;background:#f5f6f8;color:#202531;font-family:Inter,Arial,sans-serif;line-height:1.45}.sheet{max-width:1080px;margin:0 auto;background:#fff;padding:28px}.cover{border:1px solid #ece7df;border-radius:18px;padding:28px;background:linear-gradient(135deg,#fff8ef,#fff)}.brand{font-size:12px;font-weight:800;letter-spacing:.18em;color:#c66b15;text-transform:uppercase}.cover h1{font-family:Georgia,serif;font-size:34px;margin:8px 0 10px}.muted{color:#6e7580}.meta{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:20px}.meta div{padding:14px;border:1px solid #eee;border-radius:12px;background:#fafafa}.meta small{display:block;color:#7c828a;text-transform:uppercase;letter-spacing:.08em;font-weight:700;font-size:10px;margin-bottom:4px}.collection{margin-top:28px;break-before:auto}.collection-title{display:flex;justify-content:space-between;gap:20px;align-items:flex-end;border-bottom:2px solid #ef7d00;padding-bottom:10px}.collection-title h2{margin:2px 0 3px;font-size:23px}.collection-title p{margin:0;color:#6e7580}.collection-title>strong{font-size:14px;white-space:nowrap}.eyebrow{font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:#c66b15;font-weight:800}.record-card{margin-top:12px;border:1px solid #e8eaed;border-radius:12px;overflow:hidden;break-inside:avoid}.record-card h3{margin:0;padding:10px 12px;background:#f7f8fa;font-size:13px}.record{width:100%;border-collapse:collapse}.record th,.record td{border-top:1px solid #eceef1;padding:8px 10px;vertical-align:top;text-align:left;font-size:11px}.record th{width:30%;background:#fcfcfd;color:#4d5560}.empty{padding:16px;border:1px dashed #d7dbe0;color:#737985;border-radius:10px}.note{margin-top:20px;padding:14px;border-radius:12px;background:#fff7e8;border:1px solid #f3d29a;color:#6c5123;font-size:12px}.page-break{page-break-before:always}.footer{margin-top:30px;padding-top:12px;border-top:1px solid #eee;color:#7b818b;font-size:10px;text-align:center}@media(max-width:700px){.sheet{padding:16px}.meta{grid-template-columns:1fr}.collection-title{align-items:flex-start;flex-direction:column}}
+@page{size:A4;margin:14mm}*{box-sizing:border-box}body{margin:0;background:#f5f6f8;color:#202531;font-family:Inter,Arial,sans-serif;line-height:1.45}.sheet{max-width:1080px;margin:0 auto;background:#fff;padding:28px}.print-brand{padding:0 0 16px;border-bottom:3px solid #d61f26;margin-bottom:18px}.print-brand img{display:block;width:360px;max-width:70%;height:auto}.cover{border:1px solid #ece7df;border-radius:18px;padding:28px;background:linear-gradient(135deg,#fff8ef,#fff)}.brand{font-size:12px;font-weight:800;letter-spacing:.18em;color:#c66b15;text-transform:uppercase}.cover h1{font-family:Georgia,serif;font-size:34px;margin:8px 0 10px}.muted{color:#6e7580}.meta{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:20px}.meta div{padding:14px;border:1px solid #eee;border-radius:12px;background:#fafafa}.meta small{display:block;color:#7c828a;text-transform:uppercase;letter-spacing:.08em;font-weight:700;font-size:10px;margin-bottom:4px}.collection{margin-top:28px;break-before:auto}.collection-title{display:flex;justify-content:space-between;gap:20px;align-items:flex-end;border-bottom:2px solid #ef7d00;padding-bottom:10px}.collection-title h2{margin:2px 0 3px;font-size:23px}.collection-title p{margin:0;color:#6e7580}.collection-title>strong{font-size:14px;white-space:nowrap}.eyebrow{font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:#c66b15;font-weight:800}.record-card{margin-top:12px;border:1px solid #e8eaed;border-radius:12px;overflow:hidden;break-inside:avoid}.record-card h3{margin:0;padding:10px 12px;background:#f7f8fa;font-size:13px}.record{width:100%;border-collapse:collapse}.record th,.record td{border-top:1px solid #eceef1;padding:8px 10px;vertical-align:top;text-align:left;font-size:11px}.record th{width:30%;background:#fcfcfd;color:#4d5560}.empty{padding:16px;border:1px dashed #d7dbe0;color:#737985;border-radius:10px}.note{margin-top:20px;padding:14px;border-radius:12px;background:#fff7e8;border:1px solid #f3d29a;color:#6c5123;font-size:12px}.page-break{page-break-before:always}.footer{margin-top:30px;padding-top:12px;border-top:1px solid #eee;color:#7b818b;font-size:10px;text-align:center}@media(max-width:700px){.sheet{padding:16px}.meta{grid-template-columns:1fr}.collection-title{align-items:flex-start;flex-direction:column}}
 </style></head><body><main class="sheet">
+${letterheadDataUri ? `<div class="print-brand"><img src="${letterheadDataUri}" alt="Midax Petroleum letterhead" /></div>` : ""}
 <section class="cover"><div class="brand">Benevolent Midax · Data Governance</div><h1>Human-Readable Database Backup</h1><p class="muted">A complete application-data snapshot prepared for SuperAdmin records, review, printing and offline reference.</p><div class="meta"><div><small>Generated</small>${safe(timestamp.toLocaleString("en-KE"))}</div><div><small>Database</small>${safe(mongoose.connection.name || "Connected database")}</div><div><small>Collections</small>${safe(sorted.length)}</div></div><div class="note"><strong>Security note:</strong> Passwords, access tokens, reset tokens, API keys, OTPs and other sensitive secret fields are intentionally redacted. This document is a human-readable record, not a credential recovery document.</div></section>
 ${sections.join("")}
 <div class="footer">Benevolent Midax · Confidential SuperAdmin data record · Generated ${safe(timestamp.toLocaleString("en-KE"))}</div>
@@ -781,13 +799,14 @@ exports.printDatabaseDetails = async (req, res) => {
         }
         const collections = await mongoose.connection.db.listCollections({}, { nameOnly: true }).toArray();
         const escapeHtml = (value) => String(value ?? "").replace(/[&<>\"']/g, (character) => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", "\"":"&quot;", "'":"&#39;" }[character]));
+        const letterheadDataUri = getPrintLetterheadDataUri();
         const sections = [];
         for (const item of collections.sort((a,b) => a.name.localeCompare(b.name))) {
             const docs = await mongoose.connection.db.collection(item.name).find({}).toArray();
             const rows = docs.map((doc, index) => `<tr><td>${index + 1}</td><td><pre>${escapeHtml(JSON.stringify(redactForBackup(doc), null, 2))}</pre></td></tr>`).join("");
             sections.push(`<section><h2>${escapeHtml(item.name)} <span>(${docs.length})</span></h2><table><thead><tr><th>#</th><th>Record</th></tr></thead><tbody>${rows || `<tr><td colspan="2">No records.</td></tr>`}</tbody></table></section>`);
         }
-        const html = `<!doctype html><html><head><meta charset="utf-8"><title>Benevolent Midax — Full Database Print</title><style>@page{size:A4 landscape;margin:10mm}body{font-family:Arial,sans-serif;color:#222;margin:0}header{border-bottom:3px solid #ef7d00;padding:12px 0;margin-bottom:15px}h1{margin:0;font-size:22px}h2{margin:22px 0 8px;font-size:16px;background:#f6f6f6;padding:8px;border-left:4px solid #ef7d00}h2 span{font-weight:400;color:#777}table{width:100%;border-collapse:collapse;table-layout:fixed}th,td{border:1px solid #ddd;padding:6px;vertical-align:top;font-size:9px}th{background:#f0f0f0;text-align:left}td:first-child{width:35px;text-align:center}pre{white-space:pre-wrap;word-break:break-word;margin:0;font:8px/1.35 Consolas,monospace}section{break-inside:auto;margin-bottom:16px}.note{font-size:11px;color:#666;line-height:1.5}</style></head><body><header><h1>Benevolent Midax — Full Database Print</h1><p class="note">Generated ${escapeHtml(new Date().toLocaleString("en-KE"))}. Credential/token fields are redacted for security. This printout reflects the live MongoDB database at generation time.</p></header>${sections.join("")}<script>window.onload=()=>window.print()</script></body></html>`;
+        const html = `<!doctype html><html><head><meta charset="utf-8"><title>Benevolent Midax — Full Database Print</title><style>@page{size:A4 landscape;margin:10mm}body{font-family:Arial,sans-serif;color:#222;margin:0}header{border-bottom:3px solid #ef7d00;padding:12px 0;margin-bottom:15px}h1{margin:0;font-size:22px}h2{margin:22px 0 8px;font-size:16px;background:#f6f6f6;padding:8px;border-left:4px solid #ef7d00}h2 span{font-weight:400;color:#777}table{width:100%;border-collapse:collapse;table-layout:fixed}th,td{border:1px solid #ddd;padding:6px;vertical-align:top;font-size:9px}th{background:#f0f0f0;text-align:left}td:first-child{width:35px;text-align:center}pre{white-space:pre-wrap;word-break:break-word;margin:0;font:8px/1.35 Consolas,monospace}section{break-inside:auto;margin-bottom:16px}.note{font-size:11px;color:#666;line-height:1.5}</style></head><body><header>${letterheadDataUri ? `<img src="${letterheadDataUri}" alt="Midax Petroleum letterhead" style="display:block;width:320px;max-width:70%;height:auto;margin:0 0 12px" />` : ""}<h1>Benevolent Midax — Full Database Print</h1><p class="note">Generated ${escapeHtml(new Date().toLocaleString("en-KE"))}. Credential/token fields are redacted for security. This printout reflects the live MongoDB database at generation time.</p></header>${sections.join("")}<script>window.onload=()=>window.print()</script></body></html>`;
         res.setHeader("Content-Type", "text/html; charset=utf-8");
         res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, private");
         return res.send(html);
