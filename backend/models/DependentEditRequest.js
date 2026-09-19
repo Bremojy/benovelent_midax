@@ -5,7 +5,7 @@ const dependentEditRequestSchema = new mongoose.Schema({
   dependent: { type: mongoose.Schema.Types.ObjectId, ref: "Dependent", required: true, index: true },
   requestedChanges: { type: mongoose.Schema.Types.Mixed, required: true },
   reason: { type: String, required: true, trim: true, maxlength: 2000 },
-  supportingFiles: [{ fileName: String, mimeType: String, url: String, uploadedAt: { type: Date, default: Date.now } }],
+  supportingFiles: [{ fileName: String, originalFilename: String, storageFilename: String, mimeType: String, url: String, uploadedAt: { type: Date, default: Date.now }, uploadedBy: { type: mongoose.Schema.Types.ObjectId, refPath: "supportingFiles.uploadedByModel" }, uploadedByModel: { type: String, enum: ["Member", "Admin", "SuperAdmin"] } }],
   status: { type: String, enum: ["pending", "approved", "rejected"], default: "pending", index: true },
   reviewer: { type: mongoose.Schema.Types.ObjectId, default: null },
   reviewerModel: { type: String, enum: ["Admin", "SuperAdmin"], default: null },

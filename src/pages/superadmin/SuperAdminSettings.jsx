@@ -197,6 +197,11 @@ export default function SuperAdminSettings({ initialTab = "website" }) {
           const images = galleryRes.value.data?.section?.images || galleryRes.value.data?.gallery || [];
           setGallery(Array.isArray(images) ? images : []);
         }
+        const failures = [
+          [websiteRes, "website content"], [carouselRes, "carousel"], [leadersRes, "leaders"],
+          [galleryRes, "gallery"], [settingsRes, "website settings"], [systemRes, "system settings"],
+        ].filter(([result]) => result.status === "rejected").map(([, label]) => label);
+        if (failures.length) setError(`Unable to load ${failures.join(", ")}. Loaded sections remain visible, but failed sections were not replaced with fake data.`);
       } catch (err) {
         if (active) setError(err.response?.data?.message || err.message || "Unable to load website settings.");
       } finally {

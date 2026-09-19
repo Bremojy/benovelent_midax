@@ -75,6 +75,13 @@ export default function Support() {
       setClaims(Array.isArray(claimsData?.claims) ? claimsData.claims : []);
       setDependents(Array.isArray(dependentsData?.data?.dependents) ? dependentsData.data.dependents : (Array.isArray(dependentsData?.dependents) ? dependentsData.dependents : []));
       setPolicies(Array.isArray(policiesData?.data?.policies) ? policiesData.data.policies : (Array.isArray(policiesData?.policies) ? policiesData.policies : []));
+      const failures = [
+        [claimsRes, "support requests"], [dependentsRes, "dependents"], [policiesRes, "support policies"],
+      ].filter(([result]) => result.status === "rejected").map(([, label]) => label);
+      if (failures.length) {
+        const first = [claimsRes, dependentsRes, policiesRes].find((result) => result.status === "rejected")?.reason;
+        setError(`${first?.response?.data?.message || "Some support data could not be loaded."} Failed: ${failures.join(", ")}.`);
+      }
     } catch (err) {
       setError(err.response?.data?.message || err.message || "Unable to load your support centre.");
     } finally {

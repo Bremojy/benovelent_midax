@@ -118,6 +118,29 @@ notificationSchema.index({recipient:1,createdAt:-1});
 notificationSchema.index({recipient:1,read:1,createdAt:-1});
 notificationSchema.index({eventId:1},{unique:true,sparse:true});
 
+const notificationEventKeyExpression = {
+  $cond: [
+    { $ne: [{ $ifNull: ["$eventId", ""] }, ""] },
+    { $concat: ["event:", "$eventId"] },
+    { $concat: [
+      "legacy:", { $toString: "$recipientModel" }, "|", { $toString: "$recipient" }, "|",
+      { $toString: { $ifNull: ["$type", "system"] } }, "|", { $toString: { $ifNull: ["$referenceModel", ""] } }, "|",
+      { $toString: { $ifNull: ["$referenceId", ""] } }, "|", { $toString: { $ifNull: ["$title", ""] } }, "|",
+      { $toString: { $ifNull: ["$message", ""] } },
+    ] },
+  ],
+};
+
+async function getUniqueUnreadCount(recipient, recipientModel = "Member") {
+  const result = await mongoose.model("Notification").aggregate([
+    { $match: { recipient, recipientModel, read: false } },
+    { $set: { _eventKey: notificationEventKeyExpression } },
+    { $group: { _id: "$_eventKey" } },
+    { $count: "unread" },
+  ]);
+  return Number(result?.[0]?.unread || 0);
+}
+
 const fanoutCreatedNotification = async (notification) => {
   if (!notification?.recipient) return;
   const room = `user:${String(notification.recipient)}`;
@@ -126,7 +149,7 @@ const fanoutCreatedNotification = async (notification) => {
     const io = getIO();
     if (io) {
       io.to(room).emit("new-notification", notification);
-      const unread = await mongoose.model("Notification").countDocuments({ recipient: notification.recipient, recipientModel: notification.recipientModel || "Member", read: false });
+      const unread = await getUniqueUnreadCount(notification.recipient, notification.recipientModel || "Member");
       io.to(room).emit("notification-count", unread);
     }
   } catch (error) { console.warn("Realtime notification delivery skipped:", error.message); }
@@ -151,7 +174,7 @@ const emitNotificationUpdated = async (notification) => {
     const io = getIO();
     if (io) {
       io.to(room).emit("notification-updated", notification);
-      const unread = await mongoose.model("Notification").countDocuments({ recipient: notification.recipient, recipientModel: notification.recipientModel || "Member", read: false });
+      const unread = await getUniqueUnreadCount(notification.recipient, notification.recipientModel || "Member");
       io.to(room).emit("notification-count", unread);
     }
   } catch (error) { console.warn("Realtime notification update delivery skipped:", error.message); }

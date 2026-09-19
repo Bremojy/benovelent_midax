@@ -1,7 +1,7 @@
 import { confirmAction } from "../../utils/modernDialog";
 
 import { useEffect, useState } from "react";
-import { BellRing, Mail, Phone, UserPlus } from "lucide-react";
+import { BellRing, Mail, Phone, UserPlus, Megaphone, MessageSquareText, ClipboardList } from "lucide-react";
 import DashboardLayout from "../../layouts/DashboardLayout";
 import { useAuth } from "../../context/AuthContext";
 import API from "../../services/api";
@@ -23,32 +23,21 @@ export default function AdminSupport() {
   const [success, setSuccess] = useState("");
   const [broadcast, setBroadcast] = useState(true);
   const [smsEnabled, setSmsEnabled] = useState(false);
+  const [broadcastRequestId, setBroadcastRequestId] = useState(() => globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`);
+  const [deliveryResult, setDeliveryResult] = useState(null);
 
   const load = async () => {
     try {
       setLoading(true);
-      const [membersRes, contactsRes, supportRes] = await Promise.allSettled([
+      const [membersRes, contactsRes, supportRes] = await Promise.all([
         getAdminMembers({ page: 1, limit: 100 }),
         API.get("/contact"),
         API.get("/member/support-requests"),
       ]);
 
-      setMembers(
-        membersRes.status === "fulfilled"
-          ? (membersRes.value?.members || [])
-          : []
-      );
-
-      setContactMessages(
-        contactsRes.status === "fulfilled"
-          ? (contactsRes.value?.data?.messages || [])
-          : []
-      );
-      setSupportRequests(
-        supportRes.status === "fulfilled"
-          ? (supportRes.value?.data?.requests || [])
-          : []
-      );
+      setMembers(Array.isArray(membersRes?.members) ? membersRes.members : []);
+      setContactMessages(Array.isArray(contactsRes?.data?.messages) ? contactsRes.data.messages : []);
+      setSupportRequests(Array.isArray(supportRes?.data?.requests) ? supportRes.data.requests : []);
     } catch (e) {
       setError(e.response?.data?.message || e.message || "Unable to load support data.");
     } finally {
@@ -64,6 +53,7 @@ export default function AdminSupport() {
     e.preventDefault();
     setError("");
     setSuccess("");
+    setDeliveryResult(null);
 
     if (!form.title || !form.message) {
       setError("Complete the subject and message.");
@@ -73,7 +63,7 @@ export default function AdminSupport() {
     try {
       setSending(true);
       const payload = broadcast
-        ? { requestId: globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`, title: form.title, message: form.message, smsText: form.message, broadcastSms: smsEnabled, inApp: true }
+        ? { requestId: broadcastRequestId, title: form.title, message: form.message, smsText: form.message, broadcastSms: smsEnabled, inApp: true }
         : { recipient: form.recipient, recipientModel: "Member", title: form.title, message: form.message, type: "system", senderModel: "Admin" };
 
       if (!broadcast && !form.recipient) {
@@ -85,18 +75,45 @@ export default function AdminSupport() {
       const { data } = await API.post(url, payload);
       if (!data?.success) throw new Error(data?.message || "Unable to send support message.");
 
-      const emailSent = data?.result?.emailResult?.sent || 0;
-      const smsSent = data?.result?.smsResult?.sent || 0;
-      const inAppSent = data?.result?.inAppNotifications || data?.result?.membersCount || 0;
-      const emailSkipped = data?.result?.emailResult?.skipped;
-      const smsSkipped = data?.result?.smsResult?.skipped;
+      const result = data?.result || {};
+      const broadcastResult = data?.broadcast || result?.broadcast || {};
+      const inAppSent = Number(data?.inAppNotifications ?? broadcastResult.inAppSent ?? 0);
+      const emailSent = Number(result?.emailResult?.sent ?? broadcastResult.emailSent ?? 0);
+      const emailAttempted = Number(result?.emailResult?.attempted ?? broadcastResult.emailAttempted ?? 0);
+      const emailFailed = Number(result?.emailResult?.failed ?? broadcastResult.emailFailed ?? 0);
+      const emailSkipped = Number(result?.emailResult?.skipped ?? broadcastResult.emailSkipped ?? Math.max(0, emailAttempted - emailSent - emailFailed));
+      const smsSent = Number(result?.smsResult?.sent ?? broadcastResult.smsSent ?? 0);
+      const smsAttempted = Number(result?.smsResult?.attempted ?? broadcastResult.smsAttempted ?? 0);
+      const smsFailed = Number(result?.smsResult?.failed ?? broadcastResult.smsFailed ?? 0);
+      const smsSkipped = Number(result?.smsResult?.skipped ?? broadcastResult.smsSkipped ?? Math.max(0, smsAttempted - smsSent - smsFailed));
+      const pushResult = result?.pushResult || {};
+      const pushSent = Number(pushResult.sent ?? broadcastResult.pushSent ?? 0);
+      const pushSkipped = Number(pushResult.skipped ?? broadcastResult.pushSkipped ?? 0);
+      const pushFailed = Number(pushResult.failed ?? broadcastResult.pushFailed ?? 0);
 
+      setDeliveryResult({
+        targetedUsers: Number(broadcastResult.targetedUsers ?? 0),
+        inAppSent,
+        pushSent,
+        pushSkipped,
+        pushFailed,
+        emailSent,
+        emailAttempted,
+        emailSkipped,
+        emailFailed,
+        smsSent,
+        smsAttempted,
+        smsSkipped,
+        smsFailed,
+        duplicate: Boolean(data?.duplicate),
+      });
       setSuccess(
         broadcast
-          ? `Broadcast processed. In-app: ${inAppSent}. Email: ${emailSent}${emailSkipped ? ` (skipped: ${emailSkipped})` : ""}. SMS: ${smsSent}${smsSkipped ? ` (skipped: ${smsSkipped})` : ""}.`
+          ? `${data?.duplicate ? "Broadcast already processed. Existing delivery results:" : "Broadcast processed."} In-app: ${inAppSent}. Push: ${pushSent} sent, ${pushSkipped} skipped, ${pushFailed} failed. Email: ${emailSent}/${emailAttempted} sent${emailFailed ? `, ${emailFailed} failed` : ""}. SMS: ${smsSent}/${smsAttempted} sent${smsFailed ? `, ${smsFailed} failed` : ""}${emailSkipped || smsSkipped ? ` (${emailSkipped} email / ${smsSkipped} SMS skipped)` : ""}.`
           : "Message sent successfully."
       );
       setForm({ recipient: "", title: "", message: "" });
+      if (broadcast) setBroadcastRequestId(globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`);
     } catch (e) {
       setError(e.response?.data?.message || e.message || "Unable to send message.");
     } finally {
@@ -170,9 +187,9 @@ export default function AdminSupport() {
       <div className="portal-module">
         <header className="portal-module-header">
           <div>
-            <span>MEMBER COMMUNICATION</span>
-            <h1>Support</h1>
-            <p>Send direct support and service messages, invite members, and review contact form submissions.</p>
+            <span>ADMIN COMMUNICATIONS</span>
+            <h1>Support &amp; Broadcast Centre</h1>
+            <p>Separate broadcast delivery, direct messages, support requests and website inbox work so each workflow is auditable.</p>
           </div>
         </header>
 
@@ -182,7 +199,7 @@ export default function AdminSupport() {
         <section className="portal-panel">
           <div className="portal-panel-header" style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
             <Mail size={18} />
-            <h2 style={{ margin: 0 }}>Broadcast or direct message</h2>
+            <h2 style={{ margin: 0 }}>Broadcast / Direct message</h2>
           </div>
           <form onSubmit={send}>
             <div className="portal-form-grid">
@@ -214,11 +231,23 @@ export default function AdminSupport() {
               <label>Message</label>
               <textarea rows="7" value={form.message} onChange={e => setForm({ ...form, message: e.target.value })} placeholder={broadcast ? "Write the message for all members..." : "Write the message to the member..."} />
             </div>
-            <button className="portal-btn" type="submit" disabled={sending}>{sending ? "Sending..." : broadcast ? "Send Broadcast" : "Send Support Message"}</button>
+            <button className="portal-btn" type="submit" disabled={sending}>{sending ? "Sending..." : broadcast ? "Send Broadcast" : "Send Direct Message"}</button>
           </form>
           <p style={{ marginTop: 12, color: "#64748b" }}>
-            Broadcasts can create in-app notifications and send email notifications. SMS is optional and stays off until you enable it.
+            Broadcasts create auditable in-app delivery records. Email and SMS delivery are provider-dependent; each result is reported separately.
           </p>
+          {deliveryResult && (
+            <div className="portal-card" style={{ marginTop: 14 }}>
+              <strong>Delivery results</strong>
+              <div className="portal-form-grid" style={{ marginTop: 10 }}>
+                <div><small>Targeted recipients</small><div>{deliveryResult.targetedUsers}</div></div>
+                <div><small>In-app sent</small><div>{deliveryResult.inAppSent}</div></div>
+                <div><small>Push</small><div>{deliveryResult.pushSent} sent · {deliveryResult.pushSkipped} skipped · {deliveryResult.pushFailed} failed</div></div>
+                <div><small>Email</small><div>{deliveryResult.emailSent}/{deliveryResult.emailAttempted} sent · {deliveryResult.emailFailed} failed</div></div>
+                <div><small>SMS</small><div>{deliveryResult.smsSent}/{deliveryResult.smsAttempted} sent · {deliveryResult.smsFailed} failed</div></div>
+              </div>
+            </div>
+          )}
         </section>
 
         <section className="portal-panel" style={{ marginTop: 18 }}>
@@ -253,7 +282,7 @@ export default function AdminSupport() {
         </section>
 
         <section className="portal-panel" style={{ marginTop: 18 }}>
-          <div className="portal-panel-header"><h2>Other support requests</h2></div>
+          <div className="portal-panel-header"><h2>Support requests</h2></div>
           {supportRequests.length === 0 ? (
             <div className="portal-empty">No custom support requests.</div>
           ) : (
@@ -323,7 +352,7 @@ export default function AdminSupport() {
         <section className="portal-panel" style={{ marginTop: 18 }}>
           <div className="portal-panel-header" style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
             <Phone size={18} />
-            <h2 style={{ margin: 0 }}>Website contact submissions</h2>
+            <h2 style={{ margin: 0 }}>Contact / inbox</h2>
           </div>
           {contactMessages.length === 0 ? (
             <div className="portal-empty">No contact messages yet.</div>

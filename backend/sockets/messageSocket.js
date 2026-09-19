@@ -1,13 +1,10 @@
 const Member = require("../models/Member");
-const Admin = require("../models/Admin");
-const SuperAdmin = require("../models/SuperAdmin");
 const Message = require("../models/Message");
 const Conversation = require("../models/Conversation");
 const Notification = require("../models/Notification");
-const { addUser, removeUser, touchUser, getPresence, cleanupStale, PRESENCE_TIMEOUT_MS } = require("./onlineUsers");
+const { getPresence } = require("./onlineUsers");
 const { sendPushToRecipient } = require("../services/pushService");
 
-const modelsByRole = { member: Member, admin: Admin, superadmin: SuperAdmin };
 const { resolveChatActor, isChatRole } = require("../utils/chatProfile");
 const activeCalls = new Map();
 // Canonical admin mirrors carry portalOwnerId; call/presence routing uses the same actor identity.
@@ -15,38 +12,6 @@ const CALL_TIMEOUT_MS = 35_000;
 
 function modelName(role) {
   return role === "superadmin" ? "SuperAdmin" : role === "admin" ? "Admin" : "Member";
-}
-
-async function savePresence(actor, online, socketId = "") {
-  if (!actor?.user?._id) return;
-  const Model = modelsByRole[String(actor.role || "member").toLowerCase()] || Member;
-  const update = online
-    ? { online: true, socketId, lastSeen: new Date() }
-    : { online: false, socketId: "", lastSeen: new Date() };
-  await Model.findByIdAndUpdate(actor.user._id, update).catch(() => null);
-  if (actor.chatId && String(actor.chatId) !== String(actor.user._id)) {
-    await Member.findByIdAndUpdate(actor.chatId, update).catch(() => null);
-  }
-}
-
-function broadcastPresence(io) {
-  io.emit("online-users", { users: require("./onlineUsers").getUsers(), presenceTimeoutMs: PRESENCE_TIMEOUT_MS });
-}
-
-let presenceCleanupStarted = false;
-function ensurePresenceCleanup(io) {
-  if (presenceCleanupStarted) return;
-  presenceCleanupStarted = true;
-  const intervalMs = Math.max(15000, Math.round(PRESENCE_TIMEOUT_MS / 3));
-  setInterval(() => {
-    const stale = cleanupStale();
-    if (!stale.length) return;
-    Promise.all(stale.map(async ({ userId, lastSeen }) => {
-      const actor = await resolveChatActor(userId);
-      if (actor) await savePresence(actor, false, "").catch(() => null);
-      return lastSeen;
-    })).finally(() => broadcastPresence(io)).catch(() => null);
-  }, intervalMs).unref?.();
 }
 
 async function deliverCallNotification({ recipient, caller, callType, title, message, callId, incomingPayload, missed = false }) {
@@ -70,25 +35,29 @@ async function deliverCallNotification({ recipient, caller, callType, title, mes
     eventId: `call:${String(callId)}:${String(recipient.user._id)}`,
     metadata: { callId: String(callId), callType, missed },
   });
-  await sendPushToRecipient({
-    recipient: recipient.user._id,
-    recipientModel,
-    title,
-    message,
-    link: recipient.role === "admin" ? "/admin/messages" : "/member/messages",
-    data: {
-      type: missed ? "missed_call" : "incoming_call",
-      callType,
-      incomingCall: !missed,
-      missedCall: missed,
-      role: recipient.role,
-      callId,
-      callerUserId: String(caller.chatId),
-      callerName: caller.user.fullName || caller.user.name || "Member",
-      callerRole: caller.role,
-      incomingPayload: missed ? undefined : incomingPayload,
-    },
-  }).catch((error) => console.warn("Call push skipped:", error.message));
+  const recipientPresence = getPresence(recipient.chatId);
+  const recipientIsLive = Boolean(recipientPresence?.sockets?.size);
+  if (!recipientIsLive) {
+    await sendPushToRecipient({
+      recipient: recipient.user._id,
+      recipientModel,
+      title,
+      message,
+      link: recipient.role === "admin" ? "/admin/messages" : "/member/messages",
+      data: {
+        type: missed ? "missed_call" : "incoming_call",
+        callType,
+        incomingCall: !missed,
+        missedCall: missed,
+        role: recipient.role,
+        callId,
+        callerUserId: String(caller.chatId),
+        callerName: caller.user.fullName || caller.user.name || "Member",
+        callerRole: caller.role,
+        incomingPayload: missed ? undefined : incomingPayload,
+      },
+    }).catch((error) => console.warn("Call push skipped:", error.message));
+  }
   return notification;
 }
 
@@ -179,39 +148,6 @@ function mongooseIsValid(value) {
 }
 
 module.exports = (io, socket) => {
-  ensurePresenceCleanup(io);
-
-  socket.on("user-online", async () => {
-    try {
-      const role = socket.userRole || "member";
-      if (!isChatRole(role)) return;
-      const actor = await resolveChatActor(socket.user?._id, role);
-      if (!actor) return;
-      socket.data.userId = String(actor.user._id);
-      socket.data.chatId = String(actor.chatId);
-      socket.data.role = actor.role;
-      addUser(actor.chatId, socket.id, actor.role, actor.portalOwnerId || actor.user._id);
-      socket.join(String(actor.chatId));
-      if (String(actor.user._id) !== String(actor.chatId)) socket.join(String(actor.user._id));
-      await savePresence(actor, true, socket.id);
-      broadcastPresence(io);
-    } catch (error) { console.warn("Could not persist online state:", error.message); }
-  });
-
-  socket.on("presence-heartbeat", async () => {
-    try {
-      const touched = touchUser(socket.id);
-      if (!touched) {
-        socket.emit("presence-required");
-        return;
-      }
-      const actor = await resolveChatActor(socket.data?.userId, socket.data?.role || "member");
-      if (actor) await savePresence(actor, true, socket.id);
-    } catch (error) {
-      console.warn("Presence heartbeat failed:", error.message);
-    }
-  });
-
   socket.on("join-conversation", async (conversationId) => {
     try {
       const conversation = await getAuthorizedConversation(socket, conversationId);
@@ -229,6 +165,10 @@ module.exports = (io, socket) => {
     if (!isChatRole(socket.data?.role) || !to || !offer) return;
     const recipient = await resolveChatActor(to);
     const caller = await resolveChatActor(socket.data.chatId || socket.data.userId, socket.data.role);
+    if (!recipient || !isChatRole(recipient.role) || !caller || !isChatRole(caller.role)) {
+      socket.emit("call-error", { code: "CALL_ROLE_FORBIDDEN", message: "Calling is only available between authorised member/admin chat accounts." });
+      return;
+    }
     if (String(recipient?.chatId || "") === String(caller?.chatId || "")) {
       socket.emit("call-error", { code: "SELF_CALL_BLOCKED", message: "Calling yourself is not available." });
       return;
@@ -398,17 +338,4 @@ module.exports = (io, socket) => {
     } catch (error) { console.warn("Seen message update failed:", error.message); }
   });
 
-  socket.on("disconnect", async () => {
-    const userId = socket.data?.userId;
-    const chatId = socket.data?.chatId || userId;
-    const role = socket.data?.role || "member";
-    const removed = removeUser(socket.id);
-    try {
-      if (userId && removed?.offline) {
-        const actor = await resolveChatActor(chatId, role);
-        if (actor) await savePresence(actor, false, "");
-      }
-      broadcastPresence(io);
-    } catch (error) { console.warn("Could not persist offline state:", error.message); }
-  });
 };

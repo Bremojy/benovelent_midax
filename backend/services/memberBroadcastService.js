@@ -132,7 +132,7 @@ async function sendBulkEmailToMembers({ subject, text, html, members }) {
   )];
 
   if (!recipients.length) {
-    return { sent: 0, skipped: "no-email-recipients" };
+    return { sent: 0, attempted: 0, failed: 0, skipped: "no-email-recipients" };
   }
 
   const provider = getEmailProvider();
@@ -140,10 +140,11 @@ async function sendBulkEmailToMembers({ subject, text, html, members }) {
   if (provider === "resend") {
     const config = getResendConfig();
     const client = getResendClient();
-    if (!config || !client) return { sent: 0, skipped: "resend-not-configured" };
+    if (!config || !client) return { sent: 0, attempted: recipients.length, failed: 0, skipped: recipients.length, reason: "resend-not-configured" };
 
     const BATCH_SIZE = 8;
     let sent = 0;
+    let failed = 0;
 
     for (let index = 0; index < recipients.length; index += BATCH_SIZE) {
       const batch = recipients.slice(index, index + BATCH_SIZE);
@@ -159,18 +160,20 @@ async function sendBulkEmailToMembers({ subject, text, html, members }) {
         )
       );
       sent += results.filter((result) => result.status === "fulfilled").length;
+      failed += results.filter((result) => result.status === "rejected").length;
     }
 
-    return { sent, provider: "resend", attempted: recipients.length };
+    return { sent, failed, provider: "resend", attempted: recipients.length };
   }
 
   if (provider === "smtp") {
     const config = getSmtpConfig();
     const transport = await getTransport();
-    if (!config || !transport) return { sent: 0, skipped: "smtp-not-configured" };
+    if (!config || !transport) return { sent: 0, attempted: recipients.length, failed: 0, skipped: recipients.length, reason: "smtp-not-configured" };
 
     const BATCH_SIZE = 8;
     let sent = 0;
+    let failed = 0;
 
     for (let index = 0; index < recipients.length; index += BATCH_SIZE) {
       const batch = recipients.slice(index, index + BATCH_SIZE);
@@ -186,12 +189,13 @@ async function sendBulkEmailToMembers({ subject, text, html, members }) {
         )
       );
       sent += results.filter((result) => result.status === "fulfilled").length;
+      failed += results.filter((result) => result.status === "rejected").length;
     }
 
-    return { sent, provider: "smtp", attempted: recipients.length };
+    return { sent, failed, provider: "smtp", attempted: recipients.length };
   }
 
-  return { sent: 0, skipped: "email-not-configured" };
+  return { sent: 0, attempted: recipients.length, failed: 0, skipped: recipients.length, reason: "email-not-configured" };
 }
 
 function normalizeSmsRecipient(value) {
@@ -253,24 +257,26 @@ async function sendSmsNotification({ to, message }) {
 async function notifyMembers({ subject, text, html, smsText, broadcastSms = false, members = null }) {
   const recipients = Array.isArray(members) && members.length ? members : await getActiveMembers({ includeEmails: true });
 
-  let emailResult = { sent: 0, skipped: "no-members" };
+  let emailResult = { sent: 0, attempted: 0, failed: 0, skipped: 0, reason: "no-members" };
   if (recipients.length) {
     emailResult = await sendBulkEmailToMembers({ subject, text, html, members: recipients });
   }
 
-  let smsResult = { sent: 0, skipped: "sms-not-configured" };
+  let smsResult = { sent: 0, attempted: 0, failed: 0, skipped: "sms-not-configured" };
   if (broadcastSms) {
     const smsTargets = recipients
       .map((member) => member.phone || member.mpesaNumber)
       .filter(Boolean);
 
+    smsResult.attempted = smsTargets.length;
     for (const phone of smsTargets) {
       try {
         const result = await sendSmsNotification({ to: phone, message: smsText || text });
         if (result?.sent) smsResult.sent += 1;
-        else smsResult.skipped = result?.reason || smsResult.skipped;
+        else smsResult.skipped += 1;
+        if (result?.reason) smsResult.reason = result.reason;
       } catch (error) {
-        smsResult.error = error.message;
+        smsResult.failed += 1;
       }
     }
   }

@@ -6,6 +6,7 @@ const SuperAdmin = require("../models/SuperAdmin");
 const { resolveCanonicalChatActorForAuthenticatedUser } = require("../utils/chatProfile");
 
 const registerMessageSocket = require("./messageSocket");
+const registerPresence = require("./presence");
 const registerNotificationSocket = require("./notificationSocket");
 const registerNewsSocket = require("./newsSocket");
 const registerPollSocket = require("./pollSocket");
@@ -111,6 +112,8 @@ const initSocket = (server) => {
 
         console.log("User Connected:", socket.id);
 
+        registerPresence(io, socket);
+
         registerMessageSocket(io, socket);
 
         registerNotificationSocket(io, socket);
@@ -118,12 +121,6 @@ const initSocket = (server) => {
         registerNewsSocket(io, socket);
 
         registerPollSocket(io, socket);
-
-        socket.on("disconnect", () => {
-
-            console.log("User Disconnected:", socket.id);
-
-        });
 
     });
 

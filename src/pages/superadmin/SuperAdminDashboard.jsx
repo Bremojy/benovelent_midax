@@ -6,7 +6,6 @@ import {
   DatabaseZap,
   Gauge,
   HandHeart,
-  MessageCircle,
   Newspaper,
   RefreshCw,
   ShieldAlert,
@@ -91,7 +90,7 @@ export default function SuperAdminDashboard() {
           <Metric label="Members" value={overview?.members?.total ?? 0} caption="Total scheme members" icon={<Users />} />
           <Metric label="Support cases" value={overview?.support?.pending ?? 0} caption="pending" icon={<HandHeart />} tone="green" />
           <Metric label="Administrators" value={overview?.leadership?.administrators ?? statistics.total} caption={`${overview?.leadership?.activeAdministrators ?? statistics.active} active`} icon={<UserCog />} tone="violet" />
-          <Metric label="Messages" value={overview?.communication?.messages ?? 0} caption={`${overview?.communication?.conversations ?? 0} conversations`} icon={<MessageCircle />} tone="blue" />
+          <Metric label="Feedback responses" value={overview?.content?.feedbackResponses ?? 0} caption="member feedback received" icon={<ClipboardList />} tone="blue" />
           <Metric label="Published news" value={overview?.content?.publishedNews ?? 0} caption="live content" icon={<Newspaper />} tone="rose" />
           <Metric label="Book balance" value={money(overview?.finance?.bookBalance)} caption="live finance snapshot" icon={<Wallet />} tone="amber" />
           <Metric label="Contributions collected" value={money(overview?.finance?.contributionCollected)} caption={`${overview?.finance?.contributionMembersCharged ?? 0} members charged`} icon={<Wallet />} tone="green" />
@@ -155,7 +154,7 @@ export default function SuperAdminDashboard() {
             <Tool href="/superadmin/notifications" icon={<Bell />} title="Notifications" text="Review and manage alerts." />
             <Tool href="/superadmin/policies" icon={<ShieldCheck />} title="Policies" text="Maintain privacy and terms content." />
             <Tool href="/superadmin/polls" icon={<ClipboardList />} title="Polls" text="Manage active and archived polls." />
-            <Tool href="/superadmin/feedback" icon={<MessageCircle />} title="Feedback" text="Manage feedback collections." />
+            <Tool href="/superadmin/feedback" icon={<ClipboardList />} title="Feedback" text="Manage feedback collections." />
             <Tool href="/superadmin/news" icon={<Newspaper />} title="News" text="Manage website news." />
             <Tool href="/superadmin/password" icon={<ShieldCheck />} title="Password" text="Change the SuperAdmin password." />
           </div>

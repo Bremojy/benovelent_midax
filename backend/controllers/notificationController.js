@@ -27,48 +27,48 @@ GET MY NOTIFICATIONS
 ===================================================== */
 
 exports.getNotifications = async (req, res) => {
-    const cacheKey = `notifications:${req.user._id}:${JSON.stringify(req.query || {})}`;
-    const cached = await redisCache.getJson(cacheKey);
-    if (cached !== null) return res.json(cached);
-    const __originalJson = res.json.bind(res);
-    res.json = (body) => { redisCache.setJson(cacheKey, body, 10).catch(() => {}); return __originalJson(body); };
-
+  const cacheKey = `notifications:${req.user._id}:${JSON.stringify(req.query || {})}`;
+  const cached = await redisCache.getJson(cacheKey);
+  if (cached !== null) return res.json(cached);
   try {
     const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
     const limit = Math.min(100, Math.max(1, Number.parseInt(req.query.limit, 10) || 50));
     const skip = (page - 1) * limit;
     const filter = { recipient: req.user._id };
-
-    const rawNotifications = await Notification.find(filter)
-      .populate("sender", "fullName profileImage")
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(Math.min(100, limit * 2))
-      .lean();
-    const notifications = [];
-    const fingerprints = new Set();
-    for (const item of rawNotifications) {
-      const fingerprint = [item.recipientModel, item.recipient, item.type, item.referenceModel, item.referenceId, item.title, item.message].map((v) => String(v ?? "")).join("|");
-      if (fingerprints.has(fingerprint)) continue;
-      fingerprints.add(fingerprint);
-      notifications.push(item);
-      if (notifications.length >= limit) break;
-    }
-    const total = await Notification.countDocuments(filter);
-
-    return res.json({
-      success: true,
-      count: notifications.length,
-      total,
-      page,
-      pages: Math.max(1, Math.ceil(total / limit)),
-      notifications,
-    });
+    const eventKey = {
+      $cond: [
+        { $ne: [{ $ifNull: ["$eventId", ""] }, ""] },
+        { $concat: ["event:", "$eventId"] },
+        { $concat: [
+          "legacy:",
+          { $toString: "$recipientModel" }, "|", { $toString: "$recipient" }, "|",
+          { $toString: { $ifNull: ["$type", "system"] } }, "|", { $toString: { $ifNull: ["$referenceModel", ""] } }, "|",
+          { $toString: { $ifNull: ["$referenceId", ""] } }, "|", { $toString: { $ifNull: ["$title", ""] } }, "|",
+          { $toString: { $ifNull: ["$message", ""] } },
+        ] },
+      ],
+    };
+    const pipeline = [
+      { $match: filter },
+      { $set: { _eventKey: eventKey } },
+      { $sort: { createdAt: -1, _id: -1 } },
+      { $group: { _id: "$_eventKey", notificationId: { $first: "$_id" }, createdAt: { $first: "$createdAt" } } },
+      { $sort: { createdAt: -1, notificationId: -1 } },
+      { $facet: { meta: [{ $count: "total" }], items: [{ $skip: skip }, { $limit: limit }] } },
+    ];
+    const [result] = await Notification.aggregate(pipeline);
+    const total = Number(result?.meta?.[0]?.total || 0);
+    const ids = (result?.items || []).map((item) => item.notificationId);
+    const docs = ids.length
+      ? await Notification.find({ _id: { $in: ids } }).populate("sender", "fullName profileImage").lean()
+      : [];
+    const order = new Map(ids.map((id, index) => [String(id), index]));
+    docs.sort((a, b) => (order.get(String(a._id)) ?? 0) - (order.get(String(b._id)) ?? 0));
+    const body = { success: true, count: docs.length, total, page, pages: Math.max(1, Math.ceil(total / limit)), notifications: docs };
+    await redisCache.setJson(cacheKey, body, 10).catch(() => {});
+    return res.json(body);
   } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: error.message,
-    });
+    return res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -77,31 +77,34 @@ UNREAD COUNT
 ===================================================== */
 
 exports.getUnreadCount = async (req, res) => {
-    const cacheKey = `notifications:${req.user._id}:unread`;
-    const cached = await redisCache.getJson(cacheKey);
-    if (cached !== null) return res.json(cached);
-    const __originalJson = res.json.bind(res);
-    res.json = (body) => { redisCache.setJson(cacheKey, body, 5).catch(() => {}); return __originalJson(body); };
-
+  const cacheKey = `notifications:${req.user._id}:unread`;
+  const cached = await redisCache.getJson(cacheKey);
+  if (cached !== null) return res.json(cached);
   try {
-    const unreadRows = await Notification.find({ recipient: req.user._id, read: false })
-      .select("recipientModel recipient type referenceModel referenceId title message")
-      .lean();
-    const fingerprints = new Set();
-    for (const item of unreadRows) {
-      fingerprints.add([item.recipientModel, item.recipient, item.type, item.referenceModel, item.referenceId, item.title, item.message].map((v) => String(v ?? "")).join("|"));
-    }
-    const unread = fingerprints.size;
-
-    return res.json({
-      success: true,
-      unread,
-    });
+    const eventKey = {
+      $cond: [
+        { $ne: [{ $ifNull: ["$eventId", ""] }, ""] },
+        { $concat: ["event:", "$eventId"] },
+        { $concat: [
+          "legacy:",
+          { $toString: "$recipientModel" }, "|", { $toString: "$recipient" }, "|",
+          { $toString: { $ifNull: ["$type", "system"] } }, "|", { $toString: { $ifNull: ["$referenceModel", ""] } }, "|",
+          { $toString: { $ifNull: ["$referenceId", ""] } }, "|", { $toString: { $ifNull: ["$title", ""] } }, "|",
+          { $toString: { $ifNull: ["$message", ""] } },
+        ] },
+      ],
+    };
+    const result = await Notification.aggregate([
+      { $match: { recipient: req.user._id, read: false } },
+      { $set: { _eventKey: eventKey } },
+      { $group: { _id: "$_eventKey" } },
+      { $count: "unread" },
+    ]);
+    const body = { success: true, unread: Number(result?.[0]?.unread || 0) };
+    await redisCache.setJson(cacheKey, body, 5).catch(() => {});
+    return res.json(body);
   } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: error.message,
-    });
+    return res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -125,6 +128,23 @@ exports.markRead = async (req, res) => {
     notification.read = true;
     notification.readAt = new Date();
     await notification.save();
+
+    // Read state follows the authoritative event identity so a legacy/replayed
+    // duplicate cannot remain unread after the user opens the event.
+    const identityFilter = notification.eventId
+      ? { eventId: notification.eventId, recipient: req.user._id }
+      : {
+          recipient: req.user._id,
+          type: notification.type,
+          referenceModel: notification.referenceModel || "",
+          referenceId: notification.referenceId || null,
+          title: notification.title,
+          message: notification.message,
+        };
+    await Notification.updateMany(
+      identityFilter,
+      { $set: { read: true, readAt: notification.readAt } }
+    );
     await Notification.emitNotificationUpdated(notification);
     await invalidateNotificationCaches(req.user._id);
 
@@ -189,18 +209,26 @@ CREATE NOTIFICATION
 
 exports.createNotification = async (req, res) => {
   try {
-    const notification = await createNotification(req.body || {});
-    if (!notification) return res.status(400).json({ success: false, message: "Notification recipient, title and message are required." });
-
-    return res.status(201).json({
-      success: true,
-      notification,
+    const body = req.body || {};
+    const recipient = String(body.recipient || "").trim();
+    const title = String(body.title || "").trim();
+    const message = String(body.message || "").trim();
+    if (!recipient || !title || !message) return res.status(400).json({ success: false, message: "Notification recipient, title and message are required." });
+    if (String(body.recipientModel || "Member") !== "Member") return res.status(400).json({ success: false, message: "Direct notifications may only target Member recipients." });
+    if (!(await Member.exists({ _id: recipient }))) return res.status(404).json({ success: false, message: "Member recipient not found." });
+    const notification = await createNotification({
+      ...body,
+      recipient,
+      recipientModel: "Member",
+      sender: req.user._id,
+      senderModel: senderModelFromUser(req.user),
+      title,
+      message,
     });
+    if (!notification) return res.status(400).json({ success: false, message: "Unable to create the notification." });
+    return res.status(201).json({ success: true, notification });
   } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: error.message,
-    });
+    return res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -301,43 +329,103 @@ exports.broadcastToMembers = async (req, res) => {
     const { title, message, smsText, emailHtml, broadcastSms = false, inApp = true } = body;
     if (!title?.trim() || !message?.trim()) return res.status(400).json({ success: false, message: "Title and message are required." });
 
-    const existing = await Broadcast.findOne({ requestId }).lean();
+    const existing = await Broadcast.findOne({ requestId });
     if (existing?.status === "completed") {
       return res.status(200).json({
         success: true,
         duplicate: true,
         message: "This broadcast was already processed.",
-        result: { membersCount: existing.targetedUsers, emailResult: { sent: existing.emailSent }, smsResult: { sent: existing.smsSent } },
+        result: {
+          membersCount: existing.targetedUsers,
+          emailResult: { sent: existing.emailSent, attempted: existing.emailAttempted, failed: Math.max(0, existing.emailAttempted - existing.emailSent) },
+          smsResult: { sent: existing.smsSent, attempted: existing.smsAttempted, failed: existing.smsFailed, skipped: existing.smsEnabled ? undefined : "sms-disabled" },
+          pushResult: { sent: existing.pushSent, skipped: existing.pushSkipped, failed: existing.pushFailed },
+        },
         inAppNotifications: existing.inAppSent,
+        broadcast: {
+          requestId, targetedUsers: existing.targetedUsers, inAppSent: existing.inAppSent,
+          pushSent: existing.pushSent, pushSkipped: existing.pushSkipped, pushFailed: existing.pushFailed,
+          emailSent: existing.emailSent, emailAttempted: existing.emailAttempted, emailSkipped: Math.max(0, existing.emailAttempted - existing.emailSent),
+          smsSent: existing.smsSent, smsAttempted: existing.smsAttempted, smsSkipped: Math.max(0, existing.smsAttempted - existing.smsSent), smsFailed: existing.smsFailed,
+        },
       });
     }
+    if (existing?.status === "processing") {
+      return res.status(409).json({ success: false, code: "BROADCAST_IN_PROGRESS", message: "This broadcast request is already being processed.", requestId });
+    }
 
-    record = existing ? await Broadcast.findById(existing._id) : await Broadcast.create({ requestId, sender: req.user._id, senderModel: senderModelFromUser(req.user), title: title.trim(), message: message.trim(), smsEnabled: Boolean(broadcastSms) });
+    try {
+      record = existing || await Broadcast.create({ requestId, sender: req.user._id, senderModel: senderModelFromUser(req.user), title: title.trim(), message: message.trim(), smsEnabled: Boolean(broadcastSms) });
+    } catch (createError) {
+      if (createError?.code !== 11000) throw createError;
+      const raced = await Broadcast.findOne({ requestId });
+      if (raced?.status === "completed") return res.status(200).json({ success: true, duplicate: true, message: "This broadcast was already processed.", requestId });
+      return res.status(409).json({ success: false, code: "BROADCAST_IN_PROGRESS", message: "This broadcast request is already being processed.", requestId });
+    }
+
     const contactableMembers = await getActiveMembers({ includeEmails: true });
     const inAppMembers = inApp ? await Member.find({ role: "member", status: "active", isDeleted: false }).select("_id").lean() : [];
     const senderModel = senderModelFromUser(req.user);
 
     let inAppSent = 0;
+    let pushSent = 0;
+    let pushSkipped = 0;
+    let pushFailed = 0;
     if (inApp && inAppMembers.length) {
       const notifications = inAppMembers.map((member) => ({
         recipient: member._id, recipientModel: "Member", sender: req.user._id, senderModel,
         title: title.trim(), message: message.trim(), type: "announcement", icon: "campaign", read: false,
         eventId: `broadcast:${requestId}:${String(member._id)}`, referenceId: record._id, referenceModel: "Broadcast",
-        metadata: { broadcastId: String(record._id), requestId },
+        metadata: { broadcastId: String(record._id), requestId }, suppressPush: true,
       }));
       const inserted = await Notification.insertMany(notifications);
       inAppSent = inserted.length;
+      if (inserted.length) {
+        const pushResults = await Promise.all(inserted.map(async (notification) => {
+          try {
+            const result = await sendPushForNotification(notification);
+            if (result?.sent) return "sent";
+            if (Number(result?.failed || 0) > 0) return "failed";
+            return "skipped";
+          } catch (_) { return "failed"; }
+        }));
+        pushSent = pushResults.filter((r) => r === "sent").length;
+        pushSkipped = pushResults.filter((r) => r === "skipped").length;
+        pushFailed = pushResults.filter((r) => r === "failed").length;
+      }
     }
 
     const result = await notifyMembers({ subject: title.trim(), text: message.trim(), html: emailHtml || `<h2>${title.trim()}</h2><p>${message.trim().replace(/\n/g, "<br>")}</p>`, smsText: smsText || message.trim(), broadcastSms: Boolean(broadcastSms), members: contactableMembers });
     const emailSent = Number(result?.emailResult?.sent || 0);
-    const emailAttempted = Number(result?.emailResult?.attempted || contactableMembers.length || 0);
+    const emailAttempted = Number(result?.emailResult?.attempted || 0);
+    const emailFailed = Number(result?.emailResult?.failed || Math.max(0, emailAttempted - emailSent));
+    const emailSkipped = Number.isFinite(Number(result?.emailResult?.skipped)) ? Number(result.emailResult.skipped) : Math.max(0, emailAttempted - emailSent - emailFailed);
     const smsSent = Number(result?.smsResult?.sent || 0);
+    const smsAttempted = Number(result?.smsResult?.attempted || 0);
+    const smsFailed = Number(result?.smsResult?.failed || 0);
+    const smsSkipped = Number.isFinite(Number(result?.smsResult?.skipped)) ? Number(result.smsResult.skipped) : Math.max(0, smsAttempted - smsSent - smsFailed);
 
-    await Broadcast.findByIdAndUpdate(record._id, { targetedUsers: inApp ? inAppMembers.length : contactableMembers.length, inAppSent, emailSent, emailAttempted, smsSent, completedAt: new Date(), status: "completed", error: "" });
-    return res.status(201).json({ success: true, message: "Broadcast sent successfully.", result, inAppNotifications: inAppSent, broadcast: { requestId, targetedUsers: inApp ? inAppMembers.length : contactableMembers.length, inAppSent, emailSent, emailAttempted, smsSent } });
+    await Broadcast.findByIdAndUpdate(record._id, {
+      targetedUsers: inApp ? inAppMembers.length : contactableMembers.length,
+      inAppSent, pushSent, pushSkipped, pushFailed,
+      emailSent, emailAttempted,
+      smsSent, smsAttempted, smsFailed,
+      smsEnabled: Boolean(broadcastSms), completedAt: new Date(), status: "completed", error: "",
+    });
+    return res.status(201).json({
+      success: true,
+      message: "Broadcast sent successfully.",
+      result: { ...result, emailResult: { ...result.emailResult, attempted: emailAttempted, sent: emailSent, skipped: emailSkipped, failed: emailFailed }, smsResult: { ...result.smsResult, attempted: smsAttempted, sent: smsSent, skipped: smsSkipped, failed: smsFailed }, pushResult: { sent: pushSent, skipped: pushSkipped, failed: pushFailed } },
+      inAppNotifications: inAppSent,
+      broadcast: {
+        requestId, targetedUsers: inApp ? inAppMembers.length : contactableMembers.length, inAppSent,
+        pushSent, pushSkipped, pushFailed,
+        emailSent, emailAttempted, emailSkipped, emailFailed,
+        smsSent, smsAttempted, smsSkipped, smsFailed,
+      },
+    });
   } catch (error) {
-    console.error("Broadcast notification error:", error);
+    console.error("Broadcast notification error:", error.message);
     if (record?._id) await Broadcast.findByIdAndUpdate(record._id, { status: "failed", error: String(error.message || error).slice(0, 2000) }).catch(() => {});
     return res.status(500).json({ success: false, message: error.message || "Unable to broadcast message.", requestId });
   }

@@ -3,8 +3,9 @@ const mongoose = require("mongoose");
 const dependentDocumentSchema = new mongoose.Schema({
   dependent: { type: mongoose.Schema.Types.ObjectId, ref: "Dependent", required: true, index: true },
   member: { type: mongoose.Schema.Types.ObjectId, ref: "Member", required: true, index: true },
-  documentType: { type: String, enum: ["dependent-id", "birth-certificate", "supporting-document", "profile-photo", "other"], default: "other" },
+  documentType: { type: String, enum: ["dependent-id", "dependent-id-front", "dependent-id-back", "birth-certificate", "supporting-document", "profile-photo", "other"], default: "other" },
   filename: { type: String, required: true, trim: true },
+  storageFilename: { type: String, default: "", trim: true },
   mimeType: { type: String, default: "application/octet-stream" },
   url: { type: String, required: true },
   uploadedAt: { type: Date, default: Date.now },

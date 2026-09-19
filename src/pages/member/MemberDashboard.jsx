@@ -29,6 +29,7 @@ export default function MemberDashboard() {
   const [c, setC] = useState(null);
   const [contributionSummary, setContributionSummary] = useState(null);
   const [error, setError] = useState("");
+  const [widgetError, setWidgetError] = useState("");
   const [loading, setLoading] = useState(true);
 
   const load = async () => {
@@ -62,6 +63,7 @@ export default function MemberDashboard() {
     }
 
     setD(dashboardResponse.dashboard || {});
+    setWidgetError("");
 
     const [communityResult, accountsResult] = await Promise.allSettled([
       API.get("/member/community-stats"),
@@ -77,9 +79,11 @@ export default function MemberDashboard() {
     }
 
     if (communityResult.status === "rejected" || accountsResult.status === "rejected") {
-      // Secondary widgets are intentionally non-blocking. Keep the dashboard
-      // visible even when one endpoint is temporarily unavailable.
-      console.warn("Some dashboard widgets could not refresh.");
+      const failed = [
+        [communityResult, "community statistics"], [accountsResult, "contribution summary"],
+      ].filter(([result]) => result.status === "rejected").map(([, label]) => label);
+      const first = [communityResult, accountsResult].find((result) => result.status === "rejected")?.reason;
+      setWidgetError(`${first?.response?.data?.message || "Some dashboard data could not be refreshed."} Failed: ${failed.join(", ")}.`);
     }
 
     setLoading(false);

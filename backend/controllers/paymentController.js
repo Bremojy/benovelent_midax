@@ -19,6 +19,7 @@ const getSafeMpesaSettings = async () => (await SystemSettings.findOne({ singlet
 const normalizeManualCode = (value) => String(value || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 32);
 
 const modelMap = { SupportRequest, MedicalSupport, FuneralSupport, EducationSupport };
+const { invalidateFinanceCache } = require("../services/financeLedgerService");
 
 async function ensureReferenceExists(referenceModel, referenceId) {
   const Model = modelMap[referenceModel];
@@ -1019,6 +1020,7 @@ exports.b2cResult = async (req, res) => {
           { $setOnInsert: { member: directTransaction.member, transactionNumber: financeTransactionNumber, type: "withdrawal", category: "B2C disbursement", amount: directTransaction.amount, description: directTransaction.remarks, paymentMethod: "M-PESA", referenceNumber: directTransaction.conversationId || directTransaction.requestReference, receiptNumber: receipt, status: "completed", transactionDate: new Date(), notes: `SuperAdmin B2C disbursement confirmed by M-PESA. Request ${directTransaction.requestReference}.` } },
           { upsert: true, returnDocument: "after" }
         );
+        await invalidateFinanceCache();
         if (directTransaction.member) await createNotification({ recipient: directTransaction.member, recipientModel: "Member", title: "M-PESA Disbursement Received", message: `KSh ${Number(directTransaction.amount).toLocaleString("en-KE")} has been sent to your M-PESA account. Receipt: ${receipt || "pending"}.`, type: "payment", referenceId: directTransaction._id, referenceModel: "MpesaB2CTransaction", icon: "payments" });
       } else if (directTransaction.member) await createNotification({ recipient: directTransaction.member, recipientModel: "Member", title: "M-PESA Disbursement Update", message: `Your M-PESA disbursement of KSh ${Number(directTransaction.amount).toLocaleString("en-KE")} was not completed. ${result.ResultDesc || "Please contact the scheme administrator."}`, type: "payment", referenceId: directTransaction._id, referenceModel: "MpesaB2CTransaction", icon: "payments" });
     }
@@ -1035,6 +1037,7 @@ exports.b2cResult = async (req, res) => {
           { $setOnInsert: { member: campaign.recipientMember, transactionNumber: financeTransactionNumber, type: "withdrawal", category: "Community assistance disbursement", amount: Number(campaign.payoutAmount || 0), description: campaign.title, paymentMethod: "M-PESA", referenceNumber: campaign.payoutConversationId, receiptNumber: receipt, status: "completed", transactionDate: new Date(), notes: `Community assistance disbursement confirmed by M-PESA. Case ${campaign._id}.` } },
           { upsert: true, returnDocument: "after" }
         );
+        await invalidateFinanceCache();
         await createNotification({ recipient: campaign.recipientMember, recipientModel: "Member", title: "Community Assistance Paid", message: `KSh ${Number(campaign.payoutAmount).toLocaleString("en-KE")} has been sent to your registered M-PESA number.`, type: "claim", referenceId: campaign._id, referenceModel: "CommunityAssistance", icon: "payments" });
       }
     }

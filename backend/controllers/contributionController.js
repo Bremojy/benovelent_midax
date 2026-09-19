@@ -4,6 +4,7 @@ const Member = require("../models/Member");
 const Notification = require("../models/Notification");
 const { sanitizeDocument } = require("../utils/clientSanitizer");
 const SystemSettings = require("../models/SystemSettings");
+const { invalidateFinanceCache } = require("../services/financeLedgerService");
 
 async function configuredMonthlyContribution() {
   const settings = await SystemSettings.findOne({ singletonKey: "primary" }).select("scheme.monthlyContribution").lean();
@@ -91,6 +92,7 @@ exports.createContribution = async (req, res) => {
       });
       contribution.finance = finance._id;
       await contribution.save();
+      await invalidateFinanceCache();
     }
 
     await Notification.create({
@@ -240,6 +242,7 @@ exports.createBulkContributionRun = async (req, res) => {
 
     // Keep the shared member profile field aligned as a display fallback only.
     await Member.updateMany({ role: "member", isDeleted: false }, { $set: { monthlyContribution: amount } });
+    await invalidateFinanceCache();
 
     return res.status(201).json({
       success: true,
@@ -496,6 +499,7 @@ exports.updateContribution = async (req, res) => {
             await contribution.save();
         }
 
+        await invalidateFinanceCache();
         res.json({
 
             success: true,
@@ -551,10 +555,12 @@ exports.deleteContribution = async (req, res) => {
         if (contribution.finance) {
 
             await Finance.findByIdAndDelete(contribution.finance);
+            await invalidateFinanceCache();
 
         }
 
         await contribution.deleteOne();
+        await invalidateFinanceCache();
 
         res.json({
 

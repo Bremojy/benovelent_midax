@@ -83,7 +83,7 @@ exports.cleanupStale = () => {
   for (const [userId, value] of onlineUsers.entries()) {
     const heartbeatAt = new Date(value?.lastHeartbeat || value?.lastSeen || 0).getTime();
     if (!heartbeatAt || now - heartbeatAt > PRESENCE_TIMEOUT_MS) {
-      stale.push({ userId, lastSeen: value?.lastSeen || new Date(), sockets: [...(value?.sockets || [])] });
+      stale.push({ userId, role: value?.role || "member", portalOwnerId: value?.portalOwnerId || userId, lastSeen: value?.lastSeen || new Date(), sockets: [...(value?.sockets || [])] });
       onlineUsers.delete(userId);
     }
   }

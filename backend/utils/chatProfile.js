@@ -156,10 +156,15 @@ async function resolveChatActor(id, hintedRole = '') {
 async function resolveCanonicalChatActorForAuthenticatedUser(user) {
   const role = String(user?.role || '').toLowerCase();
   if (role === 'member') return { user, role, chatId: String(user._id), portalOwnerId: String(user._id) };
-  if (role === 'admin' || role === 'superadmin') {
+  if (role === 'admin') {
     const mirror = await ensureChatProfile(user);
     if (!mirror?._id) throw new Error('Chat identity could not be prepared.');
     return { user, role, chatId: String(mirror._id), portalOwnerId: String(user._id), chatProfile: mirror };
+  }
+  if (role === 'superadmin') {
+    // SuperAdmin is part of live portal presence but intentionally has no chat
+    // identity. Chat routes are separately limited to member/admin.
+    return { user, role, chatId: String(user._id), portalOwnerId: String(user._id), chatProfile: null };
   }
   return null;
 }

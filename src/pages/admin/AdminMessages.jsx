@@ -16,22 +16,22 @@ export default function AdminMessages() {
       loadContacts={async ({ filters = {} } = {}) => {
         const params = { limit: 1000 };
         Object.entries(filters || {}).forEach(([key, value]) => { if (value && value !== "all") params[key] = value; });
-        const [membersRes, convRes] = await Promise.allSettled([
+        const [membersRes, convRes] = await Promise.all([
           API.get("/member/chat-members", { params }),
           API.get("/conversations"),
         ]);
 
-        const members = membersRes.status === "fulfilled"
-          ? (membersRes.value?.data?.members || [])
-          : [];
-        const conversations = convRes.status === "fulfilled"
-          ? (convRes.value?.data?.conversations || [])
-          : [];
+        if (!membersRes?.data?.success && membersRes?.data?.success !== undefined) {
+          throw new Error(membersRes?.data?.message || "Unable to load members for chat.");
+        }
+        if (!convRes?.data?.success && convRes?.data?.success !== undefined) {
+          throw new Error(convRes?.data?.message || "Unable to load conversations.");
+        }
 
         return {
-          members,
-          conversations,
-          filterOptions: membersRes.status === "fulfilled" ? (membersRes.value?.data?.filterOptions || {}) : {},
+          members: membersRes?.data?.members || [],
+          conversations: convRes?.data?.conversations || [],
+          filterOptions: membersRes?.data?.filterOptions || {},
         };
       }}
     />

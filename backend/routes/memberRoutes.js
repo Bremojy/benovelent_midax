@@ -27,7 +27,7 @@ const supportRequestController = require("../controllers/supportRequestControlle
 
 
 const { verifyToken: protect } = require("../middleware/authMiddleware");
-const { isMember } = require("../middleware/roleMiddleware");
+const { isMember, isChatUser } = require("../middleware/roleMiddleware");
 
 // ===============================
 // DASHBOARD
@@ -100,7 +100,7 @@ router.post(
 // CHAT MEMBERS
 // ===============================
 
-router.get("/chat-members", protect, getChatMembers);
+router.get("/chat-members", protect, isChatUser, getChatMembers);
 
 // ===============================
 // SETTINGS

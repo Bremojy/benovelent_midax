@@ -806,6 +806,7 @@ exports.constitutionLedger = async (req, res) => {
     const ledger = await getAuthoritativeLedger({
       startDate: startDate || `${new Date().getFullYear()}-01-01`,
       endDate: endDate || `${new Date().getFullYear()}-12-31`,
+      memberId: role === "member" ? req.user._id : null,
       includeHidden: role === "superadmin" && String(req.query.includeHidden || "false").toLowerCase() === "true",
     });
     return res.json({ success: true, ...ledger });
@@ -822,7 +823,7 @@ exports.exportConstitutionLedger = async (req, res) => {
     const startDate = String(req.query?.startDate || "").trim();
     const endDate = String(req.query?.endDate || "").trim();
     if (!startDate || !endDate) return res.status(400).json({ success: false, message: "Start and end dates are required." });
-    const ledger = await getAuthoritativeLedger({ startDate, endDate });
+    const ledger = await getAuthoritativeLedger({ startDate, endDate, memberId: role === "member" ? req.user._id : null });
     const rows = [
       "Benevolent Constitution",
       `Date range: ${ledger.startDate} to ${ledger.endDate}`,
@@ -851,7 +852,7 @@ exports.exportConstitutionLedgerCsv = async (req, res) => {
     const startDate = String(req.query?.startDate || "").trim();
     const endDate = String(req.query?.endDate || "").trim();
     if (!startDate || !endDate) return res.status(400).json({ success: false, message: "Start and end dates are required." });
-    const ledger = await getAuthoritativeLedger({ startDate, endDate });
+    const ledger = await getAuthoritativeLedger({ startDate, endDate, memberId: role === "member" ? req.user._id : null });
     const escape = (value) => `"${String(value ?? "").replace(/"/g, '""')}"`;
     const lines = [
       ["Benevolent Constitution Ledger"],

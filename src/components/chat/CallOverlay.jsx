@@ -116,7 +116,10 @@ export default function CallOverlay({
     if (!accepted) return undefined;
     let cancelled = false;
     startCall().catch((err) => {
-      if (!cancelled) setError(err.message || "Camera or microphone access failed.");
+      if (!cancelled) {
+        setError(err.message || "Camera or microphone access failed.");
+        if (incomingCall) rejectCall("media_error");
+      }
     });
     return () => { cancelled = true; };
   }, [accepted]);

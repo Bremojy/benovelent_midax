@@ -28,7 +28,7 @@ async function sendPushToRecipient({ recipient, recipientModel = "Member", title
     return { sent: 0, removed: 0, subscriptions: 0, skipped: "subscription-lookup-failed" };
   }
 
-  let sent=0, removed=0;
+  let sent=0, removed=0, failed=0;
   const isCall = ["incoming_call", "audio_call", "video_call", "missed_call", "missed_audio_call", "missed_video_call"].includes(String(data?.type || "").toLowerCase()) || Boolean(data?.incomingCall) || Boolean(data?.missedCall);
   const payload = JSON.stringify({
     title:String(title).slice(0,120), body:String(message).slice(0,500), icon:"/pwa-icon-192.png", badge:"/pwa-icon-192.png",
@@ -53,10 +53,11 @@ async function sendPushToRecipient({ recipient, recipientModel = "Member", title
         httpStatus: statusCode, providerCode: error?.code || null, staleSubscription: stale,
         message: String(error?.body || error?.message || "Web push delivery failed.").slice(0, 300),
       });
+      failed++;
       if (stale) { await PushSubscription.deleteOne({_id:subscription._id}).catch(() => null); removed++; }
     }
   }
-  return { sent, removed, subscriptions: subscriptions.length };
+  return { sent, removed, failed, subscriptions: subscriptions.length };
 }
 async function sendPushForNotification(notification) {
   return sendPushToRecipient({ recipient:notification.recipient, recipientModel:notification.recipientModel||"Member", title:notification.title, message:notification.message, link:notification.link||"/", data:{ notificationId:String(notification._id||""), type:notification.type||"system", referenceId:notification.referenceId?String(notification.referenceId):"" } });

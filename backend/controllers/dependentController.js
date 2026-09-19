@@ -8,9 +8,61 @@ const createNotification = require("../utils/createNotification");
 const createAuditLog = require("../utils/createAuditLog");
 const redisCache = require("../services/redisCache");
 const { resolveStoredFileUrl } = require("../utils/uploadUrl");
+const fs = require("fs");
+const path = require("path");
+const axios = require("axios");
+const uploadConfig = require("../config/uploadConfig");
 
 const MEMBER_EDIT_FIELDS = ["fullName", "relationship", "gender", "dateOfBirth", "nationalId", "birthCertificateNumber", "phone", "email", "county", "address", "school", "admissionNumber", "educationLevel", "occupation", "employer", "medicalConditions", "isNextOfKin"];
 const ADMIN_MODEL_FROM_ROLE = (role) => String(role || "").toLowerCase() === "superadmin" ? "SuperAdmin" : "Admin";
+
+const serializeDocument = (doc, dependentId) => {
+  const out = { ...doc };
+  delete out.url;
+  out.downloadUrl = `/api/dependents/${String(dependentId)}/documents/${String(doc._id)}/file`;
+  return out;
+};
+
+const serializeDocuments = (docs, dependentId) => (Array.isArray(docs) ? docs : []).map((doc) => serializeDocument(doc, dependentId));
+
+function safeLocalDocumentPath(document, storageFolder = "dependent-documents") {
+  const uploadRoot = uploadConfig.uploadRoot;
+  const filename = path.basename(String(document.storageFilename || document.filename || ""));
+  if (!filename || !uploadRoot) return "";
+  const folder = String(storageFolder || "dependent-documents").replace(/[^a-zA-Z0-9_-]/g, "") || "dependent-documents";
+  const candidate = path.resolve(uploadRoot, folder, filename);
+  const root = path.resolve(uploadRoot, folder);
+  return candidate.startsWith(`${root}${path.sep}`) ? candidate : "";
+}
+
+async function streamStoredDocument(res, document, storageFolder = "dependent-documents") {
+  res.setHeader("Cache-Control", "private, no-store");
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("Content-Disposition", `inline; filename*=UTF-8''${encodeURIComponent(String(document.filename || "document"))}`);
+  if (/^https?:\/\//i.test(String(document.url || ""))) {
+    const remoteUrl = new URL(String(document.url));
+    if (remoteUrl.hostname !== "res.cloudinary.com" && !remoteUrl.hostname.endsWith(".cloudinary.com")) return res.status(403).json({ success: false, message: "This stored document location is not an approved file host." });
+    const remote = await axios.get(remoteUrl.toString(), { responseType: "stream", timeout: 30000, maxRedirects: 3 });
+    res.status(remote.status);
+    res.setHeader("Content-Type", String(document.mimeType || remote.headers["content-type"] || "application/octet-stream"));
+    return remote.data.pipe(res);
+  }
+  const localPath = safeLocalDocumentPath(document, storageFolder);
+  if (!localPath || !fs.existsSync(localPath)) {
+    const fallback = String(document.url || "");
+    if (fallback.startsWith("/uploads/")) {
+      const requested = path.resolve(uploadConfig.uploadRoot, fallback.replace(/^\/uploads\//, ""));
+      const root = path.resolve(uploadConfig.uploadRoot);
+      if (requested.startsWith(`${root}${path.sep}`) && fs.existsSync(requested)) {
+        res.setHeader("Content-Type", String(document.mimeType || "application/octet-stream"));
+        return fs.createReadStream(requested).pipe(res);
+      }
+    }
+    return res.status(404).json({ success: false, message: "Document file is no longer available." });
+  }
+  res.setHeader("Content-Type", String(document.mimeType || "application/octet-stream"));
+  return fs.createReadStream(localPath).pipe(res);
+}
 
 const validateChanges = (changes) => {
   const clean = {};
@@ -61,7 +113,7 @@ exports.addDependent = async (req, res) => {
 exports.getDependents = async (req, res) => {
   try {
     const dependents = await Dependent.find({ member: req.user._id, active: true }).sort({ relationship: 1, fullName: 1 }).lean();
-    const withDocs = await Promise.all(dependents.map(async (dependent) => ({ ...dependent, documents: await DependentDocument.find({ dependent: dependent._id }).sort({ createdAt: -1 }).lean() })));
+    const withDocs = await Promise.all(dependents.map(async (dependent) => ({ ...dependent, documents: serializeDocuments(await DependentDocument.find({ dependent: dependent._id }).sort({ createdAt: -1 }).lean(), dependent._id) })));
     res.json({ success: true, total: withDocs.length, dependents: withDocs });
   } catch (error) { res.status(500).json({ success: false, message: error.message }); }
 };
@@ -72,7 +124,7 @@ exports.getDependent = async (req, res) => {
     if (!dependent) return res.status(404).json({ success: false, message: "Dependent not found." });
     const role = String(req.user?.role || "").toLowerCase();
     if (role === "member" && String(dependent.member) !== String(req.user._id)) return res.status(403).json({ success: false, message: "Access denied." });
-    const documents = await DependentDocument.find({ dependent: dependent._id }).sort({ createdAt: -1 }).lean();
+    const documents = serializeDocuments(await DependentDocument.find({ dependent: dependent._id }).sort({ createdAt: -1 }).lean(), dependent._id);
     res.json({ success: true, dependent: { ...dependent, documents } });
   } catch (error) { res.status(500).json({ success: false, message: error.message }); }
 };
@@ -131,20 +183,44 @@ exports.createEditRequest = async (req, res) => {
     if (open) return res.status(409).json({ success: false, code: "EDIT_REQUEST_ALREADY_PENDING", message: "An edit request for this dependent is already awaiting review." });
     const supportingFiles = (Array.isArray(req.files) ? req.files : []).map((file) => ({
       fileName: String(file.originalname || file.filename || "supporting-file").slice(0, 180),
+      originalFilename: String(file.originalname || file.filename || "supporting-file").slice(0, 180),
+      storageFilename: String(file.filename || "").slice(0, 240),
       mimeType: String(file.mimetype || "application/octet-stream"),
       url: resolveStoredFileUrl(file, `/uploads/${req.uploadType || "dependent-edit-requests"}`),
       uploadedAt: new Date(),
+      uploadedBy: req.user._id,
+      uploadedByModel: "Member",
     }));
     const request = await DependentEditRequest.create({ member: req.user._id, dependent: dependent._id, requestedChanges: changes, reason, supportingFiles });
     await notifyEditRequestTeam(request, req, `${req.user.fullName || "A member"} requested changes to dependent ${dependent.fullName}.`);
     await createAuditLog({ user: req.user._id, userRole: "member", action: "REQUEST_EDIT", module: "DependentEditRequest", description: `Requested changes to dependent ${dependent.fullName}`, req, metadata: { requestId: String(request._id), dependentId: String(dependent._id) } });
-    res.status(201).json({ success: true, message: "Edit request submitted for review.", request });
+    const safeRequest = request.toObject();
+    safeRequest.supportingFiles = (safeRequest.supportingFiles || []).map((file, index) => ({ ...file, url: undefined, downloadUrl: `/api/dependents/edit-requests/${String(request._id)}/files/${index}` }));
+    delete safeRequest.supportingFiles?.url;
+    res.status(201).json({ success: true, message: "Edit request submitted for review.", request: safeRequest });
   } catch (error) { res.status(400).json({ success: false, message: error.message }); }
 };
 
 exports.getMyEditRequests = async (req, res) => {
-  try { const requests = await DependentEditRequest.find({ member: req.user._id }).populate("dependent", "fullName relationship verified").sort({ createdAt: -1 }).lean(); res.json({ success: true, requests }); }
+  try { const requests = await DependentEditRequest.find({ member: req.user._id }).populate("dependent", "fullName relationship verified").sort({ createdAt: -1 }).lean(); res.json({ success: true, requests: requests.map((request) => ({ ...request, supportingFiles: (request.supportingFiles || []).map((file, index) => ({ fileName: file.fileName, mimeType: file.mimeType, uploadedAt: file.uploadedAt, downloadUrl: `/api/dependents/edit-requests/${String(request._id)}/files/${index}` })) })) }); }
   catch (error) { res.status(500).json({ success: false, message: error.message }); }
+};
+
+exports.getEditRequestFile = async (req, res) => {
+  try {
+    const request = await DependentEditRequest.findById(req.params.id).lean();
+    if (!request) return res.status(404).json({ success: false, message: "Edit request not found." });
+    const role = String(req.user?.role || "").toLowerCase();
+    if (role === "member" && String(request.member) !== String(req.user._id)) return res.status(403).json({ success: false, message: "Access denied." });
+    if (!['member', 'admin', 'superadmin'].includes(role)) return res.status(403).json({ success: false, message: "Access denied." });
+    const index = Number.parseInt(req.params.index, 10);
+    const file = Array.isArray(request.supportingFiles) ? request.supportingFiles[index] : null;
+    if (!file) return res.status(404).json({ success: false, message: "Supporting file not found." });
+    await streamStoredDocument(res, { ...file, filename: file.fileName }, "dependent-edit-requests");
+  } catch (error) {
+    console.warn("Dependent edit-request file stream failed:", error.message);
+    if (!res.headersSent) return res.status(502).json({ success: false, message: "Unable to retrieve the supporting file securely." });
+  }
 };
 
 exports.getAdminEditRequests = async (req, res) => {
@@ -189,9 +265,9 @@ exports.uploadDependentDocuments = async (req, res) => {
     const files = Array.isArray(req.files) ? req.files : [];
     if (!files.length) return res.status(400).json({ success: false, message: "Choose at least one document." });
     const uploadedByModel = role === "superadmin" ? "SuperAdmin" : role === "admin" ? "Admin" : "Member";
-    const documents = await DependentDocument.insertMany(files.map((file) => ({ dependent: dependent._id, member: dependent.member, documentType: String(req.body?.documentType || "other"), filename: String(file.originalname || file.filename || "document").slice(0, 180), mimeType: String(file.mimetype || "application/octet-stream"), url: resolveStoredFileUrl(file, `/uploads/${req.uploadType || "dependent-documents"}`), uploadedBy: req.user._id, uploadedByModel })));
+    const documents = await DependentDocument.insertMany(files.map((file) => ({ dependent: dependent._id, member: dependent.member, documentType: String(req.body?.documentType || "other"), filename: String(file.originalname || file.filename || "document").slice(0, 180), storageFilename: String(file.filename || "").slice(0, 240), mimeType: String(file.mimetype || "application/octet-stream"), url: resolveStoredFileUrl(file, `/uploads/${req.uploadType || "dependent-documents"}`), uploadedBy: req.user._id, uploadedByModel })));
     await createAuditLog({ user: req.user._id, userRole: role, action: "UPLOAD", module: "DependentDocument", description: `Uploaded ${documents.length} dependent document(s)`, req, metadata: { dependentId: String(dependent._id) } });
-    res.status(201).json({ success: true, message: `${documents.length} document(s) uploaded successfully.`, documents });
+    res.status(201).json({ success: true, message: `${documents.length} document(s) uploaded successfully.`, documents: serializeDocuments(documents, dependent._id) });
   } catch (error) { res.status(400).json({ success: false, message: error.message }); }
 };
 
@@ -202,8 +278,24 @@ exports.getDependentDocuments = async (req, res) => {
     const role = String(req.user?.role || "").toLowerCase();
     if (role === "member" && String(dependent.member) !== String(req.user._id)) return res.status(403).json({ success: false, message: "Access denied." });
     const documents = await DependentDocument.find({ dependent: dependent._id }).sort({ createdAt: -1 }).lean();
-    res.json({ success: true, documents });
+    res.json({ success: true, documents: serializeDocuments(documents, dependent._id) });
   } catch (error) { res.status(500).json({ success: false, message: error.message }); }
+};
+
+exports.getDependentDocumentFile = async (req, res) => {
+  try {
+    const dependent = await Dependent.findById(req.params.id).select("member").lean();
+    if (!dependent) return res.status(404).json({ success: false, message: "Dependent not found." });
+    const role = String(req.user?.role || "").toLowerCase();
+    if (role === "member" && String(dependent.member) !== String(req.user._id)) return res.status(403).json({ success: false, message: "Access denied." });
+    if (!['member', 'admin', 'superadmin'].includes(role)) return res.status(403).json({ success: false, message: "Access denied." });
+    const document = await DependentDocument.findOne({ _id: req.params.documentId, dependent: dependent._id }).lean();
+    if (!document) return res.status(404).json({ success: false, message: "Document not found." });
+    await streamStoredDocument(res, document);
+  } catch (error) {
+    console.warn("Dependent document stream failed:", error.message);
+    if (!res.headersSent) return res.status(502).json({ success: false, message: "Unable to retrieve the document securely." });
+  }
 };
 
 exports.verifyDependentDocument = async (req, res) => {
@@ -214,13 +306,23 @@ exports.verifyDependentDocument = async (req, res) => {
     if (!["verified", "rejected", "pending"].includes(document.verificationStatus)) return res.status(400).json({ success: false, message: "Invalid document verification status." });
     document.verifiedBy = document.verificationStatus === "pending" ? null : req.user._id; document.verifiedAt = document.verificationStatus === "pending" ? null : new Date();
     await document.save();
-    res.json({ success: true, message: "Document verification status updated.", document });
+    await createAuditLog({ user: req.user._id, userRole: String(req.user.role || "admin").toLowerCase(), action: "VERIFY", module: "DependentDocument", description: `Set dependent document ${document._id} verification status to ${document.verificationStatus}`, req, metadata: { documentId: String(document._id), dependentId: String(document.dependent), status: document.verificationStatus } });
+    await redisCache.invalidateMany([`member:${document.member}:dashboard`, `member:${document.member}:dependents`]);
+    res.json({ success: true, message: "Document verification status updated.", document: serializeDocument(document.toObject(), document.dependent) });
   } catch (error) { res.status(400).json({ success: false, message: error.message }); }
 };
 
 exports.deleteDependentDocument = async (req, res) => {
-  try { const document = await DependentDocument.findById(req.params.documentId); if (!document) return res.status(404).json({ success:false,message:"Document not found." }); await document.deleteOne(); res.json({ success:true,message:"Document removed." }); }
-  catch (error) { res.status(500).json({ success:false,message:error.message }); }
+  try {
+    const document = await DependentDocument.findById(req.params.documentId);
+    if (!document) return res.status(404).json({ success:false,message:"Document not found." });
+    if (String(req.params.id || "") !== String(document.dependent || "")) return res.status(400).json({ success:false,message:"Document does not belong to this dependent." });
+    const memberId = document.member;
+    await document.deleteOne();
+    await redisCache.invalidateMany([`member:${memberId}:dashboard`, `member:${memberId}:dependents`]);
+    await createAuditLog({ user: req.user._id, userRole: String(req.user.role || "admin").toLowerCase(), action: "DELETE", module: "DependentDocument", description: `Removed dependent document ${document._id}`, req, metadata: { documentId: String(document._id), dependentId: String(document.dependent), memberId: String(memberId) } });
+    res.json({ success:true,message:"Document removed." });
+  } catch (error) { res.status(500).json({ success:false,message:error.message }); }
 };
 
 exports.verifyDependent = async (req, res) => {
@@ -240,6 +342,6 @@ exports.getAllDependents = async (req, res) => {
 };
 
 exports.getDependentsForMember = async (req, res) => {
-  try { const member = await Member.findById(req.params.memberId).select("_id").lean(); if (!member) return res.status(404).json({success:false,message:"Member not found."}); const dependents = await Dependent.find({ member: member._id, active:true }).sort({createdAt:-1}).lean(); const docs=await DependentDocument.find({member:member._id}).sort({createdAt:-1}).lean(); const byDependent=new Map(); docs.forEach((d)=>{const key=String(d.dependent);if(!byDependent.has(key))byDependent.set(key,[]);byDependent.get(key).push(d);}); res.json({success:true,dependents:dependents.map(d=>({...d,documents:byDependent.get(String(d._id))||[]}))}); }
+  try { const member = await Member.findById(req.params.memberId).select("_id").lean(); if (!member) return res.status(404).json({success:false,message:"Member not found."}); const dependents = await Dependent.find({ member: member._id, active:true }).sort({createdAt:-1}).lean(); const docs=await DependentDocument.find({member:member._id}).sort({createdAt:-1}).lean(); const byDependent=new Map(); docs.forEach((d)=>{const key=String(d.dependent);if(!byDependent.has(key))byDependent.set(key,[]);byDependent.get(key).push(d);}); res.json({success:true,dependents:dependents.map(d=>({...d,documents:serializeDocuments(byDependent.get(String(d._id))||[], d._id)}))}); }
   catch (error) { res.status(500).json({success:false,message:error.message}); }
 };

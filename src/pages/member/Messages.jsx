@@ -18,19 +18,22 @@ export default function Messages() {
       onRefreshHint="Member conversations refreshed."
       initialConversationId={conversationId}
       loadContacts={async () => {
-        const [membersResponse, conversationsResponse] = await Promise.allSettled([
+        const [membersResponse, conversationsResponse] = await Promise.all([
           API.get("/member/chat-members", { params: { limit: 400 } }),
           API.get("/conversations"),
         ]);
 
-        const members = membersResponse.status === "fulfilled"
-          ? (membersResponse.value?.data?.members || membersResponse.value?.members || [])
-          : [];
-        const conversations = conversationsResponse.status === "fulfilled"
-          ? (conversationsResponse.value?.data?.conversations || conversationsResponse.value?.conversations || [])
-          : [];
+        if (!membersResponse?.data?.success && membersResponse?.data?.success !== undefined) {
+          throw new Error(membersResponse?.data?.message || "Unable to load members for chat.");
+        }
+        if (!conversationsResponse?.data?.success && conversationsResponse?.data?.success !== undefined) {
+          throw new Error(conversationsResponse?.data?.message || "Unable to load conversations.");
+        }
 
-        return { members, conversations };
+        return {
+          members: membersResponse?.data?.members || membersResponse?.members || [],
+          conversations: conversationsResponse?.data?.conversations || conversationsResponse?.conversations || [],
+        };
       }}
     />
   );

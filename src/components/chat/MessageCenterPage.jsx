@@ -288,8 +288,7 @@ function MessageCenterPage({
       if (result?.filterOptions) setFilterOptions(result.filterOptions);
     } catch (error) {
       console.error("Load chat data error:", error);
-      setPeople([]);
-      setConversations([]);
+      setBanner(error?.response?.data?.message || error?.message || "Unable to load chat data. Please retry.");
     } finally {
       setLoadingSidebar(false);
     }

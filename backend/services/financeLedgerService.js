@@ -14,6 +14,24 @@ const validBalanceMatch = (extra = {}) => ({
   hidden: { $ne: true },
 });
 
+const asDate = (value, fallback = new Date()) => {
+  if (value === undefined || value === null || value === "") return new Date(fallback);
+  const date = value instanceof Date ? new Date(value.getTime()) : new Date(value);
+  return Number.isNaN(date.getTime()) ? new Date(fallback) : date;
+};
+
+const startOfDay = (value) => {
+  if (value === undefined || value === null || value === "") return null;
+  const date = asDate(value);
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 0, 0, 0, 0));
+};
+
+const endOfDay = (value) => {
+  if (value === undefined || value === null || value === "") return null;
+  const date = asDate(value);
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 23, 59, 59, 999));
+};
+
 const invalidateFinanceCache = async () => {
   await Promise.allSettled([
     redisCache.invalidatePrefix("finance:") ,
@@ -34,10 +52,18 @@ const getCurrentBookBalance = async ({ asOf = new Date() } = {}) => {
       _id: null,
       credit: { $sum: { $cond: [{ $in: ["$type", [...CREDIT_TYPES]] }, "$amount", 0] } },
       debit: { $sum: { $cond: [{ $in: ["$type", [...CREDIT_TYPES]] }, 0, "$amount"] } },
+      moneyIn: { $sum: { $cond: [{ $in: ["$type", [...CREDIT_TYPES]] }, "$amount", 0] } },
+      moneyOut: { $sum: { $cond: [{ $in: ["$type", [...CREDIT_TYPES]] }, 0, "$amount"] } },
     }},
   ]);
+  const moneyIn = Number(agg?.moneyIn || 0);
+  const moneyOut = Number(agg?.moneyOut || 0);
+  const bookBalance = moneyIn - moneyOut;
   const payload = {
-    balance: Number(agg?.credit || 0) - Number(agg?.debit || 0),
+    balance: bookBalance,
+    bookBalance,
+    moneyIn,
+    moneyOut,
     asOf: asOfDate.toISOString(),
   };
   await redisCache.setJson(cacheKey, payload, 10).catch(() => {});
@@ -73,10 +99,11 @@ const getLedger = async ({ startDate, endDate, memberId = null, includeHidden = 
     endDate: end.toISOString().slice(0, 10),
     openingBalance: opening,
     closingBalance: calculated.closingBalance,
-    currentBookBalance: Number(current?.balance || 0),
+    currentBookBalance: Number(current?.bookBalance ?? current?.balance ?? 0),
+    bookBalance: Number(current?.bookBalance ?? current?.balance ?? 0),
     asOf: current?.asOf || asDate(asOf, new Date()).toISOString(),
     entries: calculated.entries,
-    totals: calculated.totals,
+    totals: { ...calculated.totals, moneyIn: calculated.totals.credit, moneyOut: calculated.totals.debit },
   };
 };
 
@@ -90,7 +117,9 @@ const getCurrentBookBalanceForMember = async (memberId, asOf = new Date()) => {
       debit: { $sum: { $cond: [{ $in: ["$type", [...CREDIT_TYPES]] }, 0, "$amount"] } },
     }},
   ]);
-  return { balance: Number(agg?.credit || 0) - Number(agg?.debit || 0), asOf: asOfDate.toISOString() };
+  const moneyIn = Number(agg?.credit || 0);
+  const moneyOut = Number(agg?.debit || 0);
+  return { balance: moneyIn - moneyOut, bookBalance: moneyIn - moneyOut, moneyIn, moneyOut, asOf: asOfDate.toISOString() };
 };
 
 module.exports = {

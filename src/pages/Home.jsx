@@ -10,14 +10,16 @@ export default function Home() {
   const [leaders, setLeaders] = useState([]);
   const [policies, setPolicies] = useState([]);
   const [policyError, setPolicyError] = useState("");
+  const [leadershipError, setLeadershipError] = useState("");
   const { settings, loading: settingsLoading, error: settingsError } = usePublicSettings();
   useEffect(() => {
     let cancelled = false;
     Promise.allSettled([API.get("/leaders/current"), API.get("/policies/public")]).then(([leadersResult, policiesResult]) => {
       if (cancelled) return;
       if (leadersResult.status === "fulfilled") setLeaders(Array.isArray(leadersResult.value.data?.leaders) ? leadersResult.value.data.leaders : []);
+      else setLeadershipError(leadersResult.reason?.response?.data?.message || "Unable to load current leadership records.");
       if (policiesResult.status === "fulfilled") setPolicies(Array.isArray(policiesResult.value.data?.policies) ? policiesResult.value.data.policies : []);
-      else setPolicyError("Unable to load current support policies.");
+      else setPolicyError(policiesResult.reason?.response?.data?.message || "Unable to load current support policies.");
     });
     return () => { cancelled = true; };
   }, []);
@@ -46,6 +48,7 @@ export default function Home() {
           {medical ? <Card icon={Stethoscope} title={medical.name || "Medical support"} text={policyText(medical)} /> : <Card icon={Stethoscope} title="Medical support" text="Not configured" />}
           <Card icon={ShieldCheck} title="Accountability" text="See the current published policy and Constitution for authoritative scheme rules." />
         </div>
+        {leadershipError && <p role="alert" className="portal-error">{leadershipError}</p>}
         {policyError && <p role="alert" className="portal-error">{policyError}</p>}
         <Link className="modern-btn" to="/constitution">Read the Constitution <ArrowRight size={17} /></Link>
       </section>

@@ -38,12 +38,14 @@ function News() {
   const [videoFailed, setVideoFailed] = useState(false);
   const [selectedNews, setSelectedNews] = useState(null);
   const [reportBusy, setReportBusy] = useState(false);
+  const [loadError, setLoadError] = useState("");
 
   const activeTab = tabs.some((item) => item.key === searchParams.get("tab")) ? searchParams.get("tab") : "all";
 
   useEffect(() => {
     const fetchNewsroom = async () => {
       setLoading(true);
+      setLoadError("");
       const [newsResponse, pollResponse, eventsResponse, documentsResponse] = await Promise.allSettled([
         api.get("/news/public"),
         api.get("/polls/public"),
@@ -54,6 +56,10 @@ function News() {
       if (pollResponse.status === "fulfilled") setPolls(Array.isArray(pollResponse.value.data?.polls) ? pollResponse.value.data.polls : []);
       if (eventsResponse.status === "fulfilled") setEvents(Array.isArray(eventsResponse.value.data?.events) ? eventsResponse.value.data.events : []);
       if (documentsResponse.status === "fulfilled") setDocuments(Array.isArray(documentsResponse.value.data?.documents) ? documentsResponse.value.data.documents : []);
+      const failures = [
+        [newsResponse, "news"], [pollResponse, "polls"], [eventsResponse, "events"], [documentsResponse, "resources"],
+      ].filter(([result]) => result.status === "rejected").map(([, label]) => label);
+      if (failures.length) setLoadError(`Unable to load: ${failures.join(", ")}. The available newsroom data remains visible.`);
       setLoading(false);
     };
     fetchNewsroom();
@@ -104,6 +110,7 @@ function News() {
 
   return (
     <main className="news-page newsroom-v8">
+      {loadError && <div className="portal-alert" role="alert">{loadError}</div>}
       <section className={`news-video-hero ${videoFailed ? "video-failed" : ""}`}>
         {!videoFailed && <video className="news-video" autoPlay={!shouldSkipBackgroundVideo} muted loop playsInline preload={shouldSkipBackgroundVideo ? "none" : "metadata"} poster="/hero.jpg" onError={() => setVideoFailed(true)} aria-hidden="true">{newsVideoSources.map((src) => <source key={src} src={src} type="video/mp4" />)}</video>}
         <div className="news-video-overlay" />
