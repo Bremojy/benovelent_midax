@@ -339,94 +339,45 @@ exports.getMyApplications = async (
 // GET /api/medical/:id
 // ======================================================
 
-exports.getApplicationById = async (
-
-    req,
-
-    res
-
-) => {
-
+exports.getApplicationById = async (req, res) => {
     try {
-
-        const application = await MedicalSupport.findById(
-
-            req.params.id
-
-        )
-
-            .populate(
-
-                "member",
-
-                "memberNumber fullName phone"
-
-            )
-
-            .populate(
-
-                "dependent",
-
-                "fullName relationship"
-
-            )
-
-            .populate(
-
-                "approvedBy",
-
-                "fullName"
-
-            )
-
-            .populate(
-
-                "processedBy",
-
-                "fullName"
-
-            );
-
-
-
-        if (!application) {
-
-            return res.status(404).json({
-
+        const role = String(req.user?.role || "").toLowerCase();
+        if (!["member", "admin", "superadmin"].includes(role)) {
+            return res.status(403).json({
                 success: false,
-
-                message: "Application not found."
-
+                message: "You do not have permission to view medical support applications.",
             });
-
         }
 
+        // Medical support records contain sensitive health and contact information.
+        // Members may only resolve their own application; Admin/SuperAdmin can manage
+        // the full application set through the protected administration flows.
+        const filter = role === "member"
+            ? { _id: req.params.id, member: req.user._id }
+            : { _id: req.params.id };
 
+        const application = await MedicalSupport.findOne(filter)
+            .populate("member", "memberNumber fullName phone")
+            .populate("dependent", "fullName relationship")
+            .populate("approvedBy", "fullName")
+            .populate("processedBy", "fullName");
 
-        res.json({
+        if (!application) {
+            return res.status(404).json({
+                success: false,
+                message: "Application not found.",
+            });
+        }
 
-            success: true,
-
-            application
-
-        });
-
-    }
-
-    catch (error) {
-
-        res.status(500).json({
-
+        return res.json({ success: true, application });
+    } catch (error) {
+        console.error("Get medical support application error:", error);
+        return res.status(500).json({
             success: false,
-
-            message: error.message
-
+            message: "Unable to load the medical support application.",
         });
-
     }
-
 };
-
 
 
 // ======================================================

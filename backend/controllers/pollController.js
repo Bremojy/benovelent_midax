@@ -237,44 +237,35 @@ exports.getAllPolls = async (req, res) => {
 ===================================================== */
 
 exports.getPollById = async (req, res) => {
-
     try {
+        const isMember = String(req.user?.role || "").toLowerCase() === "member";
+        const filter = isMember
+            ? { _id: req.params.id, active: true, endDate: { $gte: new Date() } }
+            : { _id: req.params.id };
 
-        const poll = await Poll.findById(req.params.id)
-
+        // Keep the single-poll endpoint consistent with the member list: members only
+        // receive currently active polls, while administrators retain management access.
+        const poll = await Poll.findOne(filter)
             .populate("createdBy", "fullName email profileImage")
-
             .populate("news", "title")
-
             .lean();
 
         if (!poll) {
-
             return res.status(404).json({
                 success: false,
-                message: "Poll not found."
+                message: "Poll not found or is no longer available.",
             });
-
         }
 
-        res.json({
-            success: true,
-            poll
-        });
-
+        return res.json({ success: true, poll });
     } catch (error) {
-
-        console.error(error);
-
-        res.status(500).json({
+        console.error("Get poll error:", error);
+        return res.status(500).json({
             success: false,
-            message: error.message
+            message: "Unable to load the poll.",
         });
-
     }
-
 };
-
 
 
 /* =====================================================

@@ -18,6 +18,6 @@ router.get("/:id/responses", protect, isAdminOrSuperAdmin, controller.responses)
 router.get("/:id/export", protect, isAdminOrSuperAdmin, controller.exportResponses);
 router.post("/:id/import", protect, isAdminOrSuperAdmin, importUpload.single("file"), controller.importResponses);
 router.post("/:id/publish-news", protect, isAdminOrSuperAdmin, controller.publishToNews);
-router.get("/published/:id/download", protect, controller.memberDownload);
+router.get("/published/:id/download", protect, isAdminOrSuperAdmin, controller.memberDownload);
 
 module.exports = router;

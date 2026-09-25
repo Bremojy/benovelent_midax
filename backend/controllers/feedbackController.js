@@ -401,6 +401,10 @@ exports.publishToNews = async (req, res) => {
 };
 
 exports.memberDownload = async (req, res) => {
+  const role = String(req.user?.role || "").toLowerCase();
+  if (!['admin', 'superadmin'].includes(role)) {
+    return res.status(403).json({ success: false, message: "Only authorised administrators can download full feedback responses." });
+  }
   const doc = await FeedbackCollection.findOne({ _id: req.params.id, publishedToNews: true }).populate("responses.member", "fullName email memberNumber");
   if (!doc) return res.status(404).json({ success: false, message: "Published feedback report not found." });
   const format = String(req.query.format || "csv").toLowerCase();

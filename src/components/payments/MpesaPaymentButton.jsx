@@ -92,14 +92,28 @@ export default function MpesaPaymentButton({ purpose, referenceId, label = "Pay 
               setMessage(refreshed.resultDescription || "M-PESA payment was not completed.");
               return;
             }
-          } catch {}
+          } catch (queryError) {
+            console.error("M-PESA STK status query error:", queryError);
+            const queryMessage = queryError?.response?.data?.message || queryError?.message || "The payment status could not be refreshed yet.";
+            setMessage(`${queryMessage} The original STK request may still be processing; do not make a second payment yet.`);
+          }
         }
         if (attempts >= 30) {
           setMessage("The STK request is still pending. The server will continue accepting the Safaricom callback; you can safely close this window.");
           return;
         }
         window.setTimeout(poll, 2000);
-      } catch {}
+      } catch (error) {
+        console.error("M-PESA transaction polling error:", error);
+        const statusMessage = error?.response?.data?.message || error?.message || "Unable to refresh the M-PESA payment status.";
+        setMessage(`${statusMessage} The original STK request may still be processing; do not make a second payment yet.`);
+        attempts += 1;
+        if (attempts >= 30) {
+          setMessage("The payment status could not be confirmed after repeated checks. The Safaricom callback may still reconcile the transaction; check payment records before trying again.");
+          return;
+        }
+        window.setTimeout(poll, 2000);
+      }
     };
     poll();
     return () => { stopped = true; };

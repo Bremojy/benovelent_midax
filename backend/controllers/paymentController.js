@@ -880,8 +880,11 @@ exports.communityCases = async (req, res) => {
     const isAdminView = ["admin", "superadmin"].includes(String(req.user?.role || "").toLowerCase());
     const filter = isAdminView ? {} : { enabled: true, status: { $in: ["open", "target_reached"] } };
     const currentMemberId = String(req.user?._id || "");
+    const recipientProjection = isAdminView
+      ? "_id fullName memberNumber profileImage department position phone mpesaNumber"
+      : "_id fullName profileImage";
     const campaigns = await CommunityAssistance.find(filter)
-      .populate("recipientMember", "_id fullName memberNumber profileImage department position phone mpesaNumber")
+      .populate("recipientMember", recipientProjection)
       .sort({ createdAt: -1 })
       .lean();
     const enriched = campaigns.map((campaign) => ({

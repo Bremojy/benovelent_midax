@@ -17,7 +17,18 @@ const iconFor = (type = "system") => {
 
 export default function NotificationCenter() {
   const [notifications, setNotifications] = useState([]);
-  const load = async () => { try { const { data } = await API.get("/notifications", { params: { limit: 6 } }); setNotifications(Array.isArray(data?.notifications) ? data.notifications : []); } catch {} };
+  const [loadError, setLoadError] = useState("");
+  const load = async () => {
+    try {
+      const { data } = await API.get("/notifications", { params: { limit: 6 } });
+      setNotifications(Array.isArray(data?.notifications) ? data.notifications : []);
+      setLoadError("");
+    } catch (error) {
+      console.error("Notification center load error:", error);
+      const message = error?.response?.data?.message || error?.message || "Unable to load notifications right now.";
+      setLoadError(message);
+    }
+  };
   useEffect(() => {
     load();
     const id = window.setInterval(load, 30000);
@@ -42,7 +53,7 @@ export default function NotificationCenter() {
   return <div className="notification-card">
     <div className="notification-header"><h2><Bell size={22} />Notifications</h2><a href="/member/notifications">View All</a></div>
     <div className="notification-list">
-      {notifications.length === 0 ? <div className="notification-empty">No notifications yet.</div> : notifications.map((item) => { const Icon = iconFor(item.type); return <div key={item._id} className={`notification-item ${item.read ? "read" : "unread"}`}><div className="notification-icon"><Icon size={20} /></div><div className="notification-content"><h4>{item.title}</h4><p>{item.message}</p></div><small>{item.createdAt ? new Date(item.createdAt).toLocaleString([], { dateStyle: "medium", timeStyle: "short" }) : ""}</small></div>; })}
+      {loadError ? <div className="notification-empty" role="alert">{loadError}</div> : notifications.length === 0 ? <div className="notification-empty">No notifications yet.</div> : notifications.map((item) => { const Icon = iconFor(item.type); return <div key={item._id} className={`notification-item ${item.read ? "read" : "unread"}`}><div className="notification-icon"><Icon size={20} /></div><div className="notification-content"><h4>{item.title}</h4><p>{item.message}</p></div><small>{item.createdAt ? new Date(item.createdAt).toLocaleString([], { dateStyle: "medium", timeStyle: "short" }) : ""}</small></div>; })}
     </div>
   </div>;
 }
