@@ -399,7 +399,7 @@ export default function AdminFinance() {
           <div className="portal-stat-grid">
             <Stat label="STK status" value={mpesaConfig?.configured ? "Ready" : "Not configured"} />
             <Stat label="B2C payout status" value={mpesaConfig?.b2cConfigured ? "Ready" : "Not configured"} />
-            <Stat label="Daraja shortcode" value={mpesaConfig?.shortCode || "650014"} />
+            <Stat label="Daraja shortcode" value={mpesaConfig?.shortCode || "Not configured"} />
             <Stat label="Manual account" value={mpesaConfig?.manualAccountNumber || "Not configured"} />
             <Stat label="Manual PayBill" value={mpesaConfig?.manualPaybill || "Not configured"} />
           </div>
@@ -420,7 +420,7 @@ export default function AdminFinance() {
         </section>}
 
         <section id="finance-payments" className="portal-panel">
-          <div className="portal-module-header compact-header"><div><span>MANUAL M-PESA VERIFICATION</span><h2>Equity PayBill 247247 submissions</h2><p>Verify the transaction code against the authorised payment records before approving. Submitted payments remain pending until an administrator verifies them.</p></div><span className="portal-badge">PayBill {mpesaConfig?.manualPaybill || "Not configured"} · Account {mpesaConfig?.manualAccountNumber || "Not configured"}</span></div>
+          <div className="portal-module-header compact-header"><div><span>MANUAL M-PESA VERIFICATION</span><h2>M-PESA PayBill submissions</h2><p>Verify the transaction code against the authorised payment records before approving. Submitted payments remain pending until an administrator verifies them.</p></div><span className="portal-badge">PayBill {mpesaConfig?.manualPaybill || "Not configured"} · Account {mpesaConfig?.manualAccountNumber || "Not configured"}</span></div>
           {manualMpesa.length === 0 ? <div className="portal-empty">No manual M-PESA PayBill submissions are waiting for review.</div> : <div className="portal-table-wrap"><table className="portal-table"><thead><tr><th>Date</th><th>Member</th><th>Amount</th><th>Transaction code</th><th>Status</th><th>Reconciliation</th><th>Action</th></tr></thead><tbody>{manualMpesa.map((x) => {
             const pending = x.status === "pending";
             const needsReview = x.status === "successful" && !x.reconciled;

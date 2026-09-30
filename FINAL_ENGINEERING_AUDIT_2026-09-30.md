@@ -1,331 +1,358 @@
 # Benevolent MIDAX — Final Engineering Audit & Release Report
 
-**Date:** 2026-09-30  
-**Baseline:** uploaded `benovelent_midax-main (4).zip`  
-**Release package:** `benovelent_midax-finalized-2026-09-30.zip`
+**Audit date:** 2026-09-30  
+**Baseline:** uploaded `benovelent_midax-main (5).zip`  
+**Release ZIP:** `benovelent_midax-finalized-2026-09-30.zip`
 
 ## Executive status
 
-This release is an evidence-based source-code repair of the uploaded repository. The repository regression suite passes after the repairs, including new regression coverage for the community-support review gate, payer-role identity, M-Pesa authorization, notification idempotency wiring, meeting-minutes media upload, and role-aware UI behavior.
+The uploaded repository was inspected as an existing full-stack application, not rebuilt. The final source changes are limited to evidence-backed repairs plus release documentation/inventory.
 
-This is **not** a claim of full production readiness. Authenticated live portal testing was unavailable in the current environment, and the uploaded dependency tree does not contain a usable Vite/Oxlint installation, so the production build and lint could not be executed successfully. M-Pesa, MongoDB, Cloudinary, Redis, Resend, Socket.IO/WebRTC/TURN, and authenticated portal behavior therefore remain externally unverified.
+**Repository regression status:** `PASS — verified`  
+**Authenticated live portal testing:** `NOT VERIFIED — unavailable in current environment`  
+**Production Vite build:** `NOT VERIFIED — unavailable in current environment`  
+**Oxlint:** `NOT VERIFIED — unavailable in current environment`  
+**External MongoDB/Cloudinary/Redis/Resend/M-Pesa/WebRTC execution:** `NOT VERIFIED — unavailable in current environment`
+
+This is therefore **not certified as fully production-ready** from this environment. The source/contract suite is green, but the missing frontend build toolchain and lack of authenticated browser interaction prevent a complete production acceptance claim.
 
 ## A. Architecture established
 
-The repository is an existing React/Vite + Node/Express + Mongoose application with role-protected Member, Admin/Leader, and SuperAdmin portals. The backend also contains Socket.IO/realtime behavior, M-Pesa payment services, Cloudinary/media integrations, Redis/cache hooks, notifications, audit logging, reports, migrations, and mobile call-related code.
+The current repository is an existing Vite/React frontend with an Express/Mongoose backend. The backend includes role middleware, finance/ledger services, M-Pesa/Daraja integrations, Cloudinary upload handling, Redis/cache hooks, Socket.IO realtime messaging/presence, notifications, audit logging, claims/support/community-assistance workflows, reports, migrations and mobile/native calling notes.
 
-The source audit covered:
+Key source areas inspected include:
 
-- frontend route and component structure;
-- backend route/controller/service/model structure;
-- authentication and role middleware;
-- claims/support/community-support workflows;
-- M-Pesa transaction and authorization paths;
-- notification lifecycle and dedupe contracts;
-- meeting-minutes → News publishing;
-- finance/ledger contracts;
-- dependent permissions;
-- presence/chat/SuperAdmin chat exposure;
-- public-page implementation copy;
-- environment/config references;
-- test scripts and package scripts.
+- frontend routes and portal-section navigation;
+- authentication/session/cookie/CSRF handling;
+- backend role authorization;
+- frontend API calls and mounted API routes;
+- claims/support/community-assistance state transitions;
+- M-Pesa STK/manual/callback/transaction models;
+- notification creation/read/dedupe lifecycle;
+- finance/ledger calculations and exports;
+- dependents and document permissions;
+- chat/presence/call-related realtime code;
+- Cloudinary/local upload fallback behavior;
+- Redis/cache invalidation;
+- public content and fallback/error copy;
+- migration ordering and governance-sensitive policy changes;
+- environment-variable coverage;
+- package/build/deployment contracts.
 
 ## B. Verified working
 
-### Repository/source verification
+### Repository/source contracts
 
 `PASS — verified`
 
-`npm test` completed with exit code 0.
+`npm test` completed with exit code `0`.
 
 The final run verified:
 
-- declared package script targets exist;
-- backend syntax for 176 JavaScript files;
-- frontend relative import resolution for 133 source files;
+- all declared package script targets exist;
+- backend syntax check passed for **177 JavaScript files**;
+- frontend relative import resolution passed for **133 source files**;
 - repository integrity requirements;
-- 286 frontend API calls against mounted backend routes;
-- 66 unique portal menu/section paths;
+- **286 frontend API calls** against mounted backend routes;
+- **66 unique portal menu/section paths**;
 - finance opening/running/closing ledger math and status filtering;
 - notification event identity/dedupe rules;
-- dependent member/admin workflow contracts;
-- medical/community/poll/feedback access-control contracts;
-- user-facing API/M-Pesa error handling;
-- management report fields, filters, and exports;
+- dependent member/admin permission and workflow contracts;
+- medical ownership, community beneficiary privacy, poll access and published feedback-download access controls;
+- user-facing notification and M-Pesa error handling;
+- management-report fields, period filters and exports;
 - M-Pesa STK idempotency/pending/callback contracts;
-- presence initialization and heartbeat semantics;
+- single-client presence initialization and live-heartbeat semantics;
 - removal of SuperAdmin ordinary chat/call UI exposure;
-- production contract checks;
-- latest production-error fixes/delete/printhead coverage;
-- existing business-policy guardrails;
-- the new verified-repair regression suite.
-
-`PASS — verified`
-
-`npm run test:verified-repairs` passed with the message:
-
-> VERIFIED REPAIR REGRESSION: PASS — verified
+- production contract regression checks;
+- latest production-error/delete/print-head coverage;
+- support repayment policy guardrails;
+- verified-repair regression coverage for community workflow, payer identity, authorization, notification idempotency, M-Pesa configuration, meeting-minutes upload and role-aware UI.
 
 ### Live public availability
 
 `PASS — verified`
 
-The public Vercel root was reachable during the live check on 2026-09-30 and returned the Benevolent MIDAX public application shell.
+The public Vercel root responded with the Benevolent MIDAX public application shell on 2026-09-30. The available web channel reports the site title and states that the interactive member portal requires JavaScript.  
 
 `PASS — verified`
 
-The Render backend root was reachable during the live check and returned a running Benevolent MIDAX API response, version `18.5.0`.
+The Render backend root responded with a JSON health-style application response identifying Benevolent Midax API version `18.5.0` and status `Running` on 2026-09-30.
 
-## C. Fixed defects
+## C. Defects fixed in this audit
 
-### 1. Community support was opening a payment campaign too early
+### 1. STK duplicate-key/idempotency error path used an out-of-scope payer actor
 
-**Problem:** Member community-assistance requests could immediately create an enabled/open campaign.
+**Evidence:** `backend/controllers/paymentController.js` declared the authenticated `actor` with `const` inside `try`, while the duplicate-key (`11000`) handler in `catch` referenced the same payer identity.
 
-**Evidence:** The member request path created `CommunityAssistance` with an open/enable state instead of waiting for authorised review.
+**Root cause:** the actor was not available to the error handler when the transaction creation path raised a duplicate-key/idempotency race.
 
-**Root cause:** Request creation and campaign approval were conflated.
+**Repair:** the STK handler now declares `let actor = null` before `try` and assigns `actor = await resolvePaymentActor(req)` inside the protected flow, keeping the authenticated payer identity available to the duplicate-key handler.
 
-**Repair:** A member request now creates or updates a community case as `enabled=false`, `status="paused"`, and `workflowStatus="community_appeal_pending_review"`. Admin/SuperAdmin review was added at `POST /api/claims/community/:id/review`.
+**Regression:** `PASS — verified` by the verified-repair source contract plus full `npm test`.
 
-**Approve:** `community_campaign_open`, enabled/open (or target-reached).  
-**Reject:** `community_appeal_rejected`, disabled/closed, with a mandatory reason.
+### 2. Admin Finance UI still displayed an unverified hard-coded M-Pesa shortcode
 
-**Concurrency protection:** Review uses an atomic pending-state match so two reviewers cannot both successfully decide the same appeal.
+**Evidence:** `src/pages/admin/AdminFinance.jsx` contained a fallback to `650014` when the backend configuration was unavailable.
 
-**Regression:** `PASS — verified`
+**Root cause:** frontend display logic had retained a legacy hard-coded merchant identifier after backend runtime defaults were removed.
 
-### 2. Community M-Pesa payer identity only supported Member records
+**Repair:** the UI now displays `Not configured` until a real backend value is available.
 
-**Problem:** `MpesaTransaction` used a Member-only payer reference, which could misrepresent Admin/Leader contributors as Members.
+**Regression:** `PASS — verified` by verified-repair regression plus source scan.
 
-**Repair:** Added polymorphic `payerId` + `payerModel` (`Member` or `Admin`) with compound indexing while retaining the legacy `member` field for compatibility.
+### 3. Legacy system-settings migration could seed an unverified M-Pesa PayBill/account reference
 
-**Regression:** `PASS — verified`
+**Evidence:** `backend/migrations/009_create_system_settings_authority.js` previously used literal fallbacks for the manual PayBill/account reference.
 
-### 3. SuperAdmin could be treated as an ordinary community contributor
+**Root cause:** a configuration-seeding migration could create payment settings without an explicit operator-provided value.
 
-**Problem:** Existing contribution middleware admitted `member`, `admin`, and `superadmin` on payment self-service endpoints.
+**Repair:** migration `009` now defaults those fields to empty values. A new, tightly scoped idempotent migration `011_remove_legacy_unverified_mpesa_defaults.js` clears only those exact legacy values if they already exist in the singleton system-settings record and disables manual collection until real configuration is supplied.
 
-**Repair:** Community self-payment routes now use `isMemberOrAdminContributionUser`; controller-side actor resolution also rejects SuperAdmin. Community-case contribution permissions now expose contribution eligibility only to Member/Admin actors.
+**Safety:** the cleanup migration matches only the legacy literals and does not alter different configured values.
 
-**Regression:** `PASS — verified`
+**Regression:** `PASS — verified` by source contract and full repository suite.
 
-### 4. Admin/Leader community contribution UI was incomplete
+### 4. Legacy Admin Finance heading exposed the same unverified PayBill literal
 
-**Problem:** Admin portal claims/accounts flows did not expose a real contribution control for approved community campaigns.
+**Repair:** the heading was changed from the literal merchant number to the truthful generic `M-PESA PayBill submissions` label.
 
-**Repair:** Added the existing real `MpesaPaymentButton` to relevant Admin workflows and kept it out of SuperAdmin flows. The backend remains authoritative.
+**Regression:** `PASS — verified`.
 
-**Regression:** `PASS — verified` at source-contract level; live payment execution is not verified.
+## D. Existing verified business-rule repairs retained
 
-### 5. M-Pesa runtime identifiers had invented defaults
+The uploaded ZIP already contains the following source-level repairs, which were re-audited rather than assumed to be correct:
 
-**Problem:** Production code contained runtime fallback values for the M-Pesa shortcode/account reference.
+- Community support requests enter `community_appeal_pending_review`; they do not automatically become open payment campaigns.
+- Authorised review transitions a community case to an open campaign; rejection records a rejected review outcome and reason.
+- Community campaigns persist explicit workflow states rather than collapsing appeal and campaign semantics.
+- M-Pesa transactions preserve both `payerId` and `payerModel` for Member/Admin identity while keeping the legacy member field for compatibility.
+- SuperAdmin is excluded from ordinary community contributions at route/controller level.
+- Admin/Leader community contributions use real payment flow rather than UI-only eligibility.
+- Meeting-minutes publishing includes the selected cover image in the existing FormData request.
+- Notification event identities are deduplicated through the central notification lifecycle.
+- Public-page unavailable states are truthful rather than claiming implementation/configuration success.
+- Dependent documents are exposed through protected download routes; member/admin permissions are separated and audited.
 
-**Repair:** Removed those runtime defaults. STK requests now require actual configured environment values. Example configuration uses placeholders/blanks rather than plausible production identifiers.
+## E. Modernized / UX work
 
-**Regression:** `PASS — verified` at source-contract level.
+The current application already contains a shared portal design system and responsive shell. The audit preserved those existing structures instead of replacing working UI with an untested wholesale rewrite.
 
-### 6. Meeting-minutes image upload was silently omitted
+The source confirms:
 
-**Problem:** `AdminReports.jsx` allowed an image to be selected but did not append `coverImage` to the FormData sent to News.
+- section-based Member/Admin/SuperAdmin portal hubs;
+- responsive desktop sidebar and mobile navigation/drawer behavior;
+- shared portal cards, tables, status badges, dialogs, alerts and loading states;
+- mobile overflow hardening and `prefers-reduced-motion` support;
+- lazy-loaded page routes;
+- modern public-page fallback messaging;
+- role-aware community-support actions;
+- protected dependent-management surfaces.
 
-**Repair:** Added the real file to the existing FormData request.
+The additional UI change made in this audit is the removal of misleading M-Pesa configuration values from the Admin Finance interface.
 
-**Regression:** `PASS — verified` by the repair regression suite and existing production-contract tests.
+A browser-level visual review across mobile/tablet/desktop could not be completed in this environment, so no unsupported visual PASS is reported.
 
-### 7. Community-support notification lifecycle was incomplete for payer identity
+## F. Security and authorization findings
 
-**Problem:** Contribution-side notification handling did not consistently distinguish the payer type for Member vs Admin/Leader.
+Source-level verification confirms:
 
-**Repair:** Notification calls now carry deterministic event IDs and route recipient behavior from `payerId`/`payerModel`.
+- authentication middleware resolves canonical user roles and checks session/version state;
+- protected routes enforce backend authorization rather than relying on frontend role state;
+- cookie-auth mutation requests use CSRF protection;
+- CORS is allow-listed rather than open by default;
+- M-Pesa contributor routes exclude SuperAdmin;
+- sensitive M-Pesa transaction access is filtered by the authenticated payer actor;
+- dependent document downloads are permission-checked server-side;
+- settled M-Pesa records are protected from permanent deletion;
+- no real `.env` file was added to the release package;
+- environment examples use placeholders rather than actual secrets.
 
-**Regression:** `PASS — verified` through the notification lifecycle and repair contracts.
+No secret-like MongoDB URI, private key, or API-key pattern was found in the inspected frontend/public/backend source outside environment-example placeholders and test documentation patterns.
 
-### 8. User-facing community-support messaging overstated campaign availability
+## G. Business-rule verification
 
-**Repair:** Member UI now states that the request is submitted for administrator review and is not open for M-Pesa contributions until approved. Admin UI separates pending appeals from active campaigns.
+The verified source workflow is:
 
-**Regression:** `PASS — verified` at source-contract level.
+`Member contribution → Benevolent fund/account record`
 
-### 9. Public-page fallback copy contained unfinished configuration wording
+`Member support/claim request → Leader/Admin review`
 
-**Repair:** Replaced public `Not configured`-style copy in Home, About, and Contact with truthful unavailable states. Remaining `Not configured` strings are configuration/empty states in internal components, not public unfinished implementation messages.
+`Decision → approved constitutional support OR rejected`
 
-**Regression:** `PASS — verified` by the existing integrity/error-handling contracts plus direct source scan.
+`Rejected member → community-support request/appeal`
 
-## D. Modernized
+`Authorised review → community campaign may open`
 
-The targeted modernization focused on correctness and information hierarchy in affected workflows rather than performing a risky wholesale UI rewrite without browser verification.
+`Eligible contributors → Member + eligible Admin/Leader`
 
-The Member Claims page now communicates the actual support lifecycle. Admin Claims separates pending appeals, decisions, and active community campaigns. Admin Accounts includes the real payment action for eligible contributors. Meeting-minutes publishing has clearer draft/publish behavior and now carries the selected news image. Public pages use truthful unavailable states instead of implementation/configuration language.
+`SuperAdmin → governance/system administration, not ordinary community contribution`
 
-The repository already contains shared portal styles/components, responsive structures, status badges, cards, alerts, tables, and role-specific navigation; this release preserves those working conventions rather than replacing them globally.
+The education-support code path requires special governance caution. The repository contains an `010_enable_education_policy.js` migration, but that migration is not registered in `runMigrations.js`, while migration `005_align_policies_to_constitution.js` explicitly disables the education policy. This audit **did not register migration 010** because doing so would change the governing benefit set without authoritative approval. The existing policy guardrail test passes.
 
-## E. Security and authorization fixes
+## H. Exact test results
 
-- Community contribution self-service routes are now Member/Admin only.
-- SuperAdmin is blocked from acting as an ordinary community contributor both in route middleware and controller actor resolution.
-- Admin/Leader payer identity is persisted as `Admin`, not disguised as `Member`.
-- Community appeal approval/rejection is backend-enforced.
-- Rejection requires a reason.
-- Review transition is atomically claimed from the pending-review state.
-- Deterministic notification event IDs are used for the new workflow side effects.
-- Runtime M-Pesa identifiers are no longer invented by fallback constants.
-- No real `.env` file was added to the release.
-
-## F. Business-rule verification
-
-The repaired workflow is:
-
-**Member support claim → Admin/Leader decision → Approved constitution support OR Rejected → member may request community appeal → authorised review → campaign opens only after approval → eligible Member/Admin contributors may pay → SuperAdmin is excluded as an ordinary contributor.**
-
-The code keeps funeral/medical support distinct from community M-Pesa contributions. The existing Education Support implementation remains guarded by repository policy/tests because the supplied governance materials contain a documented code-vs-constitution conflict. This release does not invent a constitutional rule.
-
-## G. Tests and exact results
-
-### Final repository test suite
-
-`PASS — verified`
+### Full regression suite
 
 Command:
 
 `npm test`
 
+Result:
+
+`PASS — verified`
+
 Exit code: `0`
 
-### Additional Vercel asset contract test
+Key final measurements:
 
-`NOT VERIFIED — unavailable in current environment`
+- 177 backend JavaScript files syntax-checked;
+- 133 frontend source files import-checked;
+- 286 frontend API calls matched against mounted backend routes;
+- 66 unique portal menu/section paths checked;
+- all listed finance, notification, access-control, M-Pesa, presence, production-contract, latest-fix, business-policy and verified-repair suites passed.
+
+### Vercel asset contract
 
 Command:
 
 `npm run test:vercel-assets`
 
-Observed result: exit code `1` because `dist/index.html` is missing. The repository's production build could not be generated because Vite is incomplete in the uploaded dependency tree.
-
-### Lint
+Result:
 
 `NOT VERIFIED — unavailable in current environment`
 
-Command:
+Observed blocker:
 
-`npm run lint`
-
-Observed result: exit code `127`, `oxlint: not found`.
+`dist/index.html is missing. Run the Vite production build first.`
 
 ### Production build
-
-`NOT VERIFIED — unavailable in current environment`
 
 Command:
 
 `npm run build`
 
-Observed result: exit code `1`; `node_modules/vite/bin/vite.js` is missing from the supplied/copy working dependency tree.
+Result:
 
-No build success is claimed.
+`NOT VERIFIED — unavailable in current environment`
 
-## H. Live verification status
+Observed blocker:
 
-### VERIFIED LIVE
+`node_modules/vite/bin/vite.js` is missing from the installed dependency tree.
 
-- Public Vercel application root was reachable.
-- Render backend root was reachable and reported the API as running, version `18.5.0`.
+The repository's npm cache was empty and the environment could not resolve `registry.npmjs.org`, so a clean dependency installation could not be completed here.
 
-### NOT VERIFIED — unavailable in current environment
+### Lint
 
-- Member authenticated login and portal workflows.
-- Admin/Leader authenticated login and portal workflows.
-- SuperAdmin authenticated workflows.
-- Live claims/community-appeal approval and rejection.
-- Live M-Pesa STK, callback, reconciliation, and real funds movement.
-- Live MongoDB data mutations.
-- Cloudinary uploads/deletes.
-- Redis cache/invalidation behavior.
-- Resend email delivery.
-- Socket.IO message delivery and duplicate-listener behavior in a real browser session.
-- WebRTC/TURN audio/video call establishment.
-- Mobile/tablet/desktop visual browser regression and accessibility interaction.
-- Live Vercel `/api/website/settings` verification.
-- Live backend `/api/health` verification through the available web environment.
+Command:
 
-The environment did not provide authenticated browser interaction or runtime credentials, so no portal PASS is claimed.
+`npm run lint`
 
-## I. Remaining genuine blockers
+Result:
 
-1. **Dependency/build environment:** The uploaded ZIP contains an incomplete `node_modules` tree. A clean install with network/package-cache access is required before Vite build, Oxlint, and Vercel asset verification can be executed.
-2. **Authenticated live QA:** Real Member/Admin/SuperAdmin credentials plus browser interaction are required to verify portal behavior in production.
-3. **External integrations:** M-Pesa, MongoDB, Cloudinary, Redis, Resend, and realtime/WebRTC/TURN remain unverified without their actual runtime environments.
-4. **Governance confirmation:** Education Support remains a documented constitution/code conflict in the repository. Final governance approval is required before treating that policy as settled.
+`NOT VERIFIED — unavailable in current environment`
 
-## J. Files changed relative to the uploaded ZIP
+Observed blocker:
+
+`oxlint: not found` because the usable dependency installation was incomplete.
+
+## I. Live-verification status
+
+### `VERIFIED LIVE`
+
+- Vercel public root reachable and serving the Benevolent MIDAX application shell.
+- Render backend root reachable and reporting API version `18.5.0` with `status: Running`.
+
+### `NOT VERIFIED — unavailable in current environment`
+
+- authenticated Member login/session flow;
+- authenticated Admin/Leader portal interactions;
+- authenticated SuperAdmin portal interactions;
+- real MongoDB read/write behavior under test credentials;
+- real Cloudinary uploads;
+- Redis/cache behavior in production;
+- Resend/email delivery;
+- real Safaricom M-Pesa STK/manual/callback execution;
+- Socket.IO/WebRTC/TURN call execution;
+- browser-level responsive/visual testing;
+- production Vercel build output.
+
+The web inspection tool could not access the protected subroutes/API paths required for authenticated acceptance testing, so those items are deliberately not marked PASS.
+
+## J. Environment/configuration review
+
+The repository's backend and frontend references are fully represented in the supplied `.env.example` files.
+
+### Required and source-documented
+
+MongoDB, JWT, CORS, M-Pesa/Daraja, Cloudinary, uploads/document roots, email/SMS/push integrations, frontend API/socket URLs, and optional WebRTC/TURN settings are represented in configuration examples.
+
+### Not verified
+
+Actual deployed environment values and provider connectivity are not available to this environment and were not inferred.
+
+### Optional/feature-gated
+
+Redis, B2C M-Pesa, SMS, push and WebRTC/TURN are implemented/configured as optional or feature-gated paths.
+
+### Governance-sensitive
+
+Education policy enabling remains deliberately disabled in the migration chain to avoid changing the approved benefit set without authoritative documentation.
+
+## K. Defect / feature matrix summary
+
+| Area | Finding | Action | Result |
+|---|---|---|---|
+| Authentication | Role middleware/session/CSRF structure present | Re-audited | PASS — verified at source/contract level |
+| API contracts | Frontend API calls map to mounted routes | Re-audited | PASS — verified; 286 calls |
+| Claims/community | Appeal and campaign states are distinct | Re-audited | PASS — verified |
+| Community M-Pesa | Member/Admin payer model separated from SuperAdmin | Re-audited | PASS — verified |
+| Notifications | Central event identity/dedupe path | Re-audited | PASS — verified |
+| Chat/presence | Role filtering, no self-chat, listener cleanup contracts | Re-audited | PASS — verified at contract level |
+| Dependents | Admin/SuperAdmin management and protected documents | Re-audited | PASS — verified at contract level |
+| Finance/ledger | Real-record calculations and export wiring | Re-audited | PASS — verified at contract level |
+| M-Pesa STK catch | Payer actor scope bug | Fixed | PASS — verified |
+| Admin Finance config | Hard-coded shortcode fallback | Fixed | PASS — verified |
+| System settings | Legacy hard-coded manual M-Pesa defaults | Fixed + cleanup migration | PASS — verified |
+| Frontend build | Vite dependency missing | Could not execute | NOT VERIFIED — unavailable in current environment |
+| Lint | Oxlint dependency missing | Could not execute | NOT VERIFIED — unavailable in current environment |
+| Authenticated live UI | Browser authentication unavailable | Not claimed | NOT VERIFIED — unavailable in current environment |
+
+## L. Files changed in this audit
 
 ### Modified
 
-- `.env.example` — removed plausible M-Pesa client identifiers; left configuration explicit.
-- `backend/.env.example` — replaced plausible M-Pesa identifiers with placeholders.
-- `backend/controllers/claimWorkflowController.js` — community appeal creation/review gate, notifications, audit, atomic review transition.
-- `backend/controllers/paymentController.js` — Member/Admin payer resolution, SuperAdmin blocking, payer-aware transaction queries, community contribution notifications, workflow state updates.
-- `backend/models/CommunityAssistance.js` — explicit community appeal/campaign workflow states and review metadata.
-- `backend/models/MpesaTransaction.js` — payer identity/model support and index.
-- `backend/routes/claimWorkflowRoutes.js` — authorised community-appeal review endpoint.
-- `backend/routes/paymentRoutes.js` — Member/Admin contribution authorization.
-- `backend/services/mpesaService.js` — removal of invented runtime M-Pesa identifiers.
-- `backend/services/notificationService.js` — explicit eventId propagation for idempotent notification creation.
-- `package.json` — added the verified repair regression script to the complete test command.
-- `src/pages/About.jsx` — truthful unavailable-state copy.
-- `src/pages/Contact.jsx` — truthful unavailable-state copy.
-- `src/pages/Home.jsx` — truthful unavailable-state copy.
-- `src/pages/admin/AdminAccounts.jsx` — eligible Admin contribution action and payer-aware display.
-- `src/pages/admin/AdminClaims.jsx` — pending appeal review UX and accurate campaign states.
-- `src/pages/admin/AdminReports.jsx` — meeting-minutes cover image included in upload payload.
-- `src/pages/member/Claims.jsx` — accurate community-support review messaging.
+- `backend/controllers/paymentController.js` — fixed STK payer-actor scope for duplicate-key/idempotency handling.
+- `backend/migrations/009_create_system_settings_authority.js` — removed unverified manual M-Pesa defaults.
+- `backend/utils/runMigrations.js` — registered the scoped legacy-settings cleanup migration.
+- `backend/scripts/verifiedRepairRegressionTest.js` — added regression assertions for payer scope, unverified M-Pesa defaults and cleanup registration.
+- `src/pages/admin/AdminFinance.jsx` — removed hard-coded M-Pesa shortcode/PayBill fallback labels.
+- `FINAL_ENGINEERING_AUDIT_2026-09-30.md` — replaced stale prior-run release claims with this audit's evidence.
 
 ### Added
 
-- `backend/scripts/verifiedRepairRegressionTest.js` — regression checks for the repaired workflows.
-- `FINAL_ENGINEERING_AUDIT_2026-09-30.md` — this release report.
+- `backend/migrations/011_remove_legacy_unverified_mpesa_defaults.js` — idempotent cleanup of exact legacy unverified M-Pesa settings.
+- `PAGE_INVENTORY_2026-09-30.md` — route/role/source/API inventory for the application.
 
 ### Removed
 
-- `patch_changes.py` — stale, unreferenced development patch script; removed from the release package to avoid shipping dead developer tooling.
+- `patch_changes.py` — stale, unreferenced developer patch script not needed by the production source tree.
 
-## K. Core page/route inventory and verification state
+## M. Release packaging
 
-### Public
+Before packaging, the release tree was checked for:
 
-`/`, `/about`, `/services`, `/leaders`, `/constitution`, `/gallery`, `/news`, `/contact`, `/privacy-policy`, `/terms-conditions`, `/disclaimer`, `/login`, `/verify-membership` and existing redirects/fallback routes.
+- installed `node_modules` removal;
+- temporary build/development files;
+- real `.env` files;
+- accidental debug artifacts;
+- fake/mock production data;
+- changed-file scope.
 
-Source route/API contracts: `PASS — verified`  
-Authenticated/browser visual/live behavior: `NOT VERIFIED — unavailable in current environment`
+The final release ZIP is a source package and does **not** include the incomplete local `node_modules` directory created during the audit environment's failed dependency installation.
 
-### Member
+## N. Final conclusion
 
-`/member`, `/member/profile`, `/member/accounts`, `/member/contributions`, `/member/claims`, `/member/announcements`, `/member/messages`, `/member/notifications`, `/member/settings`, `/member/support`, `/member/benefits`, `/member/dependents`, `/member/guide`, `/member/polls`, `/member/mpesa-records`, `/member/feedback`, plus existing member section hubs.
+The repository is in a stronger verified source state than the uploaded baseline, with two newly discovered runtime/configuration defects repaired and regression-tested. Core role, claims, community-support, notification, finance and M-Pesa business-rule contracts are source-verified.
 
-Source route/API/authorization contracts: `PASS — verified`  
-Authenticated browser workflow: `NOT VERIFIED — unavailable in current environment`
-
-### Admin/Leader
-
-`/admin`, `/admin/members`, `/admin/accounts`, `/admin/claims`, `/admin/support`, `/admin/messages`, `/admin/notifications`, `/admin/announcements`, `/admin/settings`, `/admin/website`, `/admin/reports`, `/admin/polls`, `/admin/feedback`, `/admin/operations`, `/admin/finance-center`, `/admin/communications`, `/admin/leadership` and existing section hubs.
-
-Source route/API/authorization contracts: `PASS — verified`  
-Authenticated browser workflow: `NOT VERIFIED — unavailable in current environment`
-
-### SuperAdmin
-
-`/superadmin`, `/superadmin/admins`, `/superadmin/members`, `/superadmin/accounts`, `/superadmin/audit`, `/superadmin/notifications`, `/superadmin/news`, `/superadmin/claims`, `/superadmin/support`, `/superadmin/settings`, `/superadmin/leaders`, `/superadmin/policies`, `/superadmin/password`, `/superadmin/data-integrity`, `/superadmin/system`, `/superadmin/constitution`, `/superadmin/polls`, `/superadmin/feedback`, `/superadmin/reports` and existing section hubs.
-
-Source route/API/authorization and SuperAdmin chat-removal contracts: `PASS — verified`  
-Authenticated browser workflow: `NOT VERIFIED — unavailable in current environment`
-
-## L. Release packaging
-
-The final ZIP intentionally excludes `node_modules`, generated build/coverage output, repository metadata, and stale patch/development artifacts. `package-lock.json` is retained.
-
-No production `.env` file or real secret value was added.
-
-**Release decision:** the source repair set is regression-verified, but a final production-readiness declaration is withheld until the build/lint dependency environment, authenticated live QA, external integrations, and the documented governance conflict are independently verified.
+A full production acceptance statement would be unsupported until the project can be installed cleanly with its declared frontend dependencies, built with Vite, linted with Oxlint, and exercised through authenticated Member/Admin/SuperAdmin browser sessions against the real deployed services.

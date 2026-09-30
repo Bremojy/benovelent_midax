@@ -280,13 +280,14 @@ exports.deleteTransaction = async (req, res) => {
 exports.stk = async (req, res) => {
   let tx = null;
   let paymentMember = null;
+  let actor = null;
   let idempotencyKey = "";
   const requestId = String(req.requestId || req.get("X-Request-ID") || "unknown");
   try {
     const purpose = String(req.body?.purpose || "").trim();
     const referenceId = req.body?.referenceId || null;
     const amount = Number(req.body?.amount);
-    const actor = await resolvePaymentActor(req);
+    actor = await resolvePaymentActor(req);
     paymentMember = actor.memberId ? req.user : null;
     const role = String(req.user?.role || req.userRole || "").toLowerCase();
     const phoneNumber = normalizePhone(req.body?.phoneNumber || req.user?.phone || req.user?.mpesaNumber);

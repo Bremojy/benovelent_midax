@@ -6,8 +6,8 @@ const id = "009_create_system_settings_authority";
 module.exports = { id, async run() {
   const existingWebsiteSettings = await WebsiteContent.findOne({ section: "settings" }).lean();
   const content = existingWebsiteSettings?.content || {};
-  const manualPaybill = String(process.env.MPESA_MANUAL_PAYBILL || "247247").trim();
-  const manualAccount = String(process.env.MPESA_MANUAL_ACCOUNT_NUMBER || "0650186528835").trim();
+  const manualPaybill = String(process.env.MPESA_MANUAL_PAYBILL || "").trim();
+  const manualAccount = String(process.env.MPESA_MANUAL_ACCOUNT_NUMBER || "").trim();
   const accentColor = String(content.themeColor || content.accentColor || "").trim();
 
   await SystemSettings.findOneAndUpdate(

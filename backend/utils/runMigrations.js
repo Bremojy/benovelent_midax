@@ -10,6 +10,7 @@ const migrations = [
   require("../migrations/007_repair_direct_conversations"),
   require("../migrations/008_normalize_contribution_source"),
   require("../migrations/009_create_system_settings_authority"),
+  require("../migrations/011_remove_legacy_unverified_mpesa_defaults"),
 ];
 
 function normalizeMigration(migration, index) {
