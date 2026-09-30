@@ -17,7 +17,7 @@ const stageCopy = {
   "Disbursement Pending": "Approval is complete; funds are being prepared.",
   Paid: "Payment/disbursement has been recorded.",
   Completed: "The support process is complete.",
-  Rejected: "The request was not approved. Community assistance may be available.",
+  Rejected: "The request was not approved. You may request community assistance for administrator review.",
   Cancelled: "This application has been cancelled.",
   Closed: "This application is closed.",
 };
@@ -63,7 +63,7 @@ export default function Claims() {
       const referenceModel = { medical: "MedicalSupport", funeral: "FuneralSupport", education: "EducationSupport", support: "SupportRequest" }[claim.sourceType];
       const { data } = await API.post("/claims/community/request", { referenceModel, referenceId: claim._id, targetAmount: t });
       if (!data?.success) throw new Error(data?.message || "Unable to create community support request.");
-      toast.success("Community support request created. It can now receive voluntary M-PESA contributions.");
+      toast.success("Community support request submitted for administrator review. It is not open for M-PESA contributions yet.");
       await load();
     } catch (e) {
       toast.error(e.response?.data?.message || e.message || "Unable to create community support request.");
@@ -131,7 +131,7 @@ export default function Claims() {
               <div className="portal-stat-grid compact"><div className="portal-stat"><span>Requested</span><strong>{money(claim.requestedAmount || claim.amount)}</strong></div><div className="portal-stat"><span>Approved</span><strong>{money(claim.approvedAmount)}</strong></div>{claim.repaymentEnabled && <div className="portal-stat"><span>Repayment balance</span><strong>{money(claim.balance)}</strong></div>}</div>
               {idx >= 0 && <div style={{ marginTop: 12 }}><strong>Review progress</strong><div style={{ display: "grid", gap: 8, marginTop: 8 }}>{STAGES.map((s, i) => <div key={s} style={{ display: "grid", gridTemplateColumns: "18px 1fr", gap: 8, opacity: i <= idx ? 1 : .42 }}><div style={{ width: 14, height: 14, borderRadius: "50%", background: i <= idx ? "#0f766e" : "#cbd5e1", marginTop: 3 }} /><div><strong>{s}</strong><div style={{ fontSize: 13 }}>{stageCopy[s]}</div></div></div>)}</div></div>}
               {status === "Rejected" && !campaign && <div className="portal-panel" style={{ marginTop: 14, background: "#fff7ed", border: "1px solid #fed7aa" }}><div className="claim-card-head"><div><h3 style={{ margin: 0 }}>Community support is available</h3><p>Request a voluntary M-PESA community assistance campaign for this declined case.</p></div><HeartHandshake size={22} /></div><div className="portal-field" style={{ marginTop: 10 }}><label htmlFor={`claim-target-${claim._id}`}>Community target (KSh)</label><input id={`claim-target-${claim._id}`} type="number" min="1" inputMode="decimal" value={target[claim._id] ?? (claim.requestedAmount || claim.amount || "")} onChange={(e) => setTarget({ ...target, [claim._id]: e.target.value })} /></div><button className="portal-btn primary" style={{ marginTop: 10 }} onClick={() => requestCommunity(claim)} disabled={busy === `community-${claim._id}`}>{busy === `community-${claim._id}` ? "Creating…" : "Request community support"}</button></div>}
-              {campaign && <div className="portal-panel" style={{ marginTop: 14, background: "#f8fafc" }}><div className="claim-card-head"><div><span className="portal-badge">COMMUNITY M-PESA</span><h3>{campaign.title}</h3><p>{campaign.description}</p></div><strong>{money(campaign.raisedAmount)} / {money(campaign.targetAmount)}</strong></div><p style={{ color: "#667085", fontSize: 13 }}>Campaign status: {campaign.status}. Contributions are processed through the scheme's M-PESA account.</p></div>}
+              {campaign && <div className="portal-panel" style={{ marginTop: 14, background: "#f8fafc" }}><div className="claim-card-head"><div><span className="portal-badge">COMMUNITY M-PESA</span><h3>{campaign.title}</h3><p>{campaign.description}</p></div><strong>{money(campaign.raisedAmount)} / {money(campaign.targetAmount)}</strong></div><p style={{ color: "#667085", fontSize: 13 }}>Campaign workflow: {campaign.workflowStatus || "community_campaign_open"}. Contributions open only after administrator approval.</p></div>}
               {status === "Rejected" && <div className="portal-alert" style={{ marginTop: 12 }}><strong>Reason:</strong> {claim.rejectionReason || claim.remarks || "Your application was declined."}</div>}
               {history.length > 0 && <div style={{ marginTop: 14 }}><h3>Review history</h3>{history.slice().reverse().map((h, i) => <div key={`${h.date}-${i}`} style={{ padding: "10px 0", borderBottom: "1px solid #e5e7eb" }}><strong>{h.status}</strong><div>{h.remarks || "No additional note."}</div><small>{fmt(h.date)}</small></div>)}</div>}
             </article>;

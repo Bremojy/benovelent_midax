@@ -10,4 +10,5 @@ router.delete("/:type/:id", verifyToken, isAdminOrSuperAdmin, controller.remove)
 router.post("/:type/:id/publish-news", verifyToken, isAdminOrSuperAdmin, controller.publishClaimToNews);
 router.post("/community/:id/publish-news", verifyToken, isAdminOrSuperAdmin, controller.publishCommunityToNews);
 router.post("/community/request", verifyToken, require("../middleware/roleMiddleware").isMember, controller.requestCommunityAssistance);
+router.post("/community/:id/review", verifyToken, isAdminOrSuperAdmin, controller.reviewCommunityAssistance);
 module.exports = router;

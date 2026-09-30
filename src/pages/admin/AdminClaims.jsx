@@ -1,9 +1,10 @@
 import { confirmAction } from "../../utils/modernDialog";
 import { useEffect, useMemo, useState } from "react";
-import { HeartHandshake, Megaphone, Trash2, Smartphone, WalletCards, LockKeyhole, RefreshCw } from "lucide-react"
+import { HeartHandshake, Megaphone, Trash2, Smartphone, WalletCards, LockKeyhole, RefreshCw, CheckCircle2, XCircle } from "lucide-react"
 import { useAuth } from "../../context/AuthContext";
 import DashboardLayout from "../../layouts/DashboardLayout";
 import API, { resolveApiUrl } from "../../services/api";
+import MpesaPaymentButton from "../../components/payments/MpesaPaymentButton";
 import "../../styles/portalModule.css";
 
 const STAGES = ["Pending", "Under Review", "Documents Required", "Eligibility Review", "Approval Review", "Approved", "Disbursement Pending", "Paid", "Completed", "Rejected", "Cancelled", "Closed"];
@@ -28,6 +29,8 @@ export default function AdminClaims() {
   const [communityTitle, setCommunityTitle] = useState("");
   const [communityDescription, setCommunityDescription] = useState("");
   const [communityDraft, setCommunityDraft] = useState(null);
+  const [appealReview, setAppealReview] = useState(null);
+  const [appealReason, setAppealReason] = useState("");
 
   const load = async () => {
     try {
@@ -112,10 +115,32 @@ export default function AdminClaims() {
       });
       if (!data?.success) throw new Error(data?.message || "Unable to enable community support.");
       setCommunityDraft(null);
-      setSuccess("Community M-PESA assistance is now open for this declined case.");
+      setSuccess("Community M-PESA assistance was created as a pending appeal. It is not open until an authorised administrator approves it.");
       await load();
     } catch (e) {
       setError(e.response?.data?.message || e.message || "Unable to enable community support.");
+    } finally {
+      setBusy("");
+    }
+  };
+
+  const reviewAppeal = async (decision) => {
+    if (!appealReview) return;
+    if (decision === "reject" && !appealReason.trim()) {
+      setError("A rejection reason is required.");
+      return;
+    }
+    try {
+      setBusy(`appeal-${appealReview._id}`);
+      setError("");
+      const { data } = await API.post(`/claims/community/${appealReview._id}/review`, { decision, reason: appealReason.trim() });
+      if (!data?.success) throw new Error(data?.message || "Unable to review community appeal.");
+      setAppealReview(null);
+      setAppealReason("");
+      setSuccess(decision === "approve" ? "Community appeal approved and the campaign is now open." : "Community appeal rejected. The campaign remains closed.");
+      await load();
+    } catch (e) {
+      setError(e.response?.data?.message || e.message || "Unable to review community appeal.");
     } finally {
       setBusy("");
     }
@@ -238,7 +263,9 @@ export default function AdminClaims() {
         ) : (
           <section className="portal-grid two">
             {claims.map((c) => {
-              const alreadyCommunity = community.some((item) => String(item.referenceId) === String(c._id));
+              const existingCommunity = community.find((item) => String(item.referenceId) === String(c._id));
+              const alreadyCommunity = Boolean(existingCommunity);
+              const appealPending = ["community_appeal_pending_review", "community_appeal_requested"].includes(String(existingCommunity?.workflowStatus || ""));
               return (
                 <article className="portal-panel claim-admin-card" key={`${c.sourceType}-${c._id}`}>
                   <div className="claim-card-head">
@@ -267,7 +294,8 @@ export default function AdminClaims() {
                         <HeartHandshake size={15} /> Enable community M-PESA
                       </button>
                     )}
-                    {alreadyCommunity && <span className="portal-badge approved">Community support enabled</span>}
+                    {appealPending && <span className="portal-badge">Community appeal pending review</span>}
+                    {alreadyCommunity && !appealPending && <span className="portal-badge approved">Community support enabled</span>}
                     {["Approved", "Paid", "Completed"].includes(c.status) && <button className="portal-btn secondary" onClick={() => publishClaim(c)} disabled={busy === `publish-${c._id}`}><Megaphone size={15} />{busy === `publish-${c._id}` ? "Publishing…" : "Publish approval"}</button>}
                     {isSuperAdmin && ["Closed", "Rejected", "Cancelled"].includes(String(c.status)) && <button className="portal-btn secondary" onClick={() => reopenClaim(c)} disabled={busy === `reopen-${c._id}`}><RefreshCw size={15} />{busy === `reopen-${c._id}` ? "Reopening…" : "Reopen case"}</button>}
                     {isSuperAdmin && <button className="portal-btn danger" onClick={() => deleteClaim(c)} disabled={busy === `delete-${c._id}`}><Trash2 size={15} />{busy === `delete-${c._id}` ? "Deleting…" : "Delete claim"}</button>}
@@ -283,18 +311,35 @@ export default function AdminClaims() {
           <div className="portal-module-header compact-header">
             <div>
               <span>COMMUNITY M-PESA</span>
-              <h2>Active assistance cases</h2>
-              <p>Administrators can monitor verified requests. Only SuperAdmin can disburse collected funds or close an M-PESA collection request.</p>
+              <h2>Appeals & active assistance</h2>
+              <p>Community appeals require an authorised review before any M-PESA campaign opens. Members and eligible Admin / leader accounts may contribute only after approval; SuperAdmin remains a governance/payment-control role.</p>
             </div>
           </div>
-          {community.length === 0 ? <div className="portal-empty">No active community assistance cases.</div> : (
+          {community.filter((c) => ["community_appeal_pending_review", "community_appeal_requested"].includes(String(c.workflowStatus || ""))).length > 0 && (
+            <section className="portal-panel" style={{ marginBottom: 16, background: "#fff7ed" }}>
+              <div className="claim-card-head"><div><span className="portal-badge">PENDING REVIEW</span><h3>Community appeals awaiting decision</h3></div><HeartHandshake size={22}/></div>
+              <div className="portal-grid two">
+                {community.filter((c) => ["community_appeal_pending_review", "community_appeal_requested"].includes(String(c.workflowStatus || ""))).map((c) => (
+                  <article className="portal-panel" key={`appeal-${c._id}`} style={{ margin: 0 }}>
+                    <div className="claim-card-head"><div><span className="portal-badge">{c.referenceModel}</span><h3>{c.title}</h3><p>{c.recipientMember?.fullName || "Member"}</p></div><span className="portal-badge">{c.workflowStatus || "Pending review"}</span></div>
+                    <p>{c.description}</p>
+                    <div className="portal-stat-grid compact"><div className="portal-stat"><span>Requested target</span><strong>{money(c.targetAmount)}</strong></div><div className="portal-stat"><span>Raised</span><strong>{money(c.raisedAmount)}</strong></div></div>
+                    <div className="portal-actions"><button className="portal-btn primary" onClick={() => { setAppealReview(c); setAppealReason(""); }}><CheckCircle2 size={15}/> Review appeal</button></div>
+                  </article>
+                ))}
+              </div>
+            </section>
+          )}
+          {community.filter((c) => !["community_appeal_pending_review", "community_appeal_requested", "community_appeal_rejected"].includes(String(c.workflowStatus || ""))).length === 0 ? <div className="portal-empty">No approved/open community assistance cases.</div> : (
             <div className="portal-grid two">
-              {community.map((c) => (
+              {community.filter((c) => !["community_appeal_pending_review", "community_appeal_requested", "community_appeal_rejected"].includes(String(c.workflowStatus || ""))).map((c) => (
                 <article className="portal-panel" key={c._id}>
-                  <div className="claim-card-head"><div><span className="portal-badge">{c.referenceModel}</span><h3>{c.title}</h3></div><span className="portal-badge approved">{c.status}</span></div>
+                  <div className="claim-card-head"><div><span className="portal-badge">{c.referenceModel}</span><h3>{c.title}</h3></div><span className="portal-badge approved">{c.workflowStatus === "completed" ? "Completed" : c.status}</span></div>
                   <p>{c.description}</p>
                   <div className="portal-stat-grid compact"><div className="portal-stat"><span>Target</span><strong>{money(c.targetAmount)}</strong></div><div className="portal-stat"><span>Raised</span><strong>{money(c.raisedAmount)}</strong></div></div>
                   <div className="portal-actions">
+                    {String(c.workflowStatus || "") === "community_campaign_open" && Number(c.raisedAmount || 0) < Number(c.targetAmount || 0) && !isSuperAdmin && c.canContribute && <MpesaPaymentButton purpose="community_assistance" referenceId={c._id} label="Contribute via M-PESA" maxAmount={Math.max(0, Number(c.targetAmount || 0) - Number(c.raisedAmount || 0))} onSuccess={load} />}
+                    {String(c.workflowStatus || "") === "community_campaign_open" && !isSuperAdmin && !c.canContribute && <span className="portal-badge">Contribution unavailable for this account/case</span>}
                     {!["closed", "paid"].includes(c.status) && <button className="portal-btn secondary" onClick={() => publishCommunity(c)} disabled={busy === `publish-community-${c._id}`}><Megaphone size={15} />{busy === `publish-community-${c._id}` ? "Publishing…" : "Publish to News"}</button>}
                     {isSuperAdmin && Number(c.raisedAmount) > 0 && ["open", "target_reached"].includes(c.status) && <button className="portal-btn primary" onClick={() => payoutCommunity(c)} disabled={busy === `payout-${c._id}`}><WalletCards size={15} />{busy === `payout-${c._id}` ? "Submitting…" : "Disburse raised funds"}</button>}
                     {isSuperAdmin && ["open", "target_reached"].includes(c.status) && <button className="portal-btn danger" onClick={() => closeCommunity(c)} disabled={busy === `close-${c._id}`}><LockKeyhole size={15} />{busy === `close-${c._id}` ? "Closing…" : "Close collection"}</button>}
@@ -305,6 +350,15 @@ export default function AdminClaims() {
             </div>
           )}
         </section>
+
+        {appealReview && <div className="portal-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="community-appeal-review-title">
+          <section className="portal-modal-card">
+            <div className="portal-modal-head"><div><span>COMMUNITY APPEAL REVIEW</span><h2 id="community-appeal-review-title">Review community assistance request</h2><p>{appealReview.recipientMember?.fullName || "Member"} • {appealReview.referenceModel}</p></div><button className="portal-btn secondary" onClick={() => setAppealReview(null)}>Close</button></div>
+            <p>This review only controls the community campaign. It does not change the original rejected claim decision.</p>
+            <div className="portal-field"><label htmlFor="community-appeal-reason">Decision notes / rejection reason</label><textarea id="community-appeal-reason" rows="5" value={appealReason} onChange={(e) => setAppealReason(e.target.value)} placeholder="Record the governance/review reason. A rejection must include a reason." /></div>
+            <div className="portal-actions"><button className="portal-btn primary" onClick={() => reviewAppeal("approve")} disabled={busy === `appeal-${appealReview._id}`}><CheckCircle2 size={15}/> Approve & open campaign</button><button className="portal-btn danger" onClick={() => reviewAppeal("reject")} disabled={busy === `appeal-${appealReview._id}`}><XCircle size={15}/> Reject appeal</button></div>
+          </section>
+        </div>}
 
         {communityDraft && <div className="portal-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="community-assistance-title">
           <section className="portal-modal-card">

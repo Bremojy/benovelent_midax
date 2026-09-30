@@ -7,8 +7,6 @@ const isPlaceholder = (value) => {
   const v = String(value || "").trim().toUpperCase();
   return !v || v.startsWith("YOUR_") || v.includes("YOUR_DARAJA_") || v === "CHANGE_ME" || v === "REPLACE_ME";
 };
-const DEFAULT_MPESA_SHORTCODE = "650014";
-const DEFAULT_MPESA_ACCOUNT_REFERENCE = "BENMIDAX";
 const MPESA_TIMEZONE = env("MPESA_TIMEZONE", "Africa/Nairobi") || "Africa/Nairobi";
 const MPESA_OAUTH_TIMEOUT_MS = Math.min(Math.max(Number(env("MPESA_OAUTH_TIMEOUT_MS", 15000)) || 15000, 3000), 30000);
 const MPESA_REQUEST_TIMEOUT_MS = Math.min(Math.max(Number(env("MPESA_REQUEST_TIMEOUT_MS", 20000)) || 20000, 5000), 45000);
@@ -129,7 +127,7 @@ const timestamp = () => {
   return `${get("year")}${get("month")}${get("day")}${get("hour")}${get("minute")}${get("second")}`;
 };
 
-const normalizeAccountReference = (value) => String(value || DEFAULT_MPESA_ACCOUNT_REFERENCE).trim().replace(/[^A-Za-z0-9._-]/g, "").slice(0, 13) || DEFAULT_MPESA_ACCOUNT_REFERENCE;
+const normalizeAccountReference = (value) => String(value || "").trim().replace(/[^A-Za-z0-9._-]/g, "").slice(0, 13);
 
 const normalizePhone = (value) => {
   const raw = String(value || "").replace(/\s+/g, "").replace(/^\+/, "");
@@ -249,7 +247,7 @@ async function stkPush({ phoneNumber, amount, accountReference, transactionDesc 
   }
   const accessToken = await getAccessToken();
   const timestampValue = timestamp();
-  const shortcode = env("MPESA_SHORTCODE", DEFAULT_MPESA_SHORTCODE);
+  const shortcode = env("MPESA_SHORTCODE");
   const transactionType = env("MPESA_TRANSACTION_TYPE", "CustomerPayBillOnline");
   const callbackUrl = env("MPESA_CALLBACK_URL");
   const password = Buffer.from(`${shortcode}${env("MPESA_PASSKEY")}${timestampValue}`).toString("base64");
@@ -263,7 +261,7 @@ async function stkPush({ phoneNumber, amount, accountReference, transactionDesc 
     PartyB: shortcode,
     PhoneNumber: normalizedPhone,
     CallBackURL: callbackUrl,
-    AccountReference: normalizeAccountReference(accountReference || env("MPESA_ACCOUNT_REFERENCE", DEFAULT_MPESA_ACCOUNT_REFERENCE)),
+    AccountReference: normalizeAccountReference(accountReference || env("MPESA_ACCOUNT_REFERENCE")),
     TransactionDesc: String(transactionDesc || "Benevolent MIDAX payment").slice(0, 20),
   };
   logMpesa("stk:init", { endpoint: endpointSummary().stk, environment: env("MPESA_ENVIRONMENT", "production"), shortcode, transactionType, phone: maskPhone(normalizedPhone), amount: payload.Amount, callbackConfigured: Boolean(callbackUrl), passkeyPresent: !isPlaceholder(env("MPESA_PASSKEY")) });
@@ -278,7 +276,7 @@ async function stkQuery({ checkoutRequestId }) {
   if (!id) throw Object.assign(new Error("CheckoutRequestID is required for an STK status check."), { paymentStage: "validation", errorCategory: "validation" });
   const accessToken = await getAccessToken();
   const timestampValue = timestamp();
-  const shortcode = env("MPESA_SHORTCODE", DEFAULT_MPESA_SHORTCODE);
+  const shortcode = env("MPESA_SHORTCODE");
   const password = Buffer.from(`${shortcode}${env("MPESA_PASSKEY")}${timestampValue}`).toString("base64");
   const response = await postWithToken("/mpesa/stkpushquery/v1/query", { BusinessShortCode: shortcode, Password: password, Timestamp: timestampValue, CheckoutRequestID: id }, { paymentStage: "stk_query" });
   return response.data;
@@ -343,7 +341,7 @@ const getProductionDiagnostics = async ({ probeCallback = true } = {}) => {
     environment, endpoint: endpointSummary(),
     shortcode: env("MPESA_SHORTCODE") || null,
     transactionType: env("MPESA_TRANSACTION_TYPE", "CustomerPayBillOnline"),
-    accountReference: normalizeAccountReference(env("MPESA_ACCOUNT_REFERENCE", DEFAULT_MPESA_ACCOUNT_REFERENCE)),
+    accountReference: normalizeAccountReference(env("MPESA_ACCOUNT_REFERENCE")),
     callback: { ...callback, https: checks.callbackHttps },
     checks,
     notes: [

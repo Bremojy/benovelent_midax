@@ -14,6 +14,7 @@ const createNotification = async ({
   referenceModel,
   icon = "notifications",
   suppressPush = false,
+  eventId,
 }) => {
   try {
     if (!recipient || !title || !message) return null;
@@ -32,6 +33,7 @@ const createNotification = async ({
       referenceModel,
       icon,
       suppressPush,
+      eventId,
     });
 
     // Notification.create owns CREATE lifecycle fanout. Do not emit or push again here.

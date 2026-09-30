@@ -3,6 +3,8 @@ const mongoose = require("mongoose");
 const mpesaTransactionSchema = new mongoose.Schema(
   {
     member: { type: mongoose.Schema.Types.ObjectId, ref: "Member", default: null, index: true },
+    payerId: { type: mongoose.Schema.Types.ObjectId, default: null, refPath: "payerModel", index: true },
+    payerModel: { type: String, enum: ["Member", "Admin"], default: undefined, index: true },
     purpose: {
       type: String,
       enum: ["loan_repayment", "support_repayment", "community_assistance", "contribution", "other"],
@@ -43,6 +45,7 @@ mpesaTransactionSchema.index({ purpose: 1, referenceId: 1, status: 1 });
 mpesaTransactionSchema.index({ paymentMethod: 1, status: 1, createdAt: -1 });
 mpesaTransactionSchema.index({ manualTransactionCode: 1 }, { unique: true, sparse: true });
 mpesaTransactionSchema.index({ checkoutRequestId: 1, status: 1 });
+mpesaTransactionSchema.index({ payerId: 1, payerModel: 1, createdAt: -1 });
 mpesaTransactionSchema.index({ createdAt: -1 });
 
 module.exports = mongoose.models.MpesaTransaction || mongoose.model("MpesaTransaction", mpesaTransactionSchema);
