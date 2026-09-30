@@ -95,3 +95,11 @@
 
 **Unique routes inventoried:** 85.
 **Portal menu/section paths:** 66 unique linked paths verified by `npm run test:menu-routes`.
+
+
+## Global cross-portal addition — Command Center
+
+| Surface | Role | Purpose | API dependencies | Authorization | Mobile/Desktop | Test result |
+|---|---|---|---|---|---|---|
+| Ctrl+K / topbar Search | Member / Admin / SuperAdmin | Search records authorized to the current role | `GET /api/platform/search` | Backend `protect` plus role-scoped query filters | Shared responsive modal; desktop shortcut plus mobile-safe dialog | `PASS — verified` source/contract |
+| Attention control | Member / Admin / SuperAdmin | Show current unread notifications and pending support attention | `GET /api/platform/activity` | Backend actor-scoped notifications/audits; SuperAdmin governance audit visibility | Shared responsive modal | `PASS — verified` source/contract |

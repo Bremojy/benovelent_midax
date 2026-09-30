@@ -6,6 +6,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import "../styles/dashboard.css";
 import "../styles/dashboard-mobile.css";
 import "../styles/final-ui-polish.css";
+import PortalCommandCenter from "../components/dashboard/PortalCommandCenter";
 
 function DashboardLayout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(() => (
@@ -97,6 +98,8 @@ function DashboardLayout({ children }) {
           onClick={() => setSidebarOpen(false)}
         />
       )}
+
+      <PortalCommandCenter role={portalRole} />
 
       <DashboardSidebar
         role={role}

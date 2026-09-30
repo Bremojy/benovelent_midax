@@ -21,7 +21,6 @@ const normalizeBaseUrl = (value) =>
 
 const hostname = typeof window !== "undefined" ? String(window.location.hostname || "").toLowerCase() : "";
 const isLocalHost = ["localhost", "127.0.0.1", "::1"].includes(hostname);
-const isVercelHost = hostname.endsWith(".vercel.app") || hostname === "vercel.app";
 
 // Production browsers use the deployment's same-origin /api proxy by default.
 // This keeps authentication cookies on the browser origin and works for both
@@ -115,7 +114,6 @@ const isAuthBootstrapRequest = (url) => {
   return /\/auth\/(?:me|csrf)(?:\?|$)/i.test(path);
 };
 
-const pendingGets = new Map();
 const isRetryableGet = (config, error) => {
   const method = String(config?.method || "get").toLowerCase();
   if (method !== "get" || config?.skipRetry) return false;

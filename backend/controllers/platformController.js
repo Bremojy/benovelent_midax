@@ -31,6 +31,10 @@ const Conversation = require("../models/Conversation");
 const SupportRequest = require("../models/SupportRequest");
 const News = require("../models/News");
 const Contribution = require("../models/Contribution");
+const Finance = require("../models/Finance");
+const MedicalSupport = require("../models/MedicalSupport");
+const FuneralSupport = require("../models/FuneralSupport");
+const EducationSupport = require("../models/EducationSupport");
 const AuditLog = require("../models/AuditLog");
 const Event = require("../models/Event");
 const WebsiteContent = require("../models/WebsiteContent");
@@ -59,13 +63,25 @@ exports.activityCenter = async (req, res) => {
   const role = req.userRole;
   const recipient = req.user._id;
   const recipientModel = asUserModel(role);
+  const supportFilter = role === "member"
+    ? { member: recipient }
+    : { status: { $in: ["Pending", "Under Review"] } };
+  const auditFilter = role === "superadmin"
+    ? {}
+    : { user: recipient, userModel: recipientModel };
+  const conversationFilter = role === "superadmin" ? { _id: null } : { participants: recipient };
+
   const [notifications, support, conversations, audits] = await Promise.all([
     Notification.find({ recipient, recipientModel }).sort({ createdAt: -1 }).limit(15).lean(),
-    role === "member" ? SupportRequest.find({ member: recipient }).sort({ updatedAt: -1 }).limit(8).lean() : SupportRequest.find({ status: { $in: ["Pending", "Under Review"] } }).sort({ updatedAt: -1 }).limit(8).lean(),
-    Conversation.find({ participants: recipient }).sort({ lastMessageTime: -1 }).limit(8).lean(),
-    role === "member" ? AuditLog.find({ user: recipient, userModel: "Member" }).sort({ createdAt: -1 }).limit(8).lean() : AuditLog.find({}).sort({ createdAt: -1 }).limit(8).lean(),
+    SupportRequest.find(supportFilter).sort({ updatedAt: -1 }).limit(8).lean(),
+    Conversation.find(conversationFilter).sort({ lastMessageTime: -1 }).limit(8).lean(),
+    AuditLog.find(auditFilter).sort({ createdAt: -1 }).limit(8).lean(),
   ]);
-  res.json({ success: true, data: { notifications, support, conversations, audits } });
+
+  res.json({
+    success: true,
+    data: { notifications, support, conversations, audits },
+  });
 };
 
 exports.directory = async (req, res) => {
@@ -98,22 +114,52 @@ exports.directory = async (req, res) => {
 
 exports.search = async (req, res) => {
   const q = String(req.query.q || "").trim();
-  if (q.length < 2) return res.json({ success: true, data: { members: [], news: [], documents: [] } });
+  if (q.length < 2) {
+    return res.json({
+      success: true,
+      data: {
+        members: [], claims: [], contributions: [], transactions: [], messages: [], notifications: [],
+        news: [], documents: [], policies: [], audits: [],
+      },
+    });
+  }
+
   const safe = q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const regex = new RegExp(safe, "i");
-  const role = req.userRole;
-  const memberQuery = role === "member" ? { role: "member", status: "active" } : { isDeleted: { $ne: true }, status: "active" };
-  const [members, news] = await Promise.all([
-    role === "member" ? Promise.resolve([]) : Member.find({ ...memberQuery, $or: [{ fullName: regex }, { memberNumber: regex }, { department: regex }, { siteStation: regex }] }).select("fullName memberNumber profileImage siteStation department position").limit(12).lean(),
-    News.find({ published: true, status: "published", $or: [{ title: regex }, { summary: regex }, { content: regex }, { category: regex }] }).select("title summary category coverImage publishDate slug").sort({ publishDate: -1 }).limit(12).lean(),
-  ]);
-  const root = path.join(documentRoot);
-  const publicRoot = path.join(__dirname, "..", "..", "public", "documents");
-  const files = [];
-  const seenDocuments = new Set();
-  for (const dir of [root, publicRoot]) {
+  const role = String(req.userRole || "member").toLowerCase();
+  const recipient = req.user._id;
+
+  const base = {
+    members: [], claims: [], contributions: [], transactions: [], messages: [], notifications: [],
+    news: [], documents: [], policies: [], audits: [],
+  };
+
+  // Public news is safe for every authenticated role because the query is
+  // limited to records already published to the public site.
+  const newsPromise = News.find({
+    published: true,
+    status: "published",
+    $or: [
+      { title: regex },
+      { summary: regex },
+      { content: regex },
+      { category: regex },
+    ],
+  })
+    .select("title summary category coverImage publishDate slug")
+    .sort({ publishDate: -1 })
+    .limit(12)
+    .lean();
+
+  // Only public bundled documents are searched here. Never scan the private
+  // production document root and expose filenames merely because a user can
+  // authenticate. Private/member documents have their own protected routes.
+  const documentsPromise = Promise.resolve().then(() => {
+    const publicRoot = path.join(__dirname, "..", "..", "public", "documents");
+    const files = [];
+    const seenDocuments = new Set();
     try {
-      for (const name of fs.readdirSync(dir)) {
+      for (const name of fs.readdirSync(publicRoot)) {
         if (!/\.(pdf|docx?|xlsx?|pptx?)$/i.test(name) || !regex.test(name)) continue;
         const key = String(name).toLowerCase();
         if (seenDocuments.has(key)) continue;
@@ -121,8 +167,185 @@ exports.search = async (req, res) => {
         files.push({ name, url: `/documents/${encodeURIComponent(name)}` });
       }
     } catch (_) {}
+    return files.slice(0, 12);
+  });
+
+  const [news, documents] = await Promise.all([newsPromise, documentsPromise]);
+  base.news = news;
+  base.documents = documents;
+
+  if (role === "member") {
+    const memberId = recipient;
+    const [support, medical, funeral, education, contributions, messages, notifications] = await Promise.all([
+      SupportRequest.find({
+        member: memberId,
+        $or: [{ supportType: regex }, { policyName: regex }, { description: regex }, { status: regex }],
+      })
+        .select("supportType policyName status requestedAmount approvedAmount createdAt updatedAt")
+        .sort({ updatedAt: -1 })
+        .limit(10)
+        .lean(),
+      MedicalSupport.find({
+        member: memberId,
+        isDeleted: { $ne: true },
+        $or: [{ hospitalName: regex }, { diagnosis: regex }, { status: regex }, { memberNumber: regex }],
+      })
+        .select("member memberNumber hospitalName diagnosis status requestedAmount approvedAmount rejectionReason createdAt")
+        .sort({ createdAt: -1 })
+        .limit(10)
+        .lean(),
+      FuneralSupport.find({
+        member: memberId,
+        $or: [{ deceasedName: regex }, { burialLocation: regex }, { status: regex }, { memberNumber: regex }],
+      })
+        .select("member memberNumber deceasedName burialLocation status requestedAmount approvedAmount rejectionReason createdAt")
+        .sort({ createdAt: -1 })
+        .limit(10)
+        .lean(),
+      EducationSupport.find({
+        member: memberId,
+        $or: [{ school: regex }, { dependentName: regex }, { purpose: regex }, { status: regex }, { memberNumber: regex }],
+      })
+        .select("member memberNumber dependentName school purpose status requestedAmount approvedAmount rejectionReason createdAt")
+        .sort({ createdAt: -1 })
+        .limit(10)
+        .lean(),
+      Contribution.find({
+        member: memberId,
+        $or: [{ receiptNumber: regex }, { mpesaCode: regex }, { status: regex }],
+      })
+        .select("month year expectedAmount paidAmount balance status paymentDate receiptNumber mpesaCode")
+        .sort({ year: -1, month: -1 })
+        .limit(10)
+        .lean(),
+      Conversation.find({ participants: memberId, lastMessageText: regex })
+        .select("_id lastMessageText lastMessageTime")
+        .sort({ lastMessageTime: -1 })
+        .limit(10)
+        .lean(),
+      Notification.find({
+        recipient: memberId,
+        recipientModel: "Member",
+        $or: [{ title: regex }, { message: regex }, { type: regex }],
+      })
+        .select("title message type link read createdAt referenceId referenceModel")
+        .sort({ createdAt: -1 })
+        .limit(10)
+        .lean(),
+    ]);
+    base.claims = [
+      ...support.map((row) => ({ ...row, source: "SupportRequest", title: row.policyName || row.supportType || "Support request" })),
+      ...medical.map((row) => ({ ...row, source: "MedicalSupport", title: row.hospitalName || "Medical support" })),
+      ...funeral.map((row) => ({ ...row, source: "FuneralSupport", title: row.deceasedName || "Funeral support" })),
+      ...education.map((row) => ({ ...row, source: "EducationSupport", title: row.school || "Education support" })),
+    ].slice(0, 24);
+    base.contributions = contributions;
+    base.messages = messages;
+    base.notifications = notifications;
+  } else {
+    const memberQuery = { isDeleted: { $ne: true }, status: "active", role: "member" };
+    const [members, support, medical, funeral, education, transactions] = await Promise.all([
+      Member.find({
+        ...memberQuery,
+        $or: [
+          { fullName: regex }, { memberNumber: regex }, { department: regex },
+          { siteStation: regex }, { position: regex },
+        ],
+      })
+        .select("_id fullName memberNumber profileImage siteStation department position")
+        .limit(12)
+        .lean(),
+      SupportRequest.find({
+        $or: [{ supportType: regex }, { policyName: regex }, { description: regex }, { status: regex }],
+      })
+        .populate("member", "fullName memberNumber")
+        .select("member supportType policyName status requestedAmount approvedAmount createdAt updatedAt")
+        .sort({ updatedAt: -1 })
+        .limit(8)
+        .lean(),
+      MedicalSupport.find({
+        $or: [{ hospitalName: regex }, { diagnosis: regex }, { status: regex }, { memberNumber: regex }],
+        isDeleted: { $ne: true },
+      })
+        .populate("member", "fullName memberNumber")
+        .select("member memberNumber hospitalName diagnosis status requestedAmount approvedAmount rejectionReason createdAt")
+        .sort({ createdAt: -1 })
+        .limit(8)
+        .lean(),
+      FuneralSupport.find({
+        $or: [{ deceasedName: regex }, { burialLocation: regex }, { status: regex }, { memberNumber: regex }],
+      })
+        .select("member memberNumber deceasedName burialLocation status requestedAmount approvedAmount rejectionReason createdAt")
+        .populate("member", "fullName memberNumber")
+        .sort({ createdAt: -1 })
+        .limit(8)
+        .lean(),
+      EducationSupport.find({
+        $or: [{ school: regex }, { dependentName: regex }, { purpose: regex }, { status: regex }, { memberNumber: regex }],
+      })
+        .select("member memberNumber dependentName school purpose status requestedAmount approvedAmount rejectionReason createdAt")
+        .populate("member", "fullName memberNumber")
+        .sort({ createdAt: -1 })
+        .limit(8)
+        .lean(),
+      Finance.find({
+        hidden: { $ne: true },
+        $or: [
+          { transactionNumber: regex }, { type: regex }, { category: regex },
+          { description: regex }, { referenceNumber: regex }, { receiptNumber: regex },
+          { status: regex }, { contributorName: regex },
+        ],
+      })
+        .select("_id transactionNumber type category amount status referenceNumber receiptNumber transactionDate contributorName member")
+        .sort({ transactionDate: -1 })
+        .limit(12)
+        .lean(),
+    ]);
+    base.members = members;
+    base.claims = [
+      ...support.map((row) => ({ ...row, source: "SupportRequest", title: row.policyName || row.supportType || "Support request" })),
+      ...medical.map((row) => ({ ...row, source: "MedicalSupport", title: row.hospitalName || "Medical support" })),
+      ...funeral.map((row) => ({ ...row, source: "FuneralSupport", title: row.deceasedName || "Funeral support" })),
+      ...education.map((row) => ({ ...row, source: "EducationSupport", title: row.school || "Education support" })),
+    ].slice(0, 24);
+    base.transactions = transactions;
+
+    const [notifications] = await Promise.all([
+      Notification.find({
+        recipient,
+        recipientModel: asUserModel(role),
+        $or: [{ title: regex }, { message: regex }, { type: regex }],
+      })
+        .select("title message type link read createdAt referenceId referenceModel")
+        .sort({ createdAt: -1 })
+        .limit(10)
+        .lean(),
+    ]);
+    base.notifications = notifications;
   }
-  res.json({ success: true, data: { members, news, documents: files.slice(0, 12) } });
+
+  if (role === "superadmin") {
+    const [policies, audits] = await Promise.all([
+      Policy.find({
+        $or: [{ name: regex }, { slug: regex }, { description: regex }, { category: regex }],
+      })
+        .select("_id name slug category description enabled repaymentEnabled repaymentMonths updatedAt")
+        .sort({ order: 1, updatedAt: -1 })
+        .limit(12)
+        .lean(),
+      AuditLog.find({
+        $or: [{ action: regex }, { module: regex }, { description: regex }],
+      })
+        .select("_id action module description status createdAt userRole userModel")
+        .sort({ createdAt: -1 })
+        .limit(12)
+        .lean(),
+    ]);
+    base.policies = policies;
+    base.audits = audits;
+  }
+
+  return res.json({ success: true, data: base });
 };
 
 exports.events = async (req, res) => {

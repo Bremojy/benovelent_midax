@@ -8,10 +8,10 @@ import {
   LogOut,
   Download as DownloadIcon,
   House,
+  ListChecks,
 } from "lucide-react";
 
 import { useEffect, useState } from "react";
-import { dashboardMenus } from "../../config/dashboardMenu";
 import socket from "../../sockets/socket";
 import API, { resolveUploadUrl } from "../../services/api";
 
@@ -135,6 +135,8 @@ function DashboardTopbar({
   };
 
   const openInstall = () => window.dispatchEvent(new Event("benovelent:install-now"));
+  const openCommandCenter = (term = "") => window.dispatchEvent(new CustomEvent("benovelent:open-command-center", { detail: { term } }));
+  const openActionCenter = () => window.dispatchEvent(new Event("benovelent:open-action-center"));
 
   const goToSettings = () => {
     if (normalizedRole === "member") navigate("/member/settings");
@@ -204,21 +206,16 @@ function DashboardTopbar({
             type="search"
             value={searchTerm}
             onChange={(event) => setSearchTerm(event.target.value)}
+            onFocus={() => openCommandCenter(searchTerm)}
             onKeyDown={(event) => {
               if (event.key !== "Enter") return;
-              const term = searchTerm.trim().toLowerCase();
-              if (!term) return;
-              const menu = dashboardMenus[normalizedRole] || [];
-              const match = menu.find((item) => item.title.toLowerCase().includes(term));
-              if (match) {
-                setSearchTerm("");
-                navigate(match.path);
-              } else {
-                window.dispatchEvent(new CustomEvent("benovelent:portal-search", { detail: { term } }));
-              }
+              event.preventDefault();
+              const term = searchTerm.trim();
+              setSearchTerm("");
+              openCommandCenter(term);
             }}
-            placeholder="Jump to a portal section…"
-            aria-label="Search portal sections"
+            placeholder="Search portal & records…"
+            aria-label="Search authorized portal records"
           />
 
         </div>
@@ -235,6 +232,10 @@ function DashboardTopbar({
             {unreadMessages > 0 && <span className="badge">{unreadMessages > 99 ? "99+" : unreadMessages}</span>}
           </button>
         )}
+
+        <button type="button" className="icon-btn action-center-btn" onClick={openActionCenter} aria-label="Open action center" title="Action center">
+          <ListChecks size={20} />
+        </button>
 
         {/* NOTIFICATIONS */}
 

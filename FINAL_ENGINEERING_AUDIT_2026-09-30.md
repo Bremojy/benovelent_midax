@@ -1,12 +1,12 @@
 # Benevolent MIDAX — Final Engineering Audit & Release Report
 
 **Audit date:** 2026-09-30  
-**Baseline:** uploaded `benovelent_midax-main (5).zip`  
-**Release ZIP:** `benovelent_midax-finalized-2026-09-30.zip`
+**Baseline:** uploaded `benovelent_midax-main (6).zip`  
+**Release ZIP:** `benovelent_midax-modernized-2026-09-30.zip`
 
 ## Executive status
 
-The uploaded repository was inspected as an existing full-stack application, not rebuilt. The final source changes are limited to evidence-backed repairs plus release documentation/inventory.
+The uploaded repository was inspected as an existing full-stack application, not rebuilt. The final source changes are limited to evidence-backed repairs, portal UX wiring, privacy hardening, regression coverage, plus release documentation/inventory.
 
 **Repository regression status:** `PASS — verified`  
 **Authenticated live portal testing:** `NOT VERIFIED — unavailable in current environment`  
@@ -50,10 +50,10 @@ Key source areas inspected include:
 The final run verified:
 
 - all declared package script targets exist;
-- backend syntax check passed for **177 JavaScript files**;
-- frontend relative import resolution passed for **133 source files**;
+- backend syntax check passed for **178 JavaScript files**;
+- frontend relative import resolution passed for **134 source files**;
 - repository integrity requirements;
-- **286 frontend API calls** against mounted backend routes;
+- **288 frontend API calls** against mounted backend routes;
 - **66 unique portal menu/section paths**;
 - finance opening/running/closing ledger math and status filtering;
 - notification event identity/dedupe rules;
@@ -81,7 +81,62 @@ The Render backend root responded with a JSON health-style application response 
 
 ## C. Defects fixed in this audit
 
-### 1. STK duplicate-key/idempotency error path used an out-of-scope payer actor
+### 0. Global portal search was visually present but not functionally connected
+
+**Evidence:** `DashboardTopbar.jsx` only matched a small set of menu titles on Enter and otherwise dispatched `benovelent:portal-search`; there was no consumer for that event, while a real authenticated `/api/platform/search` endpoint already existed.
+
+**Root cause:** the search UI and backend search capability had been implemented independently.
+
+**Repair:** added a shared `PortalCommandCenter` used by Member, Admin and SuperAdmin layouts. Desktop/mobile-compatible Ctrl+K and topbar search open the same command surface. Results call the existing backend search route and navigate only to role-appropriate destinations.
+
+**Regression:** `PASS — verified` by the platform search/activity contract and full repository suite.
+
+### 0.1. Member global search omitted typed claim models
+
+**Evidence:** Member search previously queried only the generic `SupportRequest` collection for claim/support matches, while the repository also stores Medical, Funeral and Education support records in dedicated collections.
+
+**Root cause:** the portal search contract did not cover all Member-owned claim persistence models.
+
+**Repair:** Member search now queries `MedicalSupport`, `FuneralSupport` and `EducationSupport` using `member: req.user._id` ownership filters and merges those results with generic SupportRequest results.
+
+**Regression:** `PASS — verified` by the platform search/activity contract and full repository suite.
+
+### 0A. Global search could expose private document filenames
+
+**Evidence:** the previous `platformController.search` scanned `documentRoot` and returned matching filenames through an authenticated general-search response.
+
+**Root cause:** private document storage was treated as searchable content without an authorization boundary.
+
+**Repair:** general search now scans only the bundled public document directory. Private/member documents remain behind their dedicated protected document routes.
+
+**Regression:** `PASS — verified` by the platform search/activity privacy contract.
+
+### 0B. Activity-center endpoint could expose global audit records to non-SuperAdmin roles
+
+**Evidence:** the prior activity-center implementation used `AuditLog.find({})` for roles other than Member.
+
+**Root cause:** the endpoint did not distinguish governance-wide audit visibility from personal/operational attention data.
+
+**Repair:** only SuperAdmin receives governance-wide audit activity; Member/Admin requests are scoped to the authenticated actor. SuperAdmin activity-center responses also suppress conversation records.
+
+**Regression:** `PASS — verified` by the platform search/activity privacy contract.
+
+### 0C. API client contained dead search/retry scaffolding
+
+**Evidence:** `src/services/api.js` declared unused `isVercelHost` and `pendingGets` symbols.
+
+**Root cause:** stale scaffolding remained after earlier request-routing/retry changes.
+
+**Repair:** removed the unused symbols without altering the active request/retry behavior.
+
+**Regression:** `PASS — verified` by frontend import resolution and full repository suite.
+
+
+## D. Existing verified repairs retained from uploaded baseline
+
+The following repairs were already present in the uploaded `(6).zip` before this audit. They were re-audited and retained; they are not counted as current source edits.
+
+### Existing repair — STK duplicate-key/idempotency error path used an out-of-scope payer actor
 
 **Evidence:** `backend/controllers/paymentController.js` declared the authenticated `actor` with `const` inside `try`, while the duplicate-key (`11000`) handler in `catch` referenced the same payer identity.
 
@@ -91,7 +146,7 @@ The Render backend root responded with a JSON health-style application response 
 
 **Regression:** `PASS — verified` by the verified-repair source contract plus full `npm test`.
 
-### 2. Admin Finance UI still displayed an unverified hard-coded M-Pesa shortcode
+### Existing repair — Admin Finance UI hard-coded M-Pesa shortcode removed
 
 **Evidence:** `src/pages/admin/AdminFinance.jsx` contained a fallback to `650014` when the backend configuration was unavailable.
 
@@ -101,7 +156,7 @@ The Render backend root responded with a JSON health-style application response 
 
 **Regression:** `PASS — verified` by verified-repair regression plus source scan.
 
-### 3. Legacy system-settings migration could seed an unverified M-Pesa PayBill/account reference
+### Existing repair — legacy system-settings migration unverified M-Pesa defaults removed
 
 **Evidence:** `backend/migrations/009_create_system_settings_authority.js` previously used literal fallbacks for the manual PayBill/account reference.
 
@@ -113,13 +168,13 @@ The Render backend root responded with a JSON health-style application response 
 
 **Regression:** `PASS — verified` by source contract and full repository suite.
 
-### 4. Legacy Admin Finance heading exposed the same unverified PayBill literal
+### Existing repair — Admin Finance heading no longer exposes a hard-coded PayBill literal
 
 **Repair:** the heading was changed from the literal merchant number to the truthful generic `M-PESA PayBill submissions` label.
 
 **Regression:** `PASS — verified`.
 
-## D. Existing verified business-rule repairs retained
+## E. Existing verified business-rule repairs retained
 
 The uploaded ZIP already contains the following source-level repairs, which were re-audited rather than assumed to be correct:
 
@@ -134,7 +189,7 @@ The uploaded ZIP already contains the following source-level repairs, which were
 - Public-page unavailable states are truthful rather than claiming implementation/configuration success.
 - Dependent documents are exposed through protected download routes; member/admin permissions are separated and audited.
 
-## E. Modernized / UX work
+## F. Modernized / UX work
 
 The current application already contains a shared portal design system and responsive shell. The audit preserved those existing structures instead of replacing working UI with an untested wholesale rewrite.
 
@@ -149,11 +204,11 @@ The source confirms:
 - role-aware community-support actions;
 - protected dependent-management surfaces.
 
-The additional UI change made in this audit is the removal of misleading M-Pesa configuration values from the Admin Finance interface.
+The additional UI changes made in this audit include the removal of misleading M-Pesa configuration values from the Admin Finance interface and the new shared portal Command Center for permission-aware search and Attention items.
 
 A browser-level visual review across mobile/tablet/desktop could not be completed in this environment, so no unsupported visual PASS is reported.
 
-## F. Security and authorization findings
+## G. Security and authorization findings
 
 Source-level verification confirms:
 
@@ -170,7 +225,7 @@ Source-level verification confirms:
 
 No secret-like MongoDB URI, private key, or API-key pattern was found in the inspected frontend/public/backend source outside environment-example placeholders and test documentation patterns.
 
-## G. Business-rule verification
+## H. Business-rule verification
 
 The verified source workflow is:
 
@@ -190,7 +245,7 @@ The verified source workflow is:
 
 The education-support code path requires special governance caution. The repository contains an `010_enable_education_policy.js` migration, but that migration is not registered in `runMigrations.js`, while migration `005_align_policies_to_constitution.js` explicitly disables the education policy. This audit **did not register migration 010** because doing so would change the governing benefit set without authoritative approval. The existing policy guardrail test passes.
 
-## H. Exact test results
+## I. Exact test results
 
 ### Full regression suite
 
@@ -206,9 +261,9 @@ Exit code: `0`
 
 Key final measurements:
 
-- 177 backend JavaScript files syntax-checked;
-- 133 frontend source files import-checked;
-- 286 frontend API calls matched against mounted backend routes;
+- 178 backend JavaScript files syntax-checked;
+- 134 frontend source files import-checked;
+- 288 frontend API calls matched against mounted backend routes;
 - 66 unique portal menu/section paths checked;
 - all listed finance, notification, access-control, M-Pesa, presence, production-contract, latest-fix, business-policy and verified-repair suites passed.
 
@@ -256,7 +311,7 @@ Observed blocker:
 
 `oxlint: not found` because the usable dependency installation was incomplete.
 
-## I. Live-verification status
+## J. Live-verification status
 
 ### `VERIFIED LIVE`
 
@@ -279,7 +334,7 @@ Observed blocker:
 
 The web inspection tool could not access the protected subroutes/API paths required for authenticated acceptance testing, so those items are deliberately not marked PASS.
 
-## J. Environment/configuration review
+## K. Environment/configuration review
 
 The repository's backend and frontend references are fully represented in the supplied `.env.example` files.
 
@@ -299,12 +354,12 @@ Redis, B2C M-Pesa, SMS, push and WebRTC/TURN are implemented/configured as optio
 
 Education policy enabling remains deliberately disabled in the migration chain to avoid changing the approved benefit set without authoritative documentation.
 
-## K. Defect / feature matrix summary
+## L. Defect / feature matrix summary
 
 | Area | Finding | Action | Result |
 |---|---|---|---|
 | Authentication | Role middleware/session/CSRF structure present | Re-audited | PASS — verified at source/contract level |
-| API contracts | Frontend API calls map to mounted routes | Re-audited | PASS — verified; 286 calls |
+| API contracts | Frontend API calls map to mounted routes | Re-audited | PASS — verified; 288 calls |
 | Claims/community | Appeal and campaign states are distinct | Re-audited | PASS — verified |
 | Community M-Pesa | Member/Admin payer model separated from SuperAdmin | Re-audited | PASS — verified |
 | Notifications | Central event identity/dedupe path | Re-audited | PASS — verified |
@@ -318,27 +373,31 @@ Education policy enabling remains deliberately disabled in the migration chain t
 | Lint | Oxlint dependency missing | Could not execute | NOT VERIFIED — unavailable in current environment |
 | Authenticated live UI | Browser authentication unavailable | Not claimed | NOT VERIFIED — unavailable in current environment |
 
-## L. Files changed in this audit
+## M. Files changed in this audit
 
-### Modified
+### Modified (9)
 
-- `backend/controllers/paymentController.js` — fixed STK payer-actor scope for duplicate-key/idempotency handling.
-- `backend/migrations/009_create_system_settings_authority.js` — removed unverified manual M-Pesa defaults.
-- `backend/utils/runMigrations.js` — registered the scoped legacy-settings cleanup migration.
-- `backend/scripts/verifiedRepairRegressionTest.js` — added regression assertions for payer scope, unverified M-Pesa defaults and cleanup registration.
-- `src/pages/admin/AdminFinance.jsx` — removed hard-coded M-Pesa shortcode/PayBill fallback labels.
-- `FINAL_ENGINEERING_AUDIT_2026-09-30.md` — replaced stale prior-run release claims with this audit's evidence.
+- `FINAL_ENGINEERING_AUDIT_2026-09-30.md` — updated audit evidence, counts, release scope and verification limits.
+- `PAGE_INVENTORY_2026-09-30.md` — added the global Command Center / Attention inventory entry.
+- `PATCH_NOTES.md` — recorded the current audit delta.
+- `backend/controllers/platformController.js` — added role-scoped global search/activity hardening and Member-owned typed claim search.
+- `package.json` — added the platform search/activity regression test to the standard test chain.
+- `src/components/dashboard/DashboardTopbar.jsx` — wired topbar Search and Attention controls to the shared command center.
+- `src/layouts/DashboardLayout.jsx` — mounted the shared command center across authenticated portals.
+- `src/services/api.js` — removed unused request-routing/retry symbols.
+- `src/styles/topbar.css` — added compact Attention-control states.
 
-### Added
+### Added (3)
 
-- `backend/migrations/011_remove_legacy_unverified_mpesa_defaults.js` — idempotent cleanup of exact legacy unverified M-Pesa settings.
-- `PAGE_INVENTORY_2026-09-30.md` — route/role/source/API inventory for the application.
+- `backend/scripts/platformSearchActivityRegressionTest.js` — regression contract coverage for search/activity authorization and privacy.
+- `src/components/dashboard/PortalCommandCenter.jsx` — shared Ctrl+K/Search/Attention UI.
+- `src/components/dashboard/PortalCommandCenter.css` — responsive and reduced-motion styling for the command center.
 
 ### Removed
 
-- `patch_changes.py` — stale, unreferenced developer patch script not needed by the production source tree.
+No baseline source files were removed.
 
-## M. Release packaging
+## N. Release packaging
 
 Before packaging, the release tree was checked for:
 
@@ -351,8 +410,27 @@ Before packaging, the release tree was checked for:
 
 The final release ZIP is a source package and does **not** include the incomplete local `node_modules` directory created during the audit environment's failed dependency installation.
 
-## N. Final conclusion
+## O. Final conclusion
 
-The repository is in a stronger verified source state than the uploaded baseline, with two newly discovered runtime/configuration defects repaired and regression-tested. Core role, claims, community-support, notification, finance and M-Pesa business-rule contracts are source-verified.
+The repository is in a stronger verified source state than the uploaded baseline. This audit repaired and regression-tested the portal search/Attention integration, search privacy boundaries, activity-center role scoping, typed-claim search coverage, and stale API-client scaffolding. Core role, claims, community-support, notification, finance and M-Pesa business-rule contracts from the uploaded baseline were re-audited and retained.
 
 A full production acceptance statement would be unsupported until the project can be installed cleanly with its declared frontend dependencies, built with Vite, linted with Oxlint, and exercised through authenticated Member/Admin/SuperAdmin browser sessions against the real deployed services.
+
+
+## Release delta for uploaded ZIP (2026-09-30)
+
+The source archive `benovelent_midax-main (6).zip` was used as the exact working baseline. The release changes only the following application/source surfaces:
+
+- shared portal Command Center wired into Member, Admin and SuperAdmin layouts;
+- topbar Search and Attention controls;
+- permission-aware authenticated `/api/platform/search`;
+- activity-center audit/conversation scoping;
+- Member search coverage for Medical, Funeral and Education support collections;
+- new platform search/activity regression contract;
+- root test-suite registration for that regression;
+- removal of two unused API-client symbols;
+- release documentation/inventory updates.
+
+No baseline application files were removed. Prior M-Pesa, finance, claims, notification, dependent and other repairs described in the audit were already present in the uploaded baseline and were re-audited rather than recoded.
+
+The release ZIP is intentionally separate from the uploaded original.
