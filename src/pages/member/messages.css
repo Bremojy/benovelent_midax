@@ -711,3 +711,38 @@
 .chat-focused-toolbar h1{margin:2px 0 0;font-size:1.12rem;line-height:1.2}
 .chat-focused-toolbar .message-center-kicker{display:block;font-size:.68rem;letter-spacing:.12em;font-weight:800;opacity:.62}
 @media (max-width:720px){.chat-focused-toolbar{padding:10px 12px}.chat-focused-toolbar h1{font-size:1rem}.chat-focused-toolbar .portal-chip-action{min-height:40px}}
+
+
+/* Production mobile hardening: dynamic viewport + safe-area aware chat shell. */
+@media (max-width: 900px) {
+  .mobile-chat-overlay {
+    min-height: 100dvh;
+    height: 100dvh;
+    padding-bottom: env(safe-area-inset-bottom);
+    box-sizing: border-box;
+  }
+  .mobile-chat-overlay .chat-window {
+    min-height: 0;
+    height: 100%;
+    max-height: 100%;
+    overflow: hidden;
+  }
+  .mobile-chat-overlay .messages-container {
+    min-height: 0;
+    overscroll-behavior-y: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+  .mobile-chat-overlay .message-input-container {
+    padding-bottom: calc(7px + env(safe-area-inset-bottom));
+  }
+}
+@media (max-width: 520px) {
+  .chat-search input,
+  .message-input-container textarea {
+    font-size: 16px;
+  }
+  .chat-sidebar-actions button,
+  .message-input-container button {
+    min-height: 40px;
+  }
+}

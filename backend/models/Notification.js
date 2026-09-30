@@ -153,10 +153,19 @@ const fanoutCreatedNotification = async (notification) => {
       io.to(room).emit("notification-count", unread);
     }
   } catch (error) { console.warn("Realtime notification delivery skipped:", error.message); }
+  // For live chat/call events, Socket.IO is the realtime notification channel.
+  // Web Push is reserved for recipients without an active socket so a single
+  // event cannot become both a live browser notification and a push alert.
   if (!notification.suppressPush) {
     try {
       const { sendPushForNotification } = require("../services/pushService");
-      await sendPushForNotification(notification);
+      const realtimeTypes = new Set(["message", "audio_call", "video_call", "call"]);
+      let shouldPush = true;
+      if (realtimeTypes.has(String(notification.type || "").toLowerCase())) {
+        const { hasActiveUserSocket } = require("../sockets/socket");
+        shouldPush = !hasActiveUserSocket(notification.recipient, notification.metadata?.conversationId);
+      }
+      if (shouldPush) await sendPushForNotification(notification);
     } catch (error) { console.warn("Notification push delivery skipped:", error.message); }
   }
   try {
@@ -250,6 +259,7 @@ if (!NotificationModel.__midaxNotificationLifecycle) {
   };
   NotificationModel.__midaxNotificationLifecycle = true;
 }
+NotificationModel.getUniqueUnreadCount = getUniqueUnreadCount;
 NotificationModel.emitNotificationUpdated = emitNotificationUpdated;
 NotificationModel.fanoutCreatedNotification = fanoutCreatedNotification;
 

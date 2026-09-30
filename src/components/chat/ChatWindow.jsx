@@ -3,9 +3,10 @@ import ChatHeader from "./ChatHeader";
 import MessageBubble from "./MessageBubble";
 import MessageInput from "./MessageInput";
 import TypingIndicator from "./TypingIndicator";
-import { BellOff, BellRing, Pin, Trash2, X } from "lucide-react";
+import { BellOff, BellRing, Pin, Trash2, X, Volume2, VolumeX } from "lucide-react";
 import API from "../../services/api";
 import toast from "react-hot-toast";
+import { isChatSoundEnabled, setChatSoundEnabled, unlockChatSound } from "../../utils/chatSound";
 import "./ChatWindow.css";
 
 function ChatWindow({ conversation, socket, currentUser, onBack, onAudioCall, onVideoCall, onConversationDeleted }) {
@@ -19,6 +20,7 @@ function ChatWindow({ conversation, socket, currentUser, onBack, onAudioCall, on
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [muted, setMuted] = useState(Boolean(conversation?.mutedBy?.some?.((id) => String(id) === currentId)));
   const [pinned, setPinned] = useState(Boolean(conversation?.pinnedBy?.some?.((id) => String(id) === currentId)));
+  const [chatSoundEnabled, setChatSoundEnabledState] = useState(isChatSoundEnabled);
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
   const typingUserRef = useRef("");
@@ -44,6 +46,7 @@ function ChatWindow({ conversation, socket, currentUser, onBack, onAudioCall, on
   }, [conversation, currentId]);
 
   useEffect(() => {
+    unlockChatSound();
     setDetailsOpen(false);
     setMuted(Boolean(conversation?.mutedBy?.some?.((id) => String(id) === currentId)));
     setPinned(Boolean(conversation?.pinnedBy?.some?.((id) => String(id) === currentId)));
@@ -116,7 +119,8 @@ function ChatWindow({ conversation, socket, currentUser, onBack, onAudioCall, on
       });
 
       if (normalized?._id) {
-        void API.put(`/messages/${normalized._id}/read`).catch(() => {});
+        // Active-chat reads use one realtime acknowledgement plus one
+        // authoritative conversation-read request.
         socket.emit("seen-message", { messageId: normalized._id });
         void API.put(`/conversations/${conversation._id}/read`).catch(() => {});
       }
@@ -291,6 +295,18 @@ function ChatWindow({ conversation, socket, currentUser, onBack, onAudioCall, on
           <div className="chat-details-actions">
             <button type="button" onClick={() => toggleConversationFlag("pin")}><Pin size={17} />{pinned ? "Unpin conversation" : "Pin conversation"}</button>
             <button type="button" onClick={() => toggleConversationFlag("mute")}><>{muted ? <BellRing size={17} /> : <BellOff size={17} />}</>{muted ? "Unmute notifications" : "Mute notifications"}</button>
+            <button
+              type="button"
+              onClick={() => {
+                unlockChatSound();
+                const next = setChatSoundEnabled(!chatSoundEnabled);
+                setChatSoundEnabledState(next);
+              }}
+              aria-pressed={chatSoundEnabled}
+            >
+              {chatSoundEnabled ? <Volume2 size={17} /> : <VolumeX size={17} />}
+              {chatSoundEnabled ? "Message sound on" : "Message sound off"}
+            </button>
             <button type="button" className="danger" onClick={removeConversation}><Trash2 size={17} />Remove conversation</button>
           </div>
           <div className="chat-details-meta">

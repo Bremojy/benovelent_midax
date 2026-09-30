@@ -7,7 +7,6 @@ const Member = require("../models/Member");
 const Admin = require("../models/Admin");
 const SuperAdmin = require("../models/SuperAdmin");
 const { resolveStoredFileUrl } = require("../utils/uploadUrl");
-const { sendPushToRecipient } = require("../services/pushService");
 const mongoose = require("mongoose");
 
 async function getAuthorizedMessage(req) {
@@ -148,7 +147,7 @@ exports.sendMessage = async (req, res) => {
                               if (superadmin) return { recipient: recipientId, recipientModel: "SuperAdmin" };
                               return { recipient: recipientId, recipientModel: "Member" };
                           }));
-                          const notifications = await Notification.insertMany(
+                          await Notification.insertMany(
                               notificationTargets.map((target) => ({
                                   ...target,
                                   sender: actorId,
@@ -158,34 +157,16 @@ exports.sendMessage = async (req, res) => {
                                   type: "message",
                                   referenceId: newMessage._id,
                                   referenceModel: "Message",
+                                  eventId: `message:${String(newMessage._id)}:${String(target.recipientModel)}:${String(target.recipient)}`,
+                                  metadata: { conversationId: String(conversation._id), messageId: String(newMessage._id) },
                                   icon: "message-circle",
                               }))
                           );
 
-
-                          // Deliver a real browser/mobile push notification when the recipient
-                          // is offline or the chat page is not visible. The in-app Socket.IO
-                          // notification remains the primary realtime path.
-                          await Promise.allSettled(
-                            notifications.map((notification, index) =>
-                              sendPushToRecipient({
-                                recipient: notification.recipient,
-                                recipientModel: notification.recipientModel,
-                                title,
-                                message: notificationMessage,
-                                link: notification.recipientModel === "Admin" ? "/admin/messages" : "/member/messages",
-                                data: {
-                                  type: "message",
-                                  conversationId: String(updatedConversation?._id || conversation._id),
-                                  messageId: String(newMessage._id),
-                                  senderId: String(actorId),
-                                  senderName: req.user?.fullName || req.user?.name || "New message",
-                                },
-                              }).catch((error) => console.warn(`Message push ${index + 1} skipped:`, error.message))
-                            )
-                          );
-
-                          await Promise.all(notificationTargets.filter((target) => target.recipientModel === "Member").map((target) => Member.findByIdAndUpdate(target.recipient, { $inc: { unreadMessages: 1, unreadNotifications: 1 } }).catch(() => null)));
+                          // Notification.create/insertMany owns realtime fanout and push
+                          // delivery. Conversation.unreadCounts is the single source of
+                          // truth for chat unread state; legacy Member unread counters are
+                          // intentionally not modified here.
             } catch (notificationError) {
                 console.warn("Message notification delivery failed after message persistence:", { messageId: String(newMessage._id), error: notificationError.message });
             }

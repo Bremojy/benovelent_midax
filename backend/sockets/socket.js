@@ -127,6 +127,20 @@ const initSocket = (server) => {
 };
 
 const getIO = () => io;
+const hasActiveUserSocket = (userId, scopedRoom = "") => {
+    const key = String(userId || "").trim();
+    if (!key || !io?.sockets?.adapter?.rooms) return false;
+    const userSockets = io.sockets.adapter.rooms.get(`user:${key}`);
+    if (!userSockets?.size) return false;
+    const room = String(scopedRoom || "").trim();
+    if (!room) return true;
+    const scopedSockets = io.sockets.adapter.rooms.get(room);
+    if (!scopedSockets?.size) return false;
+    for (const socketId of userSockets) {
+        if (scopedSockets.has(socketId)) return true;
+    }
+    return false;
+};
 const health = () => Boolean(io && io.engine);
 
 module.exports = {
@@ -134,6 +148,7 @@ module.exports = {
     initSocket,
 
     getIO,
+    hasActiveUserSocket,
     health
 
 };

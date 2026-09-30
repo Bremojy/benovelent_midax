@@ -10,6 +10,7 @@ import API from "../../services/api";
 import toast from "react-hot-toast";
 import { getPendingCall, removePendingCall } from "../../utils/pushCallStore";
 import { startNativeIncomingCall } from "../../utils/nativeCallBridge";
+import { isChatSoundEnabled, playIncomingMessageSound, unlockChatSound } from "../../utils/chatSound";
 import { useAuth } from "../../context/AuthContext";
 import { useSocket } from "../../context/SocketContext";
 import "../../pages/member/messages.css";
@@ -48,8 +49,10 @@ function MessageCenterPage({
 
   const loadContactsRef = useRef(loadContacts);
   const peopleRef = useRef([]);
+  const conversationsRef = useRef([]);
   const selectedConversationRef = useRef(null);
   const initialSelectionAppliedRef = useRef(false);
+  const processedMessageIdsRef = useRef(new Set());
 
   const actor = useMemo(() => buildActorProfile(currentUser || authUser), [currentUser, authUser]);
   const actorId = actor.id;
@@ -106,6 +109,7 @@ function MessageCenterPage({
     if (!actorId) return undefined;
 
     const activeSocket = contextSocket || socketClient;
+    unlockChatSound();
     const handleConnectError = (error) => {
       console.warn("Chat socket connection error:", error?.message || error);
       setBanner("Chat is reconnecting. Messaging stays available; calls will work once the secure call connection is ready.");
@@ -142,6 +146,19 @@ function MessageCenterPage({
       const senderId = String(incoming?.sender?._id || incoming?.sender || incoming?.senderId || "");
       if (senderId && senderId === String(actorId)) return;
 
+      const messageId = String(incoming?._id || incoming?.messageId || "").trim();
+      const fallbackKey = [conversationId, senderId, String(incoming?.createdAt || ""), String(incoming?.message || incoming?.text || ""), String(incoming?.attachment || "")].join("|");
+      const dedupeKey = messageId || fallbackKey;
+      if (!dedupeKey || processedMessageIdsRef.current.has(dedupeKey)) return;
+      processedMessageIdsRef.current.add(dedupeKey);
+      if (processedMessageIdsRef.current.size > 500) {
+        const oldest = processedMessageIdsRef.current.values().next().value;
+        processedMessageIdsRef.current.delete(oldest);
+      }
+      const isOpen = String(selectedConversationRef.current?._id || "") === conversationId;
+      const sourceConversation = conversationsRef.current.find((item) => String(item?._id) === conversationId);
+      const mutedByCurrentUser = Boolean(sourceConversation?.mutedBy?.some?.((id) => String(id) === String(actorId)));
+
       setConversations((previous) => {
         let touched = false;
         const updated = previous.map((conversation) => {
@@ -159,6 +176,21 @@ function MessageCenterPage({
         });
         return touched ? updated.sort((a, b) => new Date(b.lastMessageTime || b.updatedAt || 0) - new Date(a.lastMessageTime || a.updatedAt || 0)) : previous;
       });
+
+      if (!isOpen && !mutedByCurrentUser && isChatSoundEnabled()) {
+        unlockChatSound();
+        playIncomingMessageSound();
+      }
+
+      if (!isOpen && typeof document !== "undefined" && document.visibilityState !== "visible" && typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
+        try {
+          const tag = `chat-message-${messageId || dedupeKey.slice(0, 80)}`;
+          new Notification(incoming?.sender?.fullName || incoming?.senderName || "New message", {
+            body: sanitizePreviewText(incoming?.message || incoming?.text || incoming?.attachment || "You received a new message."),
+            tag,
+          });
+        } catch {}
+      }
     };
 
     const handleIncomingCall = (payload) => {
@@ -305,8 +337,9 @@ function MessageCenterPage({
 
   useEffect(() => {
     peopleRef.current = normalizedPeople;
+    conversationsRef.current = normalizedConversations;
     selectedConversationRef.current = selectedConversation;
-  }, [normalizedPeople, selectedConversation]);
+  }, [normalizedPeople, normalizedConversations, selectedConversation]);
 
   useEffect(() => {
     if (!isMobile && !selectedConversation && normalizedConversations.length > 0) {

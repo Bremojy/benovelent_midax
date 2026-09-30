@@ -172,3 +172,13 @@
 .chat-details-actions button.danger { border-color:rgba(220,38,38,.25); }
 .chat-details-meta { display:flex; flex-wrap:wrap; gap:8px 14px; margin-top:12px; font-size:12px; opacity:.7; }
 @media (max-width: 700px) { .chat-details-actions { display:grid; grid-template-columns:1fr; } .chat-details-actions button { width:100%; justify-content:flex-start; } }
+
+
+/* Production interaction hardening. */
+.chat-details-actions button { min-height: 42px; }
+.chat-window, .messages-container { min-width: 0; max-width: 100%; box-sizing: border-box; }
+.messages-container { overscroll-behavior-y: contain; }
+@media (max-width: 900px) {
+  .chat-details-panel { max-width: min(92vw, 360px); }
+  .chat-details-actions button { min-height: 44px; }
+}

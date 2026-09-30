@@ -44,6 +44,8 @@ module.exports = (io, socket) => {
       const notification = await Notification.findOneAndDelete({ _id: notificationId, recipient: socket.user._id });
       if (!notification) return;
       io.to(`user:${String(socket.user._id)}`).emit("notification-deleted", notificationId);
+      const recipientModel = String(socket.userRole || "member").toLowerCase() === "superadmin" ? "SuperAdmin" : String(socket.userRole || "member").toLowerCase() === "admin" ? "Admin" : "Member";
+      io.to(`user:${String(socket.user._id)}`).emit("notification-count", await Notification.getUniqueUnreadCount(socket.user._id, recipientModel));
     } catch (error) { console.warn("Notification delete failed:", error.message); }
   });
 };

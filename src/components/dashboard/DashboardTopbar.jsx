@@ -56,7 +56,7 @@ function DashboardTopbar({
     };
 
     loadUnread();
-    const interval = window.setInterval(loadUnread, 30000);
+    const interval = window.setInterval(loadUnread, 60000);
     const loadUnreadMessages = async () => {
       if (normalizedRole === "superadmin") return;
       try {
@@ -73,11 +73,8 @@ function DashboardTopbar({
       }
     };
 
-    const onNotification = () => {
-      if (mounted) {
-        setUnreadNotifications((v) => Number(v) + 1);
-        loadUnread();
-      }
+    const onNotificationCount = (count) => {
+      if (mounted) setUnreadNotifications(Math.max(0, Number(count) || 0));
     };
     const onMessage = () => { if (mounted) loadUnreadMessages(); };
 
@@ -85,16 +82,14 @@ function DashboardTopbar({
       loadUnreadMessages();
       if (!socket.connected) socket.connect();
       socket.on("new-message", onMessage);
-      socket.on("message-seen", onMessage);
     }
-    socket.on("new-notification", onNotification);
+    socket.on("notification-count", onNotificationCount);
     return () => {
       mounted = false;
       window.clearInterval(interval);
-      socket.off("new-notification", onNotification);
+      socket.off("notification-count", onNotificationCount);
       if (normalizedRole !== "superadmin") {
         socket.off("new-message", onMessage);
-        socket.off("message-seen", onMessage);
       }
     };
   }, [user?.unreadNotifications, normalizedRole]);

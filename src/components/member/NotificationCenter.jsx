@@ -31,23 +31,35 @@ export default function NotificationCenter() {
   };
   useEffect(() => {
     load();
-    const id = window.setInterval(load, 30000);
     const onConnect = () => socket.emit("notification-register");
-    const onChange = () => load();
+    const onNew = (notification) => {
+      if (!notification?._id) return;
+      setNotifications((current) => {
+        const withoutDuplicate = current.filter((item) => String(item?._id) !== String(notification._id));
+        return [notification, ...withoutDuplicate].slice(0, 6);
+      });
+    };
+    const onUpdated = (notification) => {
+      if (!notification?._id) return;
+      setNotifications((current) => current.map((item) => String(item?._id) === String(notification._id) ? notification : item));
+    };
+    const onDeleted = (notificationId) => {
+      setNotifications((current) => current.filter((item) => String(item?._id) !== String(notificationId)));
+    };
+    const onCleared = () => setNotifications([]);
     if (!socket.connected) socket.connect();
     else onConnect();
     socket.on("connect", onConnect);
-    socket.on("new-notification", onChange);
-    socket.on("notification-updated", onChange);
-    socket.on("notification-deleted", onChange);
-    socket.on("notifications-cleared", onChange);
+    socket.on("new-notification", onNew);
+    socket.on("notification-updated", onUpdated);
+    socket.on("notification-deleted", onDeleted);
+    socket.on("notifications-cleared", onCleared);
     return () => {
-      window.clearInterval(id);
       socket.off("connect", onConnect);
-      socket.off("new-notification", onChange);
-      socket.off("notification-updated", onChange);
-      socket.off("notification-deleted", onChange);
-      socket.off("notifications-cleared", onChange);
+      socket.off("new-notification", onNew);
+      socket.off("notification-updated", onUpdated);
+      socket.off("notification-deleted", onDeleted);
+      socket.off("notifications-cleared", onCleared);
     };
   }, []);
   return <div className="notification-card">

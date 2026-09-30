@@ -263,11 +263,11 @@ exports.deleteConversation=async(req,res)=>{
 try{
 
 const actorId = String(getChatActorId(req));
-const conversation=await Conversation.findById(
-
-req.params.id
-
-);
+const conversation=await Conversation.findOne({
+  _id: req.params.id,
+  participants: actorId,
+  active: { $ne: false },
+});
 
 if(!conversation){
 
@@ -339,10 +339,10 @@ message:"Conversation not found."
 
 }
 
-if(!conversation.pinnedBy.includes(actorId)){
-
+if(conversation.pinnedBy.includes(actorId)){
+conversation.pinnedBy = conversation.pinnedBy.filter((id) => String(id) !== actorId);
+} else {
 conversation.pinnedBy.push(actorId);
-
 }
 
 await conversation.save();
@@ -397,10 +397,10 @@ message:"Conversation not found."
 
 }
 
-if(!conversation.mutedBy.includes(actorId)){
-
+if(conversation.mutedBy.includes(actorId)){
+conversation.mutedBy = conversation.mutedBy.filter((id) => String(id) !== actorId);
+} else {
 conversation.mutedBy.push(actorId);
-
 }
 
 await conversation.save();

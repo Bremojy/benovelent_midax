@@ -250,7 +250,13 @@ exports.deleteNotification = async (req, res) => {
     }
 
     await Notification.deleteOne({ _id: notification._id });
+    await Notification.emitNotificationUpdated(notification);
     await invalidateNotificationCaches(req.user._id);
+    const role = String(req.userRole || req.user?.role || "member").toLowerCase();
+    const recipientModel = role === "superadmin" ? "SuperAdmin" : role === "admin" ? "Admin" : "Member";
+    const io = getIO();
+    io?.to(`user:${String(req.user._id)}`).emit("notification-deleted", String(notification._id));
+    io?.to(`user:${String(req.user._id)}`).emit("notification-count", await Notification.getUniqueUnreadCount(req.user._id, recipientModel));
 
     return res.json({
       success: true,
@@ -274,6 +280,9 @@ exports.clearNotifications = async (req, res) => {
       recipient: req.user._id,
     });
     await invalidateNotificationCaches(req.user._id);
+    const io = getIO();
+    io?.to(`user:${String(req.user._id)}`).emit("notifications-cleared");
+    io?.to(`user:${String(req.user._id)}`).emit("notification-count", 0);
 
     return res.json({
       success: true,
