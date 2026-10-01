@@ -1,4 +1,3 @@
-import { confirmAction } from "../../utils/modernDialog";
 import { useEffect, useMemo, useState } from "react";
 import DashboardLayout from "../../layouts/DashboardLayout";
 import API from "../../services/api";
@@ -44,15 +43,7 @@ export default function SuperAdminAudit() {
     });
   }, [coverage, query, role]);
 
-  const deleteLog = async (id) => {
-    if (!await confirmAction("Delete this audit record?")) return;
-    try {
-      await API.delete(`/audit-logs/${id}`);
-      await load();
-    } catch (e) {
-      setError(e.response?.data?.message || e.message || "Unable to delete audit record.");
-    }
-  };
+
 
   return (
     <DashboardLayout>
@@ -148,7 +139,7 @@ export default function SuperAdminAudit() {
           {loading ? <div className="portal-empty">Loading audit logs...</div> : logs.length === 0 ? <div className="portal-empty">No audit records found.</div> : (
             <div className="portal-table-wrap">
               <table className="portal-table audit-log-table">
-                <thead><tr><th>Time</th><th>User</th><th>Role</th><th>Action</th><th>Module</th><th>Description</th><th /></tr></thead>
+                <thead><tr><th>Time</th><th>User</th><th>Role</th><th>Action</th><th>Module</th><th>Description</th></tr></thead>
                 <tbody>{logs.slice(0, 100).map((x, i) => (
                   <tr key={x._id || i}>
                     <td data-label="Time">{date(x.createdAt)}</td>
@@ -157,7 +148,7 @@ export default function SuperAdminAudit() {
                     <td data-label="Action"><span className="portal-badge">{x.action || "—"}</span></td>
                     <td data-label="Module">{x.module || "—"}</td>
                     <td data-label="Description">{x.description || "—"}</td>
-                    <td data-label="Actions">{x._id && <button className="portal-btn danger" onClick={() => deleteLog(x._id)}>Delete</button>}</td>
+                    
                   </tr>
                 ))}</tbody>
               </table>

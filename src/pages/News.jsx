@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import api, { resolveUploadUrl, resolveApiUrl } from "../services/api";
 import { useAuth } from "../context/AuthContext";
+import { usePublicWebsiteSection } from "../hooks/usePublicWebsiteSection";
 import { openPrintDocument, escapePrintHtml } from "../utils/printHead";
 import "./News.css";
 
@@ -31,6 +32,9 @@ const shouldSkipBackgroundVideo = typeof navigator !== "undefined" && (navigator
 
 function News() {
   const { user } = useAuth();
+  const { section: newsSection, error: newsSectionError } = usePublicWebsiteSection("news");
+  const { section: eventsSection, error: eventsSectionError } = usePublicWebsiteSection("events");
+  const { section: resourcesSection, error: resourcesSectionError } = usePublicWebsiteSection("resources");
   const canDownloadFeedback = ["admin", "superadmin"].includes(String(user?.role || "").toLowerCase());
   const [searchParams, setSearchParams] = useSearchParams();
   const [news, setNews] = useState([]);
@@ -122,10 +126,11 @@ function News() {
   return (
     <main className="news-page newsroom-v8">
       {loadError && <div className="portal-alert" role="alert">{loadError}</div>}
+      {(newsSectionError || eventsSectionError || resourcesSectionError) && <div className="portal-alert" role="alert">Unable to load some published newsroom presentation settings. Available content remains visible.</div>}
       <section className={`news-video-hero ${videoFailed ? "video-failed" : ""}`}>
         {!videoFailed && <video className="news-video" autoPlay={!shouldSkipBackgroundVideo} muted loop playsInline preload={shouldSkipBackgroundVideo ? "none" : "metadata"} poster="/hero.jpg" onError={() => setVideoFailed(true)} aria-hidden="true">{newsVideoSources.map((src) => <source key={src} src={src} type="video/mp4" />)}</video>}
         <div className="news-video-overlay" />
-        <div className="news-header"><Newspaper size={55} className="news-icon" /><span className="news-kicker">Benevolent MIDAX • COMMUNITY CENTRE</span><h1>News, events & resources in one place.</h1><p>Stay informed about community updates, upcoming activities and the documents that help members understand the scheme.</p></div>
+        <div className="news-header"><Newspaper size={55} className="news-icon" /><span className="news-kicker">{newsSection?.title || "Benevolent MIDAX • COMMUNITY CENTRE"}</span><h1>{newsSection?.subtitle || "News, events & resources in one place."}</h1><p>{newsSection?.description || "Stay informed about community updates, upcoming activities and the documents that help members understand the scheme."}</p></div>
       </section>
 
       <div className="news-content-wrap">
@@ -147,9 +152,9 @@ function News() {
 
             {(activeTab === "all" || activeTab === "news") && <section className="newsroom-v8-section"><div className="news-section-title"><div><span>NEWSROOM</span><h2>Latest updates</h2></div><strong>{filteredNews.length}</strong></div>{filteredNews.length ? <div className="news-grid">{filteredNews.map((item) => <article className="news-card" key={item._id}><div className="news-image"><img src={imageFor(item)} alt={item.title} loading="lazy" onError={(e) => { e.currentTarget.src = "/news-placeholder.svg"; }} /></div><div className="news-content"><div className="news-date"><Calendar size={15} /> {formatDate(item.publishDate || item.createdAt)}</div><h3>{item.title}</h3><p>{(item.summary || item.content || "").slice(0, 170)}{(item.summary || item.content || "").length > 170 ? "..." : ""}</p><button className="read-more-btn" type="button" onClick={() => setSelectedNews(item)}>Read More <ArrowRight size={17} /></button></div></article>)}</div> : <div className="empty-news"><Newspaper size={38}/><h2>No news matches your search</h2><p>Published announcements will appear here automatically.</p></div>}</section>}
 
-            {(activeTab === "all" || activeTab === "events") && <section className="newsroom-v8-section"><div className="news-section-title"><div><span>UPCOMING ACTIVITIES</span><h2>What's happening</h2></div><CalendarDays size={25}/></div>{filteredEvents.length ? <div className="newsroom-event-grid">{filteredEvents.map((event) => <article className="newsroom-event-card" key={event._id}><div className="newsroom-event-date"><strong>{event.startAt ? new Date(event.startAt).toLocaleDateString("en-GB", { day: "2-digit" }) : "—"}</strong><span>{event.startAt ? new Date(event.startAt).toLocaleDateString("en-GB", { month: "short" }) : "TBC"}</span></div><div className="newsroom-event-copy"><span>{event.type || "Community event"}</span><h3>{event.title}</h3><p>{event.description || "See the event details in the member portal."}</p><small>{event.location && <><MapPin size={13}/> {event.location} · </>}{eventDate(event.startAt)}</small></div></article>)}</div> : <div className="empty-news compact"><CalendarDays size={32}/><p>No public events have been published yet.</p></div>}</section>}
+            {(activeTab === "all" || activeTab === "events") && <section className="newsroom-v8-section"><div className="news-section-title"><div><span>{eventsSection?.title || "UPCOMING ACTIVITIES"}</span><h2>{eventsSection?.subtitle || "What's happening"}</h2></div><CalendarDays size={25}/></div>{filteredEvents.length ? <div className="newsroom-event-grid">{filteredEvents.map((event) => <article className="newsroom-event-card" key={event._id}><div className="newsroom-event-date"><strong>{event.startAt ? new Date(event.startAt).toLocaleDateString("en-GB", { day: "2-digit" }) : "—"}</strong><span>{event.startAt ? new Date(event.startAt).toLocaleDateString("en-GB", { month: "short" }) : "TBC"}</span></div><div className="newsroom-event-copy"><span>{event.type || "Community event"}</span><h3>{event.title}</h3><p>{event.description || "See the event details in the member portal."}</p><small>{event.location && <><MapPin size={13}/> {event.location} · </>}{eventDate(event.startAt)}</small></div></article>)}</div> : <div className="empty-news compact"><CalendarDays size={32}/><p>No public events have been published yet.</p></div>}</section>}
 
-            {(activeTab === "all" || activeTab === "resources") && <section className="newsroom-v8-section"><div className="news-section-title"><div><span>RESOURCES</span><h2>Documents, forms & guides</h2></div><FileText size={25}/></div>{filteredDocuments.length ? <div className="newsroom-resource-grid">{filteredDocuments.map((doc) => <a className="newsroom-resource-card" key={doc.name} href={resolveApiUrl(doc.url)} target="_blank" rel="noreferrer"><span className="resource-icon"><FileText size={23}/></span><span className="resource-copy"><strong>{doc.name}</strong><small>{Math.max(1, Math.round((doc.size || 0) / 1024))} KB · Updated {formatDate(doc.updatedAt)}</small></span><Download size={18}/></a>)}</div> : <div className="empty-news compact"><FileText size={32}/><p>No published resources are available yet.</p></div>}</section>}
+            {(activeTab === "all" || activeTab === "resources") && <section className="newsroom-v8-section"><div className="news-section-title"><div><span>{resourcesSection?.title || "RESOURCES"}</span><h2>{resourcesSection?.subtitle || "Documents, forms & guides"}</h2></div><FileText size={25}/></div>{filteredDocuments.length ? <div className="newsroom-resource-grid">{filteredDocuments.map((doc) => <a className="newsroom-resource-card" key={doc.name} href={resolveApiUrl(doc.url)} target="_blank" rel="noreferrer"><span className="resource-icon"><FileText size={23}/></span><span className="resource-copy"><strong>{doc.name}</strong><small>{Math.max(1, Math.round((doc.size || 0) / 1024))} KB · Updated {formatDate(doc.updatedAt)}</small></span><Download size={18}/></a>)}</div> : <div className="empty-news compact"><FileText size={32}/><p>No published resources are available yet.</p></div>}</section>}
           </>
         )}
 

@@ -5,7 +5,6 @@ const router = express.Router();
 const {
     getAuditLogs,
     getAuditLog,
-    deleteAuditLog,
     getAuditSummary,
     getAuditCoverage,
 } = require("../controllers/auditLogController");
@@ -57,17 +56,6 @@ router.get(
     protect,
     admin,
     getAuditLog
-);
-
-// ====================================
-// DELETE
-// ====================================
-
-router.delete(
-    "/:id",
-    protect,
-    superAdmin,
-    deleteAuditLog
 );
 
 module.exports = router;

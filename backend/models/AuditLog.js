@@ -98,6 +98,16 @@ auditLogSchema.index({
     action:1
 });
 
+// Governance audit history is append-only. Administrative account cleanup,
+// retention and account retirement must never erase the evidence trail.
+const rejectAuditDeletion = function rejectAuditDeletion(next) {
+    next(new Error("Audit logs are append-only and cannot be deleted."));
+};
+
+for (const method of ["deleteOne", "deleteMany", "findOneAndDelete", "findByIdAndDelete", "findOneAndRemove", "findByIdAndRemove"]) {
+    auditLogSchema.pre(method, rejectAuditDeletion);
+}
+
 module.exports =
 mongoose.models.AuditLog ||
 mongoose.model(

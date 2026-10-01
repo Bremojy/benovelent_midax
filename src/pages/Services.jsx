@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import API from "../services/api";
+import { usePublicWebsiteSection } from "../hooks/usePublicWebsiteSection";
 
 import { Link } from "react-router-dom";
 import { Heart, Stethoscope, BookOpen, ArrowRight, BadgeCheck, ShieldCheck, MessageCircle } from "lucide-react";
@@ -9,6 +10,7 @@ const heroVideo = "/videos/benevolent-community-loop.mp4";
 
 export default function Services() {
   const [policies, setPolicies] = useState([]);
+  const { section: servicesSection, error: servicesError } = usePublicWebsiteSection("services");
   const [error, setError] = useState("");
   useEffect(() => { API.get("/policies/public").then(({ data }) => setPolicies(data?.policies || [])).catch((err) => setError(err.response?.data?.message || "Unable to load current policies.")); }, []);
   return (
@@ -21,9 +23,9 @@ export default function Services() {
         <div className="modern-hero-content">
           <div>
             <span className="modern-kicker"><BookOpen size={14} /> SERVICES & CONSTITUTION</span>
-            <h1>Support that feels modern, warm and family-centred.</h1>
+            <h1>{servicesSection?.title || "Support that feels modern, warm and family-centred."}</h1>
             <p>
-              The Benevolent Constitution guides funeral and medical support, governance, accountability and member communication.
+              {servicesSection?.subtitle || servicesSection?.description || "The Benevolent Constitution guides funeral and medical support, governance, accountability and member communication."}
             </p>
             <div className="modern-hero-actions">
               <Link to="/constitution" className="modern-btn">View our Constitution <ArrowRight size={17} /></Link>
@@ -42,6 +44,7 @@ export default function Services() {
 
       <section className="modern-section">
         {error && <p role="alert">{error}</p>}
+        {servicesError && <p role="alert">{servicesError}</p>}
         <div className="modern-card-grid">
           {policies.length ? policies.map((policy) => <Service key={policy._id} icon={iconFor(policy.category)} title={policy.title || policy.name || "Support policy"} text={policyDescription(policy)} />) : <Service icon={BookOpen} title="Support policies" text="No enabled support policy is currently configured." />}
         </div>

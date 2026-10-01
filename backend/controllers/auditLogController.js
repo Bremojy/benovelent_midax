@@ -162,58 +162,6 @@ exports.getAuditLog = async (req, res) => {
 };
 
 // =====================================================
-// DELETE LOG
-// SUPER ADMIN
-// =====================================================
-
-exports.deleteAuditLog = async (req, res) => {
-
-    try {
-
-        const log =
-            await AuditLog.findById(req.params.id);
-
-        if (!log) {
-
-            return res.status(404).json({
-
-                success: false,
-
-                message: "Audit log not found."
-
-            });
-
-        }
-
-        await log.deleteOne();
-
-        res.json({
-
-            success: true,
-
-            message: "Audit log deleted."
-
-        });
-
-    }
-
-    catch (error) {
-
-        console.error(error);
-
-        res.status(500).json({
-
-            success: false,
-
-            message: error.message
-
-        });
-
-    }
-
-};
-
-// =====================================================
 // DASHBOARD SUMMARY
 // =====================================================
 

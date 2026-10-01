@@ -14,6 +14,7 @@ import {
   Users,
   ImagePlus,
   Edit3,
+  Eye,
   Smartphone,
   FileText,
 } from "lucide-react";
@@ -36,6 +37,7 @@ const SECTION_FIELDS = [
   { key: "gallery", label: "Gallery" },
   { key: "privacy-policy", label: "Privacy Policy" },
   { key: "terms-conditions", label: "Terms & Conditions" },
+  { key: "disclaimer", label: "Disclaimer" },
 ];
 
 const THEMES = [
@@ -48,6 +50,7 @@ const THEMES = [
 ];
 
 const EMPTY_SECTION = (section) => ({
+  _id: "",
   section,
   title: "",
   subtitle: "",
@@ -99,6 +102,7 @@ export default function SuperAdminSettings({ initialTab = "website" }) {
   const [slides, setSlides] = useState([]);
   const [leaders, setLeaders] = useState([]);
   const [gallery, setGallery] = useState([]);
+  const [galleryDraft, setGalleryDraft] = useState({ title: "", caption: "", altText: "" });
   const [loading, setLoading] = useState(true);
   const [savingKey, setSavingKey] = useState("");
   const [savingCarousel, setSavingCarousel] = useState(false);
@@ -106,6 +110,7 @@ export default function SuperAdminSettings({ initialTab = "website" }) {
   const [savingGallery, setSavingGallery] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [previewKey, setPreviewKey] = useState("");
   const [uploadFile, setUploadFile] = useState(null);
   const [galleryFile, setGalleryFile] = useState(null);
   const [leaderFile, setLeaderFile] = useState(null);
@@ -150,6 +155,7 @@ export default function SuperAdminSettings({ initialTab = "website" }) {
           rows.forEach((row) => {
             if (!row?.section || !nextSections[row.section]) return;
             nextSections[row.section] = {
+              _id: row._id || row.id || "",
               section: row.section,
               title: row.title || "",
               subtitle: row.subtitle || "",
@@ -189,8 +195,14 @@ export default function SuperAdminSettings({ initialTab = "website" }) {
         }
 
         if (galleryRes.status === "fulfilled") {
-          const images = galleryRes.value.data?.section?.images || galleryRes.value.data?.gallery || [];
-          setGallery(Array.isArray(images) ? images : []);
+          const section = galleryRes.value.data?.section || {};
+          const configuredItems = section?.content?.galleryItems;
+          if (Array.isArray(configuredItems) && configuredItems.length) {
+            setGallery(configuredItems.slice().sort((a, b) => Number(a.order || 0) - Number(b.order || 0)));
+          } else {
+            const images = section?.images || galleryRes.value.data?.gallery || [];
+            setGallery(Array.isArray(images) ? images.map((url, index) => ({ id: `legacy-${index}`, url, title: "", caption: "", altText: "Benevolent MIDAX community moment", published: true, order: index })) : []);
+          }
         }
         const failures = [
           [websiteRes, "website content"], [carouselRes, "carousel"], [leadersRes, "leaders"],
@@ -233,10 +245,26 @@ export default function SuperAdminSettings({ initialTab = "website" }) {
         content: { body: item.content },
       };
 
-      const exists = Boolean(item.title || item.subtitle || item.description || item.content);
-      const request = exists ? API.put(`/website/${key}`, payload) : API.post("/website", { section: key, ...payload });
+      const request = item._id
+        ? API.put(`/website/${key}`, payload)
+        : API.post("/website", { section: key, ...payload });
       const { data } = await request;
-      setMessage(data?.message || "Section saved.");
+      const saved = data?.section;
+      if (saved) {
+        setSections((prev) => ({
+          ...prev,
+          [key]: {
+            ...prev[key],
+            _id: saved._id || prev[key]?._id || "",
+            title: saved.title ?? prev[key]?.title ?? "",
+            subtitle: saved.subtitle ?? prev[key]?.subtitle ?? "",
+            description: saved.description ?? prev[key]?.description ?? "",
+            content: normalizeContent(saved.content),
+            published: saved.published !== false,
+          },
+        }));
+      }
+      setMessage(data?.message || (item.published ? "Section saved and published." : "Section saved as a draft."));
     } catch (err) {
       setError(err.response?.data?.message || err.message || "Unable to save section.");
     } finally {
@@ -378,18 +406,64 @@ export default function SuperAdminSettings({ initialTab = "website" }) {
       setError("");
       const form = new FormData();
       form.append("image", galleryFile);
-      form.append("caption", galleryFile.name);
+      form.append("title", galleryDraft.title.trim());
+      form.append("caption", galleryDraft.caption.trim());
+      form.append("altText", galleryDraft.altText.trim());
       const { data } = await API.post("/website/gallery/upload", form, {
         headers: { "Content-Type": "multipart/form-data" },
       });
-      const images = data?.section?.images || [];
-      setGallery(Array.isArray(images) ? images : gallery);
+      const items = data?.section?.content?.galleryItems || [];
+      if (Array.isArray(items)) setGallery(items.slice().sort((a, b) => Number(a.order || 0) - Number(b.order || 0)));
       setGalleryFile(null);
+      setGalleryDraft({ title: "", caption: "", altText: "" });
       setMessage("Gallery image uploaded and published to the public gallery.");
     } catch (err) {
       setError(err.response?.data?.message || err.message || "Unable to upload gallery image.");
     } finally {
       setSavingGallery(false);
+    }
+  };
+
+  const updateGalleryItem = async (itemId, patch) => {
+    try {
+      setError("");
+      const { data } = await API.patch(`/website/gallery/items/${itemId}`, patch);
+      const items = data?.section?.content?.galleryItems;
+      if (Array.isArray(items)) setGallery(items.slice().sort((a, b) => Number(a.order || 0) - Number(b.order || 0)));
+      setMessage("Gallery item updated.");
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || "Unable to update gallery item.");
+    }
+  };
+
+  const archiveGalleryItem = async (itemId) => {
+    if (!await confirmAction("Archive this gallery item from the public website? The stored media will be retained.")) return;
+    try {
+      setError("");
+      const { data } = await API.delete(`/website/gallery/items/${itemId}`);
+      const items = data?.section?.content?.galleryItems;
+      if (Array.isArray(items)) setGallery(items.slice().sort((a, b) => Number(a.order || 0) - Number(b.order || 0)));
+      setMessage("Gallery item archived from the public website.");
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || "Unable to archive gallery item.");
+    }
+  };
+
+  const moveGalleryItem = async (itemId, direction) => {
+    const current = gallery.slice().sort((a, b) => Number(a.order || 0) - Number(b.order || 0));
+    const index = current.findIndex((item) => item.id === itemId);
+    const target = index + direction;
+    if (index < 0 || target < 0 || target >= current.length) return;
+    [current[index], current[target]] = [current[target], current[index]];
+    const items = current.map((item, order) => ({ id: item.id, order }));
+    try {
+      setError("");
+      const { data } = await API.patch("/website/gallery/items/reorder", { items });
+      const next = data?.section?.content?.galleryItems;
+      if (Array.isArray(next)) setGallery(next.slice().sort((a, b) => Number(a.order || 0) - Number(b.order || 0)));
+      setMessage("Gallery order saved.");
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || "Unable to save gallery order.");
     }
   };
 
@@ -550,14 +624,39 @@ export default function SuperAdminSettings({ initialTab = "website" }) {
                       </div>
                     </div>
 
-                    <div className="portal-actions">
-                      <button type="button" className="portal-btn" onClick={() => saveSection(item.key)} disabled={savingKey === item.key}>
-                        <Save size={16} /> {savingKey === item.key ? "Saving..." : "Save section"}
-                      </button>
+                    <div className="portal-actions" style={{ justifyContent: "space-between", flexWrap: "wrap" }}>
+                      <label className="portal-field" style={{ margin: 0, minWidth: 180 }}>
+                        <span>Publication</span>
+                        <select value={sections[item.key]?.published === false ? "draft" : "published"} onChange={(e) => patchSection(item.key, { published: e.target.value === "published" })}>
+                          <option value="published">Published</option>
+                          <option value="draft">Draft / unpublished</option>
+                        </select>
+                      </label>
+                      <div className="portal-actions">
+                        <button type="button" className="portal-btn light" onClick={() => setPreviewKey(item.key)}>Preview</button>
+                        <button type="button" className="portal-btn" onClick={() => saveSection(item.key)} disabled={savingKey === item.key}>
+                          <Save size={16} /> {savingKey === item.key ? "Saving..." : sections[item.key]?.published === false ? "Save draft" : "Save & publish"}
+                        </button>
+                      </div>
                     </div>
                   </section>
                 ))}
               </div>
+            )}
+
+            {previewKey && activeTab === "website" && (
+              <section className="portal-panel" style={{ marginTop: 16 }} aria-live="polite">
+                <div className="portal-section-title">
+                  <Eye size={20} />
+                  <div><span>DRAFT PREVIEW</span><h2>{sections[previewKey]?.title || previewKey}</h2><small>{sections[previewKey]?.published === false ? "Draft / unpublished" : "Published"}</small></div>
+                </div>
+                <div style={{ display: "grid", gap: 10, padding: "8px 0" }}>
+                  {sections[previewKey]?.subtitle && <p style={{ margin: 0, fontWeight: 700 }}>{sections[previewKey].subtitle}</p>}
+                  {sections[previewKey]?.description && <p style={{ margin: 0, lineHeight: 1.7 }}>{sections[previewKey].description}</p>}
+                  {sections[previewKey]?.content && <div style={{ whiteSpace: "pre-wrap", lineHeight: 1.75, borderTop: "1px solid #eee", paddingTop: 12 }}>{sections[previewKey].content}</div>}
+                </div>
+                <div className="portal-actions"><button type="button" className="portal-btn light" onClick={() => setPreviewKey("")}>Close preview</button></div>
+              </section>
             )}
 
             {activeTab === "system" && (
@@ -800,12 +899,11 @@ export default function SuperAdminSettings({ initialTab = "website" }) {
                   <form className="portal-form-grid" onSubmit={uploadGallery}>
                     <div className="portal-field" style={{ gridColumn: "1 / -1" }}>
                       <label>Gallery image</label>
-                      <input type="file" accept="image/*" onChange={(e) => setGalleryFile(e.target.files?.[0] || null)} />
+                      <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" onChange={(e) => setGalleryFile(e.target.files?.[0] || null)} required />
                     </div>
-                    <div className="portal-field" style={{ gridColumn: "1 / -1" }}>
-                      <label>Optional caption</label>
-                      <input type="text" value={galleryFile ? galleryFile.name : ""} readOnly placeholder="Selected file name appears here" />
-                    </div>
+                    <label className="portal-field"><span>Title</span><input type="text" value={galleryDraft.title} onChange={(e) => setGalleryDraft((prev) => ({ ...prev, title: e.target.value }))} placeholder="Optional title" maxLength={180} /></label>
+                    <label className="portal-field"><span>Caption</span><input type="text" value={galleryDraft.caption} onChange={(e) => setGalleryDraft((prev) => ({ ...prev, caption: e.target.value }))} placeholder="Optional caption" maxLength={300} /></label>
+                    <label className="portal-field" style={{ gridColumn: "1 / -1" }}><span>Alt text</span><input type="text" value={galleryDraft.altText} onChange={(e) => setGalleryDraft((prev) => ({ ...prev, altText: e.target.value }))} placeholder="Describe the image for accessibility" maxLength={180} /></label>
                     <button className="portal-btn" type="submit" disabled={savingGallery}>
                       <Save size={16} /> {savingGallery ? "Uploading..." : "Upload image"}
                     </button>
@@ -825,10 +923,24 @@ export default function SuperAdminSettings({ initialTab = "website" }) {
                     <div className="portal-empty">No gallery images yet.</div>
                   ) : (
                     <div className="portal-grid" style={{ gridTemplateColumns: "repeat(2, minmax(0, 1fr))" }}>
-                      {gallery.map((img, index) => (
-                        <div key={`${img}-${index}`} className="portal-panel" style={{ padding: 12, marginBottom: 0 }}>
-                          <img src={normalizeImagePath(img)} alt={`Gallery ${index + 1}`} style={{ width: "100%", height: 180, objectFit: "cover", borderRadius: 14 }} />
-                        </div>
+                      {gallery.map((item, index) => (
+                        <article key={item.id || `${item.url}-${index}`} className="portal-panel" style={{ padding: 12, marginBottom: 0 }}>
+                          <img src={normalizeImagePath(item.url)} alt={item.altText || `Gallery ${index + 1}`} style={{ width: "100%", height: 180, objectFit: "cover", borderRadius: 14 }} />
+                          <div className="portal-form-grid" style={{ marginTop: 12 }}>
+                            <label className="portal-field"><span>Title</span><input value={item.title || ""} onChange={(e) => setGallery((prev) => prev.map((entry) => entry.id === item.id ? { ...entry, title: e.target.value } : entry))} /></label>
+                            <label className="portal-field"><span>Caption</span><input value={item.caption || ""} onChange={(e) => setGallery((prev) => prev.map((entry) => entry.id === item.id ? { ...entry, caption: e.target.value } : entry))} /></label>
+                            <label className="portal-field" style={{ gridColumn: "1 / -1" }}><span>Alt text</span><input value={item.altText || ""} onChange={(e) => setGallery((prev) => prev.map((entry) => entry.id === item.id ? { ...entry, altText: e.target.value } : entry))} /></label>
+                          </div>
+                          <div className="portal-actions" style={{ marginTop: 10, flexWrap: "wrap" }}>
+                            <label className="portal-field" style={{ margin: 0, minWidth: 160 }}><span>Published</span><input type="checkbox" checked={item.published !== false} onChange={(e) => setGallery((prev) => prev.map((entry) => entry.id === item.id ? { ...entry, published: e.target.checked } : entry))} /></label>
+                            <button type="button" className="portal-btn light" onClick={() => moveGalleryItem(item.id, -1)} disabled={index === 0}>↑ Move up</button>
+                            <button type="button" className="portal-btn light" onClick={() => moveGalleryItem(item.id, 1)} disabled={index === gallery.length - 1}>↓ Move down</button>
+                            <button type="button" className="portal-btn" onClick={() => { const current = gallery.find((entry) => entry.id === item.id); updateGalleryItem(item.id, { title: current?.title || "", caption: current?.caption || "", altText: current?.altText || "", published: current?.published !== false }); }}>
+                              <Save size={15} /> Save
+                            </button>
+                            <button type="button" className="portal-btn danger" onClick={() => archiveGalleryItem(item.id)}><Trash2 size={15} /> Archive</button>
+                          </div>
+                        </article>
                       ))}
                     </div>
                   )}
@@ -840,7 +952,7 @@ export default function SuperAdminSettings({ initialTab = "website" }) {
 
         <section className="portal-panel">
           <p style={{ color: "#666" }}>
-            Signed in as <strong>{user?.fullName || user?.name || "Super Administrator"}</strong> ({roleLabel}). Carousel, leader and gallery uploads are stored securely and served through permanent URLs.
+            Signed in as <strong>{user?.fullName || user?.name || "Super Administrator"}</strong> ({roleLabel}). Carousel, leader and gallery uploads are stored securely and served through permanent URLs. Gallery metadata, ordering and publication state are also managed here; archiving removes an image from the public site without deleting its stored media.
           </p>
         </section>
       </div>

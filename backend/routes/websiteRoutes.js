@@ -7,12 +7,17 @@ const {
   getWebsiteManagementContent,
   getGallery,
   getConstitution,
+  getConstitutionManagement,
+  restoreConstitutionVersion,
   uploadConstitutionFile,
   getSection,
   createSection,
   updateSection,
   deleteSection,
   uploadGalleryImage,
+  updateGalleryItem,
+  reorderGallery,
+  archiveGalleryItem,
 } = require("../controllers/websiteController");
 
 const { verifyToken: protect } = require("../middleware/authMiddleware");
@@ -27,10 +32,15 @@ router.get("/", getWebsiteContent);
 router.get("/settings", getWebsiteSettings);
 router.get("/manage", protect, isSuperAdmin, getWebsiteManagementContent);
 router.get("/gallery", getGallery);
+router.get("/constitution/manage", protect, isSuperAdmin, getConstitutionManagement);
 router.get("/constitution", getConstitution);
 
 router.post("/gallery/upload", protect, isSuperAdmin, setUploadType("gallery"), uploadSingle("image"), uploadGalleryImage);
+router.patch("/gallery/items/reorder", protect, isSuperAdmin, reorderGallery);
+router.patch("/gallery/items/:itemId", protect, isSuperAdmin, updateGalleryItem);
+router.delete("/gallery/items/:itemId", protect, isSuperAdmin, archiveGalleryItem);
 router.post("/constitution/upload", protect, isSuperAdmin, setUploadType("documents"), uploadSingle("file"), uploadConstitutionFile);
+router.post("/constitution/restore/:version", protect, isSuperAdmin, restoreConstitutionVersion);
 
 // Get one section
 router.get("/:section", getSection);

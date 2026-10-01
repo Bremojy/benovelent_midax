@@ -18,7 +18,6 @@ const FeedbackCollection = require("../models/FeedbackCollection");
 const News = require("../models/News");
 const Poll = require("../models/Poll");
 const WebsiteContent = require("../models/WebsiteContent");
-const AuditLog = require("../models/AuditLog");
 
 const toObjectId = (id) => {
   if (id instanceof mongoose.Types.ObjectId) return id;
@@ -138,11 +137,7 @@ async function deleteMemberPermanently(memberId) {
   if (messageMarkers.modifiedCount) summary.updated.push({ label: "message member references removed", count: messageMarkers.modifiedCount });
   if (conversationMarkers.modifiedCount) summary.updated.push({ label: "conversation member references removed", count: conversationMarkers.modifiedCount });
 
-  const auditCount = await AuditLog.countDocuments({ user: id, userModel: "Member" });
-  if (auditCount) {
-    await AuditLog.deleteMany({ user: id, userModel: "Member" });
-    summary.deleted.push({ label: "member audit entries", count: auditCount });
-  }
+  // Audit history is append-only. Account retirement must not erase governance evidence.
 
   await Member.deleteOne({ _id: id });
   summary.deleted.push({ label: "member account", count: 1 });

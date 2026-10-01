@@ -4,6 +4,7 @@ import API, { resolveApiUrl } from "../services/api";
 import { Heart, Stethoscope, MessageCircle, FileText, Users, Images, ArrowRight, ShieldCheck, Wallet, Bell, Sparkles, ClipboardCheck, Smartphone, Headphones, CheckCircle2 } from "lucide-react";
 import Hero from "../components/Hero";
 import { usePublicSettings } from "../hooks/usePublicSettings";
+import { usePublicWebsiteSection } from "../hooks/usePublicWebsiteSection";
 import "../styles/public-modern.css";
 
 export default function Home() {
@@ -12,6 +13,7 @@ export default function Home() {
   const [policyError, setPolicyError] = useState("");
   const [leadershipError, setLeadershipError] = useState("");
   const { settings, loading: settingsLoading, error: settingsError } = usePublicSettings();
+  const { section: homeSection, loading: homeLoading, error: homeError } = usePublicWebsiteSection("home");
   useEffect(() => {
     let cancelled = false;
     Promise.allSettled([API.get("/leaders/current"), API.get("/policies/public")]).then(([leadersResult, policiesResult]) => {
@@ -30,13 +32,13 @@ export default function Home() {
   const configured = (value, formatter = (v) => `Ksh ${Number(v).toLocaleString("en-KE")}`) => value === null || value === undefined || value === "" ? "Information unavailable" : formatter(value);
 
   return (<>
-    <Hero />
+    <Hero homeContent={homeSection} />
     <main className="public-modern-page">
       <section className="modern-section">
         <div className="modern-section-head">
           <span className="eyebrow">BENEVOLENT FUND SCHEME</span>
-          <h2>Better life is better when you stand together.</h2>
-          {settingsLoading ? <p aria-live="polite">Loading current scheme configuration…</p> : settingsError ? <p role="alert">{settingsError}</p> : <p>{settings?.website?.subtitle || settings?.organization?.displayName || "Current scheme information is configured by SuperAdmin."}</p>}
+          <h2>{homeSection?.title || "Better life is better when you stand together."}</h2>
+          {homeLoading || settingsLoading ? <p aria-live="polite">Loading current scheme configuration…</p> : (homeError || settingsError) ? <p role="alert">{homeError || settingsError}</p> : <p>{homeSection?.subtitle || homeSection?.description || settings?.website?.subtitle || settings?.organization?.displayName || "Current scheme information is configured by SuperAdmin."}</p> }
           <div className="modern-trust-band" aria-label="Current scheme settings">
             <Chip icon={Wallet} title={configured(scheme.monthlyContribution)} text="Monthly contribution" />
             <Chip icon={ShieldCheck} title={configured(scheme.minimumBookBalance)} text="Minimum book balance" />

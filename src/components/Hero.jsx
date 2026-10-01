@@ -21,7 +21,7 @@ const FALLBACK_SLIDES = [
   },
 ];
 
-function Hero() {
+function Hero({ homeContent = null }) {
   const [slides, setSlides] = useState([]);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -53,7 +53,13 @@ function Hero() {
     return () => { cancelled = true; };
   }, []);
 
-  const visibleSlides = slides.length ? slides : FALLBACK_SLIDES;
+  const fallbackSlide = useMemo(() => ({
+    ...FALLBACK_SLIDES[0],
+    title: homeContent?.title || FALLBACK_SLIDES[0].title,
+    description: homeContent?.subtitle || homeContent?.description || FALLBACK_SLIDES[0].description,
+  }), [homeContent]);
+
+  const visibleSlides = slides.length ? slides : [fallbackSlide];
   const current = visibleSlides[currentSlide] || visibleSlides[0];
 
   useEffect(() => {
@@ -133,10 +139,10 @@ function Hero() {
 
           <p className="hero-label">COMMUNITY · COMPASSION · SUPPORT</p>
 
-          <h1>{current?.title || FALLBACK_SLIDES[0].title}</h1>
+          <h1>{current?.title || fallbackSlide.title}</h1>
 
           <p className="hero-description">
-            {current?.description || FALLBACK_SLIDES[0].description}
+            {current?.description || fallbackSlide.description}
           </p>
 
           <div className="hero-buttons">
