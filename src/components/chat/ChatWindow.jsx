@@ -7,6 +7,7 @@ import { BellOff, BellRing, Pin, Trash2, X, Volume2, VolumeX, Search, Archive, A
 import API from "../../services/api";
 import toast from "react-hot-toast";
 import { isChatSoundEnabled, setChatSoundEnabled, unlockChatSound } from "../../utils/chatSound";
+import { applyMessageDelivered } from "./messageDelivery";
 import "./ChatWindow.css";
 
 function ChatWindow({ conversation, socket, currentUser, onBack, onAudioCall, onVideoCall, onConversationDeleted, onConversationArchived, availableConversations = [] }) {
@@ -140,14 +141,8 @@ function ChatWindow({ conversation, socket, currentUser, onBack, onAudioCall, on
       }
     };
 
-    const handleDelivered = (payload) => {
-      const messageId = String(payload?.messageId || payload || "");
-      if (!messageId) return;
-      setMessages((previous) => previous.map((item) => (
-        String(item._id) === messageId
-          ? { ...item, delivered: true, deliveredAt: payload?.deliveredAt || item.deliveredAt || new Date().toISOString(), status: item.status === "sending" ? "sent" : item.status }
-          : item
-      )));
+    const handleMessageDelivered = (payload) => {
+      setMessages((previous) => applyMessageDelivered(previous, payload));
     };
 
     const handleSeen = (payload) => {
@@ -172,7 +167,7 @@ function ChatWindow({ conversation, socket, currentUser, onBack, onAudioCall, on
     };
 
     socket.on("new-message", handleNewMessage);
-    socket.on("message-delivered", handleDelivered);
+    socket.on("message-delivered", handleMessageDelivered);
     socket.on("message-seen", handleSeen);
     socket.on("message-deleted", handleDeleted);
     socket.on("typing", handleTyping);
@@ -181,7 +176,7 @@ function ChatWindow({ conversation, socket, currentUser, onBack, onAudioCall, on
     return () => {
       socket.emit("leave-conversation", conversationId);
       socket.off("new-message", handleNewMessage);
-      socket.off("message-delivered", handleDelivered);
+      socket.off("message-delivered", handleMessageDelivered);
       socket.off("message-seen", handleSeen);
       socket.off("message-deleted", handleDeleted);
       socket.off("typing", handleTyping);

@@ -2,15 +2,19 @@
 const { read, assert, pass } = require('./testUtils');
 
 const chatWindow = read('src/components/chat/ChatWindow.jsx');
+const messageCenter = read('src/components/chat/MessageCenterPage.jsx');
+const deliveryHelper = read('src/components/chat/messageDelivery.js');
 const sidebar = read('src/components/dashboard/DashboardSidebar.jsx');
 const sidebarCss = read('src/styles/sidebar.css');
 const portalShellCss = read('src/styles/portal-shell-final.css');
 
-const deliveredDefinition = chatWindow.indexOf('const handleDelivered = (payload) =>');
-const deliveredListener = chatWindow.indexOf('socket.on("message-delivered", handleDelivered)');
-assert(deliveredDefinition >= 0, 'ChatWindow defines the delivered-message handler before registering the listener');
-assert(deliveredDefinition < deliveredListener, 'ChatWindow registers message-delivered only after defining the handler');
-assert(/delivered:\s*true/.test(chatWindow.slice(deliveredDefinition, chatWindow.indexOf('const handleSeen', deliveredDefinition))), 'delivered acknowledgements update message delivery state');
+const deliveredHandler = chatWindow.indexOf('const handleMessageDelivered = (payload) =>');
+const deliveredListener = chatWindow.indexOf('socket.on("message-delivered", handleMessageDelivered)');
+assert(deliveredHandler >= 0, 'ChatWindow defines the delivered-message handler before registering the listener');
+assert(deliveredHandler < deliveredListener, 'ChatWindow registers message-delivered only after defining the handler');
+assert(/applyMessageDelivered\(/.test(chatWindow.slice(deliveredHandler, deliveredListener)), 'delivered acknowledgements flow through the shared delivery-state helper');
+assert(/delivered:\s*true/.test(deliveryHelper), 'delivery helper marks acknowledged messages as delivered');
+assert(!/\bhandleDelivered\b/.test(messageCenter), 'MessageCenterPage does not contain a free handleDelivered reference that can trigger a runtime ReferenceError');
 
 const mobileBranch = sidebar.slice(sidebar.indexOf('if (mobileBottomNav)'));
 const bottomNavStart = mobileBranch.indexOf('<aside className="dashboard-sidebar mobile-bottom-nav"');
