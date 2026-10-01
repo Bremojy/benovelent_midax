@@ -384,6 +384,11 @@ function MessageCenterPage({
     }
   };
 
+  const handleConversationArchived = (conversationId, archived, payload) => {
+    setConversations((previous) => previous.map((item) => String(item?._id) === String(conversationId) ? { ...item, ...(payload || {}), archivedBy: payload?.archivedBy || item.archivedBy || [] } : item));
+    setSelectedConversation((current) => String(current?._id || "") === String(conversationId) ? { ...current, ...(payload || {}), archivedBy: payload?.archivedBy || current.archivedBy || [] } : current);
+  };
+
   const startConversation = async (person) => {
     try {
       if (!person?._id) return;
@@ -513,6 +518,8 @@ function MessageCenterPage({
             onAudioCall={() => startCall("audio")}
             onVideoCall={() => startCall("video")}
             onConversationDeleted={handleConversationDeleted}
+            onConversationArchived={handleConversationArchived}
+            availableConversations={normalizedConversations}
           />
         </div>
         {call && (
@@ -691,6 +698,8 @@ function MessageCenterPage({
                     onAudioCall={() => startCall("audio")}
                     onVideoCall={() => startCall("video")}
                     onConversationDeleted={handleConversationDeleted}
+                    onConversationArchived={handleConversationArchived}
+                    availableConversations={normalizedConversations}
                   />
                 )}
                 {isMobile && !mobileChatOpen && <div className="chat-window-empty choose-chat-empty">Select a chat above to open the conversation.</div>}

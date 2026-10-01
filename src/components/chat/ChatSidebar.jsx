@@ -1,5 +1,5 @@
 import { useMemo, useRef } from "react";
-import { Search, MessageCircle, Users, Crown, BadgeCheck, SlidersHorizontal, X } from "lucide-react";
+import { Search, MessageCircle, Users, Crown, BadgeCheck, SlidersHorizontal, X, Archive } from "lucide-react";
 import "./ChatSidebar.css";
 
 function ChatSidebar({
@@ -69,6 +69,8 @@ function ChatSidebar({
     });
   }, [conversations, search, actor]);
 
+  const archivedConversations = filteredConversations.filter((conversation) => (conversation.archivedBy || []).some((id) => String(id) === String(actor.id)));
+  const recentConversations = filteredConversations.filter((conversation) => !archivedConversations.some((item) => String(item._id) === String(conversation._id)));
   const leaders = filteredMembers.filter((member) => isLeader(member.role));
   const regularMembers = filteredMembers.filter((member) => !isLeader(member.role));
 
@@ -196,6 +198,23 @@ function ChatSidebar({
           );
         })}
       </Section>
+
+      {archivedConversations.length > 0 && (
+        <Section icon={<Archive size={16} />} label="Archived">
+          {archivedConversations.map((conversation) => {
+            const partner = conversation.partner || {};
+            return (
+              <button key={conversation._id} type="button" className="conversation" onClick={() => onSelectConversation?.(conversation)}>
+                <Avatar user={partner} isOnline={partner.online} />
+                <div className="conversation-info">
+                  <div className="conversation-topline"><h4>{partner.fullName || "Member"}</h4><span className="conversation-time">{formatChatTime(conversation.lastMessageTime || conversation.updatedAt || conversation.createdAt)}</span></div>
+                  <div className="conversation-subline"><p>{sanitizePreviewText(conversation.lastMessageText) || "Archived conversation"}</p>{conversation.unreadCount > 0 && <span className="badge">{conversation.unreadCount}</span>}</div>
+                </div>
+              </button>
+            );
+          })}
+        </Section>
+      )}
 
       <Section icon={<Crown size={16} />} label="Leaders">
         {leaders.length === 0 && <div className="chat-empty">{emptyMembersLabel}</div>}

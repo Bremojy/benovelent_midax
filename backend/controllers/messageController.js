@@ -226,7 +226,10 @@ exports.editMessage=async(req,res)=>{
         const { actorId, message: msg, conversation } = await getAuthorizedMessage(req);
         if(!msg || !conversation) return res.status(404).json({success:false,message:"Message not found."});
         if(String(msg.sender)!==String(actorId)) return res.status(403).json({success:false,message:"Unauthorized."});
-        msg.message=String(req.body.message || "").trim().slice(0,5000);
+        if (msg.deletedForEveryone || String(msg.messageType || "") !== "text") return res.status(400).json({success:false,message:"Only active text messages can be edited."});
+        const nextText = String(req.body.message || "").trim().slice(0,5000);
+        if (!nextText) return res.status(400).json({success:false,message:"Edited message text is required."});
+        msg.message=nextText;
         msg.edited=true; msg.editedAt=new Date(); await msg.save();
         getIO()?.to(String(msg.conversation)).emit("message-edited", msg);
         return res.json({success:true,message:msg});
@@ -309,6 +312,102 @@ exports.reactToMessage = async (req, res) => {
     } catch(error){ return res.status(500).json({success:false,message:"Unable to complete this chat operation right now."}); }
 };
 
+
+/* =====================================================
+UNREACT TO MESSAGE
+===================================================== */
+exports.unreactToMessage = async (req, res) => {
+    try {
+        const { actorId, message: msg, conversation } = await getAuthorizedMessage(req);
+        if(!msg || !conversation) return res.status(404).json({success:false,message:"Message not found."});
+        msg.reactions = (msg.reactions || []).filter((reaction) => String(reaction.member) !== String(actorId));
+        await msg.save();
+        getIO()?.to(String(msg.conversation)).emit("message-reaction", msg);
+        return res.json({success:true,message:msg});
+    } catch(error){ return res.status(500).json({success:false,message:"Unable to update the reaction right now."}); }
+};
+
+/* =====================================================
+SEARCH MESSAGES
+===================================================== */
+exports.searchConversationMessages = async (req, res) => {
+    try {
+        const actorId = getChatActorId(req);
+        const conversationId = req.params.conversationId;
+        if (!mongoose.isValidObjectId(conversationId)) return res.status(400).json({ success:false, message:"Invalid conversation." });
+        const conversation = await Conversation.findOne({ _id: conversationId, participants: actorId, isGroup: false }).select("_id").lean();
+        if (!conversation) return res.status(404).json({ success:false, message:"Conversation not found." });
+        const query = String(req.query?.q || "").trim();
+        if (!query) return res.json({ success:true, count:0, messages:[] });
+        const limit = Math.min(Math.max(Number(req.query?.limit) || 50, 1), 100);
+        const messages = await Message.find({
+            conversation: conversationId,
+            deletedFor: { $ne: actorId },
+            deletedForEveryone: false,
+            message: { $regex: query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), $options: "i" },
+        }).populate("sender", "fullName profileImage").populate("replyTo").sort({ createdAt: -1, _id: -1 }).limit(limit).lean();
+        return res.json({ success:true, count:messages.length, messages });
+    } catch(error){
+        console.error("Chat message search error:", { message:error.message });
+        return res.status(500).json({success:false,message:"Unable to search this conversation right now."});
+    }
+};
+
+/* =====================================================
+FORWARD MESSAGE
+===================================================== */
+exports.forwardMessage = async (req, res) => {
+    try {
+        const actorId = getChatActorId(req);
+        const source = await Message.findById(req.params.id);
+        if (!source) return res.status(404).json({success:false,message:"Message not found."});
+        const sourceConversation = await Conversation.findOne({ _id: source.conversation, participants: actorId, isGroup: false }).select("_id").lean();
+        if (!sourceConversation || source.deletedFor?.some?.((id) => String(id) === String(actorId)) || source.deletedForEveryone) {
+            return res.status(404).json({success:false,message:"Message not found."});
+        }
+
+        const targetConversationId = String(req.body?.targetConversationId || "");
+        if (!mongoose.isValidObjectId(targetConversationId)) return res.status(400).json({success:false,message:"A valid target conversation is required."});
+        const targetConversation = await Conversation.findOne({ _id: targetConversationId, participants: actorId, isGroup: false });
+        if (!targetConversation) return res.status(403).json({success:false,message:"Target conversation access denied."});
+
+        const clientMessageId = String(req.get("X-Idempotency-Key") || req.body?.clientMessageId || "").trim().slice(0,100);
+        if (clientMessageId) {
+            const duplicate = await Message.findOne({ conversation: targetConversationId, sender: actorId, clientMessageId });
+            if (duplicate) {
+                await duplicate.populate("sender", "fullName profileImage online lastSeen");
+                await duplicate.populate("replyTo");
+                return res.json({success:true,duplicate:true,message:duplicate});
+            }
+        }
+
+        const forwarded = await Message.create({
+            conversation: targetConversationId,
+            sender: actorId,
+            clientMessageId: clientMessageId || undefined,
+            message: String(source.message || ""),
+            messageType: source.messageType,
+            attachment: String(source.attachment || ""),
+            fileName: String(source.fileName || ""),
+            fileSize: Number(source.fileSize || 0),
+            mimeType: String(source.mimeType || ""),
+            forwarded: true,
+            forwardedFrom: source._id,
+        });
+        await forwarded.populate("sender", "fullName profileImage online lastSeen");
+        await forwarded.populate("replyTo");
+
+        const unreadKey = targetConversation.participants.map((id) => String(id)).find((id) => id !== String(actorId));
+        const update = { $set: { lastMessage: forwarded._id, lastMessageText: forwarded.message || "Forwarded attachment", lastMessageSender: actorId, lastMessageTime: new Date() } };
+        if (unreadKey) update.$inc = { [`unreadCounts.${unreadKey}`]: 1 };
+        await Conversation.updateOne({ _id: targetConversation._id, participants: actorId }, update);
+        getIO()?.to(String(targetConversation._id)).emit("new-message", forwarded);
+        return res.status(201).json({success:true,message:forwarded});
+    } catch(error){
+        console.error("Chat forward error:", { message:error.message, code:error.code || null });
+        return res.status(error?.code === 11000 ? 409 : 500).json({success:false,message:"Unable to forward the message right now."});
+    }
+};
 
 /* =====================================================
 GET SINGLE MESSAGE/* =====================================================

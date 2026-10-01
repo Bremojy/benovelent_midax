@@ -322,6 +322,22 @@ module.exports = (io, socket) => {
     } catch (_) {}
   });
 
+  socket.on("delivered-message", async ({ messageId }) => {
+    if (!isChatRole(socket.data?.role)) return;
+    try {
+      const message = await Message.findById(messageId);
+      if (!message || !socket.data?.chatId) return;
+      const conversation = await Conversation.findOne({ _id: message.conversation, participants: socket.data.chatId }).select("_id").lean();
+      if (!conversation || String(message.sender) === String(socket.data.chatId)) return;
+      message.delivered = true;
+      message.deliveredAt = message.deliveredAt || new Date();
+      await message.save();
+      io.to(String(message.sender)).emit("message-delivered", { messageId: String(message._id), deliveredAt: message.deliveredAt });
+    } catch (error) {
+      console.warn("Delivered message update failed:", error.message);
+    }
+  });
+
   socket.on("seen-message", async ({ messageId }) => {
     if (!isChatRole(socket.data?.role)) return;
     try {

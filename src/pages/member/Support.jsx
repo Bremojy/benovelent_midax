@@ -490,7 +490,7 @@ export default function Support() {
                   </div>
                   <small className="support-file-hint">Each file is stored separately with its category so admins and superadmins can review them later.</small>
                 </div>
-              )
+              )}
 
               <Field label="Requested Amount (KES)">
                 <input type="number" inputMode="decimal" min="0" step="0.01" value={form.requestedAmount} onChange={(e) => set("requestedAmount", e.target.value)} />

@@ -9,8 +9,11 @@ const {
     editMessage,
     deleteMessage,
     reactToMessage,
+    unreactToMessage,
     markAsRead,
-    deleteForEveryone
+    deleteForEveryone,
+    searchConversationMessages,
+    forwardMessage
 } = require("../controllers/messageController");
 
 const { verifyToken: protect } = require("../middleware/authMiddleware");
@@ -30,6 +33,7 @@ router.post("/upload", protect, isChatUser, profileCompleted, setUploadType("mes
 router.post("/", protect, isChatUser, profileCompleted, sendMessage);
 
 // Get all messages in a conversation
+router.get("/conversation/:conversationId/search", protect, isChatUser, profileCompleted, searchConversationMessages);
 router.get("/conversation/:conversationId", protect, isChatUser, profileCompleted, getConversationMessages);
 
 // Get a single message
@@ -44,6 +48,8 @@ router.delete("/:id/everyone", protect, isChatUser, profileCompleted, deleteForE
 
 // React to a message
 router.put("/:id/react", protect, isChatUser, profileCompleted, reactToMessage);
+router.delete("/:id/react", protect, isChatUser, profileCompleted, unreactToMessage);
+router.post("/:id/forward", protect, isChatUser, profileCompleted, forwardMessage);
 
 // Mark a message as read
 router.put("/:id/read", protect, isChatUser, profileCompleted, markAsRead);

@@ -60,6 +60,12 @@ exports.createConversation = async (req, res) => {
         let conversation = await Conversation.findOne({ directKey, isGroup: false });
 
         if (conversation) {
+            // Re-opening a direct chat must restore only this viewer's hidden state.
+            conversation.deletedFor = (conversation.deletedFor || []).filter((id) => String(id) !== canonicalMe);
+            if (conversation.archivedBy?.some?.((id) => String(id) === canonicalMe)) {
+                conversation.archivedBy = conversation.archivedBy.filter((id) => String(id) !== canonicalMe);
+            }
+            await conversation.save();
             return res.json({
                 success: true,
                 conversation
@@ -179,11 +185,7 @@ exports.getConversation=async(req,res)=>{
 
 try{
 
-const conversation=await Conversation.findById(
-
-req.params.id
-
-)
+const conversation=await Conversation.findOne({ _id: req.params.id, isGroup: false })
 
 const currentUserId = req.auth?.chatId || req.user._id;
 if (!conversation || !(conversation.participants || []).some((participant) => String(participant) === String(currentUserId))) {
@@ -427,6 +429,28 @@ message:error.message
 
 }
 
+};
+
+/* =====================================================
+ARCHIVE / UNARCHIVE CONVERSATION
+===================================================== */
+exports.archiveConversation = async (req, res) => {
+    try {
+        const actorId = String(getChatActorId(req));
+        const conversation = await Conversation.findOne({ _id: req.params.id, participants: actorId, isGroup: false, active: { $ne: false } });
+        if (!conversation) return res.status(404).json({ success: false, message: "Conversation not found." });
+
+        const archived = conversation.archivedBy.some((id) => String(id) === actorId);
+        if (archived) {
+            conversation.archivedBy = conversation.archivedBy.filter((id) => String(id) !== actorId);
+        } else {
+            conversation.archivedBy.push(actorId);
+        }
+        await conversation.save();
+        return res.json({ success: true, archived: !archived, conversation });
+    } catch (error) {
+        return res.status(500).json({ success: false, message: "Unable to update archive state." });
+    }
 };
 
 /* =====================================================

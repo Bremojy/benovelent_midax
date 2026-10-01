@@ -14,7 +14,7 @@ function getMessageType(file) {
   return "document";
 }
 
-export default function MessageInput({ onSend, socket, conversation, currentUser }) {
+export default function MessageInput({ onSend, onEdit, editingMessage, replyTo, socket, conversation, currentUser, onCancelContext }) {
   const [message, setMessage] = useState("");
   const [attachment, setAttachment] = useState("");
   const [attachmentPreview, setAttachmentPreview] = useState("");
@@ -35,7 +35,6 @@ export default function MessageInput({ onSend, socket, conversation, currentUser
   const typingTimerRef = useRef(null);
   const previewUrlRef = useRef("");
 
-  const currentId = String(currentUser?.chatId || currentUser?._id || currentUser?.id || currentUser?.memberId || "");
   const canSend = useMemo(() => Boolean(String(message).trim()) || Boolean(attachment), [message, attachment]);
 
   const clearAttachment = () => {
@@ -44,6 +43,15 @@ export default function MessageInput({ onSend, socket, conversation, currentUser
     setAttachmentPreview("");
     setMessageType("text");
   };
+
+  useEffect(() => {
+    if (editingMessage) {
+      setMessage(String(editingMessage.message || editingMessage.text || ""));
+      setShowEmoji(false);
+      setShowMore(false);
+      requestAnimationFrame(() => textareaRef.current?.focus?.());
+    }
+  }, [editingMessage]);
 
   useEffect(() => () => {
     if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
@@ -105,7 +113,12 @@ export default function MessageInput({ onSend, socket, conversation, currentUser
     socket?.emit("stop-typing", { conversationId: conversation?._id });
 
     try {
-      await onSend(cleanMessage, attachment, messageType);
+      if (editingMessage) {
+        await onEdit?.(editingMessage._id, cleanMessage);
+      } else {
+        await onSend(cleanMessage, attachment, messageType);
+      }
+      if (editingMessage || replyTo) onCancelContext?.();
     } catch (error) {
       // Put unsent text back so a temporary network error never destroys a draft.
       setMessage((current) => current || draftMessage);

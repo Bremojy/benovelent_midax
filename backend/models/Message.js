@@ -100,6 +100,16 @@ const messageSchema = new mongoose.Schema(
         ref:"Message"
     },
 
+    forwarded:{
+        type:Boolean,
+        default:false
+    },
+
+    forwardedFrom:{
+        type:mongoose.Schema.Types.ObjectId,
+        ref:"Message"
+    },
+
     edited:{
         type:Boolean,
         default:false
