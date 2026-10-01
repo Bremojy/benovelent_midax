@@ -25,6 +25,7 @@ const serviceWorker = read('public/sw.js');
 assert(/isChatUser\s*=\s*authorize\("member",\s*"admin"\)/.test(roleMiddleware), 'chat routes exclude SuperAdmin');
 assert(/CHAT_ROLES\s*=\s*new Set\(\[['"]member['"],\s*['"]admin['"]\]\)/.test(chatProfile), 'canonical chat roles are member/admin only');
 assert(/canonicalMe === canonicalTarget/.test(conversationController), 'API blocks self-chat');
+assert(/if \(conversation\)[\s\S]*?conversation\.save\(\);[\s\S]*?conversation\.populate\(\s*\"participants\"[\s\S]*?conversation\.populate\(\"lastMessage\"\)/.test(conversationController), 'reused direct conversations return hydrated participants and lastMessage');
 assert(/!currentActor \|\| !isChatRole\(currentActor\.role\).*!targetActor \|\| !isChatRole\(targetActor\.role\)/s.test(conversationController), 'API rejects SuperAdmin chat participants');
 assert(/isGroup: false/.test(conversationController) && /isGroup: false/.test(messageController), 'chat center is direct 1-to-1 only');
 assert(/getConversation[\s\S]*participants\"?\s*:\s*\{ \$size: 2 \}/.test(conversationController) && /deleteConversation[\s\S]*isGroup: false/.test(conversationController) && /archiveConversation[\s\S]*participants.*\$size: 2/.test(conversationController), 'conversation read/delete/archive operations reject legacy group-shaped records');

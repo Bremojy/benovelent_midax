@@ -71,6 +71,11 @@ exports.createConversation = async (req, res) => {
                 conversation.archivedBy = conversation.archivedBy.filter((id) => String(id) !== canonicalMe);
             }
             await conversation.save();
+            await conversation.populate(
+                "participants",
+                "fullName profileImage online lastSeen role portalOwnerRole"
+            );
+            await conversation.populate("lastMessage");
             return res.json({
                 success: true,
                 conversation

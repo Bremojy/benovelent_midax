@@ -8,8 +8,8 @@ function assert(condition, message) {
 }
 
 assert(
-  controller.includes('if ((startDate && !endDate) || (!startDate && endDate))'),
-  "ledger endpoint must reject only-partial date ranges"
+  !controller.includes('if ((startDate && !endDate) || (!startDate && endDate))'),
+  "ledger endpoint no longer rejects a partial range before the authoritative service validates/defaults it"
 );
 assert(
   controller.includes('startDate: startDate || undefined') && controller.includes('endDate: endDate || undefined'),

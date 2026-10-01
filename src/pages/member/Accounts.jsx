@@ -6,12 +6,12 @@ import MpesaPaymentButton from "../../components/payments/MpesaPaymentButton";
 import { MpesaStatusBadge, MpesaTransactionButton } from "../../components/accounts/MpesaTransactionViewer";
 import LedgerControls from "../../components/accounts/LedgerControls";
 import "../../styles/portalModule.css";
+import { getDefaultLedgerRange, normalizeLedgerDateRange } from "../../utils/ledgerDateRange";
 import "./Accounts.css";
 
 const money = (v) => new Intl.NumberFormat("en-KE", { style: "currency", currency: "KES", maximumFractionDigits: 0 }).format(Number(v || 0));
 const TABS = [["constitution", "Benevolent Constitution", Landmark], ["mpesa", "M-Pesa Accounts", Smartphone], ["community", "Community M-Pesa Support", HandHeart]];
-const today = new Date().toISOString().slice(0, 10);
-const yearStart = `${new Date().getUTCFullYear()}-01-01`;
+const { start: yearStart, end: today } = getDefaultLedgerRange();
 
 export default function MemberAccounts() {
   const [tab, setTab] = useState("constitution");
@@ -21,7 +21,7 @@ export default function MemberAccounts() {
   const [communityLedger, setCommunityLedger] = useState([]);
   const [bookBalance, setBookBalance] = useState(null);
   const [constitution, setConstitution] = useState(null);
-  const [dates, setDates] = useState({ start: yearStart, end: today });
+  const [dates, setDates] = useState(getDefaultLedgerRange());
   const [busy, setBusy] = useState(false);
   const [ledgerBusy, setLedgerBusy] = useState(false);
   const [error, setError] = useState("");
@@ -49,11 +49,20 @@ export default function MemberAccounts() {
   }, []);
 
   const loadConstitution = async (range = dates) => {
-    if (!range.start || !range.end) { setError("Select both a start date and end date first."); return; }
+    const normalized = normalizeLedgerDateRange(range);
+    if (!normalized.ok) { setError(normalized.message); return false; }
+    setDates((current) => current.start === normalized.start && current.end === normalized.end
+      ? current
+      : { ...current, start: normalized.start, end: normalized.end });
     setLedgerBusy(true); setError(""); setMessage("");
-    try { const { data } = await API.get("/finance/constitution-ledger", { params: { startDate: range.start, endDate: range.end } }); setConstitution(data); }
-    catch (e) { setError(e.response?.data?.message || e.message || "Unable to load the constitution ledger."); }
-    finally { setLedgerBusy(false); }
+    try {
+      const { data } = await API.get("/finance/constitution-ledger", { params: { startDate: normalized.start, endDate: normalized.end } });
+      setConstitution(data);
+      return true;
+    } catch (e) {
+      setError(e.response?.data?.message || e.message || "Unable to load the constitution ledger.");
+      return false;
+    } finally { setLedgerBusy(false); }
   };
 
   const successful = payments.filter((p) => p.status === "successful").reduce((n, p) => n + Number(p.amount || 0), 0);

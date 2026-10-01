@@ -14,6 +14,24 @@ const validBalanceMatch = (extra = {}) => ({
   hidden: { $ne: true },
 });
 
+const LEDGER_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+const parseLedgerDate = (value, label) => {
+  if (value === undefined || value === null || value === "") return null;
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) throw new Error(`${label} must be a valid date.`);
+    return new Date(value.getTime());
+  }
+  const raw = String(value).trim();
+  if (!LEDGER_DATE_PATTERN.test(raw)) throw new Error(`${label} must use YYYY-MM-DD.`);
+  const [year, month, day] = raw.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) {
+    throw new Error(`${label} is not a valid calendar date.`);
+  }
+  return date;
+};
+
 const asDate = (value, fallback = new Date()) => {
   if (value === undefined || value === null || value === "") return new Date(fallback);
   const date = value instanceof Date ? new Date(value.getTime()) : new Date(value);
@@ -71,10 +89,13 @@ const getCurrentBookBalance = async ({ asOf = new Date() } = {}) => {
 };
 
 const getLedger = async ({ startDate, endDate, memberId = null, includeHidden = false, asOf = new Date() } = {}) => {
-  const defaultStart = new Date(Date.UTC(new Date().getUTCFullYear(), 0, 1));
-  const defaultEnd = new Date(Date.UTC(new Date().getUTCFullYear(), 11, 31, 23, 59, 59, 999));
-  const start = startOfDay(startDate) || defaultStart;
-  const end = endOfDay(endDate) || defaultEnd;
+  const currentYear = new Date().getUTCFullYear();
+  const defaultStart = new Date(Date.UTC(currentYear, 0, 1));
+  const defaultEnd = new Date(Date.UTC(currentYear, 11, 31, 23, 59, 59, 999));
+  const parsedStart = parseLedgerDate(startDate, "startDate");
+  const parsedEnd = parseLedgerDate(endDate, "endDate");
+  const start = parsedStart ? startOfDay(parsedStart) : defaultStart;
+  const end = parsedEnd ? endOfDay(parsedEnd) : defaultEnd;
   if (start > end) throw new Error("Enter a valid date range.");
   const scoped = {};
   if (memberId) scoped.member = memberId;
