@@ -17,6 +17,7 @@ import {
   Eye,
   Smartphone,
   FileText,
+  ShieldCheck,
 } from "lucide-react";
 import DashboardLayout from "../../layouts/DashboardLayout";
 import NotificationSettings from "../../components/NotificationSettings";

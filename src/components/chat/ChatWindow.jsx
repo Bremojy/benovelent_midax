@@ -140,6 +140,16 @@ function ChatWindow({ conversation, socket, currentUser, onBack, onAudioCall, on
       }
     };
 
+    const handleDelivered = (payload) => {
+      const messageId = String(payload?.messageId || payload || "");
+      if (!messageId) return;
+      setMessages((previous) => previous.map((item) => (
+        String(item._id) === messageId
+          ? { ...item, delivered: true, deliveredAt: payload?.deliveredAt || item.deliveredAt || new Date().toISOString(), status: item.status === "sending" ? "sent" : item.status }
+          : item
+      )));
+    };
+
     const handleSeen = (payload) => {
       const messageId = String(payload?.messageId || payload || "");
       if (!messageId) return;

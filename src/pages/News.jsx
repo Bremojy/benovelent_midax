@@ -12,6 +12,7 @@ import {
   FileText,
   Download,
   ChevronRight,
+  Printer,
 } from "lucide-react";
 import api, { resolveUploadUrl, resolveApiUrl } from "../services/api";
 import { useAuth } from "../context/AuthContext";

@@ -46,11 +46,31 @@ function DashboardSidebar({ role, sidebarOpen, setSidebarOpen, mobileHidden = fa
   const renderMenuLinks = (items, { grouped = true } = {}) => {
     if (items.length === 0) return <div className="sidebar-empty">No menu items available.</div>;
 
+    const renderLink = (item) => {
+      const Icon = item.icon;
+      return (
+        <NavLink
+          key={`${item.title}-${item.path}`}
+          to={item.path}
+          onClick={handleNavigation}
+          className={() => {
+            const active = location.pathname === item.path || (item.childPaths || []).some((prefix) => location.pathname === prefix || location.pathname.startsWith(`${prefix}/`));
+            return active ? "sidebar-link active" : "sidebar-link";
+          }}
+        >
+          <Icon size={20} strokeWidth={2} />
+          <span>{item.title}</span>
+        </NavLink>
+      );
+    };
+
+    if (!grouped) return items.map(renderLink);
+
     const groups = [];
     const groupMap = new Map();
 
     items.forEach((item) => {
-      const section = grouped ? (item.section || "Portal") : null;
+      const section = item.section || "Portal";
       if (!groupMap.has(section)) {
         const group = { section, items: [] };
         groupMap.set(section, group);
@@ -60,25 +80,9 @@ function DashboardSidebar({ role, sidebarOpen, setSidebarOpen, mobileHidden = fa
     });
 
     return groups.map(({ section, items: groupItems }) => (
-      <div className="sidebar-menu-group" key={section || "ungrouped"}>
-        {grouped && section && <div className="sidebar-menu-label">{section}</div>}
-        {groupItems.map((item) => {
-          const Icon = item.icon;
-          return (
-            <NavLink
-              key={`${item.title}-${item.path}`}
-              to={item.path}
-              onClick={handleNavigation}
-              className={() => {
-                const active = location.pathname === item.path || (item.childPaths || []).some((prefix) => location.pathname === prefix || location.pathname.startsWith(`${prefix}/`));
-                return active ? "sidebar-link active" : "sidebar-link";
-              }}
-            >
-              <Icon size={20} strokeWidth={2} />
-              <span>{item.title}</span>
-            </NavLink>
-          );
-        })}
+      <div className="sidebar-menu-group" key={section}>
+        <div className="sidebar-menu-label">{section}</div>
+        {groupItems.map(renderLink)}
       </div>
     ));
   };
@@ -127,8 +131,8 @@ function DashboardSidebar({ role, sidebarOpen, setSidebarOpen, mobileHidden = fa
               </button>
             )}
           </nav>
-          {renderMorePanel()}
         </aside>
+        {renderMorePanel()}
 
         {sidebarOpen && (
           <aside className="dashboard-sidebar mobile-drawer open" aria-label="Full dashboard navigation">

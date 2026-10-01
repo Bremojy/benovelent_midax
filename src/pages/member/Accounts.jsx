@@ -49,26 +49,11 @@ export default function MemberAccounts() {
   }, []);
 
   const loadConstitution = async (range = dates) => {
-    const nextStart = String(range?.start || "").trim();
-    const nextEnd = String(range?.end || "").trim();
-
-    // Let the authoritative ledger endpoint handle the no-date case. Its
-    // contract intentionally applies the safe default reporting period when
-    // both dates are omitted, so the member UI must not block that request.
-    // A partially supplied range is still rejected by the backend with the
-    // appropriate validation message.
+    if (!range.start || !range.end) { setError("Select both a start date and end date first."); return; }
     setLedgerBusy(true); setError(""); setMessage("");
-    try {
-      const params = {};
-      if (nextStart) params.startDate = nextStart;
-      if (nextEnd) params.endDate = nextEnd;
-      const { data } = await API.get("/finance/constitution-ledger", { params });
-      setConstitution(data);
-    } catch (e) {
-      setError(e.response?.data?.message || e.message || "Unable to load the constitution ledger.");
-    } finally {
-      setLedgerBusy(false);
-    }
+    try { const { data } = await API.get("/finance/constitution-ledger", { params: { startDate: range.start, endDate: range.end } }); setConstitution(data); }
+    catch (e) { setError(e.response?.data?.message || e.message || "Unable to load the constitution ledger."); }
+    finally { setLedgerBusy(false); }
   };
 
   const successful = payments.filter((p) => p.status === "successful").reduce((n, p) => n + Number(p.amount || 0), 0);
