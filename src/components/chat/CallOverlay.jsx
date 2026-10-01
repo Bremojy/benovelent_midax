@@ -30,6 +30,7 @@ export default function CallOverlay({
   const [activeCallType, setActiveCallType] = useState(callType === "video" ? "video" : "audio");
   const [cameraOff, setCameraOff] = useState(callType !== "video");
   const [error, setError] = useState("");
+  const [audioPlaybackBlocked, setAudioPlaybackBlocked] = useState(false);
   const [accepted, setAccepted] = useState(!incomingCall || autoAccept);
   const [duration, setDuration] = useState(0);
   const [ringSecondsLeft, setRingSecondsLeft] = useState(RING_TIMEOUT_SECONDS);
@@ -49,6 +50,8 @@ export default function CallOverlay({
   const ringtoneRef = useRef(null);
   const mountedRef = useRef(true);
   const renegotiatingRef = useRef(false);
+  const iceRestartInFlightRef = useRef(false);
+  const recoveryDeadlineRef = useRef(null);
   const connectionRecoveryTimerRef = useRef(null);
   const iceServersRef = useRef(DEFAULT_ICE_SERVERS);
   const iceConfigPromiseRef = useRef(null);
@@ -160,7 +163,8 @@ export default function CallOverlay({
         await peerRef.current.setRemoteDescription(new RTCSessionDescription(offer));
         if (mode === "video" || mode === "audio") {
           setActiveCallType(mode);
-          setCameraOff(mode !== "video");
+          if (mode === "video") await applyLocalVideoMode(true);
+          else await applyLocalVideoMode(false);
         }
         await flushCandidates();
         const answer = await peerRef.current.createAnswer();
@@ -274,10 +278,7 @@ export default function CallOverlay({
       if (remoteVideoRef.current) remoteVideoRef.current.srcObject = stream;
       if (remoteAudioRef.current) {
         remoteAudioRef.current.srcObject = stream;
-        const playback = remoteAudioRef.current.play?.();
-        if (playback?.catch) {
-          playback.catch(() => setError("Remote audio could not start automatically. Interact with the call window and try again."));
-        }
+        void ensureRemoteAudioPlayback();
       }
       if (peer.connectionState === "connected") {
         setConnected(true);
@@ -287,19 +288,19 @@ export default function CallOverlay({
       }
     };
     peer.oniceconnectionstatechange = () => {
-      if (peer.iceConnectionState === "failed") {
-        setError("The call could not reach the other device. A TURN server may be required on restrictive networks.");
-      } else if (peer.iceConnectionState === "disconnected" && !endingRef.current) {
+      if (endingRef.current || peerRef.current !== peer) return;
+      if (peer.iceConnectionState === "connected" || peer.iceConnectionState === "completed") {
+        window.clearTimeout(connectionRecoveryTimerRef.current);
+        connectionRecoveryTimerRef.current = null;
+        window.clearTimeout(recoveryDeadlineRef.current);
+        recoveryDeadlineRef.current = null;
+        setStatus("Connected");
+        return;
+      }
+      if (peer.iceConnectionState === "disconnected" || peer.iceConnectionState === "failed") {
         setStatus("Reconnecting...");
-        if (!connectionRecoveryTimerRef.current) {
-          connectionRecoveryTimerRef.current = window.setTimeout(() => {
-            connectionRecoveryTimerRef.current = null;
-            if (!endingRef.current && peerRef.current === peer) {
-              setError("Call connection was lost. Please start the call again.");
-              finish(false);
-            }
-          }, 10000);
-        }
+        setError("");
+        attemptIceRestart(peer);
       }
     };
     peer.onconnectionstatechange = () => {
@@ -307,6 +308,8 @@ export default function CallOverlay({
       if (state === "connected" && remoteMediaReadyRef.current) {
         window.clearTimeout(connectionRecoveryTimerRef.current);
         connectionRecoveryTimerRef.current = null;
+        window.clearTimeout(recoveryDeadlineRef.current);
+        recoveryDeadlineRef.current = null;
         setConnected(true);
         setStatus("Connected");
         ringtoneRef.current?.stop?.();
@@ -349,6 +352,58 @@ export default function CallOverlay({
         throw new Error(type === "video" ? "A camera and microphone are required for a video call." : "A microphone is required for an audio call.");
       }
       throw error;
+    }
+  }
+
+  async function ensureRemoteAudioPlayback() {
+    const element = remoteAudioRef.current;
+    if (!element) return false;
+    element.autoplay = true;
+    element.playsInline = true;
+    element.muted = false;
+    element.volume = 1;
+    try {
+      await element.play();
+      if (mountedRef.current) setAudioPlaybackBlocked(false);
+      return true;
+    } catch (_) {
+      if (mountedRef.current) setAudioPlaybackBlocked(true);
+      return false;
+    }
+  }
+
+  async function attemptIceRestart(peer) {
+    if (!peer || endingRef.current || peerRef.current !== peer || !callIdRef.current || !socket || iceRestartInFlightRef.current) return;
+    iceRestartInFlightRef.current = true;
+    setStatus("Reconnecting...");
+    window.clearTimeout(connectionRecoveryTimerRef.current);
+    connectionRecoveryTimerRef.current = null;
+    try {
+      const offer = await peer.createOffer({ iceRestart: true, offerToReceiveAudio: true, offerToReceiveVideo: true });
+      await peer.setLocalDescription(offer);
+      socket.emit("call-mode-offer", {
+        to: incomingCall?.from || partnerId,
+        offer,
+        callId: callIdRef.current,
+        mode: activeCallType === "video" ? "video" : "audio",
+      });
+      window.clearTimeout(recoveryDeadlineRef.current);
+      recoveryDeadlineRef.current = window.setTimeout(() => {
+        recoveryDeadlineRef.current = null;
+        if (!endingRef.current && peerRef.current === peer && !["connected", "completed"].includes(peer.iceConnectionState)) {
+          setError("The call connection could not recover. Please start the call again.");
+          finish(false);
+        }
+      }, 10000);
+    } catch (error) {
+      setError(error?.message || "The call connection could not be recovered.");
+      window.clearTimeout(recoveryDeadlineRef.current);
+      recoveryDeadlineRef.current = window.setTimeout(() => {
+        recoveryDeadlineRef.current = null;
+        if (!endingRef.current && peerRef.current === peer) finish(false);
+      }, 5000);
+    } finally {
+      iceRestartInFlightRef.current = false;
     }
   }
 
@@ -417,6 +472,39 @@ export default function CallOverlay({
     }
   }
 
+  async function applyLocalVideoMode(enabled) {
+    const videoTransceiver = videoTransceiverRef.current;
+    if (!videoTransceiver) throw new Error("The call video channel is not ready yet.");
+
+    if (!enabled) {
+      await videoTransceiver.sender.replaceTrack(null);
+      videoTransceiver.direction = "recvonly";
+      localStreamRef.current?.getVideoTracks().forEach((track) => track.stop());
+      localStreamRef.current?.getTracks()
+        .filter((track) => track.kind === "video")
+        .forEach((track) => localStreamRef.current?.removeTrack?.(track));
+      if (localVideoRef.current) localVideoRef.current.srcObject = localStreamRef.current;
+      setCameraOff(true);
+      return;
+    }
+
+    const currentVideoTrack = localStreamRef.current?.getVideoTracks?.()[0];
+    let videoTrack = currentVideoTrack;
+    if (!videoTrack) {
+      const videoStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: false,
+      });
+      videoTrack = videoStream.getVideoTracks()[0];
+      if (!videoTrack) throw new Error("Camera could not be started.");
+      localStreamRef.current?.addTrack(videoTrack);
+    }
+    await videoTransceiver.sender.replaceTrack(videoTrack);
+    videoTransceiver.direction = "sendrecv";
+    if (localVideoRef.current) localVideoRef.current.srcObject = localStreamRef.current;
+    setCameraOff(false);
+  }
+
   async function toggleCallMode() {
     if (!peerRef.current || !socket || !partnerId || !connected || renegotiatingRef.current) return;
     renegotiatingRef.current = true;
@@ -426,31 +514,9 @@ export default function CallOverlay({
       if (!videoTransceiver) throw new Error("The call video channel is not ready yet.");
 
       if (nextType === "video") {
-        const videoStream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } },
-          audio: false,
-        });
-        const videoTrack = videoStream.getVideoTracks()[0];
-        if (!videoTrack) throw new Error("Camera could not be started.");
-
-        localStreamRef.current?.getVideoTracks().forEach((track) => {
-          track.stop();
-          localStreamRef.current?.removeTrack?.(track);
-        });
-        localStreamRef.current?.addTrack(videoTrack);
-        await videoTransceiver.sender.replaceTrack(videoTrack);
-        videoTransceiver.direction = "sendrecv";
-        if (localVideoRef.current) localVideoRef.current.srcObject = localStreamRef.current;
-        setCameraOff(false);
+        await applyLocalVideoMode(true);
       } else {
-        await videoTransceiver.sender.replaceTrack(null);
-        videoTransceiver.direction = "recvonly";
-        localStreamRef.current?.getVideoTracks().forEach((track) => track.stop());
-        localStreamRef.current?.getTracks()
-          .filter((track) => track.kind === "video")
-          .forEach((track) => localStreamRef.current?.removeTrack?.(track));
-        if (localVideoRef.current) localVideoRef.current.srcObject = localStreamRef.current;
-        setCameraOff(true);
+        await applyLocalVideoMode(false);
       }
 
       const offer = await peerRef.current.createOffer({
@@ -512,6 +578,9 @@ export default function CallOverlay({
     window.clearInterval(ringTimerRef.current);
     window.clearTimeout(connectionRecoveryTimerRef.current);
     connectionRecoveryTimerRef.current = null;
+    window.clearTimeout(recoveryDeadlineRef.current);
+    recoveryDeadlineRef.current = null;
+    iceRestartInFlightRef.current = false;
     peerRef.current?.close();
     peerRef.current = null;
     videoTransceiverRef.current = null;
@@ -531,7 +600,7 @@ export default function CallOverlay({
   const displayDuration = `${mins}:${secs}`;
 
   return (
-    <div className="call-overlay" role="dialog" aria-modal="true" aria-label={`${isVideo ? "Video" : "Audio"} call`}>
+    <div className="call-overlay" role="dialog" aria-modal="true" aria-label={`${isVideo ? "Video" : "Audio"} call`} onClick={() => { if (audioPlaybackBlocked) void ensureRemoteAudioPlayback(); }}>
       <div className="call-card">
         <div className="call-card-header">
           <div>
@@ -545,9 +614,14 @@ export default function CallOverlay({
         </div>
         {error && <div className="call-error" role="alert">{error}</div>}
 
+        <audio ref={remoteAudioRef} className="call-remote-audio" autoPlay playsInline muted={false} />
+        {audioPlaybackBlocked && <button type="button" className="call-enable-audio" onClick={() => void ensureRemoteAudioPlayback()}>
+          Enable call audio
+        </button>}
+
         {isVideo ? (
           <div className="call-videos">
-            <video ref={remoteVideoRef} className="remote-call-video" autoPlay playsInline />
+            <video ref={remoteVideoRef} className="remote-call-video" autoPlay playsInline muted />
             <video ref={localVideoRef} className="local-call-video" autoPlay muted playsInline />
             {!connected && <div className="call-video-placeholder">{incomingCall && !accepted ? "Answer to start the call" : status}</div>}
           </div>
@@ -556,7 +630,6 @@ export default function CallOverlay({
             <div className="audio-call-avatar"><img src={partner?.profileImage || incomingCall?.callerProfileImage || "/default-avatar.svg"} alt={partner?.fullName || "Member"} /></div>
             <h3>{partner?.fullName || incomingCall?.callerName || "Member"}</h3>
             <p>{connected ? `Connected • ${displayDuration}` : status}</p>
-            <audio ref={remoteAudioRef} autoPlay playsInline />
           </div>
         )}
 

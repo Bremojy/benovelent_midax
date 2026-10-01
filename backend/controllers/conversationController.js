@@ -2,6 +2,36 @@ const Conversation = require("../models/Conversation");
 const Member = require("../models/Member");
 const { resolveChatActor, resolveCanonicalChatActorForAuthenticatedUser, getChatActorId, isChatRole } = require("../utils/chatProfile");
 
+
+const DIRECT_CONVERSATION_POPULATE = "fullName profileImage online lastSeen role portalOwnerRole status isDeleted portalOwnerId";
+
+async function getAuthorizedDirectConversation(id, actorId) {
+    if (!id || !actorId) return null;
+    const conversation = await Conversation.findOne({
+        _id: id,
+        $and: [
+            { participants: actorId },
+            { participants: { $size: 2 } },
+        ],
+        isGroup: false,
+        active: true,
+        deletedFor: { $ne: actorId },
+    });
+    if (!conversation) return null;
+    await conversation.populate("participants", DIRECT_CONVERSATION_POPULATE);
+    const participantRoles = conversation.participants.map((participant) =>
+        String(participant?.role || participant?.portalOwnerRole || "").toLowerCase()
+    );
+    const participantStates = conversation.participants.map((participant) => ({
+        role: String(participant?.role || participant?.portalOwnerRole || "").toLowerCase(),
+        status: String(participant?.status || "active").toLowerCase(),
+        deleted: participant?.isDeleted === true,
+    }));
+    if (participantRoles.some((role) => role === "superadmin" || role === "super_admin" || !["member", "admin"].includes(role))) return null;
+    if (participantStates.some((state) => state.deleted || state.status !== "active")) return null;
+    return conversation;
+}
+
 const getConversationPartnerIds = (conversation, currentUserId) => {
     const participantIds = Array.isArray(conversation?.participants)
         ? conversation.participants.map((participant) => String(participant?._id || participant)).filter(Boolean)
@@ -64,16 +94,37 @@ exports.createConversation = async (req, res) => {
 
         let conversation = await Conversation.findOne({ directKey, isGroup: false });
 
+        // Legacy rows may have missing directKey values. Reuse the newest exact
+        // two-party row instead of creating a duplicate thread.
+        if (!conversation) {
+            conversation = await Conversation.findOne({
+                $and: [
+                    { participants: { $all: [canonicalMe, canonicalTarget] } },
+                    { participants: { $size: 2 } },
+                ],
+                isGroup: false,
+            }).sort({ updatedAt: -1, _id: -1 });
+            if (conversation) conversation.directKey = directKey;
+        }
+
         if (conversation) {
-            // Re-opening a direct chat must restore only this viewer's hidden state.
+            // Re-opening a direct chat restores this viewer only and makes the
+            // canonical thread active again. The other viewer's state is preserved.
+            conversation.active = true;
             conversation.deletedFor = (conversation.deletedFor || []).filter((id) => String(id) !== canonicalMe);
             if (conversation.archivedBy?.some?.((id) => String(id) === canonicalMe)) {
                 conversation.archivedBy = conversation.archivedBy.filter((id) => String(id) !== canonicalMe);
             }
-            await conversation.save();
+            try {
+                await conversation.save();
+            } catch (error) {
+                if (error?.code !== 11000) throw error;
+                const canonical = await Conversation.findOne({ directKey, isGroup: false });
+                if (canonical) conversation = canonical;
+            }
             await conversation.populate(
                 "participants",
-                "fullName profileImage online lastSeen role portalOwnerRole"
+                DIRECT_CONVERSATION_POPULATE
             );
             await conversation.populate("lastMessage");
             return res.json({
@@ -83,7 +134,7 @@ exports.createConversation = async (req, res) => {
         }
 
         try {
-            conversation = await Conversation.create({ participants: [canonicalMe, canonicalTarget], directKey, isGroup: false });
+            conversation = await Conversation.create({ participants: [canonicalMe, canonicalTarget], directKey, isGroup: false, active: true });
         } catch (error) {
             if (error?.code !== 11000) throw error;
             conversation = await Conversation.findOne({ directKey, isGroup: false });
@@ -91,7 +142,7 @@ exports.createConversation = async (req, res) => {
 
         await conversation.populate(
             "participants",
-            "fullName profileImage online lastSeen role portalOwnerRole"
+            DIRECT_CONVERSATION_POPULATE
         );
 
         return res.status(201).json({
@@ -113,147 +164,65 @@ exports.createConversation = async (req, res) => {
 GET MY CONVERSATIONS
 ===================================================== */
 
-exports.getMyConversations=async(req,res)=>{
+exports.getMyConversations = async (req, res) => {
+    try {
+        const currentUserId = String(getChatActorId(req));
+        const conversations = await Conversation.find({
+            $and: [
+                { participants: currentUserId },
+                { participants: { $size: 2 } },
+            ],
+            isGroup: false,
+            active: true,
+            deletedFor: { $ne: currentUserId },
+        })
+            .populate("participants", DIRECT_CONVERSATION_POPULATE)
+            .populate("lastMessage")
+            .sort({ updatedAt: -1 });
 
+        const visibleConversations = conversations.filter((conversation) => {
+            if (conversation.isGroup || (conversation.participants || []).length !== 2) return false;
+            const participantRoles = conversation.participants.map((participant) =>
+                String(participant?.role || participant?.portalOwnerRole || "").toLowerCase()
+            );
+            if (participantRoles.some((role) => role === "superadmin" || role === "super_admin" || !["member", "admin"].includes(role))) return false;
+            if (conversation.participants.some((participant) => participant?.isDeleted === true || String(participant?.status || "active").toLowerCase() !== "active")) return false;
+            const partnerIds = getConversationPartnerIds(conversation, currentUserId);
+            return partnerIds.length === 1;
+        });
 
-try{
-
-const currentUserId = String(getChatActorId(req));
-
-const conversations=await Conversation.find({
-
-participants: currentUserId,
-
-isGroup: false,
-
-"participants": { $size: 2 },
-
-deletedFor: {$ne: currentUserId}
-
-})
-
-.populate(
-
-"participants",
-
-"fullName profileImage online lastSeen role portalOwnerRole"
-
-)
-
-.populate(
-
-"lastMessage"
-
-)
-
-.sort({
-
-updatedAt:-1
-
-});
-
-const visibleConversations = conversations.filter((conversation) => {
-    if (conversation.isGroup || (conversation.participants || []).length !== 2) return false;
-    if (conversation.participants.some((participant) => {
-        const role = String(participant?.role || participant?.portalOwnerRole || "").toLowerCase();
-        return role === "superadmin" || role === "super_admin";
-    })) return false;
-    const partnerIds = getConversationPartnerIds(conversation, currentUserId);
-    if (!partnerIds.length) return false;
-    return conversation.participants.some((participant) => {
-        const id = String(participant?._id || participant);
-        if (id === currentUserId) return true;
-        const role = String(participant?.role || participant?.portalOwnerRole || "member").toLowerCase();
-        return role === "member" || role === "admin";
-    });
-});
-
-res.json({
-
-success:true,
-
-count:visibleConversations.length,
-
-conversations: visibleConversations
-
-});
-
-}
-
-catch(error){
-
-res.status(500).json({
-
-success:false,
-
-message:"Unable to complete this conversation operation right now."
-
-});
-
-}
-
+        return res.json({
+            success: true,
+            count: visibleConversations.length,
+            conversations: visibleConversations,
+        });
+    } catch (error) {
+        return res.status(500).json({
+            success: false,
+            message: "Unable to complete this conversation operation right now.",
+        });
+    }
 };
-
 
 
 /* =====================================================
 GET SINGLE CONVERSATION
 ===================================================== */
 
-exports.getConversation=async(req,res)=>{
-
-try{
-
-const conversation=await Conversation.findOne({ _id: req.params.id, isGroup: false, "participants": { $size: 2 } })
-
-const currentUserId = req.auth?.chatId || req.user._id;
-if (!conversation || !(conversation.participants || []).some((participant) => String(participant) === String(currentUserId))) {
-    return res.status(404).json({ success:false, message:"Conversation not found." });
-}
-
-await conversation.populate("participants", "fullName profileImage online lastSeen role portalOwnerRole");
-const hasForbiddenPartner = conversation.participants.some((participant) => {
-    const role = String(participant?.role || participant?.portalOwnerRole || "").toLowerCase();
-    return role === "superadmin" || role === "super_admin";
-});
-if (hasForbiddenPartner) {
-    return res.status(403).json({ success:false, message:"SuperAdmin is not available as a chat participant." });
-}
-
-await conversation.populate(
-
-"participants",
-
-"fullName profileImage online lastSeen role portalOwnerRole"
-
-);
-
-await conversation.populate("lastMessage");
-
-res.json({
-
-success:true,
-
-conversation
-
-});
-
-}
-
-catch(error){
-
-res.status(500).json({
-
-success:false,
-
-message:"Unable to complete this conversation operation right now."
-
-});
-
-}
-
+exports.getConversation = async (req, res) => {
+    try {
+        const actorId = String(getChatActorId(req));
+        const conversation = await getAuthorizedDirectConversation(req.params.id, actorId);
+        if (!conversation) return res.status(404).json({ success: false, message: "Conversation not found." });
+        await conversation.populate("lastMessage");
+        return res.json({ success: true, conversation });
+    } catch (error) {
+        return res.status(500).json({
+            success: false,
+            message: "Unable to complete this conversation operation right now.",
+        });
+    }
 };
-
 
 
 /* =====================================================
@@ -261,8 +230,8 @@ MARK CONVERSATION READ
 ===================================================== */
 exports.markConversationRead = async (req, res) => {
     try {
-        const actorId = req.auth?.chatId || req.user._id;
-        const conversation = await Conversation.findOne({ _id: req.params.id, participants: actorId, isGroup: false, "participants": { $size: 2 }, active: { $ne: false } });
+        const actorId = String(getChatActorId(req));
+        const conversation = await getAuthorizedDirectConversation(req.params.id, actorId);
         if (!conversation) return res.status(404).json({ success:false, message:"Conversation not found." });
         conversation.unreadCounts = conversation.unreadCounts || new Map();
         conversation.unreadCounts.set(String(actorId), 0);
@@ -284,13 +253,7 @@ exports.deleteConversation=async(req,res)=>{
 try{
 
 const actorId = String(getChatActorId(req));
-const conversation=await Conversation.findOne({
-  _id: req.params.id,
-  participants: actorId,
-  isGroup: false,
-  "participants": { $size: 2 },
-  active: { $ne: false },
-});
+const conversation = await getAuthorizedDirectConversation(req.params.id, actorId);
 
 if(!conversation){
 
@@ -304,7 +267,7 @@ message:"Conversation not found."
 
 }
 
-if(!conversation.deletedFor.includes(actorId)){
+if(!conversation.deletedFor.some((id) => String(id) === actorId)){
 
 conversation.deletedFor.push(actorId);
 
@@ -346,9 +309,9 @@ exports.pinConversation=async(req,res)=>{
 
 try{
 
-const actorId = req.auth?.chatId || req.user?.chatMemberId || req.user?._id;
+const actorId = String(getChatActorId(req));
 
-const conversation = await Conversation.findOne({ _id: req.params.id, participants: actorId, isGroup: false, "participants": { $size: 2 }, active: { $ne: false } });
+const conversation = await getAuthorizedDirectConversation(req.params.id, actorId);
 
 if(!conversation){
 
@@ -362,7 +325,7 @@ message:"Conversation not found."
 
 }
 
-if(conversation.pinnedBy.includes(actorId)){
+if(conversation.pinnedBy.some((id) => String(id) === actorId)){
 conversation.pinnedBy = conversation.pinnedBy.filter((id) => String(id) !== actorId);
 } else {
 conversation.pinnedBy.push(actorId);
@@ -404,9 +367,9 @@ exports.muteConversation=async(req,res)=>{
 
 try{
 
-const actorId = req.auth?.chatId || req.user?.chatMemberId || req.user?._id;
+const actorId = String(getChatActorId(req));
 
-const conversation = await Conversation.findOne({ _id: req.params.id, participants: actorId, isGroup: false, "participants": { $size: 2 }, active: { $ne: false } });
+const conversation = await getAuthorizedDirectConversation(req.params.id, actorId);
 
 if(!conversation){
 
@@ -420,7 +383,7 @@ message:"Conversation not found."
 
 }
 
-if(conversation.mutedBy.includes(actorId)){
+if(conversation.mutedBy.some((id) => String(id) === actorId)){
 conversation.mutedBy = conversation.mutedBy.filter((id) => String(id) !== actorId);
 } else {
 conversation.mutedBy.push(actorId);
@@ -458,7 +421,7 @@ ARCHIVE / UNARCHIVE CONVERSATION
 exports.archiveConversation = async (req, res) => {
     try {
         const actorId = String(getChatActorId(req));
-        const conversation = await Conversation.findOne({ _id: req.params.id, participants: actorId, isGroup: false, "participants": { $size: 2 }, active: { $ne: false } });
+        const conversation = await getAuthorizedDirectConversation(req.params.id, actorId);
         if (!conversation) return res.status(404).json({ success: false, message: "Conversation not found." });
 
         const archived = conversation.archivedBy.some((id) => String(id) === actorId);

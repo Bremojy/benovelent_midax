@@ -209,7 +209,7 @@ app.get("/", (req, res) => {
     res.status(200).json({
         success: true,
         application: "Benevolent Midax API",
-        version: process.env.APP_VERSION || "18.5.0",
+        version: process.env.APP_VERSION || "18.5.1",
         status: "Running",
         timestamp: new Date().toISOString(),
     });
@@ -234,6 +234,7 @@ app.get("/api/health", async (req, res) => {
         database,
         environment: process.env.NODE_ENV || "development",
         redis,
+        socketStateTopology: process.env.SOCKET_STATE_TOPOLOGY || "single-instance",
         timestamp: new Date().toISOString(),
     });
 });

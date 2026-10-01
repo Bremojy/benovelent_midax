@@ -10,7 +10,7 @@ import { isChatSoundEnabled, setChatSoundEnabled, unlockChatSound } from "../../
 import { applyMessageDelivered } from "./messageDelivery";
 import "./ChatWindow.css";
 
-function ChatWindow({ conversation, socket, currentUser, onBack, onAudioCall, onVideoCall, onConversationDeleted, onConversationArchived, availableConversations = [] }) {
+function ChatWindow({ conversation, socket, currentUser, onBack, onAudioCall, onVideoCall, onConversationDeleted, onConversationArchived, onRepairConversation, availableConversations = [] }) {
   const currentId = String(currentUser?.chatId || currentUser?._id || currentUser?.id || currentUser?.memberId || "");
   const [messages, setMessages] = useState([]);
   const [typingUserId, setTypingUserId] = useState("");
@@ -35,6 +35,7 @@ function ChatWindow({ conversation, socket, currentUser, onBack, onAudioCall, on
   const typingUserRef = useRef("");
   const stickToBottomRef = useRef(true);
   const sendLockRef = useRef(false);
+  const repairAttemptedRef = useRef(new Set());
 
   const ownIds = useMemo(
     () =>
@@ -74,24 +75,47 @@ function ChatWindow({ conversation, socket, currentUser, onBack, onAudioCall, on
 
     let cancelled = false;
 
+    const loadMessages = async (conversationId) => {
+      const { data } = await API.get(`/messages/conversation/${conversationId}`, { params: { limit: 50 } });
+      if (cancelled) return;
+      const items = Array.isArray(data) ? data : data.messages || [];
+      setMessages(items.map(normalizeMessage));
+      setHasMore(Boolean(data?.hasMore));
+      setNextCursor(String(data?.nextCursor || ""));
+      stickToBottomRef.current = true;
+      try { await API.put(`/conversations/${conversationId}/read`); } catch (_) {}
+    };
+
     (async () => {
       try {
         setLoadingMessages(true);
         setChatError("");
-        const { data } = await API.get(`/messages/conversation/${conversation._id}`, { params: { limit: 50 } });
-        if (cancelled) return;
-        const items = Array.isArray(data) ? data : data.messages || [];
-        setMessages(items.map(normalizeMessage));
-        setHasMore(Boolean(data?.hasMore));
-        setNextCursor(String(data?.nextCursor || ""));
-        stickToBottomRef.current = true;
-        try { await API.put(`/conversations/${conversation._id}/read`); } catch (_) {}
+        await loadMessages(conversation._id);
       } catch (error) {
-        console.error(error);
-        if (!cancelled) {
+        const status = Number(error?.response?.status || 0);
+        const repairKey = String(conversation?._id || "");
+        const repairable = [403, 404].includes(status);
+        if (!cancelled && repairable && repairKey && !repairAttemptedRef.current.has(repairKey) && typeof onRepairConversation === "function") {
+          repairAttemptedRef.current.add(repairKey);
+          setChatError("This chat link is stale. Reconnecting to the current conversation…");
+          try {
+            const repaired = await onRepairConversation(conversation);
+            if (!cancelled && repaired?._id && String(repaired._id) === repairKey) {
+              await loadMessages(repaired._id);
+              setChatError("");
+              return;
+            }
+            if (repaired?._id) return;
+          } catch (repairError) {
+            if (!cancelled) {
+              const message = repairError?.response?.data?.message || repairError?.message || "Unable to repair this chat right now.";
+              setChatError(message);
+            }
+          }
+        }
+        if (!cancelled && !repairable) {
           const message = error.response?.data?.message || error.message || "Unable to load this conversation.";
           setChatError(message);
-          toast.error(message, { id: `chat-load-${conversation._id}` });
         }
       } finally {
         if (!cancelled) setLoadingMessages(false);
@@ -101,7 +125,7 @@ function ChatWindow({ conversation, socket, currentUser, onBack, onAudioCall, on
     return () => {
       cancelled = true;
     };
-  }, [conversation?._id]);
+  }, [conversation?._id, onRepairConversation]);
 
   useEffect(() => {
     if (stickToBottomRef.current) messagesEndRef.current?.scrollIntoView({ behavior: "auto", block: "end" });
@@ -307,14 +331,13 @@ function ChatWindow({ conversation, socket, currentUser, onBack, onAudioCall, on
     }
   }
 
-  async function sendMessage(text, attachment, messageType = "text", attachmentMeta) {
+  async function sendMessage(text, attachment, messageType = "text", attachmentMeta, existingClientMessageId = "") {
     if (!conversation?._id) return;
     if (!String(text || "").trim() && !attachment) return;
     if (sendLockRef.current) return;
 
     sendLockRef.current = true;
-
-    const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const tempId = String(existingClientMessageId || `temp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
     const optimisticMessage = normalizeMessage({
       _id: tempId,
       conversation: conversation._id,
@@ -325,40 +348,58 @@ function ChatWindow({ conversation, socket, currentUser, onBack, onAudioCall, on
       createdAt: new Date().toISOString(),
       status: "sending",
       __optimistic: true,
-      __retry: { text, attachment, messageType, attachmentMeta },
+      __retry: { text, attachment, messageType, attachmentMeta, clientMessageId: tempId },
     });
 
-    setMessages((previous) => [...previous, optimisticMessage]);
+    setMessages((previous) => {
+      const withoutExisting = previous.filter((item) => String(item._id) !== tempId);
+      return [...withoutExisting, optimisticMessage].sort(compareMessages);
+    });
     scrollToBottom();
 
+    let targetConversation = conversation;
     try {
       setChatError("");
-      const { data } = await API.post("/messages", {
-        conversationId: conversation._id,
-        message: text,
-        attachment,
-        messageType,
-        replyTo: replyTo?._id || undefined,
-        fileName: attachmentMeta?.fileName || undefined,
-        fileSize: attachmentMeta?.fileSize || undefined,
-        mimeType: attachmentMeta?.mimeType || undefined,
-      }, { headers: { "X-Idempotency-Key": tempId } });
-      const created = normalizeMessage(data.message || data);
-      setReplyTo(null);
-      setMessages((previous) => {
-        const withoutTemp = previous.filter((item) => String(item._id) !== tempId);
-        if (!created?._id) return withoutTemp;
-        if (withoutTemp.some((item) => String(item._id) === String(created._id) || messageFingerprint(item) === messageFingerprint(created))) {
-          return withoutTemp;
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        try {
+          const { data } = await API.post("/messages", {
+            conversationId: targetConversation._id,
+            message: text,
+            attachment,
+            messageType,
+            replyTo: replyTo?._id || undefined,
+            fileName: attachmentMeta?.fileName || undefined,
+            fileSize: attachmentMeta?.fileSize || undefined,
+            mimeType: attachmentMeta?.mimeType || undefined,
+            clientMessageId: tempId,
+          }, { headers: { "X-Idempotency-Key": tempId } });
+          const created = normalizeMessage(data.message || data);
+          setReplyTo(null);
+          setMessages((previous) => {
+            const withoutTemp = previous.filter((item) => String(item._id) !== tempId);
+            if (!created?._id) return withoutTemp;
+            if (withoutTemp.some((item) => String(item._id) === String(created._id) || messageFingerprint(item) === messageFingerprint(created))) {
+              return withoutTemp;
+            }
+            return [...withoutTemp, created].sort(compareMessages);
+          });
+          return;
+        } catch (error) {
+          const status = Number(error?.response?.status || 0);
+          const canRepair = [403, 404].includes(status) && attempt === 0 && typeof onRepairConversation === "function";
+          if (!canRepair) throw error;
+          const repaired = await onRepairConversation(targetConversation);
+          if (!repaired?._id) throw error;
+          targetConversation = repaired;
+          if (String(repaired._id) !== String(conversation._id)) setReplyTo(null);
+          setMessages((previous) => previous.map((item) => String(item._id) === tempId ? { ...item, conversation: repaired._id } : item));
         }
-        return [...withoutTemp, created].sort(compareMessages);
-      });
+      }
     } catch (error) {
       console.error(error);
       setMessages((previous) => previous.map((item) => String(item._id) === tempId ? { ...item, status: "failed" } : item));
       const message = error.response?.data?.message || error.message || "Message could not be sent. Check your connection and try again.";
       setChatError(message);
-      toast.error(message, { id: `chat-send-${conversation._id}` });
       throw error;
     } finally {
       sendLockRef.current = false;
@@ -370,7 +411,7 @@ function ChatWindow({ conversation, socket, currentUser, onBack, onAudioCall, on
     if (!retry) return;
     setMessages((current) => current.filter((message) => String(message._id) !== String(item._id)));
     try {
-      await sendMessage(retry.text, retry.attachment, retry.messageType, retry.attachmentMeta);
+      await sendMessage(retry.text, retry.attachment, retry.messageType, retry.attachmentMeta, retry.clientMessageId || item._id);
     } catch (_) {}
   }
 

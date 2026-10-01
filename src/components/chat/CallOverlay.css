@@ -59,3 +59,20 @@
   .call-controls{padding-bottom:max(8px,env(safe-area-inset-bottom))}
   .call-control{min-width:0;flex:1}
 }
+
+.call-enable-audio{border:0;border-radius:999px;padding:9px 14px;background:#f97316;color:#fff;font-weight:800;cursor:pointer;box-shadow:0 8px 20px rgba(249,115,22,.25)}
+.call-enable-audio:focus-visible{outline:3px solid rgba(249,115,22,.25);outline-offset:3px}
+
+
+.call-remote-audio {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.call-enable-audio {
+  position: relative;
+  z-index: 3;
+}

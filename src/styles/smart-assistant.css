@@ -15,3 +15,21 @@
 /* The teaser bubble is the only closed-state launcher. */
 .smart-assistant-trigger { display:none !important; }
 .smart-assistant-teaser { cursor:pointer; box-shadow:0 14px 36px rgba(15,23,42,.18); }
+
+
+/* Chat pages reserve visual space for the fixed assistant so it never obscures
+   the message composer or mobile call controls. */
+body.benevolent-chat-active .smart-assistant {
+  bottom: 96px;
+}
+@media (max-width: 900px) {
+  body.benevolent-chat-active .smart-assistant {
+    bottom: calc(var(--dashboard-bottom-nav-height, 96px) + 84px + env(safe-area-inset-bottom));
+  }
+}
+@media (max-width: 640px) {
+  body.benevolent-chat-active .smart-assistant {
+    right: 8px;
+    bottom: calc(var(--dashboard-bottom-nav-height, 96px) + 82px + env(safe-area-inset-bottom));
+  }
+}

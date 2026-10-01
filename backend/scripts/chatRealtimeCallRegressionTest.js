@@ -19,7 +19,7 @@ assert(/const activeId = String\(callIdRef\.current \|\| callId \|\| incomingCal
 assert(/candidateCallId[\s\S]*!== activeId/.test(overlay), 'stale ICE candidates from unrelated call sessions are ignored');
 assert(/callIdRef\.current \|\| incomingCall\?\.callId/.test(overlay), 'call cleanup uses the stable call id ref rather than stale React state');
 assert(/remoteVideoRef\.current\.srcObject = stream/.test(overlay) && /remoteAudioRef\.current\.srcObject = stream/.test(overlay), 'remote media is attached to actual media elements');
-assert(/autoPlay playsInline/.test(overlay) && /autoPlay muted playsInline/.test(overlay) && /remoteAudioRef\.current\.play/.test(overlay), 'remote and local media playback is configured with autoplay recovery');
+assert(/autoPlay playsInline/.test(overlay) && /autoPlay muted playsInline/.test(overlay) && /remoteAudioRef\.current[\s\S]*element\.play\(\)/.test(overlay), 'remote and local media playback is configured with autoplay recovery');
 assert(/audio: \{ echoCancellation: true/.test(overlay) && /video: type === "video"/.test(overlay), 'real microphone/camera capture is requested according to call mode');
 assert(/sender\.replaceTrack\(audioTrack\)/.test(overlay) && /sender\.replaceTrack\(videoTrack\)/.test(overlay), 'captured tracks are installed on the peer connection');
 assert(/peer\.ontrack/.test(overlay) && /remoteMediaReadyRef/.test(overlay) && /getTracks\(\)\.forEach\(\(track\)\s*=>\s*track\.stop\(\)\)/.test(overlay.replace(/\n/g,' ')), 'remote media readiness, track handling, and media cleanup exist');

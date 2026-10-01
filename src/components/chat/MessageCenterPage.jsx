@@ -79,6 +79,11 @@ function MessageCenterPage({
   }, [isMobile, mobileChatOpen]);
 
   useEffect(() => {
+    document.body.classList.add("benevolent-chat-active");
+    return () => document.body.classList.remove("benevolent-chat-active");
+  }, []);
+
+  useEffect(() => {
     if (!isFullscreenChat) return undefined;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -453,6 +458,28 @@ function MessageCenterPage({
     }
   };
 
+  const repairConversation = async (staleConversation) => {
+    const partner = staleConversation?.partner || (staleConversation?.participants || []).find((participant) => String(participant?._id || participant) !== String(actorId));
+    if (!partner?._id) throw new Error("The chat participant could not be resolved.");
+    if (isSameUser(normalizeContact(partner, partner?.role || "member"), actor)) {
+      throw new Error("You cannot open a chat with yourself.");
+    }
+    const response = await API.post("/conversations", { participantId: partner._id });
+    const repaired = normalizeConversation(response.data?.conversation || response.data, actor.id);
+    if (!repaired?._id) throw new Error("The current conversation could not be prepared.");
+    setConversations((previous) => {
+      const withoutStaleAndDuplicatePartner = previous.filter((item) => {
+        if (String(item?._id) === String(staleConversation?._id) || String(item?._id) === String(repaired._id)) return false;
+        return String(item?.partner?._id || "") !== String(partner._id);
+      });
+      return [repaired, ...withoutStaleAndDuplicatePartner];
+    });
+    setSelectedConversation(repaired);
+    selectedConversationRef.current = repaired;
+    setMobileChatOpen(isMobile);
+    return repaired;
+  };
+
   const refreshChat = async () => {
     const ok = await loadChatData();
     if (ok) toast.success(onRefreshHint || "Chat refreshed.", { id: "chat-refresh" });
@@ -531,6 +558,7 @@ function MessageCenterPage({
             onConversationDeleted={handleConversationDeleted}
             onConversationArchived={handleConversationArchived}
             availableConversations={normalizedConversations}
+            onRepairConversation={repairConversation}
           />
         </div>
         {call && (
@@ -715,6 +743,7 @@ function MessageCenterPage({
                     onVideoCall={() => startCall("video")}
                     onConversationDeleted={handleConversationDeleted}
                     onConversationArchived={handleConversationArchived}
+                    onRepairConversation={repairConversation}
                     availableConversations={normalizedConversations}
                   />
                 )}

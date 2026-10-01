@@ -26,7 +26,7 @@ assert(socketServer.includes("hasActiveUserSocket"), "Socket server must expose 
 assert(notificationSocket.includes("Notification.getUniqueUnreadCount"), "Socket notification-count must use unique unread identity aggregation.");
 const notificationController = read("backend/controllers/notificationController.js");
 assert(notificationController.includes('emit("notification-deleted"') && notificationController.includes('emit("notifications-cleared"'), "REST notification mutations must synchronize other connected clients.");
-assert(conversationController.includes("participants: actorId") && conversationController.includes("active: { $ne: false }"), "Deleting a conversation must verify participant ownership.");
+assert(conversationController.includes("async function getAuthorizedDirectConversation") && conversationController.includes("{ participants: actorId }") && conversationController.includes("active: true"), "Deleting a conversation must verify participant ownership through the shared active-chat authorization helper.");
 assert(conversationController.includes("conversation.pinnedBy = conversation.pinnedBy.filter") && conversationController.includes("conversation.mutedBy = conversation.mutedBy.filter"), "Pin and mute controls must persist both enable and disable actions.");
 assert(topbar.includes('socket.on("notification-count"') && !topbar.includes('setUnreadNotifications((v) => Number(v) + 1)'), "Topbar must consume authoritative notification-count events without local +1 drift.");
 assert(!topbar.includes('socket.on("message-seen", onMessage)'), "Topbar must not issue a conversations API refresh for each message-seen receipt.");

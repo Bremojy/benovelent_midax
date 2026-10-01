@@ -28,7 +28,7 @@ assert(/canonicalMe === canonicalTarget/.test(conversationController), 'API bloc
 assert(/if \(conversation\)[\s\S]*?conversation\.save\(\);[\s\S]*?conversation\.populate\(\s*\"participants\"[\s\S]*?conversation\.populate\(\"lastMessage\"\)/.test(conversationController), 'reused direct conversations return hydrated participants and lastMessage');
 assert(/!currentActor \|\| !isChatRole\(currentActor\.role\).*!targetActor \|\| !isChatRole\(targetActor\.role\)/s.test(conversationController), 'API rejects SuperAdmin chat participants');
 assert(/isGroup: false/.test(conversationController) && /isGroup: false/.test(messageController), 'chat center is direct 1-to-1 only');
-assert(/getConversation[\s\S]*participants\"?\s*:\s*\{ \$size: 2 \}/.test(conversationController) && /deleteConversation[\s\S]*isGroup: false/.test(conversationController) && /archiveConversation[\s\S]*participants.*\$size: 2/.test(conversationController), 'conversation read/delete/archive operations reject legacy group-shaped records');
+assert(/async function getAuthorizedDirectConversation[\s\S]*participants.*\$size: 2[\s\S]*active: true/.test(conversationController) && /deleteConversation[\s\S]*getAuthorizedDirectConversation\(req.params.id, actorId\)/.test(conversationController) && /archiveConversation[\s\S]*getAuthorizedDirectConversation\(req.params.id, actorId\)/.test(conversationController), 'conversation read/delete/archive operations reject legacy group-shaped records through the shared helper');
 assert(/router\.put\("\/:id\/archive"/.test(conversationRoutes), 'archive API exists');
 assert(/archivedBy/.test(conversationController) && /pinnedBy/.test(conversationController) && /mutedBy/.test(conversationController), 'viewer-specific conversation state is actor-scoped');
 assert(/participants: actorId/.test(messageController), 'message access requires conversation membership');
@@ -39,7 +39,7 @@ assert(/if\(String\(msg\.sender\)!==String\(actorId\)\)/.test(messageController)
 assert(/Only active text messages can be edited/.test(messageController), 'edit is limited to eligible text messages');
 assert(/msg\.deletedFor\.includes\(actorId\)/.test(messageController), 'delete-for-me is actor-specific');
 assert(/unreactToMessage/.test(messageController) && /router\.delete\("\/:id\/react"/.test(messageRoutes), 'unreact exists');
-assert(/searchConversationMessages/.test(messageController) && /conversationId.*participants: actorId.*isGroup: false/s.test(messageController), 'message search is conversation-authorized');
+assert(/searchConversationMessages[\s\S]*getAuthorizedDirectConversation\(conversationId, actorId\)/.test(messageController), 'message search is conversation-authorized through the shared helper');
 assert(/router\.get\("\/conversation\/:conversationId\/search"/.test(messageRoutes), 'message-search route exists');
 assert(/router\.post\("\/:id\/forward"/.test(messageRoutes), 'forward route exists');
 assert(/if \(!isChatRole\(socket\.data\?\.role\)/.test(messageSocket) || /isChatRole\(socket\.data\?\.role\)/.test(messageSocket), 'socket actions derive role from authenticated socket');

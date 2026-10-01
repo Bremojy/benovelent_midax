@@ -1,5 +1,5 @@
 const { getIO } = require("../sockets/socket");
-const { getChatActorId } = require("../utils/chatProfile");
+const { getChatActorId, resolveChatActor, isChatRole } = require("../utils/chatProfile");
 const Message = require("../models/Message");
 const Conversation = require("../models/Conversation");
 const Notification = require("../models/Notification");
@@ -13,17 +13,20 @@ async function getAuthorizedDirectConversation(id, actorId) {
     if (!mongoose.isValidObjectId(id) || !actorId) return null;
     const conversation = await Conversation.findOne({
         _id: id,
-        participants: actorId,
+        $and: [
+            { participants: actorId },
+            { participants: { $size: 2 } },
+        ],
         isGroup: false,
-        active: { $ne: false },
+        active: true,
+        deletedFor: { $ne: actorId },
     }).lean();
     if (!conversation || !Array.isArray(conversation.participants) || conversation.participants.length !== 2) return null;
 
-    const forbidden = await Member.exists({
-        _id: { $in: conversation.participants },
-        $or: [{ role: "superadmin" }, { portalOwnerRole: "superadmin" }],
-    });
-    if (forbidden) return null;
+    const actors = await Promise.all(conversation.participants.map((participantId) => resolveChatActor(participantId)));
+    if (actors.some((actor) => !actor || !isChatRole(actor.role) || actor.user?.isDeleted === true || String(actor.user?.status || "active").toLowerCase() !== "active")) {
+        return null;
+    }
     return conversation;
 }
 
@@ -31,7 +34,9 @@ async function getAuthorizedMessage(req) {
     const actorId = getChatActorId(req);
     if (!mongoose.isValidObjectId(req.params.id)) return { actorId, message: null, conversation: null };
     const message = await Message.findById(req.params.id);
-    if (!message) return { actorId, message: null, conversation: null };
+    if (!message || message.deletedForEveryone || message.deletedFor?.some?.((id) => String(id) === String(actorId))) {
+        return { actorId, message: null, conversation: null };
+    }
     const conversation = await getAuthorizedDirectConversation(message.conversation, actorId);
     return { actorId, message, conversation };
 }
@@ -164,7 +169,16 @@ exports.sendMessage = async (req, res) => {
             unreadInc[`unreadCounts.${recipientId}`] = 1;
         }
         const updatedConversation = await Conversation.findOneAndUpdate(
-            { _id: conversation._id, participants: actorId },
+            {
+                _id: conversation._id,
+                $and: [
+                    { participants: actorId },
+                    { participants: { $size: 2 } },
+                ],
+                isGroup: false,
+                active: true,
+                deletedFor: { $ne: actorId },
+            },
             { $set: { lastMessage: newMessage._id, lastMessageText: bodyText || bodyAttachment || "New message", lastMessageSender: actorId, lastMessageTime: new Date() }, ...(Object.keys(unreadInc).length ? { $inc: unreadInc } : {}) },
             { returnDocument: "after" }
         );
@@ -325,7 +339,16 @@ exports.markAsRead = async (req, res) => {
         if(!(msg.seenBy || []).some((id) => String(id) === String(actorId))) msg.seenBy.push(actorId);
         msg.seenAt=new Date(); msg.delivered=true; msg.deliveredAt=msg.deliveredAt || new Date(); await msg.save();
         const updatedConversation = await Conversation.findOneAndUpdate(
-            { _id: conversation._id, participants: actorId },
+            {
+                _id: conversation._id,
+                $and: [
+                    { participants: actorId },
+                    { participants: { $size: 2 } },
+                ],
+                isGroup: false,
+                active: true,
+                deletedFor: { $ne: actorId },
+            },
             { $set: { [`unreadCounts.${actorId}`]: 0 } },
             { new: true }
         );
@@ -378,7 +401,7 @@ exports.searchConversationMessages = async (req, res) => {
         const actorId = getChatActorId(req);
         const conversationId = req.params.conversationId;
         if (!mongoose.isValidObjectId(conversationId)) return res.status(400).json({ success:false, message:"Invalid conversation." });
-        const conversation = await Conversation.findOne({ _id: conversationId, participants: actorId, isGroup: false }).select("_id").lean();
+        const conversation = await getAuthorizedDirectConversation(conversationId, actorId);
         if (!conversation) return res.status(404).json({ success:false, message:"Conversation not found." });
         const query = String(req.query?.q || "").trim();
         if (!query) return res.json({ success:true, count:0, messages:[] });
@@ -443,7 +466,16 @@ exports.forwardMessage = async (req, res) => {
         const unreadKey = targetConversation.participants.map((id) => String(id)).find((id) => id !== String(actorId));
         const update = { $set: { lastMessage: forwarded._id, lastMessageText: forwarded.message || "Forwarded attachment", lastMessageSender: actorId, lastMessageTime: new Date() } };
         if (unreadKey) update.$inc = { [`unreadCounts.${unreadKey}`]: 1 };
-        await Conversation.updateOne({ _id: targetConversation._id, participants: actorId }, update);
+        await Conversation.updateOne({
+            _id: targetConversation._id,
+            $and: [
+                { participants: actorId },
+                { participants: { $size: 2 } },
+            ],
+            isGroup: false,
+            active: true,
+            deletedFor: { $ne: actorId },
+        }, update);
         const io = getIO();
         const targetRecipients = targetConversation.participants.map((id) => String(id)).filter((id) => id !== String(actorId));
         if (io) {

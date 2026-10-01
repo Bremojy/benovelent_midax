@@ -1,4 +1,5 @@
 const Member = require("../models/Member");
+const crypto = require("crypto");
 const Message = require("../models/Message");
 const Conversation = require("../models/Conversation");
 const Notification = require("../models/Notification");
@@ -134,19 +135,30 @@ async function markMissedCall(callId, reason = "missed") {
 
 async function getAuthorizedConversation(socket, conversationId) {
   if (!isChatRole(socket.data?.role) || !mongooseIsValid(conversationId) || !socket.data?.chatId) return null;
-  const conversation = await Conversation.findOne({ _id: conversationId, participants: socket.data.chatId, isGroup: false, active: { $ne: false }, "participants": { $size: 2 } }).lean();
+  const conversation = await Conversation.findOne({
+    _id: conversationId,
+    $and: [
+      { participants: socket.data.chatId },
+      { participants: { $size: 2 } },
+    ],
+    isGroup: false,
+    active: true,
+    deletedFor: { $ne: socket.data.chatId },
+  }).lean();
   if (!conversation) return null;
   const forbidden = await Member.exists({
     _id: { $in: conversation.participants },
     $or: [{ role: "superadmin" }, { portalOwnerRole: "superadmin" }]
   });
   if (forbidden) return null;
-  const participantRoles = [];
+  const participants = [];
   for (const participantId of conversation.participants) {
     const participant = await resolveChatActor(participantId);
-    participantRoles.push(String(participant?.role || "").toLowerCase());
+    if (!participant || !isChatRole(participant.role) || participant.user?.isDeleted === true || String(participant.user?.status || "active").toLowerCase() !== "active") {
+      return null;
+    }
+    participants.push(participant);
   }
-  if (participantRoles.some((role) => !isChatRole(role))) return null;
   return conversation;
 }
 function mongooseIsValid(value) {
@@ -199,7 +211,7 @@ module.exports = (io, socket) => {
     const normalizedType = callType === "video" ? "video" : "audio";
     const title = normalizedType === "video" ? "Incoming video call" : "Incoming audio call";
     const message = `${caller.user.fullName || caller.user.name || callerName || "A member"} is calling you.`;
-    const callId = `${String(caller.user._id)}-${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
+    const callId = typeof crypto.randomUUID === "function" ? crypto.randomUUID() : `${String(caller.user._id)}-${Date.now()}-${crypto.randomBytes(8).toString("hex")}`;
     const incomingPayload = {
       from: String(caller.chatId),
       callerSocketId: socket.id,
@@ -376,7 +388,16 @@ module.exports = (io, socket) => {
     try {
       const message = await Message.findById(messageId);
       if (!message || !socket.data?.chatId) return;
-      const conversation = await Conversation.findOne({ _id: message.conversation, participants: socket.data.chatId }).select("_id").lean();
+      const conversation = await Conversation.findOne({
+        _id: message.conversation,
+        $and: [
+          { participants: socket.data.chatId },
+          { participants: { $size: 2 } },
+        ],
+        isGroup: false,
+        active: true,
+        deletedFor: { $ne: socket.data.chatId },
+      }).select("_id").lean();
       if (!conversation || String(message.sender) === String(socket.data.chatId)) return;
       message.delivered = true;
       message.deliveredAt = message.deliveredAt || new Date();
@@ -392,7 +413,16 @@ module.exports = (io, socket) => {
     try {
       const message = await Message.findById(messageId);
       if (!message || !socket.data?.chatId) return;
-      const conversation = await Conversation.findOne({ _id: message.conversation, participants: socket.data.chatId }).select("_id").lean();
+      const conversation = await Conversation.findOne({
+        _id: message.conversation,
+        $and: [
+          { participants: socket.data.chatId },
+          { participants: { $size: 2 } },
+        ],
+        isGroup: false,
+        active: true,
+        deletedFor: { $ne: socket.data.chatId },
+      }).select("_id").lean();
       if (!conversation) return;
       message.seenBy = Array.from(new Set([...(message.seenBy || []).map(String), String(socket.data.chatId)].filter(Boolean)));
       message.seenAt = new Date();
