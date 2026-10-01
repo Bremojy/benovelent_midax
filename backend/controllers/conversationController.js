@@ -39,6 +39,11 @@ exports.createConversation = async (req, res) => {
             return res.status(403).json({ success: false, message: "Only member and Admin chat identities are available in ordinary chat." });
         }
 
+        const targetStatus = String(targetActor.user?.status || "active").toLowerCase();
+        if (targetActor.user?.isDeleted === true || targetStatus !== "active") {
+            return res.status(403).json({ success: false, message: "That chat participant is not active." });
+        }
+
         if (!currentActor || !targetActor) {
             return res.status(404).json({
                 success: false,
@@ -92,7 +97,7 @@ exports.createConversation = async (req, res) => {
         console.error(error);
         return res.status(500).json({
             success: false,
-            message: error.message
+            message: "Unable to complete this conversation operation right now."
         });
     }
 };
@@ -113,6 +118,10 @@ const currentUserId = String(getChatActorId(req));
 const conversations=await Conversation.find({
 
 participants: currentUserId,
+
+isGroup: false,
+
+"participants": { $size: 2 },
 
 deletedFor: {$ne: currentUserId}
 
@@ -139,6 +148,11 @@ updatedAt:-1
 });
 
 const visibleConversations = conversations.filter((conversation) => {
+    if (conversation.isGroup || (conversation.participants || []).length !== 2) return false;
+    if (conversation.participants.some((participant) => {
+        const role = String(participant?.role || participant?.portalOwnerRole || "").toLowerCase();
+        return role === "superadmin" || role === "super_admin";
+    })) return false;
     const partnerIds = getConversationPartnerIds(conversation, currentUserId);
     if (!partnerIds.length) return false;
     return conversation.participants.some((participant) => {
@@ -167,7 +181,7 @@ res.status(500).json({
 
 success:false,
 
-message:error.message
+message:"Unable to complete this conversation operation right now."
 
 });
 
@@ -185,7 +199,7 @@ exports.getConversation=async(req,res)=>{
 
 try{
 
-const conversation=await Conversation.findOne({ _id: req.params.id, isGroup: false })
+const conversation=await Conversation.findOne({ _id: req.params.id, isGroup: false, "participants": { $size: 2 } })
 
 const currentUserId = req.auth?.chatId || req.user._id;
 if (!conversation || !(conversation.participants || []).some((participant) => String(participant) === String(currentUserId))) {
@@ -227,7 +241,7 @@ res.status(500).json({
 
 success:false,
 
-message:error.message
+message:"Unable to complete this conversation operation right now."
 
 });
 
@@ -243,7 +257,7 @@ MARK CONVERSATION READ
 exports.markConversationRead = async (req, res) => {
     try {
         const actorId = req.auth?.chatId || req.user._id;
-        const conversation = await Conversation.findOne({ _id: req.params.id, participants: actorId });
+        const conversation = await Conversation.findOne({ _id: req.params.id, participants: actorId, isGroup: false, "participants": { $size: 2 }, active: { $ne: false } });
         if (!conversation) return res.status(404).json({ success:false, message:"Conversation not found." });
         conversation.unreadCounts = conversation.unreadCounts || new Map();
         conversation.unreadCounts.set(String(actorId), 0);
@@ -252,7 +266,7 @@ exports.markConversationRead = async (req, res) => {
         await Message.updateMany({ conversation: conversation._id, sender: { $ne: actorId }, seenBy: { $ne: actorId }, deletedForEveryone: false }, { $addToSet: { seenBy: actorId }, $set: { seenAt: new Date(), delivered: true, deliveredAt: new Date() } });
         return res.json({ success:true });
     } catch (error) {
-        return res.status(500).json({ success:false, message:error.message });
+        return res.status(500).json({ success:false, message:"Unable to complete this conversation operation right now." });
     }
 };
 
@@ -268,6 +282,8 @@ const actorId = String(getChatActorId(req));
 const conversation=await Conversation.findOne({
   _id: req.params.id,
   participants: actorId,
+  isGroup: false,
+  "participants": { $size: 2 },
   active: { $ne: false },
 });
 
@@ -307,7 +323,7 @@ res.status(500).json({
 
 success:false,
 
-message:error.message
+message:"Unable to complete this conversation operation right now."
 
 });
 
@@ -327,7 +343,7 @@ try{
 
 const actorId = req.auth?.chatId || req.user?.chatMemberId || req.user?._id;
 
-const conversation = await Conversation.findOne({ _id: req.params.id, participants: actorId, active: { $ne: false } });
+const conversation = await Conversation.findOne({ _id: req.params.id, participants: actorId, isGroup: false, "participants": { $size: 2 }, active: { $ne: false } });
 
 if(!conversation){
 
@@ -365,7 +381,7 @@ res.status(500).json({
 
 success:false,
 
-message:error.message
+message:"Unable to complete this conversation operation right now."
 
 });
 
@@ -385,7 +401,7 @@ try{
 
 const actorId = req.auth?.chatId || req.user?.chatMemberId || req.user?._id;
 
-const conversation = await Conversation.findOne({ _id: req.params.id, participants: actorId, active: { $ne: false } });
+const conversation = await Conversation.findOne({ _id: req.params.id, participants: actorId, isGroup: false, "participants": { $size: 2 }, active: { $ne: false } });
 
 if(!conversation){
 
@@ -423,7 +439,7 @@ res.status(500).json({
 
 success:false,
 
-message:error.message
+message:"Unable to complete this conversation operation right now."
 
 });
 
@@ -437,7 +453,7 @@ ARCHIVE / UNARCHIVE CONVERSATION
 exports.archiveConversation = async (req, res) => {
     try {
         const actorId = String(getChatActorId(req));
-        const conversation = await Conversation.findOne({ _id: req.params.id, participants: actorId, isGroup: false, active: { $ne: false } });
+        const conversation = await Conversation.findOne({ _id: req.params.id, participants: actorId, isGroup: false, "participants": { $size: 2 }, active: { $ne: false } });
         if (!conversation) return res.status(404).json({ success: false, message: "Conversation not found." });
 
         const archived = conversation.archivedBy.some((id) => String(id) === actorId);
@@ -494,7 +510,7 @@ exports.addMember = async (req, res) => {
     } catch (error) {
         res.status(500).json({
             success: false,
-            message: error.message
+            message: "Unable to complete this conversation operation right now."
         });
     }
 };
@@ -530,7 +546,7 @@ exports.removeMember = async (req, res) => {
     } catch (error) {
         res.status(500).json({
             success: false,
-            message: error.message
+            message: "Unable to complete this conversation operation right now."
         });
     }
 };

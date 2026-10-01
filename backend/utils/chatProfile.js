@@ -2,7 +2,6 @@ const Member = require('../models/Member');
 const Admin = require('../models/Admin');
 const SuperAdmin = require('../models/SuperAdmin');
 const { generateMemberNumber } = require('./memberNumber');
-const generateTemporaryPassword = require('./generateTemporaryPassword');
 
 const VALID_MEMBER_NUMBER = /^BM\d{3,}$/i;
 const CHAT_ROLES = new Set(['member', 'admin']);
@@ -90,7 +89,6 @@ async function ensureChatProfile(user) {
     username: `${role}-${String(user._id).slice(-6)}`.toLowerCase(),
     phone: payload.phone || `000${String(user._id).slice(-6)}`,
     email: payload.email,
-    password: user.password || generateTemporaryPassword('MIDAX@Chat-'),
     role,
     portalOwnerId: user._id,
     portalOwnerRole: role,
@@ -114,14 +112,17 @@ async function resolveChatActor(id, hintedRole = '') {
   if (!chatId) return null;
 
   async function fromPortal(Model, role) {
-    const owner = await Model.findById(chatId).select('_id fullName name role profileImage email phone online lastSeen').lean();
+    const owner = await Model.findById(chatId).select('_id fullName name role profileImage email phone online lastSeen status isDeleted').lean();
     if (owner) {
-      const mirror = await Member.findOne({ portalOwnerId: owner._id, portalOwnerRole: role, isDeleted: { $ne: true } }).select('_id').lean();
+      let mirror = await Member.findOne({ portalOwnerId: owner._id, portalOwnerRole: role, isDeleted: { $ne: true } }).select('_id').lean();
+      if (!mirror && role === 'admin' && String(owner.status || 'active').toLowerCase() === 'active' && owner.isDeleted !== true) {
+        mirror = await ensureChatProfile(owner);
+      }
       return { user: owner, role, chatId: String(mirror?._id || owner._id), portalOwnerId: String(owner._id) };
     }
-    const profile = await Member.findOne({ _id: chatId, portalOwnerRole: role, portalOwnerId: { $ne: null }, isDeleted: { $ne: true } }).select('_id portalOwnerId portalOwnerRole fullName profileImage online lastSeen').lean();
+    const profile = await Member.findOne({ _id: chatId, portalOwnerRole: role, portalOwnerId: { $ne: null }, isDeleted: { $ne: true } }).select('_id portalOwnerId portalOwnerRole fullName profileImage online lastSeen status isDeleted').lean();
     if (!profile) return null;
-    const portalOwner = await Model.findById(profile.portalOwnerId).select('_id fullName name role profileImage email phone online lastSeen').lean();
+    const portalOwner = await Model.findById(profile.portalOwnerId).select('_id fullName name role profileImage email phone online lastSeen status isDeleted').lean();
     if (!portalOwner) return null;
     return { user: portalOwner, role, chatId: String(profile._id), portalOwnerId: String(portalOwner._id) };
   }
@@ -129,25 +130,25 @@ async function resolveChatActor(id, hintedRole = '') {
   if (requestedRole === 'admin') return fromPortal(Admin, 'admin');
   if (requestedRole === 'superadmin') return fromPortal(SuperAdmin, 'superadmin');
   if (requestedRole === 'member') {
-    const member = await Member.findById(chatId).select('_id fullName name role profileImage email phone online lastSeen portalOwnerId portalOwnerRole').lean();
+    const member = await Member.findById(chatId).select('_id fullName name role profileImage email phone online lastSeen portalOwnerId portalOwnerRole status isDeleted').lean();
     if (member) return { user: member, role: member.portalOwnerRole || 'member', chatId: String(member._id), portalOwnerId: member.portalOwnerId ? String(member.portalOwnerId) : '' };
   }
 
-  const member = await Member.findById(chatId).select('_id fullName name role profileImage email phone online lastSeen portalOwnerId portalOwnerRole').lean();
+  const member = await Member.findById(chatId).select('_id fullName name role profileImage email phone online lastSeen portalOwnerId portalOwnerRole status isDeleted').lean();
   if (member) {
     if (member.portalOwnerId && member.portalOwnerRole === 'admin') {
-      const admin = await Admin.findById(member.portalOwnerId).select('_id fullName name role profileImage email phone online lastSeen').lean();
+      const admin = await Admin.findById(member.portalOwnerId).select('_id fullName name role profileImage email phone online lastSeen status isDeleted').lean();
       if (admin) return { user: admin, role: 'admin', chatId: String(member._id), portalOwnerId: String(admin._id) };
     }
     if (member.portalOwnerId && member.portalOwnerRole === 'superadmin') {
-      const superadmin = await SuperAdmin.findById(member.portalOwnerId).select('_id fullName name role profileImage email phone online lastSeen').lean();
+      const superadmin = await SuperAdmin.findById(member.portalOwnerId).select('_id fullName name role profileImage email phone online lastSeen status isDeleted').lean();
       if (superadmin) return { user: superadmin, role: 'superadmin', chatId: String(member._id), portalOwnerId: String(superadmin._id) };
     }
     return { user: member, role: 'member', chatId: String(member._id), portalOwnerId: '' };
   }
 
   for (const [role, Model] of [['admin', Admin], ['superadmin', SuperAdmin], ['member', Member]]) {
-    const user = await Model.findById(chatId).select('_id fullName name role profileImage email phone online lastSeen').lean();
+    const user = await Model.findById(chatId).select('_id fullName name role profileImage email phone online lastSeen status isDeleted').lean();
     if (user) return { user, role, chatId: String(user._id), portalOwnerId: String(user._id) };
   }
   return null;

@@ -53,6 +53,7 @@ function MessageCenterPage({
   const selectedConversationRef = useRef(null);
   const initialSelectionAppliedRef = useRef(false);
   const processedMessageIdsRef = useRef(new Set());
+  const pendingCallIdRef = useRef("");
 
   const actor = useMemo(() => buildActorProfile(currentUser || authUser), [currentUser, authUser]);
   const actorId = actor.id;
@@ -230,12 +231,16 @@ function MessageCenterPage({
         ? "You cannot call yourself. Choose another member."
         : payload?.message || "The call could not be started.";
       toast.error(message, { id: "call-error", duration: 5000 });
+      const pendingId = pendingCallIdRef.current;
+      pendingCallIdRef.current = "";
       setCall(null);
+      if (pendingId) void removePendingCall(pendingId);
     };
 
     activeSocket.on("connect", handleConnect);
     activeSocket.on("connect_error", handleConnectError);
     activeSocket.on("new-message", handleSidebarMessage);
+    activeSocket.on("conversation-updated", handleSidebarMessage);
     activeSocket.on("incoming-call", handleIncomingCall);
     activeSocket.on("new-call-notification", handleCallNotification);
     activeSocket.on("missed-call", handleMissedCall);
@@ -250,6 +255,7 @@ function MessageCenterPage({
       activeSocket.off("connect", handleConnect);
       activeSocket.off("connect_error", handleConnectError);
       activeSocket.off("new-message", handleSidebarMessage);
+      activeSocket.off("conversation-updated", handleSidebarMessage);
       activeSocket.off("incoming-call", handleIncomingCall);
       activeSocket.off("new-call-notification", handleCallNotification);
       activeSocket.off("missed-call", handleMissedCall);
@@ -269,6 +275,7 @@ function MessageCenterPage({
       if (!active || !pending?.data) return;
       const action = String(params.get("callAction") || "open").toLowerCase();
       const payload = pending.data;
+      pendingCallIdRef.current = String(callId);
       const activeSocket = socket || contextSocket || socketClient;
 
       if (action === "decline") {
@@ -291,7 +298,6 @@ function MessageCenterPage({
           profileImage: payload.callerProfileImage || payload.profileImage || "",
         },
       });
-      await removePendingCall(callId);
       window.history.replaceState({}, "", location.pathname);
     })().catch((error) => {
       console.warn("Incoming push call handling failed:", error);
@@ -318,9 +324,11 @@ function MessageCenterPage({
       setPeople(peopleList);
       setConversations(conversationList);
       if (result?.filterOptions) setFilterOptions(result.filterOptions);
+      return true;
     } catch (error) {
       console.error("Load chat data error:", error);
       setBanner(error?.response?.data?.message || error?.message || "Unable to load chat data. Please retry.");
+      return false;
     } finally {
       setLoadingSidebar(false);
     }
@@ -333,7 +341,15 @@ function MessageCenterPage({
   }, [actorId, currentUser?._id, authUser?._id, filters.siteStation, filters.department, filters.position, filters.status, filters.online, filters.verified]);
 
   const normalizedPeople = useMemo(() => normalizeMembers(people, actor), [people, actor]);
-  const normalizedConversations = useMemo(() => normalizeConversations(conversations, actor), [conversations, actor]);
+  const normalizedConversations = useMemo(() => {
+    const list = normalizeConversations(conversations, actor);
+    return [...list].sort((a, b) => {
+      const aPinned = Boolean(a?.pinnedBy?.some?.((id) => String(id) === String(actor?.id)));
+      const bPinned = Boolean(b?.pinnedBy?.some?.((id) => String(id) === String(actor?.id)));
+      if (aPinned !== bPinned) return aPinned ? -1 : 1;
+      return new Date(b?.lastMessageTime || b?.updatedAt || 0) - new Date(a?.lastMessageTime || a?.updatedAt || 0);
+    });
+  }, [conversations, actor]);
 
   useEffect(() => {
     peopleRef.current = normalizedPeople;
@@ -438,13 +454,8 @@ function MessageCenterPage({
   };
 
   const refreshChat = async () => {
-    try {
-      toast.success(onRefreshHint || "Messages refreshed.");
-      await loadChatData();
-    } catch (error) {
-      console.error("Refresh chat error:", error);
-      toast.error(error?.message || "Unable to refresh conversations.");
-    }
+    const ok = await loadChatData();
+    if (ok) toast.success(onRefreshHint || "Chat refreshed.", { id: "chat-refresh" });
   };
 
   const mobileBack = () => {
@@ -531,7 +542,12 @@ function MessageCenterPage({
             incomingCall={call.incomingCall}
             conversationId={call.conversationId || call.incomingCall?.conversationId || selectedConversation?._id || ""}
             autoAccept={Boolean(call.autoAccept)}
-            onClose={() => setCall(null)}
+            onClose={async () => {
+              const pendingId = pendingCallIdRef.current;
+              pendingCallIdRef.current = "";
+              setCall(null);
+              if (pendingId) await removePendingCall(pendingId);
+            }}
           />
         )}
       </div>
@@ -719,7 +735,12 @@ function MessageCenterPage({
           incomingCall={call.incomingCall}
           conversationId={call.conversationId || call.incomingCall?.conversationId || selectedConversation?._id || ""}
           autoAccept={Boolean(call.autoAccept)}
-          onClose={() => setCall(null)}
+          onClose={async () => {
+            const pendingId = pendingCallIdRef.current;
+            pendingCallIdRef.current = "";
+            setCall(null);
+            if (pendingId) await removePendingCall(pendingId);
+          }}
         />
       )}
     </DashboardLayout>

@@ -16,15 +16,18 @@ const adminMessages = read('src/pages/admin/AdminMessages.jsx');
 const center = read('src/components/chat/MessageCenterPage.jsx');
 const bubble = read('src/components/chat/MessageBubble.jsx');
 const input = read('src/components/chat/MessageInput.jsx');
+const callOverlay = read('src/components/chat/CallOverlay.jsx');
 const chatWindow = read('src/components/chat/ChatWindow.jsx');
 const support = read('src/pages/member/Support.jsx');
 const pendingCallStore = read('src/utils/pushCallStore.js');
+const serviceWorker = read('public/sw.js');
 
 assert(/isChatUser\s*=\s*authorize\("member",\s*"admin"\)/.test(roleMiddleware), 'chat routes exclude SuperAdmin');
 assert(/CHAT_ROLES\s*=\s*new Set\(\[['"]member['"],\s*['"]admin['"]\]\)/.test(chatProfile), 'canonical chat roles are member/admin only');
 assert(/canonicalMe === canonicalTarget/.test(conversationController), 'API blocks self-chat');
 assert(/!currentActor \|\| !isChatRole\(currentActor\.role\).*!targetActor \|\| !isChatRole\(targetActor\.role\)/s.test(conversationController), 'API rejects SuperAdmin chat participants');
 assert(/isGroup: false/.test(conversationController) && /isGroup: false/.test(messageController), 'chat center is direct 1-to-1 only');
+assert(/getConversation[\s\S]*participants\"?\s*:\s*\{ \$size: 2 \}/.test(conversationController) && /deleteConversation[\s\S]*isGroup: false/.test(conversationController) && /archiveConversation[\s\S]*participants.*\$size: 2/.test(conversationController), 'conversation read/delete/archive operations reject legacy group-shaped records');
 assert(/router\.put\("\/:id\/archive"/.test(conversationRoutes), 'archive API exists');
 assert(/archivedBy/.test(conversationController) && /pinnedBy/.test(conversationController) && /mutedBy/.test(conversationController), 'viewer-specific conversation state is actor-scoped');
 assert(/participants: actorId/.test(messageController), 'message access requires conversation membership');
@@ -44,6 +47,10 @@ assert(/String\(recipient\?\.chatId \|\| ""\) === String\(caller\?\.chatId \|\| 
 assert(/recipientSockets.*incoming-call/s.test(messageSocket), 'incoming calls are delivered only to intended recipient sockets');
 assert(/reason === "declined".*recordCallSummary\(call, "declined"/s.test(messageSocket), 'declined calls are distinct from missed calls');
 assert(/CALL_TIMEOUT_MS.*markMissedCall/s.test(messageSocket), 'call timeout records missed behavior');
+assert(/socket\.on\(\"disconnect\"[\s\S]*clearCall\(current\.callId\)/.test(messageSocket), 'active call state is cleaned when the initiating/recipient socket disconnects');
+const callStartedIndex = messageSocket.indexOf('emit("call-started"');
+const callNotificationIndex = messageSocket.indexOf('const notification = await deliverCallNotification', callStartedIndex);
+assert(callStartedIndex >= 0 && callNotificationIndex > callStartedIndex, 'caller receives the server call id before notification work can delay early ICE tagging');
 assert(/resolveCanonicalChatActorForAuthenticatedUser/.test(socket) && /jwt\.verify/.test(socket), 'socket identity is authenticated server-side');
 assert(/presence-heartbeat/.test(presence) && /socket\.data\?\.chatId/.test(presence), 'presence derives from authenticated chat identity and heartbeat');
 assert(/MessageCenterPage/.test(memberMessages) && /MessageCenterPage/.test(adminMessages), 'Member/Admin use the shared MessageCenter');
@@ -55,5 +62,18 @@ assert(/onRetry/.test(bubble) && /retryMessage/.test(chatWindow) && /chat-date-s
 assert(support.includes('\n              )}\n\n              <Field label="Requested Amount (KES)">'), 'member Support conditional JSX is explicitly closed before Requested Amount');
 assert(/getPendingCall/.test(center) && /removePendingCall/.test(center) && /incomingPushCall/.test(center), 'PWA pending call data is consumed on navigation');
 assert(/eventId: `message:/.test(messageController) && /insertMany/.test(messageController), 'message notifications use an idempotent event identity');
+assert(/async function getAuthorizedDirectConversation/.test(messageController) && /isGroup: false/.test(messageController) && /participants\.length !== 2/.test(messageController), 'message operations enforce active direct 1-to-1 authorization');
+assert(/new Set\(\["text", "image", "video", "audio", "document"\]\)/.test(messageController) && !/allowedTypes = new Set\(\["text".*"call"/.test(messageController), 'ordinary message API cannot fabricate call messages');
+assert(/portalSenderIdentity/.test(messageController) && /sender,\s*senderModel/.test(messageController), 'notification sender identity matches the authenticated portal account');
+assert(/conversation-updated/.test(messageController) && /conversation-updated/.test(center), 'unselected conversations receive realtime sidebar updates');
+assert(/status: "active"/.test(memberController) && /profile\.toObject/.test(memberController) === false, 'chat directory is active-only by default and does not expose raw admin mirror documents');
+assert(/role === 'admin'[\s\S]*ensureChatProfile\(owner\)/.test(chatProfile), 'Admin chat identity resolution uses the existing authenticated portal-owner mirror mechanism');
+assert(/member\.memberNumber/.test(read('src/components/chat/ChatSidebar.jsx')) && /member\.phone/.test(read('src/components/chat/ChatSidebar.jsx')), 'directory search covers member number and phone');
+assert(/aPinned.*bPinned/s.test(read('src/components/chat/ChatSidebar.jsx')), 'pinned conversations are ordered before unpinned conversations');
+assert(/recordSeconds/.test(input) && /recordingTimerRef/.test(input), 'voice-note recording exposes a live timer with cleanup');
+assert(/cleanupMedia\(\)/.test(callOverlay) && /ringtoneRef\.current\?\.stop\?\./.test(callOverlay), 'call overlay unmount cleanup releases media and ringtone resources');
+assert(/onClose=\{async \(\) => \{/.test(center) && /removePendingCall\(pendingId\)/.test(center), 'pending PWA call storage is retained until the chat center consumes/closes the call');
+assert(/notificationclick/.test(serviceWorker) && !/notificationclick[\s\S]*removePendingCall\(callIdValue\)/.test(serviceWorker), 'service worker does not delete pending call data before chat-center consumption');
+assert(/const ok = await loadChatData\(\);\s*if \(ok\) toast\.success/.test(center), 'refresh only reports success after chat reload succeeds');
 
 pass('1-to-1 messaging center regression contract (A-AE source controls) passed');

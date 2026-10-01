@@ -134,13 +134,19 @@ async function markMissedCall(callId, reason = "missed") {
 
 async function getAuthorizedConversation(socket, conversationId) {
   if (!isChatRole(socket.data?.role) || !mongooseIsValid(conversationId) || !socket.data?.chatId) return null;
-  const conversation = await Conversation.findOne({ _id: conversationId, participants: socket.data.chatId, active: { $ne: false } }).lean();
+  const conversation = await Conversation.findOne({ _id: conversationId, participants: socket.data.chatId, isGroup: false, active: { $ne: false }, "participants": { $size: 2 } }).lean();
   if (!conversation) return null;
   const forbidden = await Member.exists({
     _id: { $in: conversation.participants },
     $or: [{ role: "superadmin" }, { portalOwnerRole: "superadmin" }]
   });
   if (forbidden) return null;
+  const participantRoles = [];
+  for (const participantId of conversation.participants) {
+    const participant = await resolveChatActor(participantId);
+    participantRoles.push(String(participant?.role || "").toLowerCase());
+  }
+  if (participantRoles.some((role) => !isChatRole(role))) return null;
   return conversation;
 }
 function mongooseIsValid(value) {
@@ -171,6 +177,15 @@ module.exports = (io, socket) => {
     }
     if (String(recipient?.chatId || "") === String(caller?.chatId || "")) {
       socket.emit("call-error", { code: "SELF_CALL_BLOCKED", message: "Calling yourself is not available." });
+      return;
+    }
+    const callerChatId = String(caller.chatId);
+    const recipientChatId = String(recipient.chatId);
+    const busyCall = Array.from(activeCalls.values()).find((activeCall) =>
+      !activeCall?.ended && [String(activeCall.callerChatId), String(activeCall.recipientChatId)].some((id) => id === callerChatId || id === recipientChatId)
+    );
+    if (busyCall) {
+      socket.emit("call-error", { code: "CALL_BUSY", message: "One of the chat participants is already on a call." });
       return;
     }
     if (!recipient || !caller || !isChatRole(recipient.role) || !isChatRole(caller.role)) return;
@@ -209,10 +224,12 @@ module.exports = (io, socket) => {
     activeCalls.set(callId, active);
 
     try {
-      const notification = await deliverCallNotification({ recipient, caller, callType: normalizedType, title, message, callId, incomingPayload, missed: false });
       const recipientChatRoom = String(recipient.chatId);
       const recipientPortalRoom = String(recipient.user?._id || "");
+      // Send the server-generated call id before notification/push work so the caller
+      // can tag early ICE candidates with the same active call session.
       io.to(String(caller.chatId)).emit("call-started", { callId, recipientUserId: recipientChatRoom, callType: normalizedType });
+      const notification = await deliverCallNotification({ recipient, caller, callType: normalizedType, title, message, callId, incomingPayload, missed: false });
 
       // Deliver only to the intended recipient's authenticated sockets.
       // Do not broadcast to generic ID rooms: mirrored Admin/SuperAdmin chat
@@ -307,6 +324,35 @@ module.exports = (io, socket) => {
     const target = actorChatId === String(call.callerChatId) ? call.recipientChatId : call.callerChatId;
     io.to(String(target)).emit("call-ended", { callId: call.callId });
     clearCall(call.callId);
+  });
+
+  socket.on("disconnect", async () => {
+    const actorChatId = String(socket.data?.chatId || "");
+    const affectedCalls = Array.from(activeCalls.values()).filter((call) => {
+      if (call?.callerSocketId === socket.id) return true;
+      if (actorChatId && String(call?.recipientChatId || "") === actorChatId) {
+        return !getPresence(actorChatId)?.sockets?.size;
+      }
+      return false;
+    });
+
+    for (const call of affectedCalls) {
+      const current = activeCalls.get(call.callId);
+      if (!current) continue;
+      try {
+        if (!current.answered) {
+          await markMissedCall(current.callId, "missed");
+        } else {
+          const durationSeconds = current.answeredAt ? Math.max(0, Math.round((Date.now() - current.answeredAt) / 1000)) : 0;
+          await recordCallSummary(current, "completed", durationSeconds);
+        }
+      } catch (error) {
+        console.warn("Call disconnect cleanup failed:", error.message);
+      }
+      const target = current.callerSocketId === socket.id ? current.recipientChatId : current.callerChatId;
+      io.to(String(target)).emit("call-ended", { callId: current.callId, reason: "disconnect" });
+      clearCall(current.callId);
+    }
   });
 
   socket.on("typing", async ({ conversationId }) => {

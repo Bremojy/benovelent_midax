@@ -27,21 +27,6 @@ async function savePendingCall(id, payload) {
     console.warn("PWA call storage failed:", error);
   }
 }
-async function removePendingCall(id) {
-  if (!id) return;
-  try {
-    const db = await openDb();
-    await new Promise((resolve, reject) => {
-      const tx = db.transaction(DB_STORE, "readwrite");
-      tx.objectStore(DB_STORE).delete(String(id));
-      tx.oncomplete = resolve;
-      tx.onerror = () => reject(tx.error);
-    });
-    db.close();
-  } catch (error) {
-    console.debug("PWA pending-call cleanup skipped:", error);
-  }
-}
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(ASSETS)).then(() => self.skipWaiting()));
@@ -115,7 +100,8 @@ self.addEventListener("notificationclick", (event) => {
   } else if (data.role === "admin") link = "/admin/messages";
 
   event.waitUntil((async () => {
-    if (callIdValue) await removePendingCall(callIdValue);
+    // Keep pending call data until the chat center has consumed/closed the call.
+    // Removing it here races the notification navigation and can lose the WebRTC offer.
     const clientList = await clients.matchAll({ type: "window", includeUncontrolled: true });
     for (const client of clientList) {
       if ("focus" in client) {

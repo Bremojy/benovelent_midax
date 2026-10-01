@@ -9,13 +9,55 @@ const SuperAdmin = require("../models/SuperAdmin");
 const { resolveStoredFileUrl } = require("../utils/uploadUrl");
 const mongoose = require("mongoose");
 
+async function getAuthorizedDirectConversation(id, actorId) {
+    if (!mongoose.isValidObjectId(id) || !actorId) return null;
+    const conversation = await Conversation.findOne({
+        _id: id,
+        participants: actorId,
+        isGroup: false,
+        active: { $ne: false },
+    }).lean();
+    if (!conversation || !Array.isArray(conversation.participants) || conversation.participants.length !== 2) return null;
+
+    const forbidden = await Member.exists({
+        _id: { $in: conversation.participants },
+        $or: [{ role: "superadmin" }, { portalOwnerRole: "superadmin" }],
+    });
+    if (forbidden) return null;
+    return conversation;
+}
+
 async function getAuthorizedMessage(req) {
     const actorId = getChatActorId(req);
     if (!mongoose.isValidObjectId(req.params.id)) return { actorId, message: null, conversation: null };
     const message = await Message.findById(req.params.id);
     if (!message) return { actorId, message: null, conversation: null };
-    const conversation = await Conversation.findOne({ _id: message.conversation, participants: actorId });
+    const conversation = await getAuthorizedDirectConversation(message.conversation, actorId);
     return { actorId, message, conversation };
+}
+
+async function resolveNotificationTarget(chatId) {
+    const id = String(chatId || "").trim();
+    if (!id) return null;
+    const chatProfile = await Member.findById(id).select("portalOwnerId portalOwnerRole role").lean();
+    if (chatProfile?.portalOwnerId && chatProfile?.portalOwnerRole) {
+        const role = String(chatProfile.portalOwnerRole).toLowerCase();
+        const recipientModel = role === "admin" ? "Admin" : role === "member" ? "Member" : role === "superadmin" ? "SuperAdmin" : null;
+        return recipientModel ? { recipient: chatProfile.portalOwnerId, recipientModel } : null;
+    }
+    if (chatProfile) return { recipient: chatProfile._id, recipientModel: "Member" };
+    const admin = await Admin.findById(id).select("_id").lean();
+    if (admin) return { recipient: admin._id, recipientModel: "Admin" };
+    const superadmin = await SuperAdmin.findById(id).select("_id").lean();
+    if (superadmin) return { recipient: superadmin._id, recipientModel: "SuperAdmin" };
+    return null;
+}
+
+function portalSenderIdentity(req, actorId) {
+    const role = String(req.user?.role || "member").toLowerCase();
+    const senderModel = role === "admin" ? "Admin" : role === "superadmin" ? "SuperAdmin" : "Member";
+    const sender = role === "admin" || role === "superadmin" ? req.user?._id : actorId;
+    return { sender, senderModel };
 }
 
 /* =====================================================
@@ -43,7 +85,7 @@ exports.sendMessage = async (req, res) => {
             });
         }
 
-        const conversation = await Conversation.findById(conversationId);
+        const conversation = await getAuthorizedDirectConversation(conversationId, actorId);
 
         if (!conversation) {
             return res.status(404).json({
@@ -62,7 +104,7 @@ exports.sendMessage = async (req, res) => {
         if (!bodyText && !bodyAttachment) return res.status(400).json({ success: false, message: "Message or attachment is required." });
 
         let inferredType = String(messageType || "").toLowerCase();
-        const allowedTypes = new Set(["text", "image", "video", "audio", "document", "call"]);
+        const allowedTypes = new Set(["text", "image", "video", "audio", "document"]);
         if (inferredType && !allowedTypes.has(inferredType)) return res.status(400).json({ success: false, message: "Unsupported message type." });
 
         if (!inferredType) {
@@ -89,7 +131,18 @@ exports.sendMessage = async (req, res) => {
 
         let newMessage;
         try {
-            newMessage = await Message.create({ conversation: conversationId, sender: actorId, clientMessageId: clientMessageId || undefined, message: bodyText, messageType: inferredType, attachment: bodyAttachment, replyTo: replyTo || undefined });
+            newMessage = await Message.create({
+                conversation: conversationId,
+                sender: actorId,
+                clientMessageId: clientMessageId || undefined,
+                message: bodyText,
+                messageType: inferredType,
+                attachment: bodyAttachment,
+                fileName: String(req.body?.fileName || "").trim().slice(0, 255),
+                fileSize: Math.max(0, Number(req.body?.fileSize) || 0),
+                mimeType: String(req.body?.mimeType || "").trim().slice(0, 160),
+                replyTo: replyTo || undefined,
+            });
         } catch (error) {
             if (error?.code === 11000 && clientMessageId) {
                 newMessage = await Message.findOne({ conversation: conversationId, sender: actorId, clientMessageId });
@@ -124,44 +177,34 @@ exports.sendMessage = async (req, res) => {
 
         if (io) {
             io.to(String(conversationId)).emit("new-message", newMessage);
+            recipients.forEach((recipientId) => io.to(String(recipientId)).emit("conversation-updated", {
+                conversationId: String(conversationId),
+                message: newMessage,
+                unreadCount: Number(updatedConversation.unreadCounts?.get?.(recipientId) ?? updatedConversation.unreadCounts?.[recipientId] ?? 0),
+            }));
         }
 
         if (recipients.length) {
             try {
-                          const title = req.user?.fullName ? `New message from ${req.user.fullName}` : "New message received";
-                          const notificationMessage = bodyText || "You received a new attachment.";
-                          const senderModel = String(req.user?.role || "member")
-                              .toLowerCase()
-                              .replace(/^./, (char) => char.toUpperCase());
-                          const notificationTargets = await Promise.all(recipients.map(async (recipientId) => {
-                              const chatProfile = await Member.findById(recipientId).select("portalOwnerId portalOwnerRole role").lean();
-                              if (chatProfile?.portalOwnerId && chatProfile?.portalOwnerRole) {
-                                  return { recipient: chatProfile.portalOwnerId, recipientModel: chatProfile.portalOwnerRole === "admin" ? "Admin" : chatProfile.portalOwnerRole === "superadmin" ? "SuperAdmin" : "Member" };
-                              }
-                              if (chatProfile) return { recipient: recipientId, recipientModel: "Member" };
-                              const [admin, superadmin] = await Promise.all([
-                                  Admin.findById(recipientId).select("_id").lean(),
-                                  SuperAdmin.findById(recipientId).select("_id").lean(),
-                              ]);
-                              if (admin) return { recipient: recipientId, recipientModel: "Admin" };
-                              if (superadmin) return { recipient: recipientId, recipientModel: "SuperAdmin" };
-                              return { recipient: recipientId, recipientModel: "Member" };
-                          }));
-                          await Notification.insertMany(
-                              notificationTargets.map((target) => ({
-                                  ...target,
-                                  sender: actorId,
-                                  senderModel,
-                                  title,
-                                  message: notificationMessage,
-                                  type: "message",
-                                  referenceId: newMessage._id,
-                                  referenceModel: "Message",
-                                  eventId: `message:${String(newMessage._id)}:${String(target.recipientModel)}:${String(target.recipient)}`,
-                                  metadata: { conversationId: String(conversation._id), messageId: String(newMessage._id) },
-                                  icon: "message-circle",
-                              }))
-                          );
+                const title = req.user?.fullName ? `New message from ${req.user.fullName}` : "New message received";
+                const notificationMessage = bodyText || "You received a new attachment.";
+                const { sender, senderModel } = portalSenderIdentity(req, actorId);
+                const notificationTargets = (await Promise.all(recipients.map(resolveNotificationTarget))).filter(Boolean);
+                await Notification.insertMany(
+                    notificationTargets.map((target) => ({
+                        ...target,
+                        sender,
+                        senderModel,
+                        title,
+                        message: notificationMessage,
+                        type: "message",
+                        referenceId: newMessage._id,
+                        referenceModel: "Message",
+                        eventId: `message:${String(newMessage._id)}:${String(target.recipientModel)}:${String(target.recipient)}`,
+                        metadata: { conversationId: String(conversation._id), messageId: String(newMessage._id) },
+                        icon: "message-circle",
+                    }))
+                );
 
                           // Notification.create/insertMany owns realtime fanout and push
                           // delivery. Conversation.unreadCounts is the single source of
@@ -193,7 +236,7 @@ exports.getConversationMessages = async (req, res) => {
     try {
         const actorId = getChatActorId(req);
         const conversationId = req.params.conversationId;
-        const conversation = await Conversation.findOne({ _id: conversationId, participants: actorId }).select("_id").lean();
+        const conversation = await getAuthorizedDirectConversation(conversationId, actorId);
         if (!conversation) return res.status(404).json({ success: false, message: "Conversation not found." });
 
         const limit = Math.min(Math.max(Number(req.query?.limit) || 50, 1), 100);
@@ -361,14 +404,14 @@ exports.forwardMessage = async (req, res) => {
         const actorId = getChatActorId(req);
         const source = await Message.findById(req.params.id);
         if (!source) return res.status(404).json({success:false,message:"Message not found."});
-        const sourceConversation = await Conversation.findOne({ _id: source.conversation, participants: actorId, isGroup: false }).select("_id").lean();
+        const sourceConversation = await getAuthorizedDirectConversation(source.conversation, actorId);
         if (!sourceConversation || source.deletedFor?.some?.((id) => String(id) === String(actorId)) || source.deletedForEveryone) {
             return res.status(404).json({success:false,message:"Message not found."});
         }
 
         const targetConversationId = String(req.body?.targetConversationId || "");
         if (!mongoose.isValidObjectId(targetConversationId)) return res.status(400).json({success:false,message:"A valid target conversation is required."});
-        const targetConversation = await Conversation.findOne({ _id: targetConversationId, participants: actorId, isGroup: false });
+        const targetConversation = await getAuthorizedDirectConversation(targetConversationId, actorId);
         if (!targetConversation) return res.status(403).json({success:false,message:"Target conversation access denied."});
 
         const clientMessageId = String(req.get("X-Idempotency-Key") || req.body?.clientMessageId || "").trim().slice(0,100);
@@ -401,7 +444,25 @@ exports.forwardMessage = async (req, res) => {
         const update = { $set: { lastMessage: forwarded._id, lastMessageText: forwarded.message || "Forwarded attachment", lastMessageSender: actorId, lastMessageTime: new Date() } };
         if (unreadKey) update.$inc = { [`unreadCounts.${unreadKey}`]: 1 };
         await Conversation.updateOne({ _id: targetConversation._id, participants: actorId }, update);
-        getIO()?.to(String(targetConversation._id)).emit("new-message", forwarded);
+        const io = getIO();
+        const targetRecipients = targetConversation.participants.map((id) => String(id)).filter((id) => id !== String(actorId));
+        if (io) {
+            io.to(String(targetConversation._id)).emit("new-message", forwarded);
+            targetRecipients.forEach((recipientId) => io.to(String(recipientId)).emit("conversation-updated", { conversationId: String(targetConversation._id), message: forwarded }));
+        }
+        if (targetRecipients.length) {
+            const { sender, senderModel } = portalSenderIdentity(req, actorId);
+            const senderLabel = req.user?.fullName || "A contact";
+            const targets = (await Promise.all(targetRecipients.map(resolveNotificationTarget))).filter(Boolean);
+            await Notification.insertMany(targets.map((target) => ({
+                ...target, sender, senderModel, title: `Forwarded message from ${senderLabel}`,
+                message: String(forwarded.message || "You received a forwarded attachment."), type: "message",
+                referenceId: forwarded._id, referenceModel: "Message",
+                eventId: `message:${String(forwarded._id)}:${String(target.recipientModel)}:${String(target.recipient)}`,
+                metadata: { conversationId: String(targetConversation._id), messageId: String(forwarded._id), forwarded: true },
+                icon: "message-circle",
+            })));
+        }
         return res.status(201).json({success:true,message:forwarded});
     } catch(error){
         console.error("Chat forward error:", { message:error.message, code:error.code || null });
@@ -479,11 +540,15 @@ exports.uploadMessageAsset = async (req, res) => {
             success: true,
             imageUrl: assetUrl,
             fileUrl: assetUrl,
+            fileName: req.file.originalname || "attachment",
+            fileSize: Number(req.file.size || 0),
+            mimeType: req.file.mimetype || "application/octet-stream",
         });
     } catch (error) {
+        console.error("Chat attachment upload error:", { message: error.message });
         return res.status(500).json({
             success: false,
-            message: error.message,
+            message: "Unable to upload this attachment right now.",
         });
     }
 };

@@ -16,7 +16,6 @@ const memberClaims = read("src/pages/member/Claims.jsx");
 const adminClaims = read("src/pages/admin/AdminClaims.jsx");
 const adminAccounts = read("src/pages/admin/AdminAccounts.jsx");
 const adminReports = read("src/pages/admin/AdminReports.jsx");
-const adminFinance = read("src/pages/admin/AdminFinance.jsx");
 const settingsMigration = read("backend/migrations/009_create_system_settings_authority.js");
 const legacyMpesaCleanupMigration = read("backend/migrations/011_remove_legacy_unverified_mpesa_defaults.js");
 const migrationRunner = read("backend/utils/runMigrations.js");
@@ -44,7 +43,7 @@ assert(!mpesaService.includes("650014") && !mpesaService.includes("DEFAULT_MPESA
 assert(!settingsMigration.includes("247247") && !settingsMigration.includes("0650186528835"), "System settings migration must not seed an unverified M-Pesa PayBill/account reference.");
 assert(/mpesa\.manualPaybill/.test(legacyMpesaCleanupMigration) && /manualPaymentEnabled.*false/.test(legacyMpesaCleanupMigration), "A scoped migration must disable legacy unverified M-PESA settings already present in the database.");
 assert(migrationRunner.includes("011_remove_legacy_unverified_mpesa_defaults"), "The legacy M-PESA settings cleanup migration must be registered.");
-assert(!/shortCode\s*\|\|\s*["']650014["']/.test(adminFinance) && !adminFinance.includes("247247"), "Admin Finance UI must not invent a M-Pesa shortcode or PayBill number.");
+assert(!/shortCode\s*\|\|\s*["']650014["']/.test(adminAccounts) && !adminAccounts.includes("247247"), "Admin Accounts UI must not invent a M-Pesa shortcode or PayBill number.");
 assert(/coverImage/.test(adminReports) && /payload\.append\("coverImage", form\.coverImage\)/.test(adminReports), "Meeting minutes form must upload its selected cover image.");
 assert(/submitted for administrator review/.test(memberClaims), "Member UI must accurately show community assistance as pending review.");
 assert(/claims\/community\/\$\{appealReview\._id\}\/review/.test(adminClaims), "Admin UI must call the community appeal review endpoint.");

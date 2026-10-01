@@ -13,7 +13,7 @@ export const dashboardMenus = {
   admin: [
     { section: "Overview", title: "Dashboard", icon: LayoutDashboard, path: "/admin" },
     { section: "Operations", title: "People & Operations", icon: Users, path: "/admin/operations", childPaths: ["/admin/members", "/admin/support", "/admin/claims", "/admin/operations"] },
-    { section: "Finance", title: "Finance", icon: Wallet, path: "/admin/finance-center", childPaths: ["/admin/accounts", "/admin/finance", "/admin/finance-center"] },
+    { section: "Finance", title: "Finance", icon: Wallet, path: "/admin/finance-center", childPaths: ["/admin/accounts", "/admin/finance-center"] },
     { section: "Communications", title: "Communications", icon: MessageCircle, path: "/admin/communications", childPaths: ["/admin/messages", "/admin/notifications", "/admin/announcements", "/admin/polls", "/admin/feedback", "/admin/communications"] },
     { section: "Content", title: "Website & Communications", icon: Newspaper, path: "/admin/website", childPaths: ["/admin/website", "/admin/announcements"] },
     { section: "Reports", title: "Reports", icon: BarChart3, path: "/admin/reports" },

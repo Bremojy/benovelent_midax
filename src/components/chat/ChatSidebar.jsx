@@ -43,7 +43,7 @@ function ChatSidebar({
     if (!keyword) return sorted;
 
     return sorted.filter((member) => {
-      const haystack = [member.fullName, member.username, member.department, member.position, member.email, member.roleLabel]
+      const haystack = [member.fullName, member.username, member.memberNumber, member.email, member.phone, member.department, member.position, member.siteStation, member.roleLabel]
         .filter(Boolean)
         .join(" ")
         .toLowerCase();
@@ -57,15 +57,21 @@ function ChatSidebar({
       const partner = conversation.partner || {};
       return !isSameIdentity(partner, actor) && !isExactActorId(partner, actor);
     });
-    if (!keyword) return withoutSelf;
-
-    return withoutSelf.filter((conversation) => {
+    const result = !keyword ? withoutSelf : withoutSelf.filter((conversation) => {
       const partner = conversation.partner || {};
-      const haystack = [partner.fullName, partner.username, sanitizePreviewText(conversation.lastMessageText)]
+      const haystack = [partner.fullName, partner.username, partner.memberNumber, partner.email, partner.phone, partner.department, partner.position, sanitizePreviewText(conversation.lastMessageText)]
         .filter(Boolean)
         .join(" ")
         .toLowerCase();
       return haystack.includes(keyword);
+    });
+    return [...result].sort((a, b) => {
+      const aPinned = (a.pinnedBy || []).some((id) => String(id) === String(actor.id));
+      const bPinned = (b.pinnedBy || []).some((id) => String(id) === String(actor.id));
+      if (aPinned !== bPinned) return aPinned ? -1 : 1;
+      const aTime = new Date(a.lastMessageTime || a.updatedAt || a.createdAt || 0).getTime();
+      const bTime = new Date(b.lastMessageTime || b.updatedAt || b.createdAt || 0).getTime();
+      return bTime - aTime;
     });
   }, [conversations, search, actor]);
 

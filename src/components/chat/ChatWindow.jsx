@@ -291,7 +291,7 @@ function ChatWindow({ conversation, socket, currentUser, onBack, onAudioCall, on
     }
   }
 
-  async function sendMessage(text, attachment, messageType = "text") {
+  async function sendMessage(text, attachment, messageType = "text", attachmentMeta) {
     if (!conversation?._id) return;
     if (!String(text || "").trim() && !attachment) return;
     if (sendLockRef.current) return;
@@ -309,7 +309,7 @@ function ChatWindow({ conversation, socket, currentUser, onBack, onAudioCall, on
       createdAt: new Date().toISOString(),
       status: "sending",
       __optimistic: true,
-      __retry: { text, attachment, messageType },
+      __retry: { text, attachment, messageType, attachmentMeta },
     });
 
     setMessages((previous) => [...previous, optimisticMessage]);
@@ -317,7 +317,16 @@ function ChatWindow({ conversation, socket, currentUser, onBack, onAudioCall, on
 
     try {
       setChatError("");
-      const { data } = await API.post("/messages", { conversationId: conversation._id, message: text, attachment, messageType, replyTo: replyTo?._id || undefined }, { headers: { "X-Idempotency-Key": tempId } });
+      const { data } = await API.post("/messages", {
+        conversationId: conversation._id,
+        message: text,
+        attachment,
+        messageType,
+        replyTo: replyTo?._id || undefined,
+        fileName: attachmentMeta?.fileName || undefined,
+        fileSize: attachmentMeta?.fileSize || undefined,
+        mimeType: attachmentMeta?.mimeType || undefined,
+      }, { headers: { "X-Idempotency-Key": tempId } });
       const created = normalizeMessage(data.message || data);
       setReplyTo(null);
       setMessages((previous) => {
@@ -345,7 +354,7 @@ function ChatWindow({ conversation, socket, currentUser, onBack, onAudioCall, on
     if (!retry) return;
     setMessages((current) => current.filter((message) => String(message._id) !== String(item._id)));
     try {
-      await sendMessage(retry.text, retry.attachment, retry.messageType);
+      await sendMessage(retry.text, retry.attachment, retry.messageType, retry.attachmentMeta);
     } catch (_) {}
   }
 

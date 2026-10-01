@@ -1455,6 +1455,7 @@ exports.getChatMembers = async (req, res) => {
 
         const memberFilter = {
             isDeleted: { $ne: true },
+            status: "active",
             _id: { $nin: actorExclusionIds },
         };
 
@@ -1463,6 +1464,7 @@ exports.getChatMembers = async (req, res) => {
             if (department && department !== "all") memberFilter.department = department;
             if (position && position !== "all") memberFilter.position = position;
             if (status && status !== "all") memberFilter.status = status;
+            else memberFilter.status = "active";
 
             if (verified === "true" || verified === "false") memberFilter.verified = verified === "true";
         }
@@ -1480,13 +1482,14 @@ exports.getChatMembers = async (req, res) => {
         }
 
         const adminFilter = {
-            status: { $ne: "deleted" },
+            status: "active",
             _id: { $nin: actorExclusionIds },
         };
         if (elevated) {
             if (department && department !== "all") adminFilter.department = department;
             if (position && position !== "all") adminFilter.position = position;
             if (status && status !== "all") adminFilter.status = status;
+            else adminFilter.status = "active";
 
         }
 
@@ -1610,11 +1613,23 @@ exports.getChatMembers = async (req, res) => {
                     const profile = await ensureChatProfile(admin);
                     if (profile) {
                         return {
-                            ...(typeof profile.toObject === "function" ? profile.toObject() : profile),
-                            role: "admin",
+                            _id: String(profile._id),
+                            fullName: normalizeDisplayName(admin, "Leader"),
+                            username: String(admin.username || profile.username || "").trim(),
+                            email: String(admin.email || "").trim().toLowerCase(),
+                            phone: String(admin.phone || "").trim(),
+                            profileImage: admin.profileImage || profile.profileImage || "",
+                            online: liveUserIds.has(String(profile._id)),
+                            lastSeen: profile.lastSeen || admin.lastSeen || null,
                             status: "active",
+                            verified: true,
+                            role: "admin",
+                            roleLabel: "Leader",
+                            portalOwnerId: String(admin._id),
+                            portalOwnerRole: "admin",
                             sourceAdminId: String(admin._id),
-                            position: admin.position || profile.position || "",
+                            position: String(admin.position || profile.position || "").trim(),
+                            department: String(admin.department || "").trim(),
                         };
                     }
                 } catch (profileError) {

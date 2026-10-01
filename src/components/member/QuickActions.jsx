@@ -1,3 +1,4 @@
+import { useNavigate } from "react-router-dom";
 import {
   CreditCard,
   HandHeart,
@@ -8,6 +9,8 @@ import {
 import "../../styles/member.css";
 
 function QuickActions() {
+  const navigate = useNavigate();
+
   const actions = [
     {
       title: "Make Contribution",
@@ -28,10 +31,10 @@ function QuickActions() {
       path: "/member/messages",
     },
     {
-      title: "View Statement",
+      title: "View Accounts & Ledger",
       icon: FileText,
       color: "#8b5cf6",
-      path: "/member/statements",
+      path: "/member/accounts",
     },
   ];
 
@@ -47,7 +50,7 @@ function QuickActions() {
             <button
               key={action.title}
               className="quick-action-btn"
-              onClick={() => (window.location.href = action.path)}
+              onClick={() => navigate(action.path)}
             >
               <div
                 className="quick-icon"

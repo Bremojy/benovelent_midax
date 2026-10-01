@@ -18,10 +18,14 @@ export default function MessageInput({ onSend, onEdit, editingMessage, replyTo, 
   const [message, setMessage] = useState("");
   const [attachment, setAttachment] = useState("");
   const [attachmentPreview, setAttachmentPreview] = useState("");
+  const [attachmentFileName, setAttachmentFileName] = useState("");
+  const [attachmentFileSize, setAttachmentFileSize] = useState(0);
+  const [attachmentMimeType, setAttachmentMimeType] = useState("");
   const [messageType, setMessageType] = useState("text");
   const [showEmoji, setShowEmoji] = useState(false);
   const [showMore, setShowMore] = useState(false);
   const [recording, setRecording] = useState(false);
+  const [recordSeconds, setRecordSeconds] = useState(0);
   const [busy, setBusy] = useState(false);
 
   const fileInputRef = useRef(null);
@@ -33,6 +37,7 @@ export default function MessageInput({ onSend, onEdit, editingMessage, replyTo, 
   const sendingRef = useRef(false);
   const textareaRef = useRef(null);
   const typingTimerRef = useRef(null);
+  const recordingTimerRef = useRef(null);
   const previewUrlRef = useRef("");
 
   const canSend = useMemo(() => Boolean(String(message).trim()) || Boolean(attachment), [message, attachment]);
@@ -41,6 +46,9 @@ export default function MessageInput({ onSend, onEdit, editingMessage, replyTo, 
     if (previewUrlRef.current) { URL.revokeObjectURL(previewUrlRef.current); previewUrlRef.current = ""; }
     setAttachment("");
     setAttachmentPreview("");
+    setAttachmentFileName("");
+    setAttachmentFileSize(0);
+    setAttachmentMimeType("");
     setMessageType("text");
   };
 
@@ -58,6 +66,7 @@ export default function MessageInput({ onSend, onEdit, editingMessage, replyTo, 
     if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
     socket?.emit("stop-typing", { conversationId: conversation?._id });
     (streamRef.current?.getTracks() || []).forEach((track) => track.stop());
+    if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
   }, [socket, conversation?._id]);
 
   const uploadFile = async (file, autoSend = false) => {
@@ -71,11 +80,15 @@ export default function MessageInput({ onSend, onEdit, editingMessage, replyTo, 
       const url = data.fileUrl || data.imageUrl || data.assetUrl || "";
       if (!url) throw new Error("The attachment could not be uploaded. Please try again.");
       const type = getMessageType(file);
+      const attachmentMeta = { fileName: file.name || "attachment", fileSize: Number(file.size || 0), mimeType: file.type || "application/octet-stream" };
       if (autoSend) {
-        await onSend("", url, type);
+        await onSend("", url, type, attachmentMeta);
         toast.success("Voice note sent.", { id: "chat-voice-sent", duration: 2200 });
       } else {
         setAttachment(url);
+        setAttachmentFileName(file.name || "attachment");
+        setAttachmentFileSize(Number(file.size || 0));
+        setAttachmentMimeType(file.type || "application/octet-stream");
         if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
         previewUrlRef.current = type === "image" ? URL.createObjectURL(file) : "";
         setAttachmentPreview(previewUrlRef.current);
@@ -98,6 +111,9 @@ export default function MessageInput({ onSend, onEdit, editingMessage, replyTo, 
     const draftMessage = cleanMessage;
     const draftAttachment = attachment;
     const draftAttachmentPreview = attachmentPreview;
+    const draftAttachmentFileName = attachmentFileName;
+    const draftAttachmentFileSize = attachmentFileSize;
+    const draftAttachmentMimeType = attachmentMimeType;
     const draftType = messageType;
     if ((!cleanMessage && !attachment) || busy || sendingRef.current || recording) return;
     sendingRef.current = true;
@@ -116,7 +132,7 @@ export default function MessageInput({ onSend, onEdit, editingMessage, replyTo, 
       if (editingMessage) {
         await onEdit?.(editingMessage._id, cleanMessage);
       } else {
-        await onSend(cleanMessage, attachment, messageType);
+        await onSend(cleanMessage, attachment, messageType, attachment ? { fileName: attachmentFileName, fileSize: attachmentFileSize, mimeType: attachmentMimeType } : undefined);
       }
       if (editingMessage || replyTo) onCancelContext?.();
     } catch (error) {
@@ -125,6 +141,9 @@ export default function MessageInput({ onSend, onEdit, editingMessage, replyTo, 
       if (draftAttachment) {
         setAttachment(draftAttachment);
         setAttachmentPreview(draftAttachmentPreview);
+        setAttachmentFileName(draftAttachmentFileName);
+        setAttachmentFileSize(draftAttachmentFileSize);
+        setAttachmentMimeType(draftAttachmentMimeType);
         setMessageType(draftType);
       }
       throw error;
@@ -152,9 +171,16 @@ export default function MessageInput({ onSend, onEdit, editingMessage, replyTo, 
         } catch (err) {
           console.error(err);
           toast.error(err.message || "Could not send voice note.", { id: "chat-voice-error" });
-        } finally { setRecording(false); }
+        } finally {
+          setRecording(false);
+          if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+          recordingTimerRef.current = null;
+        }
       };
       recorder.start();
+      setRecordSeconds(0);
+      if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = window.setInterval(() => setRecordSeconds((seconds) => seconds + 1), 1000);
       setRecording(true);
       setShowEmoji(false);
       setShowMore(false);
@@ -182,13 +208,19 @@ export default function MessageInput({ onSend, onEdit, editingMessage, replyTo, 
     );
   };
 
-  const stopRecord = () => { try { recorderRef.current?.stop(); } catch { setRecording(false); } };
+  const stopRecord = () => {
+    try { recorderRef.current?.stop(); } catch {
+      setRecording(false);
+      if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
+  };
 
   return (
     <form className="message-input-container instagram-composer" onSubmit={(event) => { event.preventDefault(); handleSend(); }}>
       {(attachment || recording) && (
         <div className="composer-preview">
-          {attachmentPreview ? <img src={attachmentPreview} alt="Selected attachment preview" /> : <span>{recording ? "Recording voice note…" : `Attachment ready · ${messageType}`}</span>}
+          {attachmentPreview ? <img src={attachmentPreview} alt="Selected attachment preview" /> : <span>{recording ? `Recording voice note… ${formatDuration(recordSeconds)}` : `Attachment ready · ${messageType}`}</span>}
           {!recording && <button type="button" onClick={clearAttachment} aria-label="Remove attachment"><X size={14} /></button>}
         </div>
       )}
@@ -249,4 +281,9 @@ export default function MessageInput({ onSend, onEdit, editingMessage, replyTo, 
       <input ref={fileInputRef} hidden type="file" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt" onChange={async (event) => { const file = event.target.files?.[0]; event.target.value = ""; if (file) await uploadFile(file, false); }} />
     </form>
   );
+}
+
+function formatDuration(seconds) {
+  const total = Math.max(0, Number(seconds) || 0);
+  return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
 }

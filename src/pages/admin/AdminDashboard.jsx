@@ -166,7 +166,7 @@ export default function AdminDashboard() {
           <div className="panel-heading"><div><span className="panel-kicker">WORKSPACE</span><h2>Quick actions</h2><p>Jump straight into the work that matters.</p></div></div>
           <div className="quick-action-grid">
             <Quick href="/admin/members" icon={<Users />} title="Members" text="Create, edit and manage accounts." />
-            <Quick href="/admin/finance" icon={<Wallet />} title="Payroll & Accounts" text="Run the shared monthly deduction and review the scheme ledger." />
+            <Quick href="/admin/accounts" icon={<Wallet />} title="Payroll & Accounts" text="Run the shared monthly deduction and review the scheme ledger." />
             <Quick href="/admin/claims" icon={<HandHeart />} title="Claims" text="Review assistance applications." />
             <Quick href="/admin/messages" icon={<MessageCircle />} title="Message centre" text="Continue active conversations." />
             <Quick href="/admin/notifications" icon={<Bell />} title="Notifications" text="Check alerts and broadcasts." />
@@ -189,7 +189,7 @@ export default function AdminDashboard() {
             </div>
           </article>
           <article className="portal-panel modern-panel">
-            <div className="panel-heading"><div><span className="panel-kicker">FINANCIAL SNAPSHOT</span><h2>Contribution pulse</h2></div><Link to="/admin/finance" className="panel-link">Open finance <ArrowUpRight size={16} /></Link></div>
+            <div className="panel-heading"><div><span className="panel-kicker">FINANCIAL SNAPSHOT</span><h2>Contribution pulse</h2></div><Link to="/admin/accounts" className="panel-link">Open finance <ArrowUpRight size={16} /></Link></div>
             <div className="finance-hero"><span>Scheme contributions collected</span><strong>{money(contrib.totalCollected || contrib.totalContributions || contrib.total || 0)}</strong><small>Admin-managed payroll deductions recorded for the scheme.</small></div>
             <div className="finance-mini-grid">
               <div><span>This month</span><strong>{money(contrib.collectedThisMonth || contrib.monthlyContributions || contrib.thisMonth || 0)}</strong></div>

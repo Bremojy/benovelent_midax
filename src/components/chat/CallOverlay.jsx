@@ -61,7 +61,13 @@ export default function CallOverlay({
 
   useEffect(() => {
     mountedRef.current = true;
-    return () => { mountedRef.current = false; };
+    return () => {
+      mountedRef.current = false;
+      ringtoneRef.current?.stop?.();
+      ringtoneRef.current = null;
+      stopNativeIncomingCall(callIdRef.current || callId);
+      cleanupMedia();
+    };
   }, []);
 
   useEffect(() => {
