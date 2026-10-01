@@ -129,7 +129,8 @@ function ChatWindow({ conversation, socket, currentUser, onBack, onAudioCall, on
         if (previous.some((item) => String(item._id) === id || messageFingerprint(item) === fingerprint)) {
           return previous;
         }
-        return [...previous, normalized];
+        const merged = [...previous, normalized];
+        return merged.sort(compareMessages);
       });
 
       if (normalized?._id) {
@@ -156,6 +157,14 @@ function ChatWindow({ conversation, socket, currentUser, onBack, onAudioCall, on
       setMessages((previous) => previous.map((item) => String(item._id) === messageId ? { ...item, deletedForEveryone: true, message: "This message was deleted", attachment: "" } : item));
     };
 
+    const handleReaction = (incoming) => {
+      const incomingConversationId = incoming?.conversation?._id || incoming?.conversation || incoming?.conversationId;
+      if (String(incomingConversationId || conversation._id) !== String(conversation._id)) return;
+      const normalized = normalizeMessage(incoming);
+      if (!normalized?._id) return;
+      setMessages((previous) => previous.map((item) => String(item._id) === String(normalized._id) ? { ...item, ...normalized, reactions: Array.isArray(normalized.reactions) ? normalized.reactions : [] } : item));
+    };
+
     const handleTyping = (senderId) => {
       const id = String(senderId || "");
       if (id && id !== currentId) { typingUserRef.current = id; setTypingUserId(id); }
@@ -170,6 +179,7 @@ function ChatWindow({ conversation, socket, currentUser, onBack, onAudioCall, on
     socket.on("message-delivered", handleMessageDelivered);
     socket.on("message-seen", handleSeen);
     socket.on("message-deleted", handleDeleted);
+    socket.on("message-reaction", handleReaction);
     socket.on("typing", handleTyping);
     socket.on("stop-typing", handleStopTyping);
 
@@ -179,6 +189,7 @@ function ChatWindow({ conversation, socket, currentUser, onBack, onAudioCall, on
       socket.off("message-delivered", handleMessageDelivered);
       socket.off("message-seen", handleSeen);
       socket.off("message-deleted", handleDeleted);
+      socket.off("message-reaction", handleReaction);
       socket.off("typing", handleTyping);
       socket.off("stop-typing", handleStopTyping);
     };
@@ -340,7 +351,7 @@ function ChatWindow({ conversation, socket, currentUser, onBack, onAudioCall, on
         if (withoutTemp.some((item) => String(item._id) === String(created._id) || messageFingerprint(item) === messageFingerprint(created))) {
           return withoutTemp;
         }
-        return [...withoutTemp, created];
+        return [...withoutTemp, created].sort(compareMessages);
       });
     } catch (error) {
       console.error(error);
@@ -374,7 +385,7 @@ function ChatWindow({ conversation, socket, currentUser, onBack, onAudioCall, on
       const older = (Array.isArray(data) ? data : data?.messages || []).map(normalizeMessage);
       setMessages((current) => {
         const existing = new Set(current.map((item) => String(item._id)));
-        return [...older.filter((item) => !existing.has(String(item._id))), ...current];
+        return [...older.filter((item) => !existing.has(String(item._id))), ...current].sort(compareMessages);
       });
       setHasMore(Boolean(data?.hasMore));
       setNextCursor(String(data?.nextCursor || ""));
@@ -549,6 +560,14 @@ function normalizeMessage(message) {
     attachment: message.attachment ?? message.image ?? "",
     messageType: message.messageType || (message.attachment ? "image" : "text"),
   };
+}
+
+
+function compareMessages(a, b) {
+  const at = new Date(a?.createdAt || 0).getTime();
+  const bt = new Date(b?.createdAt || 0).getTime();
+  if (at !== bt) return at - bt;
+  return String(a?._id || "").localeCompare(String(b?._id || ""));
 }
 
 function formatDateLabel(value) {

@@ -1,0 +1,37 @@
+"use strict";
+const { read, assert, pass } = require('./testUtils');
+
+const overlay = read('src/components/chat/CallOverlay.jsx');
+const socket = read('backend/sockets/messageSocket.js');
+const windowSource = read('src/components/chat/ChatWindow.jsx');
+const bubble = read('src/components/chat/MessageBubble.jsx');
+const memberController = read('backend/controllers/memberController.js');
+const center = read('src/components/chat/MessageCenterPage.jsx');
+
+assert(/pendingOutgoingCandidatesRef\s*=\s*useRef\(\[\]\)/.test(overlay), 'outgoing ICE candidates have a pre-call buffer');
+assert(/if \(!activeId\) \{\s*pendingOutgoingCandidatesRef\.current\.push\(event\.candidate\)/s.test(overlay), 'early ICE candidates are buffered until the server call id exists');
+assert(/flushOutgoingCandidates\(normalized\)/.test(overlay), 'buffered ICE candidates flush when call-started assigns the authoritative call id');
+assert(/socket\.emit\("ice-candidate", \{\s*to: target,\s*candidate,\s*callId: normalizedId/s.test(overlay), 'buffered ICE candidates are sent with the authoritative call id');
+assert(/const activeId = String\(callIdRef\.current \|\| callId \|\| incomingCall\?\.callId \|\| ""\);/.test(overlay), 'call event handlers resolve one active call id');
+assert(/candidateCallId[\s\S]*!== activeId/.test(overlay), 'stale ICE candidates from unrelated call sessions are ignored');
+assert(/callIdRef\.current \|\| incomingCall\?\.callId/.test(overlay), 'call cleanup uses the stable call id ref rather than stale React state');
+assert(/remoteVideoRef\.current\.srcObject = stream/.test(overlay) && /remoteAudioRef\.current\.srcObject = stream/.test(overlay), 'remote media is attached to actual media elements');
+assert(/autoPlay playsInline/.test(overlay) && /autoPlay muted playsInline/.test(overlay) && /remoteAudioRef\.current\.play/.test(overlay), 'remote and local media playback is configured with autoplay recovery');
+assert(/audio: \{ echoCancellation: true/.test(overlay) && /video: type === "video"/.test(overlay), 'real microphone/camera capture is requested according to call mode');
+assert(/sender\.replaceTrack\(audioTrack\)/.test(overlay) && /sender\.replaceTrack\(videoTrack\)/.test(overlay), 'captured tracks are installed on the peer connection');
+assert(/peer\.ontrack/.test(overlay) && /remoteMediaReadyRef/.test(overlay) && /getTracks\(\)\.forEach\(\(track\)\s*=>\s*track\.stop\(\)\)/.test(overlay.replace(/\n/g,' ')), 'remote media readiness, track handling, and media cleanup exist');
+assert(/socket\.on\("message-reaction", handleReaction\)/.test(windowSource), 'ChatWindow listens for real persisted reaction updates');
+assert(/reactions: Array\.isArray\(normalized\.reactions\) \? normalized\.reactions : \[\]/.test(windowSource), 'reaction state defaults to an empty array rather than a phantom emoji');
+assert(/<Plus size=\{15\} \/>/.test(bubble) && /aria-label="Add reaction"/.test(bubble) && !/aria-label="React to message">❤/.test(bubble), 'message rows no longer render a fake heart as the reaction affordance');
+assert(/call\.answered\) return/.test(socket), 'a call can only be answered once');
+assert(/call-mode-offer[\s\S]*!call\.answered/.test(socket) || /!call\.answered/.test(socket), 'renegotiation requires an accepted call');
+assert(/String\(to\) !== String\(call\.callerChatId\)/.test(socket), 'answer signaling is bound to the original caller identity');
+assert(/!call\.answered/.test(socket) && /call-mode-offer/.test(socket), 'renegotiation is unavailable before the call is accepted');
+assert(/recipientSockets\.forEach\(\(socketId\) => io\.to\(socketId\)\.emit\("incoming-call"/.test(socket), 'incoming calls are emitted only to authenticated recipient sockets');
+assert(/isChatRole\(socket\.data\?\.role\)/.test(socket) && /resolveCanonicalChatActorForAuthenticatedUser/.test(read('backend/sockets/socket.js')), 'Socket.IO calls use authenticated server-derived identities and roles');
+assert(/status: "active"/.test(memberController) && /_id: \{ \$nin: actorExclusionIds \}/.test(memberController), 'chat directory is live-data active-only and excludes the current actor');
+assert(/messageFingerprint\(item\) === fingerprint/.test(windowSource), 'live message events are deduplicated by stable identity/content fingerprint');
+assert(/\.sort\(compareMessages\)/.test(windowSource) && /function compareMessages\(/.test(windowSource), 'live and persisted messages are kept in canonical chronological order');
+assert(/clientMessageId/.test(read('backend/models/Message.js')) && /unique: true/.test(read('backend/models/Message.js')), 'messages have database-enforced client idempotency identity');
+
+pass('Chat, realtime reaction, and WebRTC signaling regression contract passed');

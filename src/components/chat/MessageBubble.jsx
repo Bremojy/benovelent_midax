@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Check, CheckCheck, MoreVertical, Reply, Pencil, Trash2, Copy, Forward } from "lucide-react";
+import { Check, CheckCheck, MoreVertical, Reply, Pencil, Trash2, Copy, Forward, Plus } from "lucide-react";
 import "./MessageBubble.css";
 import { resolveUploadUrl } from "../../services/api";
 
@@ -42,7 +42,7 @@ function MessageBubble({ message, own, currentUserId, onReply, onEdit, onDeleteF
         {!message?.deletedForEveryone && (
           <div className="message-reaction-row">
             {(message?.reactions || []).map((reaction, index) => <button key={`${reaction.member}-${index}`} type="button" onClick={() => onReact?.(message._id, reaction.emoji, String(reaction.member?._id || reaction.member) === String(currentUserId) ? reaction.emoji : "")} title={`${reaction.emoji} reaction`}>{reaction.emoji}</button>)}
-            <button type="button" className="message-reaction-add" onClick={() => onReact?.(message._id, "👍", myReaction?.emoji || "")} aria-label="React to message">❤</button>
+            <button type="button" className="message-reaction-add" onClick={() => onReact?.(message._id, "👍", myReaction?.emoji || "")} aria-label="Add reaction"><Plus size={15} /></button>
           </div>
         )}
 

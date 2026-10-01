@@ -255,7 +255,10 @@ module.exports = (io, socket) => {
     const actorChatId = String(socket.data?.chatId || "");
     if (![String(call.callerChatId), String(call.recipientChatId)].includes(actorChatId)) return;
     if (actorChatId !== String(call.recipientChatId)) return;
+    if (String(to) !== String(call.callerChatId)) return;
+    if (call.answered) return;
     call.answered = true;
+    call.answerSocketId = socket.id;
     call.answeredAt = Date.now();
     if (call.timeout) clearTimeout(call.timeout);
     activeCalls.set(call.callId, call);
@@ -264,7 +267,7 @@ module.exports = (io, socket) => {
 
   socket.on("call-mode-offer", async ({ offer, callId, mode }) => {
     const call = callId ? activeCalls.get(String(callId)) : null;
-    if (!call || !offer) return;
+    if (!call || !offer || !call.answered) return;
     const actorChatId = String(socket.data?.chatId || "");
     if (![String(call.callerChatId), String(call.recipientChatId)].includes(actorChatId)) return;
     const target = actorChatId === String(call.callerChatId) ? call.recipientChatId : call.callerChatId;
@@ -274,7 +277,7 @@ module.exports = (io, socket) => {
 
   socket.on("call-mode-answer", async ({ answer, callId, mode }) => {
     const call = callId ? activeCalls.get(String(callId)) : null;
-    if (!call || !answer) return;
+    if (!call || !answer || !call.answered) return;
     const actorChatId = String(socket.data?.chatId || "");
     if (![String(call.callerChatId), String(call.recipientChatId)].includes(actorChatId)) return;
     const target = actorChatId === String(call.callerChatId) ? call.recipientChatId : call.callerChatId;

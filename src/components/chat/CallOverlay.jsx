@@ -41,17 +41,21 @@ export default function CallOverlay({
   const [ringSecondsLeft, setRingSecondsLeft] = useState(RING_TIMEOUT_SECONDS);
   const peerRef = useRef(null);
   const localStreamRef = useRef(null);
+  const remoteStreamRef = useRef(null);
+  const remoteMediaReadyRef = useRef(false);
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
   const remoteAudioRef = useRef(null);
   const videoTransceiverRef = useRef(null);
   const pendingCandidatesRef = useRef([]);
+  const pendingOutgoingCandidatesRef = useRef([]);
   const timerRef = useRef(null);
   const ringTimerRef = useRef(null);
   const callStartedAtRef = useRef(null);
   const ringtoneRef = useRef(null);
   const mountedRef = useRef(true);
   const renegotiatingRef = useRef(false);
+  const connectionRecoveryTimerRef = useRef(null);
 
   const me = String(currentUser?.chatId || currentUser?._id || currentUser?.id || "");
   const partnerId = String(partner?._id || partner?.id || incomingCall?.callerUserId || "");
@@ -138,10 +142,13 @@ export default function CallOverlay({
         const normalized = String(startedCallId);
         callIdRef.current = normalized;
         setCallId(normalized);
+        flushOutgoingCandidates(normalized);
       }
     };
-    const handleAnswered = async ({ answer }) => {
+    const handleAnswered = async ({ answer, callId: answeredCallId }) => {
       if (!peerRef.current || !answer) return;
+      const activeId = String(callIdRef.current || callId || incomingCall?.callId || "");
+      if (answeredCallId && activeId && String(answeredCallId) !== activeId) return;
       try {
         await peerRef.current.setRemoteDescription(new RTCSessionDescription(answer));
         await flushCandidates();
@@ -151,6 +158,8 @@ export default function CallOverlay({
     };
     const handleOffer = async ({ offer, callId: incomingCallId, mode }) => {
       if (!offer || !peerRef.current) return;
+      const activeId = String(callIdRef.current || callId || incomingCall?.callId || "");
+      if (incomingCallId && activeId && String(incomingCallId) !== activeId) return;
       try {
         await peerRef.current.setRemoteDescription(new RTCSessionDescription(offer));
         if (mode === "video" || mode === "audio") {
@@ -170,8 +179,10 @@ export default function CallOverlay({
         setError(err.message || "Could not switch the call mode.");
       }
     };
-    const handleModeAnswer = async ({ answer, mode }) => {
+    const handleModeAnswer = async ({ answer, callId: answerCallId, mode }) => {
       if (!peerRef.current || !answer) return;
+      const activeId = String(callIdRef.current || callId || incomingCall?.callId || "");
+      if (answerCallId && activeId && String(answerCallId) !== activeId) return;
       try {
         await peerRef.current.setRemoteDescription(new RTCSessionDescription(answer));
         if (mode === "video" || mode === "audio") {
@@ -185,8 +196,10 @@ export default function CallOverlay({
         setError(err.message || "Could not finish the call mode change.");
       }
     };
-    const handleCandidate = async ({ candidate }) => {
+    const handleCandidate = async ({ candidate, callId: candidateCallId }) => {
       if (!candidate) return;
+      const activeId = String(callIdRef.current || callId || incomingCall?.callId || "");
+      if (candidateCallId && activeId && String(candidateCallId) !== activeId) return;
       if (!peerRef.current?.remoteDescription) {
         pendingCandidatesRef.current.push(candidate);
         return;
@@ -222,38 +235,82 @@ export default function CallOverlay({
       socket.off("call-rejected", handleRejected);
       socket.off("disconnect", handleSocketDisconnect);
     };
-  }, [socket, partnerId, callId]);
+  }, [socket, partnerId]);
 
   async function createPeer() {
     const peer = new RTCPeerConnection({ iceServers: ICE_SERVERS });
     peerRef.current = peer;
     videoTransceiverRef.current = peer.addTransceiver("video", { direction: "recvonly" });
     peer.onicecandidate = (event) => {
-      if (event.candidate && partnerId) {
-        socket?.emit("ice-candidate", { to: incomingCall?.from || partnerId, candidate: event.candidate, callId: callIdRef.current || incomingCall?.callId || "" });
+      if (!event.candidate) return;
+      const target = incomingCall?.from || partnerId;
+      const activeId = String(callIdRef.current || incomingCall?.callId || callId || "");
+      if (!target) return;
+      if (!activeId) {
+        pendingOutgoingCandidatesRef.current.push(event.candidate);
+        return;
       }
+      socket?.emit("ice-candidate", { to: target, candidate: event.candidate, callId: activeId });
     };
     peer.ontrack = (event) => {
-      const stream = event.streams?.[0];
+      if (!event.track) return;
+      let stream = event.streams?.[0] || remoteStreamRef.current;
+      if (!stream && typeof MediaStream !== "undefined") stream = new MediaStream();
       if (!stream) return;
+      remoteStreamRef.current = stream;
+      const hasTrack = stream.getTracks().some((track) => track === event.track || track.id === event.track.id);
+      if (!hasTrack) stream.addTrack(event.track);
+      remoteMediaReadyRef.current = true;
       if (remoteVideoRef.current) remoteVideoRef.current.srcObject = stream;
-      if (remoteAudioRef.current) remoteAudioRef.current.srcObject = stream;
+      if (remoteAudioRef.current) {
+        remoteAudioRef.current.srcObject = stream;
+        const playback = remoteAudioRef.current.play?.();
+        if (playback?.catch) {
+          playback.catch(() => setError("Remote audio could not start automatically. Interact with the call window and try again."));
+        }
+      }
+      if (peer.connectionState === "connected") {
+        setConnected(true);
+        setStatus("Connected");
+        ringtoneRef.current?.stop?.();
+        stopNativeIncomingCall(callIdRef.current || incomingCall?.callId || "");
+      }
     };
     peer.oniceconnectionstatechange = () => {
       if (peer.iceConnectionState === "failed") {
         setError("The call could not reach the other device. A TURN server may be required on restrictive networks.");
+      } else if (peer.iceConnectionState === "disconnected" && !endingRef.current) {
+        setStatus("Reconnecting...");
+        if (!connectionRecoveryTimerRef.current) {
+          connectionRecoveryTimerRef.current = window.setTimeout(() => {
+            connectionRecoveryTimerRef.current = null;
+            if (!endingRef.current && peerRef.current === peer) {
+              setError("Call connection was lost. Please start the call again.");
+              finish(false);
+            }
+          }, 10000);
+        }
       }
     };
     peer.onconnectionstatechange = () => {
       const state = peer.connectionState;
-      if (state === "connected") {
+      if (state === "connected" && remoteMediaReadyRef.current) {
+        window.clearTimeout(connectionRecoveryTimerRef.current);
+        connectionRecoveryTimerRef.current = null;
         setConnected(true);
         setStatus("Connected");
         ringtoneRef.current?.stop?.();
-        stopNativeIncomingCall(callId || incomingCall?.callId || "");
-      } else if (["failed", "closed"].includes(state)) {
+        stopNativeIncomingCall(callIdRef.current || incomingCall?.callId || "");
+      } else if (state === "connected") {
+        setStatus("Connecting media...");
+      } else if (state === "disconnected" && !endingRef.current) {
         setConnected(false);
-        if (state === "failed") setError("The call connection failed. Check your internet connection.");
+        setStatus("Reconnecting...");
+      } else if (["failed", "closed"].includes(state)) {
+        window.clearTimeout(connectionRecoveryTimerRef.current);
+        connectionRecoveryTimerRef.current = null;
+        setConnected(false);
+        if (state === "failed") setError("The call connection failed. Check your internet connection or TURN settings.");
       }
     };
     return peer;
@@ -274,10 +331,12 @@ export default function CallOverlay({
     } catch (error) {
       const code = String(error?.name || "");
       if (code === "NotAllowedError" || code === "SecurityError") {
-        throw new Error("Microphone/camera permission was denied. Allow access in your browser settings and try the call again.");
+        throw new Error(type === "video"
+          ? "Microphone and camera permissions are required for a video call."
+          : "Microphone permission is required for an audio call.");
       }
       if (code === "NotFoundError") {
-        throw new Error(type === "video" ? "No camera and microphone were found on this device." : "No microphone was found on this device.");
+        throw new Error(type === "video" ? "A camera and microphone are required for a video call." : "A microphone is required for an audio call.");
       }
       throw error;
     }
@@ -321,6 +380,21 @@ export default function CallOverlay({
         offer,
       });
     }
+  }
+
+
+  function flushOutgoingCandidates(activeId) {
+    const normalizedId = String(activeId || "").trim();
+    const target = incomingCall?.from || partnerId;
+    if (!normalizedId || !target || !socket) return;
+    const candidates = pendingOutgoingCandidatesRef.current.splice(0);
+    candidates.forEach((candidate) => {
+      socket.emit("ice-candidate", {
+        to: target,
+        candidate,
+        callId: normalizedId,
+      });
+    });
   }
 
   async function flushCandidates() {
@@ -425,11 +499,17 @@ export default function CallOverlay({
   function cleanupMedia() {
     window.clearInterval(timerRef.current);
     window.clearInterval(ringTimerRef.current);
+    window.clearTimeout(connectionRecoveryTimerRef.current);
+    connectionRecoveryTimerRef.current = null;
     peerRef.current?.close();
     peerRef.current = null;
     videoTransceiverRef.current = null;
     localStreamRef.current?.getTracks().forEach((track) => track.stop());
     localStreamRef.current = null;
+    remoteStreamRef.current = null;
+    remoteMediaReadyRef.current = false;
+    pendingCandidatesRef.current = [];
+    pendingOutgoingCandidatesRef.current = [];
     if (localVideoRef.current) localVideoRef.current.srcObject = null;
     if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
     if (remoteAudioRef.current) remoteAudioRef.current.srcObject = null;
