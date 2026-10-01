@@ -112,10 +112,30 @@ export default function SmartAssistant() {
   }, [messages, roleName, path]);
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }); }, [messages, typing]);
   useEffect(() => {
-    if (open) { setShowTeaser(false); window.setTimeout(() => inputRef.current?.focus(), 120); return undefined; }
-    setShowTeaser(true);
-    const t1 = window.setTimeout(() => setShowTeaser(false), 5200);
-    return () => window.clearTimeout(t1);
+    if (open) {
+      setShowTeaser(false);
+      const focusTimer = window.setTimeout(() => inputRef.current?.focus(), 120);
+      return () => window.clearTimeout(focusTimer);
+    }
+
+    let hideTimer;
+    let showTimer;
+    let cancelled = false;
+    const cycle = () => {
+      if (cancelled || document.hidden) return;
+      setShowTeaser(true);
+      hideTimer = window.setTimeout(() => {
+        if (cancelled) return;
+        setShowTeaser(false);
+        showTimer = window.setTimeout(cycle, 8000);
+      }, 5200);
+    };
+    cycle();
+    return () => {
+      cancelled = true;
+      window.clearTimeout(hideTimer);
+      window.clearTimeout(showTimer);
+    };
   }, [open, path]);
   useEffect(() => {
     if (!open) return undefined;

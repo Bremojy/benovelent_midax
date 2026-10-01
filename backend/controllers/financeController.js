@@ -809,12 +809,12 @@ exports.constitutionLedger = async (req, res) => {
     const role = String(req.user?.role || "").toLowerCase();
     const startDate = String(req.query?.startDate || "").trim();
     const endDate = String(req.query?.endDate || "").trim();
-    if (role === "member" && (!startDate || !endDate)) {
-      return res.status(400).json({ success: false, code: "DATE_FILTER_REQUIRED", message: "Select a start and end date before loading the constitution ledger." });
+    if ((startDate && !endDate) || (!startDate && endDate)) {
+      return res.status(400).json({ success: false, code: "DATE_FILTER_INCOMPLETE", message: "Provide both a start date and an end date, or leave both blank to use the default reporting period." });
     }
     const ledger = await getAuthoritativeLedger({
-      startDate: startDate || `${new Date().getFullYear()}-01-01`,
-      endDate: endDate || `${new Date().getFullYear()}-12-31`,
+      startDate: startDate || undefined,
+      endDate: endDate || undefined,
       memberId: role === "member" ? req.user._id : null,
       includeHidden: role === "superadmin" && String(req.query.includeHidden || "false").toLowerCase() === "true",
     });

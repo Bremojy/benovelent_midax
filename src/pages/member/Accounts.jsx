@@ -42,6 +42,11 @@ export default function MemberAccounts() {
     finally { setBusy(false); }
   }, []);
   useEffect(() => { loadBase(); }, [loadBase]);
+  useEffect(() => {
+    // Load the safe default reporting period automatically so the member never
+    // lands on a blank ledger that appears to require date selection first.
+    loadConstitution({ start: yearStart, end: today });
+  }, []);
 
   const loadConstitution = async (range = dates) => {
     if (!range.start || !range.end) { setError("Select both a start date and end date first."); return; }
