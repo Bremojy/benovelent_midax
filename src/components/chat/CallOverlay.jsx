@@ -2,18 +2,12 @@ import { useEffect, useRef, useState } from "react";
 import { Camera, CameraOff, Mic, MicOff, Phone, PhoneOff, Video, VideoOff } from "lucide-react";
 import { startCallTone } from "../../utils/callTone";
 import { stopNativeIncomingCall } from "../../utils/nativeCallBridge";
+import API from "../../services/api";
 import "./CallOverlay.css";
 
-const ICE_SERVERS = [
+const DEFAULT_ICE_SERVERS = [
   { urls: "stun:stun.l.google.com:19302" },
   { urls: "stun:stun1.l.google.com:19302" },
-  ...(String(import.meta.env.VITE_TURN_SERVER_URL || "").trim()
-    ? [{
-        urls: String(import.meta.env.VITE_TURN_SERVER_URL).split(",").map((value) => value.trim()).filter(Boolean),
-        username: String(import.meta.env.VITE_TURN_USERNAME || "").trim() || undefined,
-        credential: String(import.meta.env.VITE_TURN_CREDENTIAL || "").trim() || undefined,
-      }]
-    : []),
 ];
 const RING_TIMEOUT_SECONDS = 35;
 
@@ -56,6 +50,8 @@ export default function CallOverlay({
   const mountedRef = useRef(true);
   const renegotiatingRef = useRef(false);
   const connectionRecoveryTimerRef = useRef(null);
+  const iceServersRef = useRef(DEFAULT_ICE_SERVERS);
+  const iceConfigPromiseRef = useRef(null);
 
   const me = String(currentUser?.chatId || currentUser?._id || currentUser?.id || "");
   const partnerId = String(partner?._id || partner?.id || incomingCall?.callerUserId || "");
@@ -237,8 +233,22 @@ export default function CallOverlay({
     };
   }, [socket, partnerId]);
 
+  async function loadIceServers() {
+    if (iceConfigPromiseRef.current) return iceConfigPromiseRef.current;
+    iceConfigPromiseRef.current = API.get("/auth/webrtc-config")
+      .then((response) => {
+        const configured = Array.isArray(response?.data?.iceServers)
+          ? response.data.iceServers.filter((server) => server && server.urls)
+          : [];
+        if (configured.length) iceServersRef.current = configured;
+        return iceServersRef.current;
+      })
+      .catch(() => iceServersRef.current);
+    return iceConfigPromiseRef.current;
+  }
+
   async function createPeer() {
-    const peer = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+    const peer = new RTCPeerConnection({ iceServers: iceServersRef.current });
     peerRef.current = peer;
     videoTransceiverRef.current = peer.addTransceiver("video", { direction: "recvonly" });
     peer.onicecandidate = (event) => {
@@ -344,6 +354,7 @@ export default function CallOverlay({
 
   async function startCall() {
     if (selfCall || !socket || !partnerId || !accepted || peerRef.current) return;
+    await loadIceServers();
     const stream = await getMedia(activeCallType);
     localStreamRef.current = stream;
     if (localVideoRef.current) localVideoRef.current.srcObject = stream;

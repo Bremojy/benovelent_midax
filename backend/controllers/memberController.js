@@ -353,6 +353,14 @@ exports.getProfile = async (req, res) => {
    UPDATE PROFILE
 ========================================== */
 
+const normalizeNationalId = (value) => String(value ?? "").trim();
+
+const duplicateNationalIdResponse = (res) => res.status(409).json({
+    success: false,
+    code: "DUPLICATE_NATIONAL_ID",
+    message: "This national ID is already registered to another member."
+});
+
 const validateProfilePayload = (body = {}) => {
     const textFields = ["fullName", "physicalAddress", "bankName", "bankBranch"];
     for (const field of textFields) {
@@ -366,7 +374,7 @@ const validateProfilePayload = (body = {}) => {
             if (!phonePattern.test(value)) return `${field === "mpesaNumber" ? "M-PESA number" : "Phone number"} must be a valid Kenyan mobile number.`;
         }
     }
-    if (body.nationalId !== undefined && !/^\d{5,10}$/.test(String(body.nationalId).trim())) return "National ID must contain 5 to 10 digits.";
+    if (body.nationalId !== undefined && !/^\d{5,10}$/.test(normalizeNationalId(body.nationalId))) return "National ID must contain 5 to 10 digits.";
     if (body.accountNumber !== undefined && String(body.accountNumber).trim() && !/^\d{5,30}$/.test(String(body.accountNumber).trim())) return "Bank account number must contain digits only (5–30 digits).";
     if (body.email !== undefined && String(body.email).trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(body.email).trim())) return "Enter a valid email address.";
     if (body.dateOfBirth) { const date = new Date(body.dateOfBirth); if (Number.isNaN(date.getTime()) || date > new Date()) return "Date of birth must be a valid past date."; }
@@ -431,6 +439,32 @@ exports.updateProfile = async (req, res) => {
 
             }
 
+        }
+
+        const submittedNationalId = req.body.nationalId !== undefined
+            ? normalizeNationalId(req.body.nationalId)
+            : undefined;
+
+        // National ID is unique, but application-level validation provides a
+        // controlled 409 instead of allowing MongoDB E11000 to become a user error.
+        // Always exclude the current member and query the same collection that owns
+        // the unique index, including soft-deleted legacy rows that can still hold
+        // the indexed value. This mirrors MongoDB uniqueness and avoids a save-time
+        // E11000 when an existing record already owns the identifier.
+        if (submittedNationalId !== undefined) {
+            if (!/^\d{5,10}$/.test(submittedNationalId)) {
+                return res.status(400).json({
+                    success: false,
+                    message: "National ID must contain 5 to 10 digits.",
+                    code: "INVALID_NATIONAL_ID",
+                });
+            }
+
+            const existingNationalId = await Member.findOne({
+                nationalId: submittedNationalId,
+                _id: { $ne: member._id },
+            }).select("_id").lean();
+            if (existingNationalId) return duplicateNationalIdResponse(res);
         }
 
         // Prevent duplicate phone
@@ -529,7 +563,9 @@ exports.updateProfile = async (req, res) => {
             ) {
                 value = parseBoolean(value);
             } else {
-                value = typeof value === "string" ? value.trim() : value;
+                value = field === "nationalId"
+                    ? normalizeNationalId(value)
+                    : (typeof value === "string" ? value.trim() : value);
                 if (field === "email" && !String(value || "").trim()) {
                     return;
                 }
@@ -574,7 +610,8 @@ exports.updateProfile = async (req, res) => {
 
         // ------------------------------------------
         // PROFILE PHOTO / DOCUMENT UPLOADS
-        // Files are stored locally in backend/uploads.
+        // In production the existing upload middleware stores these in
+        // Cloudinary; local disk is only the configured development fallback.
         // ------------------------------------------
         const uploadedFiles = req.files || {};
         const fileBase = `/uploads/${req.uploadType || "profiles"}`;
@@ -698,14 +735,19 @@ exports.updateProfile = async (req, res) => {
 
     catch (error) {
 
-        console.error(error);
+        console.error("Member profile update error:", {
+            message: error?.message,
+            code: error?.code || null,
+            keyPattern: error?.keyPattern || null,
+        });
+
+        if (error?.code === 11000 && (error?.keyPattern?.nationalId || /nationalId_1/i.test(String(error?.message || "")))) {
+            return duplicateNationalIdResponse(res);
+        }
 
         res.status(500).json({
-
             success: false,
-
-            message: error.message
-
+            message: "Unable to update your profile right now. Please try again.",
         });
 
     }

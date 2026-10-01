@@ -7,6 +7,9 @@ const windowSource = read('src/components/chat/ChatWindow.jsx');
 const bubble = read('src/components/chat/MessageBubble.jsx');
 const memberController = read('backend/controllers/memberController.js');
 const center = read('src/components/chat/MessageCenterPage.jsx');
+const memberRoutes = read('backend/routes/memberRoutes.js');
+const conversationRoutes = read('backend/routes/conversationRoutes.js');
+const messageRoutes = read('backend/routes/messageRoutes.js');
 
 assert(/pendingOutgoingCandidatesRef\s*=\s*useRef\(\[\]\)/.test(overlay), 'outgoing ICE candidates have a pre-call buffer');
 assert(/if \(!activeId\) \{\s*pendingOutgoingCandidatesRef\.current\.push\(event\.candidate\)/s.test(overlay), 'early ICE candidates are buffered until the server call id exists');

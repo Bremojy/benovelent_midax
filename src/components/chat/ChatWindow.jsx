@@ -554,11 +554,15 @@ function ChatWindow({ conversation, socket, currentUser, onBack, onAudioCall, on
 
 function normalizeMessage(message) {
   if (!message) return message;
+  const reactions = Array.isArray(message.reactions)
+    ? message.reactions.filter((reaction) => reaction && reaction.member && typeof reaction.emoji === "string" && reaction.emoji.trim())
+    : [];
   return {
     ...message,
     message: message.message ?? message.text ?? "",
     attachment: message.attachment ?? message.image ?? "",
     messageType: message.messageType || (message.attachment ? "image" : "text"),
+    reactions,
   };
 }
 

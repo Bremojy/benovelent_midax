@@ -7,12 +7,12 @@ import {
   HandHeart,
   MessageCircle,
   RefreshCw,
-  Sparkles,
   Users,
   WalletCards,
   UserRound,
 } from "lucide-react";
 import DashboardLayout from "../../layouts/DashboardLayout";
+import AnimatedWelcomeDashboardHero from "../../components/dashboard/AnimatedWelcomeDashboardHero";
 import { getMemberDashboard } from "../../services/memberService";
 import API from "../../services/api";
 import "./MemberDashboard.css";
@@ -94,7 +94,6 @@ export default function MemberDashboard() {
   const member = d?.member || {};
   const profile = d?.profileCompletion || {};
   const pct = profile.percentage || member.profileCompletion || 0;
-  const firstName = (member.fullName || "Member").split(" ")[0];
 
   const memberSignals = useMemo(() => [
     { label: "Dependants", value: d?.statistics?.totalDependents || 0, icon: Users },
@@ -109,20 +108,21 @@ export default function MemberDashboard() {
   return (
     <DashboardLayout>
       <div className="member-dashboard v7-portal">
-        <section className="member-welcome v7-member-hero">
-          <div className="member-hero-main">
-            <div className="member-identity-chip"><div className="member-avatar"><UserRound size={21} /></div><span>MEMBER PORTAL</span></div>
-            <span className="portal-kicker"><Sparkles size={14} /> COMMUNITY · COMPASSION · SUPPORT</span>
-            <h1>Welcome home, {firstName}.</h1>
-            <p>Your Benevolent MIDAX space for contributions, support, family information and community communication.</p>
-            <div className="portal-hero-actions">
-              <Link className="portal-primary-btn member-primary" to="/member/accounts"><WalletCards size={17} /> Open my accounts</Link>
-              <Link className="portal-secondary-btn" to="/member/messages"><MessageCircle size={17} /> Messages</Link>
-              <button className="portal-ghost-btn" onClick={load}><RefreshCw size={16} /> Refresh</button>
-            </div>
-          </div>
-          <div className="member-hero-status"><span>ACCOUNT STATUS</span><strong>{member.status || "Active"}</strong><small>Member Number · {member.memberNumber || "Not assigned"}</small></div>
-        </section>
+        <AnimatedWelcomeDashboardHero
+          role="member"
+          displayName={member.fullName}
+          subtitle="Your Benevolent MIDAX member space is ready for you."
+          actions={<>
+            <Link className="portal-primary-btn member-primary" to="/member/accounts"><WalletCards size={17} /> Open my accounts</Link>
+            <Link className="portal-secondary-btn" to="/member/messages"><MessageCircle size={17} /> Messages</Link>
+            <button className="portal-ghost-btn" onClick={load}><RefreshCw size={16} /> Refresh</button>
+          </>}
+          summary={<>
+            <span>Account</span><strong>{member.status || "Active"}</strong>
+            <span>Member No.</span><strong>{member.memberNumber || "Not assigned"}</strong>
+            <span>Profile</span><strong>{pct}%</strong>
+          </>}
+        />
 
         {pct < 100 ? (
           <section className="profile-completion-card v7-completion">

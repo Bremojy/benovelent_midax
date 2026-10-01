@@ -18,7 +18,6 @@ const {
 
 const { verifyToken: protect } = require("../middleware/authMiddleware");
 const { isChatUser } = require("../middleware/roleMiddleware");
-const profileCompleted = require("../middleware/profileCompletionMiddleware");
 const { uploadSingle, setUploadType } = require("../middleware/upload");
 
 // =======================================
@@ -27,31 +26,31 @@ const { uploadSingle, setUploadType } = require("../middleware/upload");
 
 
 // Upload a chat asset
-router.post("/upload", protect, isChatUser, profileCompleted, setUploadType("messages"), uploadSingle("file"), uploadMessageAsset);
+router.post("/upload", protect, isChatUser, setUploadType("messages"), uploadSingle("file"), uploadMessageAsset);
 
 // Send a message
-router.post("/", protect, isChatUser, profileCompleted, sendMessage);
+router.post("/", protect, isChatUser, sendMessage);
 
 // Get all messages in a conversation
-router.get("/conversation/:conversationId/search", protect, isChatUser, profileCompleted, searchConversationMessages);
-router.get("/conversation/:conversationId", protect, isChatUser, profileCompleted, getConversationMessages);
+router.get("/conversation/:conversationId/search", protect, isChatUser, searchConversationMessages);
+router.get("/conversation/:conversationId", protect, isChatUser, getConversationMessages);
 
 // Get a single message
-router.get("/:id", protect, isChatUser, profileCompleted, getMessage);
+router.get("/:id", protect, isChatUser, getMessage);
 
 // Edit a message
-router.put("/:id", protect, isChatUser, profileCompleted, editMessage);
+router.put("/:id", protect, isChatUser, editMessage);
 
 // Delete a message
-router.delete("/:id", protect, isChatUser, profileCompleted, deleteMessage);
-router.delete("/:id/everyone", protect, isChatUser, profileCompleted, deleteForEveryone);
+router.delete("/:id", protect, isChatUser, deleteMessage);
+router.delete("/:id/everyone", protect, isChatUser, deleteForEveryone);
 
 // React to a message
-router.put("/:id/react", protect, isChatUser, profileCompleted, reactToMessage);
-router.delete("/:id/react", protect, isChatUser, profileCompleted, unreactToMessage);
-router.post("/:id/forward", protect, isChatUser, profileCompleted, forwardMessage);
+router.put("/:id/react", protect, isChatUser, reactToMessage);
+router.delete("/:id/react", protect, isChatUser, unreactToMessage);
+router.post("/:id/forward", protect, isChatUser, forwardMessage);
 
 // Mark a message as read
-router.put("/:id/read", protect, isChatUser, profileCompleted, markAsRead);
+router.put("/:id/read", protect, isChatUser, markAsRead);
 
 module.exports = router;

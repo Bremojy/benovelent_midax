@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import {
-  Activity,
   ArrowUpRight,
   Bell, ClipboardList,
   DatabaseZap,
@@ -10,13 +9,14 @@ import {
   RefreshCw,
   ShieldAlert,
   ShieldCheck,
-  Sparkles,
   Users,
   UserCog,
   UserPlus,
   Wallet,
 } from "lucide-react";
 import DashboardLayout from "../../layouts/DashboardLayout";
+import { useAuth } from "../../context/AuthContext";
+import AnimatedWelcomeDashboardHero from "../../components/dashboard/AnimatedWelcomeDashboardHero";
 import API from "../../services/api";
 import { getSuperAdminAdminStatistics, getSuperAdmins, getSuperAdminPortalOverview } from "../../services/superAdminService";
 import "./SuperAdminDashboard.css";
@@ -24,6 +24,7 @@ import "./SuperAdminDashboard.css";
 const money = (value) => new Intl.NumberFormat("en-KE", { style: "currency", currency: "KES", maximumFractionDigits: 0 }).format(Number(value || 0));
 
 export default function SuperAdminDashboard() {
+  const { user } = useAuth();
   const [statistics, setStatistics] = useState({ total: 0, active: 0, inactive: 0, suspended: 0 });
   const [recentAdmins, setRecentAdmins] = useState([]);
   const [systemOnline, setSystemOnline] = useState(null);
@@ -66,23 +67,21 @@ export default function SuperAdminDashboard() {
   return (
     <DashboardLayout>
       <div className="superadmin-dashboard v7-portal">
-        <section className="portal-hero superadmin-hero">
-          <div className="portal-hero-copy">
-            <span className="portal-kicker"><Sparkles size={14} /> GOVERNANCE · INTELLIGENCE · CONTROL</span>
-            <h1>The Benevolent MIDAX control room.</h1>
-            <p>See the whole platform at a glance, protect the data, and move quickly when something needs your attention.</p>
-            <div className="portal-hero-actions">
-              <a className="portal-primary-btn super-primary" href="/superadmin/data-integrity"><DatabaseZap size={17} /> Data integrity</a>
-              <a className="portal-secondary-btn" href="/superadmin/admins"><UserPlus size={17} /> Add administrator</a>
-              <button className="portal-ghost-btn" onClick={loadDashboard} disabled={loading}><RefreshCw size={16} /> {loading ? "Refreshing…" : "Refresh"}</button>
-            </div>
-          </div>
-          <div className="control-room-orbit" aria-hidden="true">
-            <div className="control-orbit-core"><Gauge size={29} /><span>CONTROL</span><strong>{statistics.total}</strong><small>administrators</small></div>
-            <div className="control-float one"><ShieldCheck size={15} /> Protected</div>
-            <div className="control-float two"><Activity size={15} /> Live</div>
-          </div>
-        </section>
+        <AnimatedWelcomeDashboardHero
+          role="superadmin"
+          displayName={user?.fullName || user?.name || "SuperAdmin"}
+          subtitle="Your Benevolent MIDAX management center is ready."
+          actions={<>
+            <a className="portal-primary-btn super-primary" href="/superadmin/data-integrity"><DatabaseZap size={17} /> Data integrity</a>
+            <a className="portal-secondary-btn" href="/superadmin/admins"><UserPlus size={17} /> Add administrator</a>
+            <button className="portal-ghost-btn" onClick={loadDashboard} disabled={loading}><RefreshCw size={16} /> {loading ? "Refreshing…" : "Refresh"}</button>
+          </>}
+          summary={<>
+            <span>Members</span><strong>{Number(overview?.members?.total ?? 0)}</strong>
+            <span>Admins</span><strong>{Number(overview?.leadership?.administrators ?? statistics.total)}</strong>
+            <span>Pending support</span><strong>{Number(overview?.support?.pending ?? 0)}</strong>
+          </>}
+        />
 
         {error && <div className="portal-alert"><ShieldAlert size={18} /> {error}</div>}
 

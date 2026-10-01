@@ -40,11 +40,12 @@ router.get("/community-stats", protect, getCommunityStats);
 // PROFILE
 // ===============================
 
-router.get("/profile", protect, getProfile);
+router.get("/profile", protect, isMember, getProfile);
 
 router.put(
   "/profile",
   protect,
+  isMember,
   setUploadType("profiles"),
   uploadFields([
     { name: "profileImage", maxCount: 1 },
@@ -103,7 +104,7 @@ router.post(
 // CHAT MEMBERS
 // ===============================
 
-router.get("/chat-members", protect, isChatUser, profileCompleted, getChatMembers);
+router.get("/chat-members", protect, isChatUser, getChatMembers);
 
 // ===============================
 // SETTINGS

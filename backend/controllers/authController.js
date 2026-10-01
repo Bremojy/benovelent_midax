@@ -29,6 +29,35 @@ const { setAuthCookies, clearAuthCookies } = require("../utils/authCookies");
 
 
 
+const DEFAULT_STUN_SERVERS = [
+  "stun:stun.l.google.com:19302",
+  "stun:stun1.l.google.com:19302",
+];
+
+exports.webrtcConfig = async (_req, res) => {
+  const iceServers = DEFAULT_STUN_SERVERS.map((urls) => ({ urls }));
+  const turnUrls = String(process.env.TURN_SERVER_URL || "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+  const turnUsername = String(process.env.TURN_USERNAME || "").trim();
+  const turnCredential = String(process.env.TURN_CREDENTIAL || "").trim();
+
+  // TURN credentials stay server-side and are only supplied at runtime to an
+  // authenticated chat user. Providers that support ephemeral TURN credentials
+  // should issue short-lived credentials through this endpoint instead.
+  if (turnUrls.length && turnUsername && turnCredential) {
+    iceServers.push({
+      urls: turnUrls,
+      username: turnUsername,
+      credential: turnCredential,
+    });
+  }
+
+  res.set("Cache-Control", "private, no-store");
+  return res.json({ success: true, iceServers });
+};
+
 exports.socketTicket = async (req, res) => {
   try {
     if (!process.env.JWT_SECRET) {

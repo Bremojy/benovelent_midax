@@ -8,6 +8,7 @@ const router = express.Router();
 
 const authController = require("../controllers/authController");
 const { csrfEndpoint } = require("../middleware/csrfMiddleware");
+const { isChatUser } = require("../middleware/roleMiddleware");
 
 // =====================================================
 // MIDDLEWARE
@@ -28,6 +29,7 @@ const {
  */
 router.get("/csrf", csrfEndpoint);
 router.get("/socket-ticket", protect, authController.socketTicket);
+router.get("/webrtc-config", protect, isChatUser, authController.webrtcConfig);
 
 router.post(
     "/login",

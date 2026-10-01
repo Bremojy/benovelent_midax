@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  Activity,
   ArrowUpRight,
   Bell,
   CheckCircle2,
@@ -10,7 +9,6 @@ import {
   Newspaper,
   RefreshCw,
   ShieldCheck,
-  Sparkles,
   Users,
   Wallet,
   UserCheck,
@@ -19,6 +17,8 @@ import {
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import DashboardLayout from "../../layouts/DashboardLayout";
+import { useAuth } from "../../context/AuthContext";
+import AnimatedWelcomeDashboardHero from "../../components/dashboard/AnimatedWelcomeDashboardHero";
 import {
   getAdminDashboard,
   getRecentMembers,
@@ -35,6 +35,7 @@ const money = (value) =>
   }).format(Number(value || 0));
 
 export default function AdminDashboard() {
+  const { user } = useAuth();
   const [stats, setStats] = useState({});
   const [recent, setRecent] = useState([]);
   const [contrib, setContrib] = useState({});
@@ -96,23 +97,21 @@ export default function AdminDashboard() {
   return (
     <DashboardLayout>
       <div className="admin-dashboard v7-portal">
-        <section className="portal-hero admin-hero">
-          <div className="portal-hero-copy">
-            <span className="portal-kicker"><Sparkles size={14} /> OPERATIONS · PEOPLE · ACTION</span>
-            <h1>Run Benevolent MIDAX with clarity.</h1>
-            <p>One live workspace for members, support, communication and daily administration.</p>
-            <div className="portal-hero-actions">
-              <Link className="portal-primary-btn" to="/admin/members"><Users size={17} /> Manage members</Link>
-              <Link className="portal-secondary-btn" to="/admin/support"><HandHeart size={17} /> Review support</Link>
-              <button className="portal-ghost-btn" onClick={load}><RefreshCw size={16} /> Refresh</button>
-            </div>
-          </div>
-          <div className="portal-hero-orbit" aria-hidden="true">
-            <div className="orbit-glow" />
-            <div className="orbit-card"><Activity size={18} /><span>LIVE PRESENCE</span><strong>{stats.onlineMembers || 0}</strong><small>members currently online</small></div>
-            <div className="orbit-mini"><CheckCircle2 size={16} /> System active</div>
-          </div>
-        </section>
+        <AnimatedWelcomeDashboardHero
+          role="admin"
+          displayName={user?.fullName || user?.name || stats?.adminProfile?.name || "Admin"}
+          subtitle="Here’s your Benevolent MIDAX operations overview."
+          actions={<>
+            <Link className="portal-primary-btn" to="/admin/members"><Users size={17} /> Manage members</Link>
+            <Link className="portal-secondary-btn" to="/admin/support"><HandHeart size={17} /> Review support</Link>
+            <button className="portal-ghost-btn" onClick={load}><RefreshCw size={16} /> Refresh</button>
+          </>}
+          summary={<>
+            <span>Members online</span><strong>{Number(stats.onlineMembers || 0)}</strong>
+            <span>Support pending</span><strong>{Number(stats.pendingSupport?.total || 0)}</strong>
+            <span>Unread</span><strong>{Number(stats.unreadNotifications || 0)}</strong>
+          </>}
+        />
 
         {error && <div className="portal-alert">{error}</div>}
 
