@@ -23,5 +23,11 @@ assert(
   memberAccounts.includes('loadConstitution({ start: yearStart, end: today });'),
   "member Accounts must load its safe default ledger period automatically"
 );
+assert(
+  memberAccounts.includes('if (nextStart) params.startDate = nextStart;') &&
+  memberAccounts.includes('if (nextEnd) params.endDate = nextEnd;') &&
+  !memberAccounts.includes('setError("Select both a start date and end date first.")'),
+  "member Accounts must allow the no-date default ledger request instead of blocking it in the UI"
+);
 
 console.log("PASS member ledger default-period contract verified");

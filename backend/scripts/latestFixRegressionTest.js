@@ -14,6 +14,7 @@ const frontendPrint = [
   read('src/pages/News.jsx'),
 ];
 const integrityPrint = read('src/pages/superadmin/SuperAdminDataIntegrity.jsx');
+const portalShellCss = read('src/styles/portal-shell-final.css');
 
 assert(/const \{ getCurrentBookBalance \} = require\("\.\.\/services\/financeLedgerService"\);/.test(superadmin), 'SuperAdmin overview imports the authoritative live book balance service');
 assert(/let action = "deleted"/.test(financeController) && /action = "archived"/.test(financeController), 'finance deletion always executes as delete or audit archive');
@@ -25,4 +26,7 @@ assert(exists('backend/assets/print-letterhead.jpg'), 'server printhead JPEG ass
 assert(/letterheadDataUri/.test(dataIntegrity) && /print-letterhead\.png/.test(dataIntegrity), 'human-readable database print/download embeds the same printhead');
 for (const page of frontendPrint) assert(/openPrintDocument/.test(page), 'print action uses shared printhead document helper');
 assert(/buildPrintHeadHtml/.test(integrityPrint) && /printHeadStyles/.test(integrityPrint), 'integrity report print action uses the shared printhead markup/styles');
-pass('latest production-error fixes, delete execution and printhead coverage verified');
+assert(/dashboard-mobile-shell \.dashboard-sidebar\.mobile-bottom-nav/.test(portalShellCss) && /sidebar-menu-group \{\s*display: contents !important;/.test(portalShellCss), 'mobile bottom navigation flattens grouped menu markup into the fixed dock grid');
+assert(/height: calc\(var\(--dashboard-bottom-nav-height, 76px\) \+ env\(safe-area-inset-bottom\)\) !important;/.test(portalShellCss), 'mobile bottom navigation has an explicit fixed height including safe-area inset');
+assert(/scroll-padding-bottom: calc\(var\(--dashboard-bottom-nav-height, 76px\) \+ env\(safe-area-inset-bottom\) \+ 28px\) !important;/.test(portalShellCss), 'mobile content reserves scroll space for the bottom dock');
+pass('latest production-error fixes, delete execution, printhead and mobile dock coverage verified');
