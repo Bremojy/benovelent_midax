@@ -38,7 +38,7 @@ export default function AdminFinance() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [editingContribution, setEditingContribution] = useState(null);
   const [contributionForm, setContributionForm] = useState({ expectedAmount: "", paidAmount: "", paymentMethod: "Payroll", receiptNumber: "", mpesaCode: "", paymentDate: today, notes: "" });
-  const [bulkForm, setBulkForm] = useState({ month: new Date().getMonth() + 1, year: new Date().getFullYear(), amount: "500", paymentDate: today, recordAsCollected: true, notes: "Monthly payroll deduction" });
+  const [bulkForm, setBulkForm] = useState({ month: new Date().getMonth() + 1, year: new Date().getFullYear(), amount: "", paymentDate: today, recordAsCollected: true, notes: "Monthly payroll deduction" });
   const [bulkSaving, setBulkSaving] = useState(false);
   const [community, setCommunity] = useState([]);
   const [manualMpesa, setManualMpesa] = useState([]);
@@ -68,7 +68,12 @@ export default function AdminFinance() {
       const [s, t, c, l, communityRes, manualRes, mpesaRes, b2cRes, mpesaListRes] = await Promise.all(requests);
       setSummary(s.data?.summary || s.data || {});
       setTransactions(Array.isArray(t.data?.transactions) ? t.data.transactions : []);
-      setContributions(Array.isArray(c.data?.contributions) ? c.data.contributions : []);
+      const liveContributions = Array.isArray(c.data?.contributions) ? c.data.contributions : [];
+      setContributions(liveContributions);
+      const configuredMonthlyContribution = c.data?.summary?.monthlyContribution;
+      if (configuredMonthlyContribution !== undefined && configuredMonthlyContribution !== null && Number.isFinite(Number(configuredMonthlyContribution))) {
+        setBulkForm((current) => ({ ...current, amount: current.amount || String(Number(configuredMonthlyContribution)) }));
+      }
       setLedger(l.data || null);
       setCommunity(Array.isArray(communityRes.data?.campaigns) ? communityRes.data.campaigns : []);
       setManualMpesa(Array.isArray(manualRes?.data?.transactions) ? manualRes.data.transactions : []);
@@ -120,7 +125,7 @@ export default function AdminFinance() {
       category: transaction?.category || "",
       amount: transaction?.amount || "",
       description: transaction?.description || "",
-      paymentMethod: transaction?.paymentMethod || "M-PESA",
+      paymentMethod: transaction?.type === "contribution" ? "Payroll" : (transaction?.paymentMethod || "M-PESA"),
       referenceNumber: transaction?.referenceNumber || "",
       receiptNumber: transaction?.receiptNumber || "",
       transactionDate: transaction?.transactionDate ? new Date(transaction.transactionDate).toISOString().slice(0, 10) : today,
@@ -475,10 +480,10 @@ export default function AdminFinance() {
           <form onSubmit={saveTransaction} className="portal-form-grid">
             <label className="portal-field"><span>Benevolent MIDAX Number</span><input type="text" autoComplete="off" value={form.employeeNumber} onChange={(e) => setForm({ ...form, employeeNumber: e.target.value })} placeholder="Enter Benevolent MIDAX Number" inputMode="text" required={form.type === "contribution" || form.type === "claim" || form.type === "refund"} /></label>
             <label className="portal-field"><span>Date</span><input type="date" value={form.transactionDate} onChange={(e) => setForm({ ...form, transactionDate: e.target.value })} required /></label>
-            <label className="portal-field"><span>Type</span><select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}><option value="contribution">Contribution</option><option value="claim">Support / Claim</option><option value="expense">Expense</option><option value="income">Income</option><option value="refund">Refund</option><option value="withdrawal">Withdrawal</option><option value="adjustment">Adjustment</option></select></label>
+            <label className="portal-field"><span>Type</span><select value={form.type} onChange={(e) => { const type = e.target.value; setForm({ ...form, type, paymentMethod: type === "contribution" ? "Payroll" : form.paymentMethod }); }}><option value="contribution">Contribution</option><option value="claim">Support / Claim</option><option value="expense">Expense</option><option value="income">Income</option><option value="refund">Refund</option><option value="withdrawal">Withdrawal</option><option value="adjustment">Adjustment</option></select></label>
             <label className="portal-field"><span>Category</span><input type="text" inputMode="text" autoComplete="off" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} placeholder="Salary, funeral support, etc." /></label>
             <label className="portal-field"><span>Amount</span><input type="number" inputMode="decimal" min="0" step="0.01" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} required /></label>
-            <label className="portal-field"><span>Payment Method</span><select value={form.paymentMethod || "M-PESA"} onChange={(e) => setForm({ ...form, paymentMethod: e.target.value })}><option value="M-PESA">M-PESA</option><option value="Bank">Bank</option><option value="Cash">Cash</option><option value="Cheque">Cheque</option><option value="Payroll">Payroll / Payslip</option></select></label>
+            <label className="portal-field"><span>Payment Method</span><select value={form.type === "contribution" ? "Payroll" : (form.paymentMethod || "M-PESA")} onChange={(e) => setForm({ ...form, paymentMethod: e.target.value })}>{form.type === "contribution" ? <option value="Payroll">Payroll / Payslip</option> : <><option value="M-PESA">M-PESA</option><option value="Bank">Bank</option><option value="Cash">Cash</option><option value="Cheque">Cheque</option><option value="Payroll">Payroll / Payslip</option></>}</select></label>
             <label className="portal-field"><span>Reference Number</span><input type="text" value={form.referenceNumber} onChange={(e) => setForm({ ...form, referenceNumber: e.target.value })} /></label>
             <label className="portal-field"><span>Receipt Number</span><input type="text" value={form.receiptNumber} onChange={(e) => setForm({ ...form, receiptNumber: e.target.value })} /></label>
             <label className="portal-field"><span>Description</span><textarea rows="3" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></label>

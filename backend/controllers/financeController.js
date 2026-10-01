@@ -47,9 +47,32 @@ exports.createTransaction = async (req, res) => {
         if (type === "contribution" && !["member", "admin", "all"].includes(scope)) {
             return res.status(400).json({ success: false, message: "Select whether the contribution is from a member, admin/leader, or all members and admins." });
         }
+        let contributionLink = null;
+        let contributionPeriod = null;
         if (scope === "member") {
             if (!memberId) return res.status(400).json({ success: false, message: "Benevolent MIDAX Number is required for a member contribution." });
             if (!await Member.exists({ _id: memberId })) return res.status(404).json({ success: false, message: "Benevolent MIDAX Number not found." });
+            if (type === "contribution") {
+                const paymentDate = transactionDate ? new Date(transactionDate) : new Date();
+                if (Number.isNaN(paymentDate.getTime())) return res.status(400).json({ success: false, message: "A valid contribution date is required." });
+                contributionPeriod = {
+                    month: paymentDate.getUTCMonth() + 1,
+                    year: paymentDate.getUTCFullYear(),
+                    paymentDate,
+                };
+                contributionLink = await Contribution.findOne({
+                    member: memberId,
+                    month: contributionPeriod.month,
+                    year: contributionPeriod.year,
+                });
+                if (contributionLink && (contributionLink.finance || Number(contributionLink.paidAmount || 0) > 0)) {
+                    return res.status(409).json({
+                        success: false,
+                        code: "CONTRIBUTION_ALREADY_RECORDED",
+                        message: `A payroll contribution for ${contributionPeriod.month}/${contributionPeriod.year} already exists for this member. Update the existing contribution record instead of creating a duplicate financial event.`,
+                    });
+                }
+            }
         } else if (scope === "admin") {
             memberId = null;
             const requesterRole = String(req.user?.role || "").toLowerCase();
@@ -84,17 +107,65 @@ exports.createTransaction = async (req, res) => {
         } else if (scope === "all") {
             contributorName = "All members & admins";
         }
+        const transactionDateValue = transactionDate ? new Date(transactionDate) : new Date();
+        if (Number.isNaN(transactionDateValue.getTime())) return res.status(400).json({ success: false, message: "A valid transaction date is required." });
+
         const transaction = await Finance.create({
             member: memberId,
             transactionNumber: generateTransactionNumber(),
             type, category, amount: Number(amount), description, paymentMethod: type === "contribution" ? "Payroll" : paymentMethod,
             referenceNumber, receiptNumber, notes,
             contributorType: scope, contributor, contributorModel, contributorName,
-            transactionDate: transactionDate ? new Date(transactionDate) : new Date(),
+            transactionDate: transactionDateValue,
             status: "approved",
             approvedBy: req.user._id,
             approvedAt: new Date(),
         });
+
+        // A member payroll contribution is one business event represented by
+        // both the finance ledger and the member-facing Contribution record.
+        // Direct finance-entry forms must create/link that canonical companion
+        // record instead of leaving the member portal on a different source.
+        if (type === "contribution" && scope === "member" && contributionPeriod) {
+            try {
+                if (!contributionLink) {
+                    contributionLink = new Contribution({
+                        member: memberId,
+                        finance: transaction._id,
+                        month: contributionPeriod.month,
+                        year: contributionPeriod.year,
+                        expectedAmount: Number(amount),
+                        paidAmount: Number(amount),
+                        paymentDate: contributionPeriod.paymentDate,
+                        source: "payroll",
+                        paymentMethod: "Payroll",
+                        receiptNumber: receiptNumber || "",
+                        mpesaCode: referenceNumber || "",
+                        status: "paid",
+                        approvedBy: req.user._id,
+                        approvedAt: new Date(),
+                        notes: notes || "",
+                    });
+                } else {
+                    contributionLink.finance = transaction._id;
+                    contributionLink.expectedAmount = Number(contributionLink.expectedAmount || amount);
+                    contributionLink.paidAmount = Number(amount);
+                    contributionLink.paymentDate = contributionPeriod.paymentDate;
+                    contributionLink.source = "payroll";
+                    contributionLink.paymentMethod = "Payroll";
+                    contributionLink.receiptNumber = receiptNumber || contributionLink.receiptNumber || "";
+                    contributionLink.mpesaCode = referenceNumber || contributionLink.mpesaCode || "";
+                    contributionLink.approvedBy = req.user._id;
+                    contributionLink.approvedAt = new Date();
+                    contributionLink.notes = notes || contributionLink.notes || "";
+                }
+                await contributionLink.save();
+            } catch (syncError) {
+                await Finance.findByIdAndDelete(transaction._id).catch(() => {});
+                throw new Error(`Contribution/finance synchronization failed: ${syncError.message}`);
+            }
+        }
+
         if (memberId) {
             await Notification.create({
                 recipient: memberId,
