@@ -59,6 +59,13 @@ export default function Support() {
   const [editingRequest, setEditingRequest] = useState(null);
   const [editDraft, setEditDraft] = useState({ description: "", amount: "", documents: [] });
   const [editBusy, setEditBusy] = useState(false);
+  const [requiredFiles, setRequiredFiles] = useState({
+    feeStructure: null,
+    admissionLetter: null,
+    deathCertificate: null,
+    burialPermit: null,
+    chiefLetter: null,
+  });
 
   const load = async () => {
     try {
@@ -196,11 +203,17 @@ export default function Support() {
     setSuccess("");
 
     try {
-      if (activeAttachments.length < 2) throw new Error("Please upload at least two supporting documents.");
-      const categories = new Set(activeAttachments.map((item) => String(item.category || "Other").trim().toLowerCase()));
-      if (categories.size < 2) throw new Error("Please use at least two different document categories.");
-      const invalidOther = activeAttachments.some((item) => String(item.category || "").toLowerCase() === "other" && !String(item.customCategory || "").trim());
-      if (invalidOther) throw new Error("For documents marked Other, provide a custom category name.");
+      const validateGeneralAttachments = () => {
+        if (activeAttachments.length < 2) throw new Error("Please upload at least two supporting documents.");
+        const categories = new Set(activeAttachments.map((item) => {
+          const category = String(item.category || "Other").trim().toLowerCase();
+          return category === "other" && item.customCategory ? item.customCategory.trim().toLowerCase() : category;
+        }));
+        if (categories.size < 2) throw new Error("Please use at least two different document categories.");
+        if (activeAttachments.some((item) => String(item.category || "").toLowerCase() === "other" && !String(item.customCategory || "").trim())) {
+          throw new Error("For documents marked Other, provide a custom category name.");
+        }
+      };
       setSubmitting(true);
 
       let endpoint;
@@ -217,6 +230,7 @@ export default function Support() {
         formData.append("hospitalLocation", form.hospitalLocation.trim());
         formData.append("diagnosis", form.diagnosis.trim());
         formData.append("requestedAmount", String(Number(form.requestedAmount)));
+        validateGeneralAttachments();
         attachFiles(formData);
       } else if (form.type === "funeral") {
         if (!form.deceasedName || !form.relationship || !form.dateOfDeath || !form.burialDate || !form.burialLocation || Number(form.requestedAmount) <= 0) {
@@ -224,6 +238,8 @@ export default function Support() {
         }
 
         endpoint = "/funeral/apply";
+        if (form.deceasedType === "Dependent" && !form.dependentId) throw new Error("Select the dependent linked to the funeral case.");
+        if (!requiredFiles.deathCertificate || !requiredFiles.burialPermit || !requiredFiles.chiefLetter) throw new Error("Death certificate, burial permit and chief/local authority letter are required.");
         Object.entries({
           deceasedType: form.deceasedType,
           deceasedName: form.deceasedName.trim(),
@@ -232,9 +248,12 @@ export default function Support() {
           burialDate: form.burialDate,
           burialLocation: form.burialLocation.trim(),
           requestedAmount: Number(form.requestedAmount),
+          ...(form.deceasedType === "Dependent" ? { dependent: form.dependentId } : {}),
         }).forEach(([key, value]) => formData.append(key, String(value)));
-
-        attachFiles(formData);
+        formData.append("deathCertificate", requiredFiles.deathCertificate);
+        formData.append("burialPermit", requiredFiles.burialPermit);
+        formData.append("chiefLetter", requiredFiles.chiefLetter);
+        activeAttachments.forEach((item) => formData.append("supportingDocuments", item.file));
       } else if (form.type === "education") {
         const educationPolicy = policies.find((policy) => policy.slug === "education-policy");
         if (!educationPolicy) throw new Error("The Education Policy is not currently configured or enabled.");
@@ -248,16 +267,18 @@ export default function Support() {
         }
 
         endpoint = "/education/apply";
+        if (!requiredFiles.feeStructure || !requiredFiles.admissionLetter) throw new Error("Fee structure and admission letter are required for Education Support.");
         Object.entries({
           dependentId: form.dependentId,
-          purpose: form.purpose.trim(),
           school: form.school.trim(),
           admissionNumber: form.admissionNumber.trim(),
+          purpose: form.purpose.trim(),
           requestedAmount: Number(form.requestedAmount),
           repaymentPeriodMonths: form.repaymentPeriodMonths === "" ? undefined : Number(form.repaymentPeriodMonths),
-        }).forEach(([key, value]) => formData.append(key, String(value)));
-
-        attachFiles(formData);
+        }).forEach(([key, value]) => value !== undefined && formData.append(key, String(value)));
+        formData.append("feeStructure", requiredFiles.feeStructure);
+        formData.append("admissionLetter", requiredFiles.admissionLetter);
+        activeAttachments.forEach((item) => formData.append("supportingDocuments", item.file));
       } else {
         const selectedPolicy = policies.find((policy) => `policy:${policy.slug}` === form.type);
         if (!selectedPolicy?.name || !selectedPolicy.enabled) {
@@ -275,6 +296,7 @@ export default function Support() {
         }
         formData.append("description", form.caseDescription.trim());
         formData.append("requestedAmount", String(Number(form.requestedAmount)));
+        validateGeneralAttachments();
         attachFiles(formData);
       }
 
@@ -287,6 +309,7 @@ export default function Support() {
       setSuccess("Your support application and supporting documents were submitted successfully.");
       setForm({ ...initialForm, type: form.type });
       setAttachments([newAttachment()]);
+      setRequiredFiles({ feeStructure: null, admissionLetter: null, deathCertificate: null, burialPermit: null, chiefLetter: null });
       await load();
     } catch (err) {
       setError(err.response?.data?.message || err.message || "Unable to submit support application.");
@@ -368,6 +391,18 @@ export default function Support() {
                       <option value="Dependent">Dependent</option>
                     </select>
                   </Field>
+                  {form.deceasedType === "Dependent" && (
+                    <Field label="Dependent">
+                      <select value={form.dependentId} onChange={(e) => {
+                        const id = e.target.value;
+                        const dep = dependents.find((d) => String(d._id) === String(id));
+                        setForm((current) => ({ ...current, dependentId: id, deceasedName: dep?.fullName || current.deceasedName, relationship: dep?.relationship || current.relationship }));
+                      }}>
+                        <option value="">Select dependent</option>
+                        {dependents.map((d) => <option key={d._id} value={d._id}>{d.fullName || "Dependent"}</option>)}
+                      </select>
+                    </Field>
+                  )}
                   <Field label="Deceased Name"><input type="text" value={form.deceasedName} onChange={(e) => set("deceasedName", e.target.value)} /></Field>
                   <Field label="Relationship"><input type="text" value={form.relationship} onChange={(e) => set("relationship", e.target.value)} /></Field>
                   <div className="support-two-col">
@@ -393,64 +428,69 @@ export default function Support() {
                 </>
               )}
 
-              <div className="support-documents-panel">
-                <div className="support-documents-panel-header">
-                  <div>
-                    <span>DOCUMENTS</span>
-                    <h3>Upload as many files as needed</h3>
-                  </div>
-                  <button type="button" className="support-mini-button" onClick={addAttachment}>
-                    <Plus size={14} /> Add file
-                  </button>
-                </div>
-
-                <div className="support-attachment-list">
-                  {attachments.map((item, index) => (
-                    <div className="support-attachment-row" key={item.id}>
-                      <div className="support-attachment-index">{index + 1}</div>
-                      <div className="support-attachment-fields">
-                        <label>
-                          <span>Category</span>
-                          <select value={item.category} onChange={(e) => updateAttachment(item.id, { category: e.target.value })}>
-                            {DOCUMENT_CATEGORIES.map((category) => (
-                              <option key={category}>{category}</option>
-                            ))}
-                          </select>
-                        </label>
-                        <label>
-                          <span>Label</span>
-                          <input
-                            value={item.label}
-                            onChange={(e) => updateAttachment(item.id, { label: e.target.value })}
-                            placeholder="Receipt, report, letter..."
-                          />
-                        </label>
-                        {item.category === "Other" && (
-                          <label>
-                            <span>Custom category</span>
-                            <input value={item.customCategory} onChange={(e) => updateAttachment(item.id, { customCategory: e.target.value })} placeholder="e.g. Employer letter" maxLength={120} required />
-                          </label>
-                        )}
-                        <label>
-                          <span>File</span>
-                          <input
-                            type="file"
-                            accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx"
-                            onChange={(e) => updateAttachment(item.id, { file: e.target.files?.[0] || null })}
-                          />
-                        </label>
-                      </div>
-                      <button type="button" className="support-mini-button danger" onClick={() => removeAttachment(item.id)} aria-label="Remove file">
-                        <Trash2 size={14} />
-                      </button>
+              {(form.type === "education" || form.type === "funeral") ? (
+                <div className="support-documents-panel">
+                  <div className="support-documents-panel-header">
+                    <div>
+                      <span>REQUIRED DOCUMENTS</span>
+                      <h3>{form.type === "education" ? "Education application documents" : "Funeral case documents"}</h3>
                     </div>
-                  ))}
+                  </div>
+                  {form.type === "education" ? (
+                    <>
+                      <RequiredFileField label="Fee Structure" file={requiredFiles.feeStructure} onChange={(file) => setRequiredFiles((x) => ({ ...x, feeStructure: file }))} />
+                      <RequiredFileField label="Admission Letter" file={requiredFiles.admissionLetter} onChange={(file) => setRequiredFiles((x) => ({ ...x, admissionLetter: file }))} />
+                    </>
+                  ) : (
+                    <>
+                      <RequiredFileField label="Death Certificate" file={requiredFiles.deathCertificate} onChange={(file) => setRequiredFiles((x) => ({ ...x, deathCertificate: file }))} />
+                      <RequiredFileField label="Burial Permit" file={requiredFiles.burialPermit} onChange={(file) => setRequiredFiles((x) => ({ ...x, burialPermit: file }))} />
+                      <RequiredFileField label="Chief / Local Authority Letter" file={requiredFiles.chiefLetter} onChange={(file) => setRequiredFiles((x) => ({ ...x, chiefLetter: file }))} />
+                    </>
+                  )}
+                  <small className="support-file-hint">These required files are sent using the backend field names for this support type.</small>
+                  <div className="support-documents-panel-header" style={{ marginTop: 16 }}>
+                    <div><span>OPTIONAL SUPPORTING DOCUMENTS</span></div>
+                    <button type="button" className="support-mini-button" onClick={addAttachment}><Plus size={14} /> Add file</button>
+                  </div>
+                  <div className="support-attachment-list">
+                    {attachments.map((item, index) => (
+                      <div className="support-attachment-row" key={item.id}>
+                        <div className="support-attachment-index">{index + 1}</div>
+                        <div className="support-attachment-fields">
+                          <label><span>Category</span><select value={item.category} onChange={(e) => updateAttachment(item.id, { category: e.target.value })}>{DOCUMENT_CATEGORIES.map((category) => <option key={category}>{category}</option>)}</select></label>
+                          <label><span>Label</span><input value={item.label} onChange={(e) => updateAttachment(item.id, { label: e.target.value })} placeholder="Supporting document" /></label>
+                          {item.category === "Other" && <label><span>Custom category</span><input value={item.customCategory} onChange={(e) => updateAttachment(item.id, { customCategory: e.target.value })} /></label>}
+                          <label><span>File</span><input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx" onChange={(e) => updateAttachment(item.id, { file: e.target.files?.[0] || null })} /></label>
+                        </div>
+                        <button type="button" className="support-mini-button danger" onClick={() => removeAttachment(item.id)} aria-label="Remove file"><Trash2 size={14} /></button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-
-                <small className="support-file-hint">
-                  Each file is stored separately with its category so admins and superadmins can review them later.
-                </small>
-              </div>
+              ) : (
+                <div className="support-documents-panel">
+                  <div className="support-documents-panel-header">
+                    <div><span>DOCUMENTS</span><h3>Upload as many files as needed</h3></div>
+                    <button type="button" className="support-mini-button" onClick={addAttachment}><Plus size={14} /> Add file</button>
+                  </div>
+                  <div className="support-attachment-list">
+                    {attachments.map((item, index) => (
+                      <div className="support-attachment-row" key={item.id}>
+                        <div className="support-attachment-index">{index + 1}</div>
+                        <div className="support-attachment-fields">
+                          <label><span>Category</span><select value={item.category} onChange={(e) => updateAttachment(item.id, { category: e.target.value })}>{DOCUMENT_CATEGORIES.map((category) => <option key={category}>{category}</option>)}</select></label>
+                          <label><span>Label</span><input value={item.label} onChange={(e) => updateAttachment(item.id, { label: e.target.value })} placeholder="Receipt, report, letter..." /></label>
+                          {item.category === "Other" && <label><span>Custom category</span><input value={item.customCategory} onChange={(e) => updateAttachment(item.id, { customCategory: e.target.value })} placeholder="e.g. Employer letter" maxLength={120} required /></label>}
+                          <label><span>File</span><input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx" onChange={(e) => updateAttachment(item.id, { file: e.target.files?.[0] || null })} /></label>
+                        </div>
+                        <button type="button" className="support-mini-button danger" onClick={() => removeAttachment(item.id)} aria-label="Remove file"><Trash2 size={14} /></button>
+                      </div>
+                    ))}
+                  </div>
+                  <small className="support-file-hint">Each file is stored separately with its category so admins and superadmins can review them later.</small>
+                </div>
+              )
 
               <Field label="Requested Amount (KES)">
                 <input type="number" inputMode="decimal" min="0" step="0.01" value={form.requestedAmount} onChange={(e) => set("requestedAmount", e.target.value)} />
@@ -545,6 +585,16 @@ export default function Support() {
         )}
       </div>
     </DashboardLayout>
+  );
+}
+
+function RequiredFileField({ label, file, onChange }) {
+  return (
+    <div className="support-field">
+      <label>{label} *</label>
+      <input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx" onChange={(e) => onChange(e.target.files?.[0] || null)} required={!file} />
+      <small className="support-file-hint">{file ? file.name : "Choose a file"}</small>
+    </div>
   );
 }
 

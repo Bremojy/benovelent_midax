@@ -145,6 +145,21 @@ app.use((req, res, next) => {
     next();
 });
 
+// Controllers in the legacy codebase still contain some explicit 500 JSON responses.
+// Sanitize those responses at the HTTP boundary so implementation/database details never
+// become normal-user error text; the request ID remains available for server-side tracing.
+app.use((req, res, next) => {
+    const json = res.json.bind(res);
+    res.json = (body) => {
+        const status = Number(res.statusCode || 200);
+        if (status >= 500 && body && body.success === false) {
+            return json({ ...body, message: "The service is temporarily unavailable. Please try again shortly.", error: undefined, requestId: req.requestId || undefined });
+        }
+        return json(body);
+    };
+    next();
+});
+
 app.use(cors(corsOptions));
 app.options(/.*/, cors(corsOptions));
 

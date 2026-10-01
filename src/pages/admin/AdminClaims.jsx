@@ -25,6 +25,9 @@ export default function AdminClaims() {
   const [stage, setStage] = useState("");
   const [remarks, setRemarks] = useState("");
   const [approvedAmount, setApprovedAmount] = useState("");
+  const [paymentReference, setPaymentReference] = useState("");
+  const [repaymentAmount, setRepaymentAmount] = useState("");
+  const [repaymentReference, setRepaymentReference] = useState("");
   const [communityTarget, setCommunityTarget] = useState("");
   const [communityTitle, setCommunityTitle] = useState("");
   const [communityDescription, setCommunityDescription] = useState("");
@@ -62,6 +65,9 @@ export default function AdminClaims() {
     setStage(claim.status || "Pending");
     setRemarks("");
     setApprovedAmount(String(claim.approvedAmount || claim.requestedAmount || ""));
+    setPaymentReference(String(claim.paymentReference || ""));
+    setRepaymentAmount(String(Math.min(Number(claim.balance || 0), Number(claim.monthlyInstallment || claim.balance || 0)) || ""));
+    setRepaymentReference("");
   };
 
   const openCommunity = (claim) => {
@@ -77,7 +83,7 @@ export default function AdminClaims() {
     try {
       setBusy(selected._id);
       setError("");
-      const payload = { status: stage, remarks };
+      const payload = { status: stage, remarks, paymentReference: paymentReference.trim() };
       if (stage === "Approved") payload.approvedAmount = Number(approvedAmount || selected.requestedAmount || 0);
       if (stage === "Rejected") payload.rejectionReason = remarks;
       const { data } = await API.put(`/claims/${selected.sourceType}/${selected._id}/stage`, payload);
@@ -87,6 +93,37 @@ export default function AdminClaims() {
       await load();
     } catch (e) {
       setError(e.response?.data?.message || e.message || "Unable to update claim.");
+    } finally {
+      setBusy("");
+    }
+  };
+
+
+  const recordEducationRepayment = async () => {
+    if (!selected || selected.sourceType !== "education") return;
+    const amount = Number(repaymentAmount);
+    if (!Number.isInteger(amount) || amount <= 0) {
+      setError("Enter a valid whole-number repayment amount.");
+      return;
+    }
+    if (amount > Number(selected.balance || 0)) {
+      setError(`Repayment cannot exceed the current balance of ${money(selected.balance)}.`);
+      return;
+    }
+    if (!repaymentReference.trim()) {
+      setError("A repayment transaction/reference is required.");
+      return;
+    }
+    try {
+      setBusy(`repay-${selected._id}`);
+      setError("");
+      const { data } = await API.put(`/education/${selected._id}/repayment`, { amount, paymentReference: repaymentReference.trim(), method: "MANUAL" });
+      if (!data?.success) throw new Error(data?.message || "Unable to record repayment.");
+      setSuccess(data.message || "Education repayment recorded successfully.");
+      setSelected(null);
+      await load();
+    } catch (e) {
+      setError(e.response?.data?.message || e.message || "Unable to record education repayment.");
     } finally {
       setBusy("");
     }
@@ -209,11 +246,11 @@ export default function AdminClaims() {
   };
 
   const deleteClaim = async (c) => {
-    if (!isSuperAdmin || !await confirmAction("Delete this claim permanently? This cannot be undone.")) return;
+    if (!isSuperAdmin || !await confirmAction("Archive this claim? Financial and audit evidence will be preserved, but it will be removed from active claim lists.")) return;
     try {
       setBusy(`delete-${c._id}`);
       await API.delete(`/claims/${c.sourceType}/${c._id}`);
-      setSuccess("Claim deleted.");
+      setSuccess("Claim archived. Financial and audit evidence was preserved.");
       await load();
     } catch (e) {
       setError(e.response?.data?.message || e.message || "Unable to delete claim.");
@@ -378,7 +415,18 @@ export default function AdminClaims() {
             <div className="portal-modal-head"><div><span>PROFESSIONAL REVIEW</span><h2 id="claim-review-title">Review {typeLabel(selected.supportType)} claim</h2><p><strong>{selected.member?.fullName || "Member"}</strong> • {money(selected.requestedAmount)} requested</p></div><button className="portal-btn secondary" onClick={() => setSelected(null)}>Close</button></div>
             <div className="portal-field"><label htmlFor="claim-stage">Stage</label><select id="claim-stage" value={stage} onChange={(e) => setStage(e.target.value)}>{STAGES.map((x) => <option key={x} value={x}>{x}</option>)}</select></div>
             {stage === "Approved" && <div className="portal-field" style={{ marginTop: 12 }}><label htmlFor="approved-amount">Approved amount</label><input id="approved-amount" type="number" min="0" inputMode="decimal" value={approvedAmount} onChange={(e) => setApprovedAmount(e.target.value)} /></div>}
+            {(stage === "Paid" || stage === "Completed") && <div className="portal-field" style={{ marginTop: 12 }}><label htmlFor="payment-reference">Payment transaction/reference</label><input id="payment-reference" type="text" value={paymentReference} onChange={(e) => setPaymentReference(e.target.value)} placeholder="M-PESA receipt, bank reference, or reconciled transaction ID" required /><small>Required payment evidence before Paid/Completed can be recorded.</small></div>}
             <div className="portal-field" style={{ marginTop: 12 }}><label htmlFor="review-remarks">Professional review notes</label><textarea id="review-remarks" rows="6" value={remarks} onChange={(e) => setRemarks(e.target.value)} placeholder="Record what was checked, what is missing, the eligibility finding, or the approval/rejection reason." /></div>
+            {selected.sourceType === "education" && ["Paid", "Defaulted"].includes(stage) && Number(selected.balance || 0) > 0 && (
+              <section className="portal-panel" style={{ marginTop: 14, background: "#f8fafc" }}>
+                <div className="claim-card-head"><div><span>EDUCATION REPAYMENT</span><h3>Record a verified manual repayment</h3><p>Use this only for a reconciled payment that is not being applied automatically from the member M-PESA flow.</p></div></div>
+                <div className="portal-form-grid">
+                  <div className="portal-field"><label htmlFor="education-repayment-amount">Repayment amount</label><input id="education-repayment-amount" type="number" min="1" max={Number(selected.balance || 0)} value={repaymentAmount} onChange={(e) => setRepaymentAmount(e.target.value)} /></div>
+                  <div className="portal-field"><label htmlFor="education-repayment-reference">Payment reference</label><input id="education-repayment-reference" type="text" value={repaymentReference} onChange={(e) => setRepaymentReference(e.target.value)} placeholder="M-PESA receipt / bank reference" /></div>
+                </div>
+                <button className="portal-btn primary" type="button" onClick={recordEducationRepayment} disabled={busy === `repay-${selected._id}`}>{busy === `repay-${selected._id}` ? "Recording…" : "Record repayment"}</button>
+              </section>
+            )}
             <div className="portal-actions"><button className="portal-btn primary" onClick={saveStage} disabled={busy === selected._id}>{busy === selected._id ? "Saving…" : "Save stage"}</button><button className="portal-btn secondary" onClick={() => setSelected(null)}>Cancel</button></div>
           </section>
         </div>}

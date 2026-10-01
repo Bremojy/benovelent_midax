@@ -34,8 +34,8 @@ function validateTransition(current, next) {
     "Documents Required": ["Under Review", "Eligibility Review", "Rejected", "Cancelled"],
     "Eligibility Review": ["Approval Review", "Documents Required", "Rejected", "Cancelled"],
     "Approval Review": ["Approved", "Documents Required", "Rejected", "Cancelled"],
-    Approved: ["Disbursement Pending", "Paid", "Completed", "Closed"],
-    "Disbursement Pending": ["Paid", "Completed", "Closed"],
+    Approved: ["Disbursement Pending", "Closed"],
+    "Disbursement Pending": ["Paid", "Closed"],
     Paid: ["Completed", "Closed"],
     Completed: [], Rejected: [], Cancelled: [], Closed: []
   };
@@ -57,7 +57,9 @@ exports.updateStage = async (req, res) => {
     const terminalStatuses = ["Closed", "Rejected", "Cancelled"];
     const reopenStatuses = ["Pending", "Under Review", "Documents Required", "Eligibility Review", "Approval Review"];
     const reopening = isSuperAdmin && terminalStatuses.includes(currentStatus) && reopenStatuses.includes(nextStatus);
-    if (!isSuperAdmin && !validateTransition(currentStatus, nextStatus)) return res.status(409).json({ success: false, message: `Cannot move a ${currentStatus} claim directly to ${nextStatus}.` });
+    if (!reopening && !validateTransition(currentStatus, nextStatus)) return res.status(409).json({ success: false, message: `Cannot move a ${currentStatus} claim directly to ${nextStatus}.` });
+    const suppliedPaymentReference = String(req.body?.paymentReference || result.claim.paymentReference || "").trim();
+    if ((nextStatus === "Paid" || nextStatus === "Completed") && !suppliedPaymentReference) return res.status(400).json({ success:false, code:"PAYMENT_EVIDENCE_REQUIRED", message:"A payment transaction/reference is required before a claim can be marked Paid or Completed." });
     if (nextStatus === "Rejected" && !reason && !remarks) return res.status(400).json({ success: false, message: "A rejection reason is required." });
 
     if (req.body?.approvedAmount !== undefined) result.claim.approvedAmount = Math.max(0, Number(req.body.approvedAmount) || 0);
@@ -94,6 +96,12 @@ exports.updateStage = async (req, res) => {
     if ("updatedBy" in result.claim) result.claim.updatedBy = req.user._id;
     if (nextStatus === "Approved" && "approvalDate" in result.claim) result.claim.approvalDate = new Date();
     if (nextStatus === "Disbursement Pending" && "disbursementDate" in result.claim) result.claim.disbursementDate = null;
+    if ((nextStatus === "Paid" || nextStatus === "Completed") && "paymentReference" in result.claim) result.claim.paymentReference = suppliedPaymentReference;
+    if (nextStatus === "Paid" && "paidAmount" in result.claim) {
+      const paidAmount = Number(req.body?.paidAmount ?? result.claim.approvedAmount ?? result.claim.requestedAmount ?? 0);
+      if (!Number.isFinite(paidAmount) || paidAmount <= 0) return res.status(400).json({ success: false, code: "PAID_AMOUNT_REQUIRED", message: "Enter the amount actually paid before marking this claim Paid." });
+      result.claim.paidAmount = paidAmount;
+    }
     if ((nextStatus === "Paid" || nextStatus === "Completed") && "disbursementDate" in result.claim && !result.claim.disbursementDate) result.claim.disbursementDate = new Date();
 
     if (!Array.isArray(result.claim.timeline)) result.claim.timeline = [];
@@ -109,11 +117,25 @@ exports.list = async (req, res) => {
   try {
     const [medical, funeral, education, support] = await Promise.all([
       MedicalSupport.find({ isDeleted: { $ne: true } }).populate("member", "fullName memberNumber phone email profileImage position employer").populate("dependent", "fullName relationship").sort({ createdAt: -1 }).lean(),
-      FuneralSupport.find().populate("member", "fullName memberNumber phone email profileImage position employer").sort({ createdAt: -1 }).lean(),
-      EducationSupport.find().populate("member", "fullName memberNumber phone email profileImage position employer").populate("dependent", "fullName relationship school educationLevel").sort({ createdAt: -1 }).lean(),
-      SupportRequest.find().populate("member", "fullName memberNumber phone email profileImage position employer").sort({ createdAt: -1 }).lean(),
+      FuneralSupport.find({ isDeleted: { $ne: true } }).populate("member", "fullName memberNumber phone email profileImage position employer").sort({ createdAt: -1 }).lean(),
+      EducationSupport.find({ isDeleted: { $ne: true } }).populate("member", "fullName memberNumber phone email profileImage position employer").populate("dependent", "fullName relationship school educationLevel").sort({ createdAt: -1 }).lean(),
+      SupportRequest.find({ isDeleted: { $ne: true } }).populate("member", "fullName memberNumber phone email profileImage position employer").sort({ createdAt: -1 }).lean(),
     ]);
-    const normalize=(key, arr)=>arr.map(x=>({...x, supportType: LABEL_MAP[key], sourceType:key, amount:Number(x.approvedAmount || x.requestedAmount || 0), timeline:Array.isArray(x.timeline)?x.timeline:[]}));
+    const normalize=(key, arr)=>arr.map(x=>({
+      ...x,
+      supportType: LABEL_MAP[key],
+      sourceType:key,
+      amount:Number(x.approvedAmount || x.requestedAmount || 0),
+      timeline:Array.isArray(x.timeline)?x.timeline:[],
+      ...(key === "education" ? {
+        repaymentEnabled: true,
+        interestRate: Number(x.interestRate || 0),
+        repaymentMonths: Number(x.repaymentPeriodMonths || 12),
+        monthlyInstallment: Number(x.monthlyInstallment || 0),
+        amountPaid: Number(x.amountPaid || 0),
+        balance: Number(x.balance || 0),
+      } : {}),
+    }));
     const claims=[...normalize("medical",medical),...normalize("funeral",funeral),...normalize("education",education),...normalize("support",support)].sort((a,b)=>new Date(b.createdAt||b.applicationDate)-new Date(a.createdAt||a.applicationDate));
     res.json({ success:true, count:claims.length, claims, stages:STAGES });
   } catch (error) { res.status(500).json({ success:false, message:error.message }); }
@@ -126,8 +148,13 @@ exports.remove = async (req, res) => {
       return res.status(403).json({ success: false, message: "Only SuperAdmin can delete a claim." });
     }
     const result = await getClaim(req.params.type, req.params.id);
-    await result.claim.deleteOne();
-    return res.json({ success: true, message: `${LABEL_MAP[result.key]} claim deleted successfully.` });
+    if (result.claim.isDeleted) return res.status(409).json({ success:false, code:"CLAIM_ALREADY_ARCHIVED", message:"This claim has already been archived." });
+    result.claim.isDeleted = true;
+    result.claim.deletedAt = new Date();
+    result.claim.deletedBy = req.user._id;
+    await result.claim.save();
+    await createAuditLog({ user:req.user._id, userRole:"superadmin", action:"ARCHIVE", module:"Claim", description:`Archived ${LABEL_MAP[result.key]} claim ${result.claim._id}`, req, metadata:{ claimId:String(result.claim._id), claimType:result.key, memberId:String(result.claim.member || "") } });
+    return res.json({ success: true, message: `${LABEL_MAP[result.key]} claim archived. Financial and audit evidence has been preserved.` });
   } catch (error) {
     return res.status(error.status || 500).json({ success: false, message: error.message });
   }

@@ -78,7 +78,9 @@ router.get(
     "/my-applications",
 
     protect,
-
+    verified,
+    memberStatus,
+    profileCompleted,
     getMyApplications
 
 );
@@ -88,7 +90,9 @@ router.get(
     "/:id",
 
     protect,
-
+    verified,
+    memberStatus,
+    profileCompleted,
     getApplicationById
 
 );

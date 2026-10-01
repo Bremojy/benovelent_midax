@@ -5,6 +5,7 @@ const Member = require("../models/Member");
 const Dependent = require("../models/Dependent");
 const createNotification =
 require("../utils/createNotification");
+const createAuditLog = require("../utils/createAuditLog");
 
 // ======================================================
 // APPLY FOR EDUCATION SUPPORT
@@ -20,9 +21,6 @@ exports.applyEducationSupport = async (req, res) => {
       purpose,
       requestedAmount,
       repaymentPeriodMonths,
-      feeStructure,
-      admissionLetter,
-      supportingDocuments,
     } = req.body;
 
     // =====================================
@@ -70,7 +68,8 @@ exports.applyEducationSupport = async (req, res) => {
     // VALIDATE AMOUNT
     // =====================================
 
-    if (!requestedAmount || requestedAmount <= 0) {
+    const numericRequestedAmount = Number(requestedAmount);
+    if (!Number.isInteger(numericRequestedAmount) || numericRequestedAmount <= 0) {
       return res.status(400).json({
         success: false,
         message: "Invalid requested amount.",
@@ -78,12 +77,13 @@ exports.applyEducationSupport = async (req, res) => {
     }
 
     const policyMinimum = Number(educationPolicy.minAmount || 0);
-    const policyMaximum = Number(educationPolicy.maxAmount || 0);
-    if (policyMinimum > 0 && Number(requestedAmount) < policyMinimum) {
+    const configuredMaximum = Number(educationPolicy.maxAmount || 20000);
+    const policyMaximum = Math.min(configuredMaximum > 0 ? configuredMaximum : 20000, 20000);
+    if (policyMinimum > 0 && numericRequestedAmount < policyMinimum) {
       return res.status(400).json({ success: false, message: `Minimum Education Policy amount is KSh ${policyMinimum.toLocaleString("en-KE")}.` });
     }
-    if (policyMaximum > 0 && Number(requestedAmount) > policyMaximum) {
-      return res.status(400).json({ success: false, message: `Maximum Education Policy amount is KSh ${policyMaximum.toLocaleString("en-KE")}.` });
+    if (numericRequestedAmount > policyMaximum) {
+      return res.status(400).json({ success: false, message: `Maximum Education Support amount is KSh ${policyMaximum.toLocaleString("en-KE")}.` });
     }
 
     // =====================================
@@ -93,11 +93,17 @@ exports.applyEducationSupport = async (req, res) => {
     const activeLoan =
       await EducationSupport.findOne({
         member: member._id,
+        isDeleted: { $ne: true },
         status: {
           $in: [
             "Pending",
+            "Under Review",
+            "Documents Required",
+            "Eligibility Review",
+            "Approval Review",
             "Approved",
-            "Disbursed",
+            "Disbursement Pending",
+            "Paid",
           ],
         },
       });
@@ -156,6 +162,9 @@ exports.applyEducationSupport = async (req, res) => {
 
     const feeStructureFile = req.files?.feeStructure?.[0];
     const admissionLetterFile = req.files?.admissionLetter?.[0];
+    if (!feeStructureFile || !admissionLetterFile) {
+      return res.status(400).json({ success: false, code: "REQUIRED_DOCUMENTS_MISSING", message: "Fee structure and admission letter are required for Education Support." });
+    }
     const supportingFiles = (req.files?.supportingDocuments || []).map(
       file => fileUrl(file)
     );
@@ -174,21 +183,21 @@ exports.applyEducationSupport = async (req, res) => {
         dependentName: dependent.fullName,
         relationship: dependent.relationship,
 
-        school: dependent.school,
+        school: String(req.body.school || dependent.school || "").trim(),
         admissionNumber:
-          dependent.admissionNumber,
+          String(req.body.admissionNumber || dependent.admissionNumber || "").trim(),
         educationLevel:
           dependent.educationLevel,
 
         purpose,
 
-        requestedAmount,
+        requestedAmount: numericRequestedAmount,
 
         repaymentPeriodMonths: Number(repaymentPeriodMonths) || Number(educationPolicy.repaymentMonths) || 12,
 
-        feeStructure: fileUrl(feeStructureFile) || feeStructure,
+        feeStructure: fileUrl(feeStructureFile),
 
-        admissionLetter: fileUrl(admissionLetterFile) || admissionLetter,
+        admissionLetter: fileUrl(admissionLetterFile),
 
         supportingDocuments: [
           ...(Array.isArray(supportingDocuments) ? supportingDocuments : []),
@@ -261,6 +270,7 @@ exports.getMyApplications = async (req, res) => {
   try {
     const applications = await EducationSupport.find({
       member: req.user._id,
+      isDeleted: { $ne: true },
     })
       .populate(
         "dependent",
@@ -291,7 +301,7 @@ exports.getMyApplications = async (req, res) => {
 exports.getApplicationById = async (req, res) => {
   try {
     const application =
-      await EducationSupport.findById(req.params.id)
+      await EducationSupport.findOne({ _id: req.params.id, isDeleted: { $ne: true } })
         .populate(
           "member",
           "memberNumber fullName email phone"
@@ -362,7 +372,7 @@ exports.getAllApplications = async (req, res) => {
     const skip =
       (page - 1) * limit;
 
-    const filter = {};
+    const filter = { isDeleted: { $ne: true } };
 
     if (req.query.status) {
       filter.status = req.query.status;
@@ -464,7 +474,7 @@ exports.getEducationSummary = async (req, res) => {
 
     const disbursed =
       await EducationSupport.countDocuments({
-        status: "Disbursed",
+        status: "Disbursement Pending",
       });
 
     const completed =
@@ -624,7 +634,6 @@ exports.approveApplication = async (req, res) => {
     application.approvalDate = new Date();
     application.approvedBy = req.user._id;
     application.approvedByModel = req.user.role === "superadmin" ? "SuperAdmin" : "Admin";
-    application.approvedByModel = req.user.role === "superadmin" ? "SuperAdmin" : "Admin";
     application.remarks =
       req.body.remarks || "";
 
@@ -779,16 +788,12 @@ exports.disburseFunds = async (req, res) => {
     if (application.status !== "Approved") {
       return res.status(400).json({
         success: false,
-        message: "Application must be approved first.",
+        message: "Only an approved Education Support application can be moved to Disbursement Pending.",
       });
     }
 
-    application.status = "Disbursed";
-    application.disbursementDate = new Date();
-
-    application.paymentReference =
-      req.body.paymentReference || "";
-
+    application.status = "Disbursement Pending";
+    application.disbursementDate = null;
     await application.save();
     await createNotification({
 
@@ -803,10 +808,10 @@ exports.disburseFunds = async (req, res) => {
             ? "SuperAdmin"
             : "Admin",
 
-    title: "Education Funds Disbursed",
+    title: "Education Support awaiting disbursement",
 
     message:
-        `Your Education Support funds of KSh ${application.approvedAmount} have been disbursed successfully. Reference: ${application.paymentReference}`,
+        `Your Education Support application for KSh ${application.approvedAmount} is approved and awaiting verified payment.`,
 
     type: "education",
 
@@ -820,7 +825,7 @@ exports.disburseFunds = async (req, res) => {
 
     res.json({
       success: true,
-      message: "Funds disbursed successfully.",
+      message: "Education Support moved to Disbursement Pending. Record Paid only after a verified payment reference is available.",
       application,
     });
 
@@ -845,18 +850,24 @@ exports.recordRepayment = async (req, res) => {
 
   try {
 
-    const amount =
-      Number(req.body.amount);
+    const amount = Number(req.body.amount);
+    const paymentReference = String(req.body.paymentReference || req.body.reference || "").trim();
 
-    if (!amount || amount <= 0) {
+    if (!Number.isInteger(amount) || amount <= 0) {
       return res.status(400).json({
         success: false,
-        message: "Invalid repayment amount.",
+        message: "Enter a valid whole-number repayment amount.",
+      });
+    }
+    if (!paymentReference) {
+      return res.status(400).json({
+        success: false,
+        code: "PAYMENT_EVIDENCE_REQUIRED",
+        message: "A payment transaction/reference is required before recording a manual repayment.",
       });
     }
 
-    const application =
-      await EducationSupport.findById(req.params.id);
+    const application = await EducationSupport.findById(req.params.id);
 
     if (!application) {
       return res.status(404).json({
@@ -864,22 +875,47 @@ exports.recordRepayment = async (req, res) => {
         message: "Application not found.",
       });
     }
+    if (!(application.status === "Paid" || application.status === "Defaulted")) {
+      return res.status(400).json({
+        success: false,
+        message: "Repayment can only be recorded after Education Support has been paid and evidenced.",
+      });
+    }
+    if (Number(application.balance) <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: "This education loan is already fully repaid.",
+      });
+    }
+    if (amount > Number(application.balance)) {
+      return res.status(400).json({
+        success: false,
+        message: "Repayment cannot exceed the current Education Support balance.",
+      });
+    }
+    if (Array.isArray(application.repayments) && application.repayments.some((entry) => String(entry.reference || "").trim().toUpperCase() === paymentReference.toUpperCase())) {
+      return res.status(409).json({ success: false, code: "DUPLICATE_REPAYMENT_REFERENCE", message: "This repayment reference has already been recorded." });
+    }
 
     application.amountPaid += amount;
-
-    application.balance -= amount;
-
-    if (application.balance < 0) {
-      application.balance = 0;
-    }
+    application.balance = Math.max(0, Number(application.balance) - amount);
+    application.repayments = Array.isArray(application.repayments) ? application.repayments : [];
+    application.repayments.push({ amount, reference: paymentReference, paidAt: new Date(), method: String(req.body.method || "MANUAL").trim() || "MANUAL" });
 
     if (application.balance === 0) {
       application.status = "Completed";
-      application.completionDate =
-        new Date();
+      application.completionDate = new Date();
     }
 
     await application.save();
+    await createAuditLog({
+      action: "EDUCATION_REPAYMENT_RECORDED",
+      performedBy: req.user._id,
+      performedByModel: req.user.role === "superadmin" ? "SuperAdmin" : "Admin",
+      entityType: "EducationSupport",
+      entityId: application._id,
+      details: { amount, paymentReference, remainingBalance: application.balance },
+    });
     await createNotification({
 
     recipient: application.member,

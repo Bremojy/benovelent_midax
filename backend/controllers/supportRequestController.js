@@ -1,6 +1,7 @@
 const SupportRequest = require("../models/SupportRequest");
 const Policy = require("../models/Policy");
 const { resolveStoredFileUrl } = require("../utils/uploadUrl");
+const createAuditLog = require("../utils/createAuditLog");
 
 const safeParse = (value, fallback) => {
   if (value === undefined || value === null || value === "") return fallback;
@@ -308,10 +309,27 @@ exports.update = async (req, res) => {
       return res.status(404).json({ success: false, message: "Support request not found." });
     }
 
-    const { status, approvedAmount, rejectionReason, remarks } = req.body;
+    const { status, approvedAmount, rejectionReason, remarks, paymentReference } = req.body;
 
-    if (status) item.status = status;
-    if (approvedAmount !== undefined) item.approvedAmount = Number(approvedAmount) || 0;
+    if (status) {
+      const allowed = {
+        Pending: ["Under Review", "Documents Required", "Rejected", "Cancelled"],
+        "Under Review": ["Documents Required", "Eligibility Review", "Approval Review", "Rejected", "Cancelled"],
+        "Documents Required": ["Under Review", "Eligibility Review", "Rejected", "Cancelled"],
+        "Eligibility Review": ["Approval Review", "Documents Required", "Rejected", "Cancelled"],
+        "Approval Review": ["Approved", "Documents Required", "Rejected", "Cancelled"],
+        Approved: ["Disbursement Pending", "Closed"],
+        "Disbursement Pending": ["Paid", "Closed"],
+        Paid: ["Completed", "Closed"],
+        Completed: [], Rejected: [], Cancelled: [], Closed: [],
+      };
+      const current = String(item.status || "Pending");
+      if (current !== status && !allowed[current]?.includes(status)) return res.status(409).json({ success: false, message: `Cannot move a ${current} support request directly to ${status}.` });
+      if ((status === "Paid" || status === "Completed") && !String(paymentReference || item.paymentReference || "").trim()) return res.status(400).json({ success: false, code: "PAYMENT_EVIDENCE_REQUIRED", message: "A payment transaction/reference is required before this support request can be finalized." });
+      item.status = status;
+      if ((status === "Paid" || status === "Completed") && "paymentReference" in item) item.paymentReference = String(paymentReference || item.paymentReference || "").trim();
+    }
+    if (approvedAmount !== undefined) item.approvedAmount = Math.max(0, Number(approvedAmount) || 0);
     if (rejectionReason !== undefined) item.rejectionReason = rejectionReason;
     if (remarks !== undefined) item.remarks = remarks;
 
@@ -342,6 +360,14 @@ exports.remove = async (req, res) => {
       return res.status(404).json({ success: false, message: "Support request not found." });
     }
 
+    await createAuditLog({
+      action: "DELETE_SUPPORT_REQUEST",
+      performedBy: req.user._id,
+      performedByModel: req.user.role === "superadmin" ? "SuperAdmin" : "Admin",
+      entityType: "SupportRequest",
+      entityId: item._id,
+      details: { status: item.status, member: item.member, approvedAmount: item.approvedAmount },
+    });
     await SupportRequest.deleteOne({ _id: item._id });
 
     return res.json({

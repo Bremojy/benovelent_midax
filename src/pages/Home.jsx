@@ -34,7 +34,7 @@ export default function Home() {
     <main className="public-modern-page">
       <section className="modern-section">
         <div className="modern-section-head">
-          <span className="eyebrow">BENOVELENT FUND SCHEME</span>
+          <span className="eyebrow">BENEVOLENT FUND SCHEME</span>
           <h2>Better life is better when you stand together.</h2>
           {settingsLoading ? <p aria-live="polite">Loading current scheme configuration…</p> : settingsError ? <p role="alert">{settingsError}</p> : <p>{settings?.website?.subtitle || settings?.organization?.displayName || "Current scheme information is configured by SuperAdmin."}</p>}
           <div className="modern-trust-band" aria-label="Current scheme settings">

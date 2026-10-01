@@ -16,6 +16,9 @@ const {
 
 const { verifyToken: protect } = require("../middleware/authMiddleware");
 const { isAdminOrSuperAdmin, isMember } = require("../middleware/roleMiddleware");
+const verified = require("../middleware/verifiedMiddleware");
+const memberStatus = require("../middleware/memberStatusMiddleware");
+const profileCompleted = require("../middleware/profileCompletionMiddleware");
 
 // ==========================================
 // CONTRIBUTION ROUTES
@@ -32,7 +35,7 @@ router.get("/", protect, isAdminOrSuperAdmin, getContributions);
 router.post("/bulk", protect, isAdminOrSuperAdmin, createBulkContributionRun);
 
 // Get all contributions for one member
-router.get("/member/:memberId", protect, getMemberContributions);
+router.get("/member/:memberId", protect, verified, memberStatus, profileCompleted, getMemberContributions);
 
 // Get one contribution
 router.get("/:id", protect, getContribution);

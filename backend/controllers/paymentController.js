@@ -34,7 +34,7 @@ async function ensureReferenceExists(referenceModel, referenceId) {
 async function applyEducationRepayment(transaction) {
   const application = await EducationSupport.findOne({ _id: transaction.referenceId, member: transaction.member });
   if (!application) throw new Error("Education loan was not found.");
-  if (!["Approved", "Disbursed", "Defaulted", "Completed"].includes(application.status)) throw new Error("This education loan is not open for repayment.");
+  if (!["Paid", "Defaulted"].includes(application.status)) throw new Error("Education loan repayment is available only after the approved support has been paid and evidenced.");
   const amount = Number(transaction.amount);
   if (!Number.isInteger(amount) || amount < 1) throw new Error("Invalid repayment amount.");
   if (Array.isArray(application.repayments) && application.repayments.some((entry) => String(entry.paymentTransactionId || "") === String(transaction._id))) return application;
@@ -325,6 +325,7 @@ exports.stk = async (req, res) => {
     if (purpose === "loan_repayment") {
       const application = await EducationSupport.findById(referenceId);
       if (!application || String(application.member) !== String(req.user._id)) return res.status(404).json({ success: false, message: "Education loan not found." });
+      if (!(application.status === "Paid" || application.status === "Defaulted")) return res.status(400).json({ success: false, message: "Education loan repayment is available only after the approved support has been paid and evidenced." });
       if (Number(application.balance) <= 0) return res.status(400).json({ success: false, message: "This education loan is already fully repaid." });
       if (amount > Number(application.balance)) return res.status(400).json({ success: false, message: "Repayment cannot exceed the current loan balance." });
       referenceModel = "EducationSupport";

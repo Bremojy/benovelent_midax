@@ -18,7 +18,7 @@ assert(medicalGet, 'medical single-application handler must be present');
 assert(/role === "member"/.test(medicalGet), 'medical single-application handler must distinguish member access');
 assert(/_id:\s*req\.params\.id,\s*member:\s*req\.user\._id/.test(medicalGet), 'medical members must be scoped to their own application records');
 assert(/\["member",\s*"admin",\s*"superadmin"\]/.test(medicalGet), 'medical handler must reject unsupported authenticated roles');
-assert(/router\.get\(\s*"\/:id",\s*verifyToken,\s*medicalController\.getApplicationById\s*\)/.test(medicalRoutes), 'medical single-application route must remain authenticated');
+assert(/router\.get\(\s*"\/:id",\s*verifyToken,\s*isMember,\s*verified,\s*memberStatus,\s*profileCompleted,\s*medicalController\.getApplicationById\s*\)/.test(medicalRoutes), 'medical single-application route must remain authenticated and member-gated');
 
 const communityStart = paymentController.indexOf('exports.communityCases = async');
 const communityEnd = paymentController.indexOf('exports.myCommunityCases', communityStart);
@@ -29,7 +29,7 @@ assert(communityGet, 'community-assistance listing handler must be present');
 assert(/const recipientProjection = isAdminView/.test(communityGet), 'community-assistance recipient fields must vary by viewer role');
 assert(/"_id fullName profileImage"/.test(communityGet), 'ordinary members must receive only the safe beneficiary projection');
 assert(/phone mpesaNumber/.test(communityGet), 'administrator community view may retain operational beneficiary contact fields');
-assert(/router\.get\("\/community-assistance",\s*protect,\s*isMember,\s*controller\.communityCases\)/.test(paymentRoutes), 'member community-assistance listing must remain member-only');
+assert(/router\.get\("\/community-assistance",\s*protect,\s*verified,\s*memberStatus,\s*profileCompleted,\s*isMember,\s*controller\.communityCases\)/.test(paymentRoutes), 'member community-assistance listing must remain verified, active and complete member-only');
 
 
 const pollStart = pollController.indexOf('exports.getPollById = async');

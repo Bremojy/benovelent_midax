@@ -54,6 +54,10 @@ exports.applyFuneralSupport = async (req, res) => {
 
         } = req.body;
 
+        if (!["Member", "Dependent"].includes(String(deceasedType || ""))) {
+            return res.status(400).json({ success:false, code:"INVALID_DECEASED_TYPE", message:"Deceased type must be Member or Dependent." });
+        }
+
         // ==========================================
         // ELIGIBILITY CHECK
         // ==========================================
@@ -89,6 +93,12 @@ exports.applyFuneralSupport = async (req, res) => {
         const deathCertificateFile = req.files?.deathCertificate?.[0];
         const burialPermitFile = req.files?.burialPermit?.[0];
         const chiefLetterFile = req.files?.chiefLetter?.[0];
+        if (!deathCertificateFile || !burialPermitFile || !chiefLetterFile) {
+            return res.status(400).json({ success:false, code:"REQUIRED_DOCUMENTS_MISSING", message:"Death certificate, burial permit and chief/local authority letter are required for Funeral Support." });
+        }
+        if (deceasedType === "Dependent" && !dependent) {
+            return res.status(400).json({ success:false, code:"DEPENDENT_REQUIRED", message:"Select the dependent for this Funeral Support application." });
+        }
         const supportingFiles = (req.files?.supportingDocuments || []).map(
             file => fileUrl(file)
         );
@@ -866,11 +876,15 @@ exports.recordPayment = async (req,res)=>{
 
         }
 
+        if (!["Disbursement Pending"].includes(String(application.status || ""))) {
+            return res.status(400).json({ success:false, message:"Funeral Support must be approved or awaiting disbursement before payment can be recorded." });
+        }
+        const paymentReference = String(req.body.paymentReference || "").trim();
+        if (!paymentReference) return res.status(400).json({ success:false, code:"PAYMENT_EVIDENCE_REQUIRED", message:"A payment transaction/reference is required before Funeral Support can be marked Paid." });
+
         application.status="Paid";
 
-        application.paymentReference=
-
-        req.body.paymentReference;
+        application.paymentReference=paymentReference;
 
         application.paymentMethod=
 

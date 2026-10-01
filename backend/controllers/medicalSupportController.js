@@ -917,7 +917,8 @@ exports.markAsPaid = async (req, res) => {
 
         const {
 
-            paidAmount
+            paidAmount,
+            paymentReference
 
         } = req.body;
 
@@ -939,10 +940,20 @@ exports.markAsPaid = async (req, res) => {
 
         }
 
+        if (!["Disbursement Pending"].includes(String(application.status || ""))) {
+            return res.status(400).json({ success: false, message: "Medical Support must be approved and awaiting disbursement before payment can be recorded." });
+        }
+
+        const reference = String(paymentReference || "").trim();
+        if (!reference) {
+            return res.status(400).json({ success: false, code: "PAYMENT_EVIDENCE_REQUIRED", message: "A payment transaction/reference is required before Medical Support can be marked Paid." });
+        }
+        const amount = Number(paidAmount ?? application.approvedAmount ?? application.requestedAmount ?? 0);
+        if (!Number.isFinite(amount) || amount <= 0) return res.status(400).json({ success: false, message: "Enter a valid paid amount." });
+
         application.status = "Paid";
-
-        application.paidAmount = paidAmount;
-
+        application.paidAmount = amount;
+        application.paymentReference = reference;
         application.paymentDate = new Date();
 
         application.processedBy = req.user._id;

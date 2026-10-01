@@ -9,7 +9,7 @@
     "lint": "oxlint",
     "preview": "node node_modules/vite/bin/vite.js preview",
     "vercel-build": "npm run build && node scripts/verify-vercel-assets.mjs",
-    "test": "npm run test:package && npm run test:backend-syntax && npm run test:frontend-imports && npm run test:integrity && npm run test:routes && npm run test:menu-routes && npm run test:finance && npm run test:notification && npm run test:chat-notifications && npm run test:dependent && npm run test:access-control && npm run test:error-handling && npm run test:report && npm run test:mpesa && npm run test:presence && npm run test:superadmin-chat && npm run test:production-contracts && npm run test:latest-fixes && npm run business-policy && npm run test:platform-search-activity && npm run test:verified-repairs",
+    "test": "npm run test:package && npm run test:backend-syntax && npm run test:frontend-imports && npm run test:integrity && npm run test:routes && npm run test:menu-routes && npm run test:finance && npm run test:notification && npm run test:chat-notifications && npm run test:dependent && npm run test:access-control && npm run test:error-handling && npm run test:report && npm run test:mpesa && npm run test:presence && npm run test:superadmin-chat && npm run test:production-contracts && npm run test:latest-fixes && npm run business-policy && npm run test:platform-search-activity && npm run test:verified-repairs && npm run test:workflow-integrity",
     "test:package": "node backend/scripts/packageContractTest.js",
     "test:backend-syntax": "node backend/scripts/backendSyntaxTest.js",
     "test:integrity": "node backend/scripts/staticIntegrityTest.js",
@@ -31,7 +31,8 @@
     "test:error-handling": "node backend/scripts/errorHandlingRegressionTest.js",
     "test:platform-search-activity": "node backend/scripts/platformSearchActivityRegressionTest.js",
     "test:verified-repairs": "node backend/scripts/verifiedRepairRegressionTest.js",
-    "test:chat-notifications": "node backend/scripts/chatNotificationReliabilityRegressionTest.js"
+    "test:chat-notifications": "node backend/scripts/chatNotificationReliabilityRegressionTest.js",
+    "test:workflow-integrity": "node backend/scripts/workflowIntegrityRegressionTest.js"
   },
   "dependencies": {
     "axios": "^1.18.1",

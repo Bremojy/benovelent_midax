@@ -120,7 +120,7 @@ export default function InstallPWA() {
       </button>
       <div className="pwa-install-sheet-icon"><Download size={22} /></div>
       <div className="pwa-install-sheet-copy">
-        <span>BENOVELENT MIDAX</span>
+        <span>BENEVOLENT MIDAX</span>
         <h2>{directInstall ? "Install Benevolent MIDAX" : iosMode ? "Add to Home Screen" : "Installation notice"}</h2>
         {directInstall ? (
           <p>Install the portal for a faster, app-like experience and easier access on your device.</p>

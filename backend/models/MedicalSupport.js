@@ -107,6 +107,12 @@ const medicalSupportSchema = new mongoose.Schema(
         type:Date
     },
 
+    paymentReference:{
+        type:String,
+        trim:true,
+        default:""
+    },
+
     // ==========================
     // DOCUMENTS
     // ==========================
@@ -214,10 +220,9 @@ const medicalSupportSchema = new mongoose.Schema(
         ref:"Admin"
     },
 
-    isDeleted:{
-        type:Boolean,
-        default:false
-    }
+    isDeleted:{ type:Boolean, default:false, index:true },
+    deletedAt:{ type:Date, default:null },
+    deletedBy:{ type:mongoose.Schema.Types.ObjectId, default:null }
 
 },
 {

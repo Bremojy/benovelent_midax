@@ -73,6 +73,7 @@ const supportRequestSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    paymentReference: { type: String, trim: true, default: "" },
     repaymentEnabled: { type: Boolean, default: false },
     repaymentMonths: { type: Number, default: 12, min: 1, max: 120 },
     interestRate: { type: Number, default: 0, min: 0 },
@@ -106,6 +107,10 @@ const supportRequestSchema = new mongoose.Schema(
         },
       },
     ],
+    isDeleted: { type: Boolean, default: false, index: true },
+    deletedAt: { type: Date, default: null },
+    deletedBy: { type: mongoose.Schema.Types.ObjectId, default: null },
+
   },
   { timestamps: true }
 );

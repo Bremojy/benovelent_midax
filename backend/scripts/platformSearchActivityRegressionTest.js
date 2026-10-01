@@ -8,7 +8,7 @@ const routes = fs.readFileSync(path.join(root, "routes", "platformRoutes.js"), "
 const fail = (message) => { throw new Error(message); };
 const assert = (condition, message) => condition || fail(message);
 
-assert(/router\.get\("\/search",\s*protect,\s*controller\.search\)/.test(routes), "Global search must remain authenticated.");
+assert(/router\.get\("\/search",\s*protect,\s*verified,\s*memberStatus,\s*profileCompleted,\s*controller\.search\)/.test(routes), "Global search must remain authenticated and member-gated.");
 assert(/News\.find\(\{/.test(controller) && /published:\s*true/.test(controller), "Search must scope public news to published records.");
 assert(!/const root = path\.join\(documentRoot\)/.test(controller), "Global search must not scan the private document root.");
 assert(/const publicRoot = path\.join\(__dirname, "\.\.", "\.\.", "public", "documents"\)/.test(controller), "Global search must use the bundled public-document directory only.");

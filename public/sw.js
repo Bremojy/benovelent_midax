@@ -57,12 +57,12 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("push", (event) => {
   let payload = {};
-  try { payload = event.data ? event.data.json() : {}; } catch { payload = { body: event.data?.text?.() || "You have a new Benovelent MIDAX update." }; }
+  try { payload = event.data ? event.data.json() : {}; } catch { payload = { body: event.data?.text?.() || "You have a new Benevolent MIDAX update." }; }
 
   const type = String(payload?.data?.type || payload?.type || "notification").toLowerCase();
   const isIncomingCall = ["incoming_call", "audio_call", "video_call"].includes(type) || Boolean(payload?.data?.incomingCall);
   const isMissedCall = ["missed_call", "missed_audio_call", "missed_video_call"].includes(type) || Boolean(payload?.data?.missedCall);
-  const title = payload.title || (isIncomingCall ? (type === "video_call" ? "Incoming video call" : "Incoming audio call") : isMissedCall ? "Missed call" : "Benovelent MIDAX");
+  const title = payload.title || (isIncomingCall ? (type === "video_call" ? "Incoming video call" : "Incoming audio call") : isMissedCall ? "Missed call" : "Benevolent MIDAX");
   const options = {
     body: payload.body || (isIncomingCall ? "Someone is calling you." : isMissedCall ? "You missed a call." : "You have a new update."),
     icon: payload.icon || "/pwa-icon-192.png",
@@ -84,7 +84,7 @@ self.addEventListener("push", (event) => {
   event.waitUntil((async () => {
     if (isIncomingCall) {
       const openClients = await clients.matchAll({ type: "window", includeUncontrolled: true });
-      await Promise.all(openClients.map((client) => client.postMessage({ type: "BENOVELENT_INCOMING_CALL", payload })));
+      await Promise.all(openClients.map((client) => client.postMessage({ type: "BENEVOLENT_INCOMING_CALL", payload })));
       const callId = String(payload?.data?.callId || `call-${Date.now()}`);
       const incomingPayload = payload?.data?.incomingPayload || {};
       const callData = {

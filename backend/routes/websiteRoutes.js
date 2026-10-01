@@ -4,6 +4,7 @@ const router = express.Router();
 const {
   getWebsiteContent,
   getWebsiteSettings,
+  getWebsiteManagementContent,
   getGallery,
   getConstitution,
   uploadConstitutionFile,
@@ -24,6 +25,7 @@ const { uploadSingle, setUploadType } = require("../middleware/upload");
 
 router.get("/", getWebsiteContent);
 router.get("/settings", getWebsiteSettings);
+router.get("/manage", protect, isSuperAdmin, getWebsiteManagementContent);
 router.get("/gallery", getGallery);
 router.get("/constitution", getConstitution);
 

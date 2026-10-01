@@ -58,6 +58,9 @@ router.post(
 router.get(
     "/my-applications",
     protect,
+    requireVerifiedMember,
+    profileCompleted,
+    requireActiveMember,
     getMyApplications
 );
 
@@ -65,6 +68,9 @@ router.get(
 router.get(
     "/:id",
     protect,
+    requireVerifiedMember,
+    profileCompleted,
+    requireActiveMember,
     getApplicationById
 );
 

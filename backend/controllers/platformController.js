@@ -73,7 +73,7 @@ exports.activityCenter = async (req, res) => {
 
   const [notifications, support, conversations, audits] = await Promise.all([
     Notification.find({ recipient, recipientModel }).sort({ createdAt: -1 }).limit(15).lean(),
-    SupportRequest.find(supportFilter).sort({ updatedAt: -1 }).limit(8).lean(),
+    SupportRequest.find({ ...supportFilter, isDeleted: { $ne: true } }).sort({ updatedAt: -1 }).limit(8).lean(),
     Conversation.find(conversationFilter).sort({ lastMessageTime: -1 }).limit(8).lean(),
     AuditLog.find(auditFilter).sort({ createdAt: -1 }).limit(8).lean(),
   ]);
@@ -179,6 +179,7 @@ exports.search = async (req, res) => {
     const [support, medical, funeral, education, contributions, messages, notifications] = await Promise.all([
       SupportRequest.find({
         member: memberId,
+        isDeleted: { $ne: true },
         $or: [{ supportType: regex }, { policyName: regex }, { description: regex }, { status: regex }],
       })
         .select("supportType policyName status requestedAmount approvedAmount createdAt updatedAt")
@@ -196,6 +197,7 @@ exports.search = async (req, res) => {
         .lean(),
       FuneralSupport.find({
         member: memberId,
+        isDeleted: { $ne: true },
         $or: [{ deceasedName: regex }, { burialLocation: regex }, { status: regex }, { memberNumber: regex }],
       })
         .select("member memberNumber deceasedName burialLocation status requestedAmount approvedAmount rejectionReason createdAt")
@@ -204,6 +206,7 @@ exports.search = async (req, res) => {
         .lean(),
       EducationSupport.find({
         member: memberId,
+        isDeleted: { $ne: true },
         $or: [{ school: regex }, { dependentName: regex }, { purpose: regex }, { status: regex }, { memberNumber: regex }],
       })
         .select("member memberNumber dependentName school purpose status requestedAmount approvedAmount rejectionReason createdAt")
@@ -256,6 +259,7 @@ exports.search = async (req, res) => {
         .limit(12)
         .lean(),
       SupportRequest.find({
+        isDeleted: { $ne: true },
         $or: [{ supportType: regex }, { policyName: regex }, { description: regex }, { status: regex }],
       })
         .populate("member", "fullName memberNumber")
@@ -273,6 +277,7 @@ exports.search = async (req, res) => {
         .limit(8)
         .lean(),
       FuneralSupport.find({
+        isDeleted: { $ne: true },
         $or: [{ deceasedName: regex }, { burialLocation: regex }, { status: regex }, { memberNumber: regex }],
       })
         .select("member memberNumber deceasedName burialLocation status requestedAmount approvedAmount rejectionReason createdAt")
@@ -281,6 +286,7 @@ exports.search = async (req, res) => {
         .limit(8)
         .lean(),
       EducationSupport.find({
+        isDeleted: { $ne: true },
         $or: [{ school: regex }, { dependentName: regex }, { purpose: regex }, { status: regex }, { memberNumber: regex }],
       })
         .select("member memberNumber dependentName school purpose status requestedAmount approvedAmount rejectionReason createdAt")

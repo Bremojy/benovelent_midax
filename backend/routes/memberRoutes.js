@@ -69,11 +69,12 @@ router.get("/summary", protect, getSummary);
 router.get(
   "/contributions",
   protect,
+  profileCompleted,
   getMemberContributions
 );
 
-router.get("/finance", protect, getMemberTransactions);
-router.get("/accounts", protect, getMemberAccounts);
+router.get("/finance", protect, profileCompleted, getMemberTransactions);
+router.get("/accounts", protect, profileCompleted, getMemberAccounts);
 
 // ===============================
 // MEMBER CLAIMS / SUPPORT HISTORY
@@ -82,6 +83,7 @@ router.get("/accounts", protect, getMemberAccounts);
 router.get(
   "/claims",
   protect,
+  profileCompleted,
   getClaims
 );
 
@@ -90,6 +92,7 @@ router.post(
   "/claims",
   protect,
   isMember,
+  profileCompleted,
   setUploadType("documents"),
   uploadArray("documents", 30),
   supportRequestController.create
@@ -100,7 +103,7 @@ router.post(
 // CHAT MEMBERS
 // ===============================
 
-router.get("/chat-members", protect, isChatUser, getChatMembers);
+router.get("/chat-members", protect, isChatUser, profileCompleted, getChatMembers);
 
 // ===============================
 // SETTINGS
@@ -130,6 +133,7 @@ router.get(
 router.get(
   "/benefits",
   protect,
+  profileCompleted,
   getEligibility
 );
 

@@ -15,7 +15,6 @@ const EducationSupport = require("../models/EducationSupport");
 const MedicalSupport = require("../models/MedicalSupport");
 const FuneralSupport = require("../models/FuneralSupport");
 const { resolveStoredFileUrl } = require("../utils/uploadUrl");
-const { deleteMemberPermanently } = require("../utils/permanentAccountDeletion");
 const generateTemporaryPassword = require("../utils/generateTemporaryPassword");
 const { createNotification } = require("../services/notificationService");
 const { getCurrentBookBalance } = require("../services/financeLedgerService");
@@ -925,32 +924,41 @@ exports.activateMember = async (req,res)=>{
 
 exports.deleteMember = async (req, res) => {
   try {
-    const result = await deleteMemberPermanently(req.params.id);
+    const member = await Member.findById(req.params.id);
+    if (!member) {
+      return res.status(404).json({ success: false, message: "Member not found." });
+    }
+    if (member.isDeleted) {
+      return res.status(409).json({ success: false, message: "Member is already archived." });
+    }
+
+    member.isDeleted = true;
+    member.deletedAt = new Date();
+    member.deletedBy = req.user._id;
+    member.status = "inactive";
+    await member.save();
 
     await createAuditLog({
       user: req.user._id,
-      userRole: "superadmin",
-      action: "DELETE_PERMANENTLY",
+      userRole: req.user.role || "superadmin",
+      action: "ARCHIVE_MEMBER",
       module: "Member",
-      description: `Permanently deleted member ${result.member.fullName || result.member.memberNumber || result.member.email || req.params.id} and linked personal/chat records.`,
-      metadata: {
-        deletedMemberId: String(result.member._id),
-        summary: result.summary,
-      },
+      description: `Archived member ${member.fullName || member.memberNumber || member.email || req.params.id} without deleting linked records.`,
+      metadata: { archivedMemberId: String(member._id) },
       req,
     });
 
     return res.json({
       success: true,
-      permanent: true,
-      message: "Member and all linked personal and chat records were permanently deleted.",
-      summary: result.summary,
+      archived: true,
+      message: "Member archived successfully. Linked records were preserved.",
+      member: { _id: member._id, status: member.status, isDeleted: member.isDeleted, deletedAt: member.deletedAt },
     });
   } catch (error) {
-    console.error("Permanent member deletion error:", error);
-    return res.status(error.statusCode || 500).json({
+    console.error("Member archive error:", error);
+    return res.status(500).json({
       success: false,
-      message: error.message || "Unable to permanently delete member.",
+      message: "Unable to archive member right now. Please try again.",
     });
   }
 };
@@ -979,10 +987,20 @@ exports.restoreMember = async (req,res)=>{
     }
 
     member.isDeleted = false;
-
+    member.deletedAt = null;
+    member.deletedBy = null;
     member.status = "active";
-
     await member.save();
+
+    await createAuditLog({
+      user: req.user._id,
+      userRole: req.user.role || "superadmin",
+      action: "RESTORE_MEMBER",
+      module: "Member",
+      description: `Restored member ${member.fullName || member.memberNumber || member.email || req.params.id}.`,
+      metadata: { restoredMemberId: String(member._id) },
+      req,
+    });
 
     res.json({
 

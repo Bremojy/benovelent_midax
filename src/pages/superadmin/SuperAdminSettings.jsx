@@ -36,7 +36,6 @@ const SECTION_FIELDS = [
   { key: "gallery", label: "Gallery" },
   { key: "privacy-policy", label: "Privacy Policy" },
   { key: "terms-conditions", label: "Terms & Conditions" },
-  { key: "settings", label: "Website Settings" },
 ];
 
 const THEMES = [
@@ -135,12 +134,11 @@ export default function SuperAdminSettings({ initialTab = "website" }) {
     const load = async () => {
       try {
         setLoading(true);
-        const [websiteRes, carouselRes, leadersRes, galleryRes, settingsRes, systemRes] = await Promise.allSettled([
-          API.get("/website"),
+        const [websiteRes, carouselRes, leadersRes, galleryRes, systemRes] = await Promise.allSettled([
+          API.get("/website/manage"),
           API.get("/carousel"),
           API.get("/leaders"),
           API.get("/website/gallery"),
-          API.get("/website/settings"),
           API.get("/superadmin/settings"),
         ]);
 
@@ -163,12 +161,6 @@ export default function SuperAdminSettings({ initialTab = "website" }) {
           setSections(nextSections);
         }
 
-        if (settingsRes.status === "fulfilled") {
-          const settingsContent = settingsRes.value.data?.section?.content || settingsRes.value.data?.settings || {};
-          const color = settingsContent.themeColor || settingsContent.accentColor;
-          if (color) setThemeColor(color);
-        }
-
         if (systemRes?.status === "fulfilled") {
           const safe = systemRes.value.data?.settings || {};
           const next = {
@@ -182,7 +174,10 @@ export default function SuperAdminSettings({ initialTab = "website" }) {
             notificationReadiness: { ...systemForm.notificationReadiness, ...(safe.notificationReadiness || {}) },
             featureToggles: safe.featureToggles || {},
           };
-          setSystemSettings(safe); setSystemForm(next); setSystemUpdatedAt(safe.updatedAt || null);
+          setSystemSettings(safe);
+          setSystemForm(next);
+          setSystemUpdatedAt(safe.updatedAt || null);
+          if (safe.branding?.accentColor) setThemeColor(safe.branding.accentColor);
         }
 
         if (carouselRes.status === "fulfilled") {
@@ -199,7 +194,7 @@ export default function SuperAdminSettings({ initialTab = "website" }) {
         }
         const failures = [
           [websiteRes, "website content"], [carouselRes, "carousel"], [leadersRes, "leaders"],
-          [galleryRes, "gallery"], [settingsRes, "website settings"], [systemRes, "system settings"],
+          [galleryRes, "gallery"], [systemRes, "system settings"],
         ].filter(([result]) => result.status === "rejected").map(([, label]) => label);
         if (failures.length) setError(`Unable to load ${failures.join(", ")}. Loaded sections remain visible, but failed sections were not replaced with fake data.`);
       } catch (err) {
@@ -235,7 +230,7 @@ export default function SuperAdminSettings({ initialTab = "website" }) {
         subtitle: item.subtitle,
         description: item.description,
         published: item.published,
-        content: key === "settings" ? { themeColor, accentColor: themeColor } : { body: item.content },
+        content: { body: item.content },
       };
 
       const exists = Boolean(item.title || item.subtitle || item.description || item.content);
@@ -269,34 +264,28 @@ export default function SuperAdminSettings({ initialTab = "website" }) {
 
   const saveTheme = async () => {
     try {
-      setSavingKey("settings");
+      setSystemSaving(true);
       setError("");
-      const payload = {
-        title: "Website Settings",
-        subtitle: "Brand color and public website preferences",
-        description: "Managed by the superadmin portal.",
-        content: {
-          themeColor,
+      const { data } = await API.put("/superadmin/settings", {
+        ...systemForm,
+        branding: {
+          ...systemForm.branding,
           accentColor: themeColor,
         },
-        published: true,
-      };
-      const { data } = await API.put("/website/settings", payload).catch(async (err) => {
-        if (err.response?.status === 404) {
-          return await API.post("/website", { section: "settings", ...payload });
-        }
-        throw err;
       });
-      const savedColor = data?.section?.content?.themeColor || themeColor;
+      const savedColor = data?.settings?.branding?.accentColor || themeColor;
+      setSystemSettings(data?.settings || null);
+      setSystemUpdatedAt(data?.updatedAt || null);
+      setSystemForm((prev) => ({ ...prev, ...(data?.settings || {}), branding: { ...prev.branding, ...(data?.settings?.branding || {}) } }));
       document.documentElement.style.setProperty("--orange", savedColor);
       document.documentElement.style.setProperty("--orange-dark", savedColor);
       document.documentElement.style.setProperty("--portal-accent", savedColor);
       document.documentElement.style.setProperty("--portal-accent-soft", `${savedColor}18`);
-      setMessage("Website theme updated.");
+      setMessage("Website theme updated in the authoritative system settings.");
     } catch (err) {
       setError(err.response?.data?.message || err.message || "Unable to save theme.");
     } finally {
-      setSavingKey("");
+      setSystemSaving(false);
     }
   };
 
@@ -532,7 +521,7 @@ export default function SuperAdminSettings({ initialTab = "website" }) {
           <>
             {activeTab === "website" && (
               <div className="portal-grid">
-                {SECTION_FIELDS.filter((item) => item.key !== "settings").map((item) => (
+                {SECTION_FIELDS.map((item) => (
                   <section className="portal-panel" key={item.key}>
                     <div className="portal-section-title">
                       <Check size={20} />
@@ -617,8 +606,8 @@ export default function SuperAdminSettings({ initialTab = "website" }) {
                 </div>
 
                 <div className="portal-actions">
-                  <button className="portal-btn" type="button" onClick={saveTheme} disabled={savingKey === "settings"}>
-                    <Save size={16} /> {savingKey === "settings" ? "Saving..." : "Save theme"}
+                  <button className="portal-btn" type="button" onClick={saveTheme} disabled={systemSaving}>
+                    <Save size={16} /> {systemSaving ? "Saving..." : "Save theme"}
                   </button>
                   <button className="portal-btn light" type="button" onClick={() => setThemeColor("#ff7a00")}>
                     <RefreshCw size={16} /> Reset to orange

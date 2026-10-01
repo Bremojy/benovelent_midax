@@ -1326,18 +1326,18 @@ exports.getClaims = async (req, res) => {
                 .sort({ createdAt: -1 })
                 .lean(),
 
-            FuneralSupport.find({ member: memberId })
+            FuneralSupport.find({ member: memberId, isDeleted: { $ne: true } })
                 .populate("dependent", "fullName relationship")
                 .sort({ createdAt: -1 })
                 .lean(),
 
-            EducationSupport.find({ member: memberId })
+            EducationSupport.find({ member: memberId, isDeleted: { $ne: true } })
                 .populate("dependent", "fullName relationship")
                 .sort({ createdAt: -1 })
                 .lean(),
 
             require("../models/SupportRequest")
-                .find({ member: memberId })
+                .find({ member: memberId, isDeleted: { $ne: true } })
                 .sort({ createdAt: -1 })
                 .lean(),
         ]);

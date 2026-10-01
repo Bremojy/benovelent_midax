@@ -200,8 +200,13 @@ const educationSupportSchema = new mongoose.Schema(
         paymentTransactionId: { type: mongoose.Schema.Types.ObjectId, ref: "MpesaTransaction", default: null },
         paidAt: { type: Date, default: Date.now },
         method: { type: String, default: "M-PESA" },
+        reference: { type: String, default: "" },
       },
     ],
+    isDeleted: { type: Boolean, default: false, index: true },
+    deletedAt: { type: Date, default: null },
+    deletedBy: { type: mongoose.Schema.Types.ObjectId, default: null },
+
   },
   {
     timestamps: true,

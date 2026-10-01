@@ -1,7 +1,7 @@
 import { confirmAction } from "../../utils/modernDialog";
 
 import { useEffect, useState } from "react";
-import { BellRing, Mail, Phone, UserPlus, Megaphone, MessageSquareText, ClipboardList } from "lucide-react";
+import { BellRing, Mail, Phone, UserPlus, Megaphone, MessageSquareText, ClipboardList, Reply, Archive, CheckCircle2 } from "lucide-react";
 import DashboardLayout from "../../layouts/DashboardLayout";
 import { useAuth } from "../../context/AuthContext";
 import API from "../../services/api";
@@ -25,6 +25,9 @@ export default function AdminSupport() {
   const [smsEnabled, setSmsEnabled] = useState(false);
   const [broadcastRequestId, setBroadcastRequestId] = useState(() => globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`);
   const [deliveryResult, setDeliveryResult] = useState(null);
+  const [contactReplyId, setContactReplyId] = useState("");
+  const [contactReply, setContactReply] = useState("");
+  const [contactBusy, setContactBusy] = useState("");
 
   const load = async () => {
     try {
@@ -121,18 +124,36 @@ export default function AdminSupport() {
     }
   };
 
-  const deleteContactMessage = async (id) => {
-    if (!id) return;
-    if (!await confirmAction("Delete this contact submission?")) return;
+  const updateContactStatus = async (id, status) => {
+    if (!id || !status) return;
     try {
-      setError("");
-      setSuccess("");
-      await API.delete(`/contact/${id}`);
-      setSuccess("Contact submission deleted.");
+      setContactBusy(id); setError(""); setSuccess("");
+      await API.patch(`/contact/${id}`, { status });
+      setSuccess(status === "archived" ? "Contact submission archived." : status === "replied" ? "Contact marked replied." : "Contact marked read.");
       await load();
     } catch (e) {
-      setError(e.response?.data?.message || e.message || "Unable to delete contact submission.");
-    }
+      setError(e.response?.data?.message || e.message || "Unable to update contact message.");
+    } finally { setContactBusy(""); }
+  };
+
+  const replyContactMessage = async (id) => {
+    const body = contactReply.trim();
+    if (!id || !body) { setError("Enter a reply before sending."); return; }
+    try {
+      setContactBusy(id); setError(""); setSuccess("");
+      const { data } = await API.post(`/contact/${id}/reply`, { message: body });
+      setContactReply(""); setContactReplyId("");
+      setSuccess(data?.message || "Reply saved.");
+      await load();
+    } catch (e) {
+      setError(e.response?.data?.message || e.message || "Unable to send the contact reply.");
+    } finally { setContactBusy(""); }
+  };
+
+  const archiveContactMessage = async (id) => {
+    if (!id) return;
+    if (!await confirmAction("Archive this contact submission? Its message and reply history will be retained.")) return;
+    await updateContactStatus(id, "archived");
   };
 
   const deleteSupportRequest = async (id) => {
@@ -366,10 +387,29 @@ export default function AdminSupport() {
                       <div style={{ color: "#64748b", marginTop: 6 }}>{item.fullName}</div>
                       <div style={{ fontWeight: 700, marginTop: 8 }}>{item.subject}</div>
                     </div>
-                    <button type="button" className="portal-btn danger" onClick={() => deleteContactMessage(item._id)}>Delete</button>
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                      {item.status === "new" && <button type="button" className="portal-btn secondary" disabled={contactBusy===item._id} onClick={() => updateContactStatus(item._id, "read")}>Mark read</button>}
+                      {item.status !== "archived" && <button type="button" className="portal-btn secondary" disabled={contactBusy===item._id} onClick={() => { setContactReplyId(item._id); setContactReply(""); }}> <Reply size={15}/> Reply</button>}
+                      {item.status !== "replied" && item.status !== "archived" && <button type="button" className="portal-btn secondary" disabled={contactBusy===item._id} onClick={() => updateContactStatus(item._id, "replied")}><CheckCircle2 size={15}/> Mark replied</button>}
+                      {item.status !== "archived" && <button type="button" className="portal-btn danger" disabled={contactBusy===item._id} onClick={() => archiveContactMessage(item._id)}><Archive size={15}/> Archive</button>}
+                    </div>
                   </div>
                   <p style={{ marginTop: 8, lineHeight: 1.7 }}>{item.message}</p>
-                  <small style={{ color: "#94a3b8" }}>{new Date(item.createdAt).toLocaleString()}</small>
+                  <small style={{ color: "#94a3b8" }}>{new Date(item.createdAt).toLocaleString()} · Status: {item.status || "new"}</small>
+                  {Array.isArray(item.replies) && item.replies.length > 0 && (
+                    <div style={{ marginTop: 12, borderTop: "1px solid rgba(15,23,42,.08)", paddingTop: 12 }}>
+                      <strong>Reply history</strong>
+                      <div style={{ display: "grid", gap: 8, marginTop: 8 }}>
+                        {item.replies.map((reply, index) => <div key={`${item._id}-reply-${index}`} style={{ padding: 10, borderRadius: 10, background: "#f8fafc" }}><div style={{ lineHeight: 1.6 }}>{reply.body}</div><small style={{ color: "#64748b" }}>{reply.repliedAt ? new Date(reply.repliedAt).toLocaleString() : ""} · {reply.emailAccepted ? `Email accepted${reply.emailProvider ? ` by ${reply.emailProvider}` : ""}` : `Email not accepted: ${reply.emailError || "not configured"}`}</small></div>)}
+                      </div>
+                    </div>
+                  )}
+                  {contactReplyId === item._id && (
+                    <div className="portal-card" style={{ marginTop: 12, background: "#f8fafc" }}>
+                      <div className="portal-field"><label htmlFor={`contact-reply-${item._id}`}>Reply to {item.email}</label><textarea id={`contact-reply-${item._id}`} rows="5" value={contactReply} onChange={(e) => setContactReply(e.target.value)} placeholder="Write the response that should be saved and emailed." /></div>
+                      <div className="portal-actions"><button type="button" className="portal-btn primary" disabled={contactBusy===item._id} onClick={() => replyContactMessage(item._id)}>{contactBusy===item._id ? "Sending..." : "Send reply"}</button><button type="button" className="portal-btn secondary" disabled={contactBusy===item._id} onClick={() => { setContactReplyId(""); setContactReply(""); }}>Cancel</button></div>
+                    </div>
+                  )}
                 </article>
               ))}
             </div>

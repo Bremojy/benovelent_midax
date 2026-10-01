@@ -14,6 +14,9 @@ const {
 } = require("../middleware/roleMiddleware");
 
 const { uploadArray, setUploadType } = require("../middleware/upload");
+const verified = require("../middleware/verifiedMiddleware");
+const memberStatus = require("../middleware/memberStatusMiddleware");
+const profileCompleted = require("../middleware/profileCompletionMiddleware");
 
 // ======================================================
 // MEMBER ROUTES
@@ -24,6 +27,9 @@ router.post(
     "/apply",
     verifyToken,
     isMember,
+    verified,
+    memberStatus,
+    profileCompleted,
     setUploadType("documents"),
     uploadArray("documents", 10),
     medicalController.createMedicalApplication
@@ -34,6 +40,9 @@ router.get(
     "/my-applications",
     verifyToken,
     isMember,
+    verified,
+    memberStatus,
+    profileCompleted,
     medicalController.getMyApplications
 );
 
@@ -41,6 +50,10 @@ router.get(
 router.get(
     "/:id",
     verifyToken,
+    isMember,
+    verified,
+    memberStatus,
+    profileCompleted,
     medicalController.getApplicationById
 );
 
@@ -49,6 +62,9 @@ router.put(
     "/cancel/:id",
     verifyToken,
     isMember,
+    verified,
+    memberStatus,
+    profileCompleted,
     medicalController.cancelApplication
 );
 

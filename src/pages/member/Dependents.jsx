@@ -75,13 +75,20 @@ export default function Dependents() {
 
   const submitRequest = async (e) => {
     e.preventDefault(); setError(""); setSuccess("");
+    const selected = dependents.find((item) => String(item._id) === String(requestDependent));
+    if (!selected) { setError("Select a dependent for the edit request."); return; }
     const requestedChanges = {};
-    Object.keys(requestFields).forEach((key) => {
-      if (key === "isNextOfKin") return;
-      const value = requestFields[key];
-      if (value !== "" && value !== null && value !== undefined) requestedChanges[key] = value;
+    Object.keys(empty).forEach((key) => {
+      const currentValue = selected[key] ?? (key === "isNextOfKin" ? false : "");
+      const requestedValue = requestFields[key];
+      if (key === "isNextOfKin") {
+        if (Boolean(requestedValue) !== Boolean(currentValue)) requestedChanges[key] = Boolean(requestedValue);
+        return;
+      }
+      const normalize = (value) => value == null ? "" : String(value).trim();
+      // A blank requested value is meaningful: it explicitly clears the field.
+      if (normalize(requestedValue) !== normalize(currentValue)) requestedChanges[key] = requestedValue ?? "";
     });
-    if (requestFields.isNextOfKin) requestedChanges.isNextOfKin = true;
     if (!requestDependent) { setError("Select a dependent for the edit request."); return; }
     if (!reason.trim()) { setError("Please explain why the record needs to change."); return; }
     if (!Object.keys(requestedChanges).length) { setError("Describe at least one requested change."); return; }
@@ -125,7 +132,7 @@ export default function Dependents() {
       setError("");
       const { data } = await API.post(`/dependents/edit-requests/${requestId}/complete`);
       if (!data?.success) throw new Error(data?.message || "Unable to apply the approved dependent change.");
-      await Promise.all([loadDependents(), loadRequests()]);
+      await load();
       setSuccess(data.message || "Approved dependent change applied successfully.");
     } catch (err) {
       setError(err.response?.data?.message || err.message || "Unable to apply the approved dependent change.");

@@ -29,7 +29,7 @@ export default class AppErrorBoundary extends Component {
       <main className="app-error-screen" role="alert">
         <div className="app-error-card">
           <div className="app-error-icon" aria-hidden="true"><AlertTriangle size={28} /></div>
-          <span className="section-label">BENOVELENT MIDAX</span>
+          <span className="section-label">BENEVOLENT MIDAX</span>
           <h1>Something went wrong</h1>
           <p>
             This page hit an unexpected error. Your account data has not been intentionally removed.

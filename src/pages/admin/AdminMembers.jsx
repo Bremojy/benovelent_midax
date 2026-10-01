@@ -221,7 +221,7 @@ function AdminMembers() { const { role }=useAuth(); const isSuperAdmin=role==="s
             formData.username,
           temporaryPassword:
             response.temporaryPassword ||
-            "MIDAX@123",
+            "",
         });
       }
 
@@ -252,7 +252,7 @@ function AdminMembers() { const { role }=useAuth(); const isSuperAdmin=role==="s
 
     const confirmed =
       await confirmAction(
-        `PERMANENT DELETION\n\n${member.fullName || "This member"} and the member's profile, dependents, support records, contribution/finance records, notifications and chat messages/conversations will be permanently deleted. This cannot be undone.\n\nMake sure a backup has been downloaded from Data Integrity first. Continue?`
+        `ARCHIVE MEMBER\n\n${member.fullName || "This member"} will be archived and the member's profile, dependents, support records, contribution/finance records, notifications and chat history will be preserved. The member can be restored later. Continue?`
       );
 
     if (!confirmed) return;
@@ -269,7 +269,7 @@ function AdminMembers() { const { role }=useAuth(); const isSuperAdmin=role==="s
       if (!response?.success) {
         throw new Error(
           response?.message ||
-            "Unable to remove member."
+            "Unable to archive member."
         );
       }
 
@@ -292,7 +292,7 @@ function AdminMembers() { const { role }=useAuth(); const isSuperAdmin=role==="s
       setError(
         err.response?.data?.message ||
           err.message ||
-          "Unable to remove member."
+          "Unable to archive member."
       );
     } finally {
       setDeletingId(null);
@@ -450,7 +450,7 @@ function AdminMembers() { const { role }=useAuth(); const isSuperAdmin=role==="s
           member.username,
         temporaryPassword:
           response.temporaryPassword ||
-          "MIDAX@123",
+          "",
         reset: true,
       });
     } catch (err) {

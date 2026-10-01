@@ -227,6 +227,10 @@ const funeralSupportSchema = new mongoose.Schema(
         ref:"Member"
     },
 
+    isDeleted: { type: Boolean, default: false, index: true },
+    deletedAt: { type: Date, default: null },
+    deletedBy: { type: mongoose.Schema.Types.ObjectId, default: null },
+
     updatedBy:{
         type:mongoose.Schema.Types.ObjectId,
         ref:"Member"
