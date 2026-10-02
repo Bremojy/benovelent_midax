@@ -41,7 +41,7 @@ export default class AppErrorBoundary extends Component {
           </details>
           <div className="app-error-actions">
             <button type="button" onClick={this.reset}><RefreshCw size={17} /> Try again</button>
-            <button type="button" className="secondary" onClick={() => window.location.reload()}>Refresh page</button>
+            <button type="button" className="secondary" onClick={this.reset}>Reset this view</button>
           </div>
         </div>
       </main>

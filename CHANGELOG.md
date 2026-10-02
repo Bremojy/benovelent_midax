@@ -1,3 +1,10 @@
+## 18.5.2 — 2026-10-02
+
+- Replaced the invalid `Instagram` import from `lucide-react` with a lightweight inline Instagram SVG in the existing footer.
+- Added a pre-build Lucide export compatibility audit that checks installed exports when dependencies are available and blocks known social-brand imports.
+- Added a footer build regression contract covering the official WhatsApp/Instagram destinations, single footer mount, and reload-free error recovery.
+- Replaced the error-boundary page reload fallback with an in-place view reset to avoid reload hacks.
+
 # Changelog
 
 ## 18.5.1 — 2026-10-01

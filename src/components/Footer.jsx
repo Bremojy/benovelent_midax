@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { ArrowUp, FileText, Instagram, Mail, MapPin, Newspaper, Phone } from "lucide-react";
+import { ArrowUp, FileText, Mail, MapPin, Newspaper, Phone } from "lucide-react";
 import { usePublicSettings } from "../hooks/usePublicSettings";
 import { usePublicWebsiteSection } from "../hooks/usePublicWebsiteSection";
 import "./Footer.css";
@@ -39,7 +39,11 @@ export default function Footer() {
               <span>WhatsApp</span>
             </a>
             <a className="footer-social footer-social-instagram" href={instagramUrl} target="_blank" rel="noopener noreferrer" aria-label="Instagram midaxpetroleum" title="Instagram midaxpetroleum">
-              <Instagram size={20} aria-hidden="true" />
+              <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">
+                <rect x="3.25" y="3.25" width="17.5" height="17.5" rx="5" fill="none" stroke="currentColor" strokeWidth="1.9" />
+                <circle cx="12" cy="12" r="4.1" fill="none" stroke="currentColor" strokeWidth="1.9" />
+                <circle cx="17.45" cy="6.65" r="1.15" fill="currentColor" />
+              </svg>
               <span>Instagram</span>
             </a>
             <Link className="footer-social footer-social-news" to="/news" aria-label="News and updates">
