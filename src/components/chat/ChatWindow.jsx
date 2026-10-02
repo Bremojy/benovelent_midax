@@ -36,6 +36,13 @@ function ChatWindow({ conversation, socket, currentUser, onBack, onAudioCall, on
   const stickToBottomRef = useRef(true);
   const sendLockRef = useRef(false);
   const repairAttemptedRef = useRef(new Set());
+  const onRepairConversationRef = useRef(onRepairConversation);
+  const historyRequestRef = useRef({ conversationId: "", controller: null, inFlight: false });
+  const loadedConversationIdRef = useRef("");
+
+  useEffect(() => {
+    onRepairConversationRef.current = onRepairConversation;
+  }, [onRepairConversation]);
 
   const ownIds = useMemo(
     () =>
@@ -68,44 +75,83 @@ function ChatWindow({ conversation, socket, currentUser, onBack, onAudioCall, on
   }, [conversation?._id, currentId]);
 
   useEffect(() => {
-    if (!conversation?._id) {
+    const conversationId = String(conversation?._id || "");
+    historyRequestRef.current.controller?.abort?.();
+    historyRequestRef.current = { conversationId, controller: null, inFlight: false };
+
+    if (!conversationId) {
+      loadedConversationIdRef.current = "";
       setMessages([]);
-      return;
+      setHasMore(false);
+      setNextCursor("");
+      setLoadingMessages(false);
+      return undefined;
     }
 
     let cancelled = false;
+    const controller = new AbortController();
+    historyRequestRef.current = { conversationId, controller, inFlight: true };
+    loadedConversationIdRef.current = "";
+    setMessages([]);
+    setHasMore(false);
+    setNextCursor("");
+    setChatError("");
+    setLoadingMessages(true);
 
-    const loadMessages = async (conversationId) => {
-      const { data } = await API.get(`/messages/conversation/${conversationId}`, { params: { limit: 50 } });
-      if (cancelled) return;
-      const items = Array.isArray(data) ? data : data.messages || [];
-      setMessages(items.map(normalizeMessage));
-      setHasMore(Boolean(data?.hasMore));
-      setNextCursor(String(data?.nextCursor || ""));
-      stickToBottomRef.current = true;
-      try { await API.put(`/conversations/${conversationId}/read`); } catch (_) {}
+    const loadMessages = async (targetId, { background = false } = {}) => {
+      const active = historyRequestRef.current;
+      if (active.inFlight && active.conversationId === targetId && active.requestStartedAt && !background) return;
+      const localController = background ? new AbortController() : active.controller;
+      if (!background) {
+        historyRequestRef.current = { conversationId: targetId, controller: localController, inFlight: true, requestStartedAt: Date.now() };
+      } else if (historyRequestRef.current.inFlight) {
+        return;
+      } else {
+        historyRequestRef.current = { ...historyRequestRef.current, inFlight: true, controller: localController, requestStartedAt: Date.now() };
+      }
+
+      try {
+        const { data } = await API.get(`/messages/conversation/${targetId}`, { params: { limit: 50 }, signal: localController?.signal });
+        if (cancelled || String(targetId) !== String(conversation?._id || "")) return;
+        const items = (Array.isArray(data) ? data : data?.messages || []).map(normalizeMessage);
+        const deduped = mergeMessageLists([], items);
+        if (background && loadedConversationIdRef.current === String(targetId)) {
+          setMessages((previous) => mergeMessageLists(previous, deduped));
+        } else {
+          setMessages(deduped);
+          stickToBottomRef.current = true;
+        }
+        setHasMore(Boolean(data?.hasMore));
+        setNextCursor(String(data?.nextCursor || ""));
+        loadedConversationIdRef.current = String(targetId);
+        try { await API.put(`/conversations/${targetId}/read`); } catch (_) {}
+      } finally {
+        if (String(historyRequestRef.current.conversationId) === String(targetId)) {
+          historyRequestRef.current = { ...historyRequestRef.current, inFlight: false };
+        }
+      }
     };
 
     (async () => {
       try {
-        setLoadingMessages(true);
-        setChatError("");
-        await loadMessages(conversation._id);
+        await loadMessages(conversationId);
       } catch (error) {
+        if (cancelled || error?.code === "ERR_CANCELED" || error?.name === "CanceledError" || error?.name === "AbortError") return;
         const status = Number(error?.response?.status || 0);
-        const repairKey = String(conversation?._id || "");
+        const repairKey = String(conversationId);
         const repairable = [403, 404].includes(status);
-        if (!cancelled && repairable && repairKey && !repairAttemptedRef.current.has(repairKey) && typeof onRepairConversation === "function") {
+        const repairHandler = onRepairConversationRef.current;
+        if (!cancelled && repairable && repairKey && !repairAttemptedRef.current.has(repairKey) && typeof repairHandler === "function") {
           repairAttemptedRef.current.add(repairKey);
           setChatError("This chat link is stale. Reconnecting to the current conversation…");
           try {
-            const repaired = await onRepairConversation(conversation);
+            const repaired = await onRepairConversationRef.current(conversation);
+            if (!cancelled && repaired?._id && String(repaired._id) !== repairKey) return;
             if (!cancelled && repaired?._id && String(repaired._id) === repairKey) {
               await loadMessages(repaired._id);
               setChatError("");
               return;
             }
-            if (repaired?._id) return;
           } catch (repairError) {
             if (!cancelled) {
               const message = repairError?.response?.data?.message || repairError?.message || "Unable to repair this chat right now.";
@@ -114,7 +160,7 @@ function ChatWindow({ conversation, socket, currentUser, onBack, onAudioCall, on
           }
         }
         if (!cancelled && !repairable) {
-          const message = error.response?.data?.message || error.message || "Unable to load this conversation.";
+          const message = error?.response?.data?.message || error?.message || "Unable to load this conversation.";
           setChatError(message);
         }
       } finally {
@@ -124,9 +170,12 @@ function ChatWindow({ conversation, socket, currentUser, onBack, onAudioCall, on
 
     return () => {
       cancelled = true;
+      controller.abort();
+      if (historyRequestRef.current.conversationId === conversationId) {
+        historyRequestRef.current = { ...historyRequestRef.current, inFlight: false, controller: null };
+      }
     };
-  }, [conversation?._id, onRepairConversation]);
-
+  }, [conversation?._id]);
   useEffect(() => {
     if (stickToBottomRef.current) messagesEndRef.current?.scrollIntoView({ behavior: "auto", block: "end" });
   }, [messages, typingUserId]);
@@ -135,6 +184,25 @@ function ChatWindow({ conversation, socket, currentUser, onBack, onAudioCall, on
     if (!socket || !conversation?._id) return;
     const conversationId = String(conversation._id);
     socket.emit("join-conversation", conversationId);
+
+    const reconcileAfterReconnect = async () => {
+      if (historyRequestRef.current.inFlight) return;
+      const controller = new AbortController();
+      historyRequestRef.current = { conversationId, controller, inFlight: true, requestStartedAt: Date.now() };
+      try {
+        const { data } = await API.get(`/messages/conversation/${conversationId}`, { params: { limit: 50 }, signal: controller.signal });
+        const items = (Array.isArray(data) ? data : data?.messages || []).map(normalizeMessage);
+        if (String(conversation?._id || "") !== conversationId) return;
+        setMessages((previous) => mergeMessageLists(previous, items));
+        setHasMore(Boolean(data?.hasMore));
+        setNextCursor(String(data?.nextCursor || ""));
+        loadedConversationIdRef.current = conversationId;
+      } catch (error) {
+        if (error?.code !== "ERR_CANCELED" && error?.name !== "CanceledError" && error?.name !== "AbortError") console.debug("Chat reconciliation skipped:", error?.message || error);
+      } finally {
+        if (historyRequestRef.current.conversationId === conversationId) historyRequestRef.current = { ...historyRequestRef.current, inFlight: false };
+      }
+    };
 
     const handleNewMessage = (incoming) => {
       const incomingConversationId = incoming?.conversation?._id || incoming?.conversation || incoming?.conversationId;
@@ -148,9 +216,8 @@ function ChatWindow({ conversation, socket, currentUser, onBack, onAudioCall, on
       const normalized = normalizeMessage(incoming);
       stickToBottomRef.current = true;
       setMessages((previous) => {
-        const id = String(normalized._id || "");
-        const fingerprint = messageFingerprint(normalized);
-        if (previous.some((item) => String(item._id) === id || messageFingerprint(item) === fingerprint)) {
+        const identityKey = messageIdentityKey(normalized);
+        if (identityKey && previous.some((item) => messageIdentityKey(item) === identityKey)) {
           return previous;
         }
         const merged = [...previous, normalized];
@@ -199,6 +266,7 @@ function ChatWindow({ conversation, socket, currentUser, onBack, onAudioCall, on
       if (!id || id === typingUserRef.current) { typingUserRef.current = ""; setTypingUserId(""); }
     };
 
+    socket.on("connect", reconcileAfterReconnect);
     socket.on("new-message", handleNewMessage);
     socket.on("message-delivered", handleMessageDelivered);
     socket.on("message-seen", handleSeen);
@@ -209,6 +277,7 @@ function ChatWindow({ conversation, socket, currentUser, onBack, onAudioCall, on
 
     return () => {
       socket.emit("leave-conversation", conversationId);
+      socket.off("connect", reconcileAfterReconnect);
       socket.off("new-message", handleNewMessage);
       socket.off("message-delivered", handleMessageDelivered);
       socket.off("message-seen", handleSeen);
@@ -216,8 +285,15 @@ function ChatWindow({ conversation, socket, currentUser, onBack, onAudioCall, on
       socket.off("message-reaction", handleReaction);
       socket.off("typing", handleTyping);
       socket.off("stop-typing", handleStopTyping);
+      historyRequestRef.current.controller?.abort?.();
     };
   }, [socket, conversation?._id, currentId, ownIds]);
+
+  useEffect(() => {
+    if (!conversation?._id) return undefined;
+    window.dispatchEvent(new CustomEvent("benevolent:chat-mute-state", { detail: { conversationId: String(conversation._id), muted } }));
+    return undefined;
+  }, [conversation?._id, muted]);
 
   async function toggleConversationFlag(kind) {
     if (!conversation?._id) return;
@@ -347,6 +423,7 @@ function ChatWindow({ conversation, socket, currentUser, onBack, onAudioCall, on
       messageType,
       createdAt: new Date().toISOString(),
       status: "sending",
+      clientMessageId: tempId,
       __optimistic: true,
       __retry: { text, attachment, messageType, attachmentMeta, clientMessageId: tempId },
     });
@@ -523,7 +600,7 @@ function ChatWindow({ conversation, socket, currentUser, onBack, onAudioCall, on
       {chatError && <div className="chat-error-banner" role="alert"><span>{chatError}</span><button type="button" onClick={() => setChatError("")} aria-label="Dismiss chat error">Dismiss</button></div>}
 
       <div ref={messagesContainerRef} className="messages-container" role="log" aria-live="polite" aria-label="Chat messages">
-        {loadingMessages ? (
+        {loadingMessages && messages.length === 0 ? (
           <div className="chat-loading">Loading messages...</div>
         ) : (
           <>
@@ -613,6 +690,27 @@ function compareMessages(a, b) {
   const bt = new Date(b?.createdAt || 0).getTime();
   if (at !== bt) return at - bt;
   return String(a?._id || "").localeCompare(String(b?._id || ""));
+}
+
+function mergeMessageLists(existing, incoming) {
+  const byIdentity = new Map();
+  for (const item of [...(existing || []), ...(incoming || [])]) {
+    const message = normalizeMessage(item);
+    const key = messageIdentityKey(message);
+    if (!key) continue;
+    const previous = byIdentity.get(key);
+    byIdentity.set(key, previous ? { ...previous, ...message, reactions: message.reactions?.length ? message.reactions : previous.reactions || [] } : message);
+  }
+  return [...byIdentity.values()].sort(compareMessages);
+}
+
+function messageIdentityKey(message) {
+  const clientMessageId = String(message?.clientMessageId || "").trim();
+  if (clientMessageId) return `client:${clientMessageId}`;
+  const id = String(message?._id || "").trim();
+  if (id) return `id:${id}`;
+  const fingerprint = messageFingerprint(message);
+  return fingerprint ? `fingerprint:${fingerprint}` : "";
 }
 
 function formatDateLabel(value) {

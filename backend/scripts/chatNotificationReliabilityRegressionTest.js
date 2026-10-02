@@ -32,7 +32,11 @@ assert(topbar.includes('socket.on("notification-count"') && !topbar.includes('se
 assert(!topbar.includes('socket.on("message-seen", onMessage)'), "Topbar must not issue a conversations API refresh for each message-seen receipt.");
 assert(!notificationCenter.includes("setInterval(load, 30000)"), "Notification center must not poll and refetch every 30 seconds.");
 assert(notificationCenter.includes('socket.on("new-notification", onNew)'), "Notification center must reconcile realtime payloads directly.");
-assert(messageCenter.includes("processedMessageIdsRef") && messageCenter.includes("playIncomingMessageSound") && messageCenter.includes("conversationsRef.current"), "Chat sidebar must deduplicate incoming messages before sound/unread processing and use current mute state.");
+const globalCenter = read("src/components/GlobalCommunicationCenter.jsx");
+assert(messageCenter.includes("processedMessageIdsRef") && messageCenter.includes("conversationsRef.current"), "Chat sidebar must deduplicate incoming messages before updating conversation previews.");
+assert(globalCenter.includes("playIncomingMessageSound") && globalCenter.includes("conversationPrefsRef.current") && globalCenter.includes("new-notification"), "Global communication center must own sound, mute-aware message popups, and realtime notification delivery.");
+assert(globalCenter.includes("callAction") && globalCenter.includes("call-rejected"), "Global communication center preserves push-call decline handling.");
+assert(messageCenter.includes("sourceMessage = incoming?.message") && messageCenter.includes("incoming?.unreadCount"), "Sidebar message processing normalizes both new-message and conversation-updated payloads without double-counting.");
 assert(!chatWindow.includes('API.put(`/messages/${normalized._id}/read`)'), "Active chat must not issue an extra REST read request for every incoming socket message.");
 assert(chatWindow.includes("Message sound on") && chatWindow.includes("setChatSoundEnabled"), "Chat details must expose a persisted message-sound control.");
 assert(chatSound.includes("catch") && chatSound.includes("benevolentChatSoundEnabled"), "Chat sound must persist preference and safely handle browser audio failures.");

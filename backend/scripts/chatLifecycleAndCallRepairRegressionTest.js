@@ -16,7 +16,7 @@ assert(/participants:\s*\{ \$all: \[canonicalMe, canonicalTarget\] \}/.test(conv
 assert(/getAuthorizedDirectConversation\(req\.params\.id, actorId\)/.test(conversation), 'conversation mutations share one authorization helper');
 assert(/deletedFor:\s*\{ \$ne: actorId \}/.test(messages), 'message operations use the viewer-specific active lifecycle');
 assert(/getAuthorizedDirectConversation\(conversationId, actorId\)/.test(messages), 'message search uses the same authorization helper');
-assert(/onRepairConversation/.test(windowSource) && /onRepairConversation\(conversation\)/.test(windowSource), 'stale chat loads trigger canonical conversation repair');
+assert(/onRepairConversation/.test(windowSource) && /(onRepairConversation\(conversation\)|onRepairConversationRef\.current\(conversation\))/.test(windowSource), 'stale chat loads trigger canonical conversation repair');
 assert(/clientMessageId: tempId/.test(windowSource) && /X-Idempotency-Key": tempId/.test(windowSource), 'message retry keeps one idempotency identity');
 assert(/retry\.clientMessageId \|\| item\._id/.test(windowSource), 'failed-message retry reuses its original idempotency key');
 assert(/crypto\.randomUUID\(\)/.test(socket), 'server generates an authoritative call id');
@@ -25,5 +25,21 @@ assert(/ensureRemoteAudioPlayback/.test(overlay) && /Enable call audio/.test(ove
 assert(/iceRestart: true/.test(overlay) && /call-mode-offer/.test(overlay), 'ICE failure/disconnect attempts same-call renegotiation with ICE restart');
 assert(/SOCKET_STATE_TOPOLOGY=single-instance/.test(read('backend/.env.example')), 'in-memory call state has an explicit non-horizontal topology requirement');
 assert(/benevolent-chat-active/.test(center) && /body\.benevolent-chat-active \.smart-assistant/.test(smartAssistant), 'assistant spacing is adjusted on active chat pages');
+
+
+const globalCenter = read('src/components/GlobalCommunicationCenter.jsx');
+const bubble = read('src/components/chat/MessageBubble.jsx');
+const footer = read('src/components/Footer.jsx');
+assert(/benevolent:active-chat-change/.test(center), 'MessageCenter publishes active-chat identity so the global popup can suppress the open conversation');
+assert(/const repairConversation = useCallback/.test(center), 'conversation repair callback is stable');
+assert(/\[conversation\?\._id\]/.test(windowSource), 'history loading depends on conversation identity rather than repair callback identity');
+assert(/AbortController/.test(windowSource) && /signal:/.test(windowSource), 'history requests support cancellation and stale-response protection');
+assert(/mergeMessageLists\(previous/.test(windowSource), 'background history reconciliation merges without blanking visible messages');
+assert(/loadingMessages && messages\.length === 0/.test(windowSource), 'loading UI is only full-screen for an empty conversation');
+assert(!/MoreVertical/.test(bubble) && !/message-menu-button/.test(bubble), 'visible three-dot message action is removed');
+assert(/LONG_PRESS_MS = 600/.test(bubble) && /onContextMenu/.test(bubble) && /ACTION_MENU_EVENT/.test(bubble), 'message actions use long press and context-menu interaction');
+assert(/notification-register/.test(globalCenter) && /new-notification/.test(globalCenter) && /incoming-call/.test(globalCenter), 'global communication layer owns authenticated realtime popups and calls');
+assert(/conversationId.*encodeURIComponent/.test(globalCenter) && /\?conversationId=/.test(globalCenter), 'global message popup navigation carries the target conversation id');
+assert(/https:\/\/wa\.me\/254729353487/.test(footer) && /https:\/\/instagram\.com\/midaxpetroleum/.test(footer), 'footer uses the required official WhatsApp and Instagram URLs');
 
 pass('conversation lifecycle, idempotent retry, and call media recovery regression passed');

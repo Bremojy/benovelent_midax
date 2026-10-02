@@ -4,7 +4,7 @@ import API from "../../services/api";
 
 export default function Messages() {
   const location = useLocation();
-  const conversationId = location.state?.conversationId || "";
+  const conversationId = new URLSearchParams(location.search || "").get("conversationId") || location.state?.conversationId || "";
 
   return (
     <MessageCenterPage

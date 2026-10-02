@@ -1,7 +1,11 @@
+import { useLocation } from "react-router-dom";
 import MessageCenterPage from "../../components/chat/MessageCenterPage";
 import API from "../../services/api";
 
 export default function AdminMessages() {
+  const location = useLocation();
+  const conversationId = new URLSearchParams(location.search || "").get("conversationId") || "";
+
   return (
     <MessageCenterPage
       eyebrow="ADMIN MESSAGE CENTRE"
@@ -12,6 +16,7 @@ export default function AdminMessages() {
       emptyMembersLabel="No members or leaders found."
       emptyConversationsLabel="No recent conversations yet."
       onRefreshHint="Administration conversations refreshed."
+      initialConversationId={conversationId}
       showMemberFilters
       loadContacts={async ({ filters = {} } = {}) => {
         const params = { limit: 1000 };

@@ -33,7 +33,7 @@ assert(/!call\.answered/.test(socket) && /call-mode-offer/.test(socket), 'renego
 assert(/recipientSockets\.forEach\(\(socketId\) => io\.to\(socketId\)\.emit\("incoming-call"/.test(socket), 'incoming calls are emitted only to authenticated recipient sockets');
 assert(/isChatRole\(socket\.data\?\.role\)/.test(socket) && /resolveCanonicalChatActorForAuthenticatedUser/.test(read('backend/sockets/socket.js')), 'Socket.IO calls use authenticated server-derived identities and roles');
 assert(/status: "active"/.test(memberController) && /_id: \{ \$nin: actorExclusionIds \}/.test(memberController), 'chat directory is live-data active-only and excludes the current actor');
-assert(/messageFingerprint\(item\) === fingerprint/.test(windowSource), 'live message events are deduplicated by stable identity/content fingerprint');
+assert(/messageIdentityKey\(item\) === identityKey/.test(windowSource) && /function messageIdentityKey\(/.test(windowSource), 'live message events are deduplicated by client id, server id, or stable content fingerprint');
 assert(/\.sort\(compareMessages\)/.test(windowSource) && /function compareMessages\(/.test(windowSource), 'live and persisted messages are kept in canonical chronological order');
 assert(/clientMessageId/.test(read('backend/models/Message.js')) && /unique: true/.test(read('backend/models/Message.js')), 'messages have database-enforced client idempotency identity');
 

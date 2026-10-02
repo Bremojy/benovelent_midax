@@ -143,6 +143,7 @@ async function getUniqueUnreadCount(recipient, recipientModel = "Member") {
 
 const fanoutCreatedNotification = async (notification) => {
   if (!notification?.recipient) return;
+  try { await notification.populate("sender", "fullName name profileImage"); } catch (_) {}
   const room = `user:${String(notification.recipient)}`;
   try {
     const { getIO } = require("../sockets/socket");

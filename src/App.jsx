@@ -25,6 +25,7 @@ import GlobalMotion from "./components/GlobalMotion";
 import InstallPWA from "./components/InstallPWA";
 import SmartAssistant from "./components/SmartAssistant";
 import LoginFeedbackPrompt from "./components/feedback/LoginFeedbackPrompt";
+import GlobalCommunicationCenter from "./components/GlobalCommunicationCenter";
 
 import "./App.css";
 import "./styles/interaction-system.css";
@@ -351,6 +352,7 @@ function AppContent() {
         }}
       />
       <GlobalMotion />
+      <GlobalCommunicationCenter />
       <PublicNavbar />
       <CookieConsent />
       <InstallPWA />

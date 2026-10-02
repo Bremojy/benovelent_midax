@@ -14,6 +14,7 @@ const memberController = read('backend/controllers/memberController.js');
 const memberMessages = read('src/pages/member/Messages.jsx');
 const adminMessages = read('src/pages/admin/AdminMessages.jsx');
 const center = read('src/components/chat/MessageCenterPage.jsx');
+const globalCenter = read('src/components/GlobalCommunicationCenter.jsx');
 const bubble = read('src/components/chat/MessageBubble.jsx');
 const input = read('src/components/chat/MessageInput.jsx');
 const callOverlay = read('src/components/chat/CallOverlay.jsx');
@@ -61,7 +62,7 @@ assert(/onEdit/.test(input) && /replyTo/.test(input), 'composer supports edit/re
 assert(/delivered-message/.test(messageSocket) && /message-delivered/.test(messageSocket), 'delivered state has an authenticated socket acknowledgement');
 assert(/onRetry/.test(bubble) && /retryMessage/.test(chatWindow) && /chat-date-separator/.test(chatWindow), 'failed-message retry and date-separator UI are wired');
 assert(support.includes('\n              )}\n\n              <Field label="Requested Amount (KES)">'), 'member Support conditional JSX is explicitly closed before Requested Amount');
-assert(/getPendingCall/.test(center) && /removePendingCall/.test(center) && /incomingPushCall/.test(center), 'PWA pending call data is consumed on navigation');
+assert(/getPendingCall/.test(globalCenter) && /removePendingCall/.test(globalCenter) && /incomingPushCall/.test(globalCenter), 'PWA pending call data is consumed by the application-level communication layer');
 assert(/eventId: `message:/.test(messageController) && /insertMany/.test(messageController), 'message notifications use an idempotent event identity');
 assert(/async function getAuthorizedDirectConversation/.test(messageController) && /isGroup: false/.test(messageController) && /participants\.length !== 2/.test(messageController), 'message operations enforce active direct 1-to-1 authorization');
 assert(/new Set\(\["text", "image", "video", "audio", "document"\]\)/.test(messageController) && !/allowedTypes = new Set\(\["text".*"call"/.test(messageController), 'ordinary message API cannot fabricate call messages');
@@ -73,7 +74,7 @@ assert(/member\.memberNumber/.test(read('src/components/chat/ChatSidebar.jsx')) 
 assert(/aPinned.*bPinned/s.test(read('src/components/chat/ChatSidebar.jsx')), 'pinned conversations are ordered before unpinned conversations');
 assert(/recordSeconds/.test(input) && /recordingTimerRef/.test(input), 'voice-note recording exposes a live timer with cleanup');
 assert(/cleanupMedia\(\)/.test(callOverlay) && /ringtoneRef\.current\?\.stop\?\./.test(callOverlay), 'call overlay unmount cleanup releases media and ringtone resources');
-assert(/onClose=\{async \(\) => \{/.test(center) && /removePendingCall\(pendingId\)/.test(center), 'pending PWA call storage is retained until the chat center consumes/closes the call');
+assert(/onClose=\{closeActiveCall/.test(globalCenter) && /removePendingCall\(pendingId\)/.test(globalCenter), 'pending PWA call storage is retained until the global communication layer consumes/closes the call');
 assert(/notificationclick/.test(serviceWorker) && !/notificationclick[\s\S]*removePendingCall\(callIdValue\)/.test(serviceWorker), 'service worker does not delete pending call data before chat-center consumption');
 assert(/const ok = await loadChatData\(\);\s*if \(ok\) toast\.success/.test(center), 'refresh only reports success after chat reload succeeds');
 

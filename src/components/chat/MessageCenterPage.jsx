@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { ArrowLeft, RefreshCw, SlidersHorizontal, X } from "lucide-react";
 import socketClient from "../../sockets/socket";
@@ -8,9 +8,6 @@ import ChatWindow from "./ChatWindow";
 import CallOverlay from "./CallOverlay";
 import API from "../../services/api";
 import toast from "react-hot-toast";
-import { getPendingCall, removePendingCall } from "../../utils/pushCallStore";
-import { startNativeIncomingCall } from "../../utils/nativeCallBridge";
-import { isChatSoundEnabled, playIncomingMessageSound, unlockChatSound } from "../../utils/chatSound";
 import { useAuth } from "../../context/AuthContext";
 import { useSocket } from "../../context/SocketContext";
 import "../../pages/member/messages.css";
@@ -53,7 +50,6 @@ function MessageCenterPage({
   const selectedConversationRef = useRef(null);
   const initialSelectionAppliedRef = useRef(false);
   const processedMessageIdsRef = useRef(new Set());
-  const pendingCallIdRef = useRef("");
 
   const actor = useMemo(() => buildActorProfile(currentUser || authUser), [currentUser, authUser]);
   const actorId = actor.id;
@@ -115,7 +111,6 @@ function MessageCenterPage({
     if (!actorId) return undefined;
 
     const activeSocket = contextSocket || socketClient;
-    unlockChatSound();
     const handleConnectError = (error) => {
       console.warn("Chat socket connection error:", error?.message || error);
       setBanner("Chat is reconnecting. Messaging stays available; calls will work once the secure call connection is ready.");
@@ -129,17 +124,6 @@ function MessageCenterPage({
       );
     };
 
-    const handleCallNotification = (payload) => {
-      const title = payload?.title || "Incoming call";
-      const body = payload?.message || "Someone is calling you.";
-      // Native/browser push is already delivered by the backend notification path.
-      // Keep this event strictly for the in-app toast so one call never produces
-      // two browser notifications in the foreground/background transition.
-      if (typeof document === "undefined" || document.visibilityState === "visible") {
-        toast(`${title}: ${body}`, { icon: "📞", duration: 5500, id: "incoming-call-notice" });
-      }
-    };
-
     const handlePresence = (payload) => {
       const onlineIds = new Set((payload?.users || []).map((item) => String(item.userId)));
       setPeople((prev) => prev.map((person) => ({ ...person, online: onlineIds.has(String(person._id)) })));
@@ -147,13 +131,14 @@ function MessageCenterPage({
     };
 
     const handleSidebarMessage = (incoming) => {
-      const conversationId = String(incoming?.conversation?._id || incoming?.conversation || incoming?.conversationId || "");
+      const sourceMessage = incoming?.message && typeof incoming.message === "object" ? incoming.message : incoming;
+      const conversationId = String(sourceMessage?.conversation?._id || sourceMessage?.conversation || incoming?.conversationId || incoming?.conversation?._id || incoming?.conversation || "");
       if (!conversationId) return;
-      const senderId = String(incoming?.sender?._id || incoming?.sender || incoming?.senderId || "");
+      const senderId = String(sourceMessage?.sender?._id || sourceMessage?.sender || sourceMessage?.senderId || "");
       if (senderId && senderId === String(actorId)) return;
 
-      const messageId = String(incoming?._id || incoming?.messageId || "").trim();
-      const fallbackKey = [conversationId, senderId, String(incoming?.createdAt || ""), String(incoming?.message || incoming?.text || ""), String(incoming?.attachment || "")].join("|");
+      const messageId = String(sourceMessage?._id || incoming?.messageId || "").trim();
+      const fallbackKey = [conversationId, senderId, String(sourceMessage?.createdAt || ""), String(sourceMessage?.message || sourceMessage?.text || ""), String(sourceMessage?.attachment || "")].join("|");
       const dedupeKey = messageId || fallbackKey;
       if (!dedupeKey || processedMessageIdsRef.current.has(dedupeKey)) return;
       processedMessageIdsRef.current.add(dedupeKey);
@@ -161,95 +146,29 @@ function MessageCenterPage({
         const oldest = processedMessageIdsRef.current.values().next().value;
         processedMessageIdsRef.current.delete(oldest);
       }
-      const isOpen = String(selectedConversationRef.current?._id || "") === conversationId;
-      const sourceConversation = conversationsRef.current.find((item) => String(item?._id) === conversationId);
-      const mutedByCurrentUser = Boolean(sourceConversation?.mutedBy?.some?.((id) => String(id) === String(actorId)));
-
       setConversations((previous) => {
         let touched = false;
         const updated = previous.map((conversation) => {
           if (String(conversation?._id) !== conversationId) return conversation;
           touched = true;
           const isOpen = String(selectedConversationRef.current?._id || "") === conversationId;
-          const preview = sanitizePreviewText(incoming?.message || incoming?.text || incoming?.attachment || "New message");
+          const preview = sanitizePreviewText(sourceMessage?.message || sourceMessage?.text || sourceMessage?.attachment || "New message");
           return {
             ...conversation,
             lastMessageText: preview || "New message",
-            lastMessageTime: incoming?.createdAt || new Date().toISOString(),
-            updatedAt: incoming?.createdAt || new Date().toISOString(),
-            unreadCount: isOpen ? 0 : Number(conversation?.unreadCount || 0) + 1,
+            lastMessageTime: sourceMessage?.createdAt || new Date().toISOString(),
+            updatedAt: sourceMessage?.createdAt || new Date().toISOString(),
+            unreadCount: isOpen ? 0 : Number.isFinite(Number(incoming?.unreadCount)) ? Number(incoming.unreadCount) : Number(conversation?.unreadCount || 0) + 1,
           };
         });
         return touched ? updated.sort((a, b) => new Date(b.lastMessageTime || b.updatedAt || 0) - new Date(a.lastMessageTime || a.updatedAt || 0)) : previous;
       });
-
-      if (!isOpen && !mutedByCurrentUser && isChatSoundEnabled()) {
-        unlockChatSound();
-        playIncomingMessageSound();
-      }
-
-      if (!isOpen && typeof document !== "undefined" && document.visibilityState !== "visible" && typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
-        try {
-          const tag = `chat-message-${messageId || dedupeKey.slice(0, 80)}`;
-          new Notification(incoming?.sender?.fullName || incoming?.senderName || "New message", {
-            body: sanitizePreviewText(incoming?.message || incoming?.text || incoming?.attachment || "You received a new message."),
-            tag,
-          });
-        } catch {}
-      }
-    };
-
-    const handleIncomingCall = (payload) => {
-      if (!payload?.offer || !payload?.from) return;
-      startNativeIncomingCall({
-        callerName: payload.callerName || "Member",
-        callType: payload.callType === "video" ? "video" : "audio",
-        callId: payload.callId || "",
-        callerUserId: payload.callerUserId || "",
-        role: currentUser?.role || authUser?.role || "member",
-      });
-      const currentPeople = peopleRef.current || [];
-      const currentConversation = selectedConversationRef.current;
-      setCall({
-        direction: "incoming",
-        incomingCall: payload,
-        callType: payload.callType === "video" ? "video" : "audio",
-        partner:
-          currentPeople.find((person) => String(person._id) === String(payload.callerUserId)) ||
-          currentConversation?.partner ||
-          { _id: payload.callerUserId, fullName: payload.callerName || "Member" },
-      });
-    };
-
-    const handleMissedCall = (payload) => {
-      const title = payload?.callType === "video" ? "Missed video call" : "Missed audio call";
-      const body = `${payload?.callerName || "A member"} tried to call you.`;
-      toast(`${title}: ${body}`, { icon: "☎️", duration: 5000, id: `missed-call-${payload?.callId || "latest"}` });
-      if (typeof document !== "undefined" && document.visibilityState !== "visible" && typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
-        try { new Notification(title, { body, tag: `missed-call-${payload?.callId || Date.now()}` }); } catch {}
-      }
-    };
-
-    const handleCallError = (payload) => {
-      const code = String(payload?.code || payload?.error || "");
-      const message = code === "SELF_CALL_BLOCKED"
-        ? "You cannot call yourself. Choose another member."
-        : payload?.message || "The call could not be started.";
-      toast.error(message, { id: "call-error", duration: 5000 });
-      const pendingId = pendingCallIdRef.current;
-      pendingCallIdRef.current = "";
-      setCall(null);
-      if (pendingId) void removePendingCall(pendingId);
     };
 
     activeSocket.on("connect", handleConnect);
     activeSocket.on("connect_error", handleConnectError);
     activeSocket.on("new-message", handleSidebarMessage);
     activeSocket.on("conversation-updated", handleSidebarMessage);
-    activeSocket.on("incoming-call", handleIncomingCall);
-    activeSocket.on("new-call-notification", handleCallNotification);
-    activeSocket.on("missed-call", handleMissedCall);
-    activeSocket.on("call-error", handleCallError);
     activeSocket.on("online-users", handlePresence);
     setSocket(activeSocket);
 
@@ -261,55 +180,10 @@ function MessageCenterPage({
       activeSocket.off("connect_error", handleConnectError);
       activeSocket.off("new-message", handleSidebarMessage);
       activeSocket.off("conversation-updated", handleSidebarMessage);
-      activeSocket.off("incoming-call", handleIncomingCall);
-      activeSocket.off("new-call-notification", handleCallNotification);
-      activeSocket.off("missed-call", handleMissedCall);
-      activeSocket.off("call-error", handleCallError);
       activeSocket.off("online-users", handlePresence);
     };
   }, [actorId, currentUser?.role, authUser?.role, contextSocket]);
 
-  useEffect(() => {
-    const params = new URLSearchParams(location.search || "");
-    const callId = params.get("incomingPushCall") || params.get("incomingNativeCall");
-    if (!callId) return undefined;
-
-    let active = true;
-    (async () => {
-      const pending = await getPendingCall(callId);
-      if (!active || !pending?.data) return;
-      const action = String(params.get("callAction") || "open").toLowerCase();
-      const payload = pending.data;
-      pendingCallIdRef.current = String(callId);
-      const activeSocket = socket || contextSocket || socketClient;
-
-      if (action === "decline") {
-        if (!activeSocket.connected) activeSocket.connect?.();
-        if (payload.from) activeSocket.emit("call-rejected", { to: payload.from, callId });
-        await removePendingCall(callId);
-        window.history.replaceState({}, "", location.pathname);
-        return;
-      }
-
-      setCall({
-        direction: "incoming",
-        incomingCall: payload,
-        autoAccept: action === "answer",
-        callType: payload.callType === "video" ? "video" : "audio",
-        conversationId: payload.conversationId || "",
-        partner: {
-          _id: payload.callerUserId,
-          fullName: payload.callerName || "Member",
-          profileImage: payload.callerProfileImage || payload.profileImage || "",
-        },
-      });
-      window.history.replaceState({}, "", location.pathname);
-    })().catch((error) => {
-      console.warn("Incoming push call handling failed:", error);
-    });
-
-    return () => { active = false; };
-  }, [location.pathname, location.search, socket, contextSocket]);
 
   const loadChatData = async () => {
     try {
@@ -361,6 +235,14 @@ function MessageCenterPage({
     conversationsRef.current = normalizedConversations;
     selectedConversationRef.current = selectedConversation;
   }, [normalizedPeople, normalizedConversations, selectedConversation]);
+
+  useEffect(() => {
+    const conversationId = String(selectedConversation?._id || "");
+    window.dispatchEvent(new CustomEvent("benevolent:active-chat-change", { detail: { conversationId } }));
+    return () => {
+      window.dispatchEvent(new CustomEvent("benevolent:active-chat-change", { detail: { conversationId: "" } }));
+    };
+  }, [selectedConversation?._id]);
 
   useEffect(() => {
     if (!isMobile && !selectedConversation && normalizedConversations.length > 0) {
@@ -458,7 +340,7 @@ function MessageCenterPage({
     }
   };
 
-  const repairConversation = async (staleConversation) => {
+  const repairConversation = useCallback(async (staleConversation) => {
     const partner = staleConversation?.partner || (staleConversation?.participants || []).find((participant) => String(participant?._id || participant) !== String(actorId));
     if (!partner?._id) throw new Error("The chat participant could not be resolved.");
     if (isSameUser(normalizeContact(partner, partner?.role || "member"), actor)) {
@@ -478,7 +360,7 @@ function MessageCenterPage({
     selectedConversationRef.current = repaired;
     setMobileChatOpen(isMobile);
     return repaired;
-  };
+  }, [actor, actorId, isMobile]);
 
   const refreshChat = async () => {
     const ok = await loadChatData();

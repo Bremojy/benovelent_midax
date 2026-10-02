@@ -34,7 +34,7 @@ async function deliverCallNotification({ recipient, caller, callType, title, mes
     referenceId: undefined,
     referenceModel: "Call",
     eventId: `call:${String(callId)}:${String(recipient.user._id)}`,
-    metadata: { callId: String(callId), callType, missed },
+    metadata: { callId: String(callId), callType, missed, conversationId: String(incomingPayload?.conversationId || "") },
   });
   const recipientPresence = getPresence(recipient.chatId);
   const recipientIsLive = Boolean(recipientPresence?.sockets?.size);
@@ -126,7 +126,7 @@ async function markMissedCall(callId, reason = "missed") {
       missed: true,
     });
     const io = call.io;
-    io?.to(String(call.recipientChatId)).emit("missed-call", { notification, callId, callType: call.callType, callerUserId: String(call.caller.chatId), callerName: call.caller.user.fullName || call.caller.user.name || "Member" });
+    io?.to(String(call.recipientChatId)).emit("missed-call", { notification, callId, callType: call.callType, conversationId: String(call.conversationId || ""), callerUserId: String(call.caller.chatId), callerName: call.caller.user.fullName || call.caller.user.name || "Member", callerProfileImage: call.caller.user.profileImage || "" });
     } catch (error) {
     console.warn("Could not create missed call notification:", error.message);
   }
