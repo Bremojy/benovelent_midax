@@ -171,7 +171,7 @@ export default function Dependents() {
                 <Field label="Phone"><input type="tel" inputMode="tel" value={form.phone} onChange={(e)=>set("phone",e.target.value)} /></Field>
               </div>
               <div className="support-two-col">
-                <Field label="Email"><input type="email" value={form.email} onChange={(e)=>set("email",e.target.value)} /></Field>
+                {/* <Field label="Email"><input type="email" value={form.email} onChange={(e)=>set("email",e.target.value)} /></Field> */}
                 <Field label="County"><input type="text" value={form.county} onChange={(e)=>set("county",e.target.value)} /></Field>
               </div>
               <Field label="Address"><input type="text" value={form.address} onChange={(e)=>set("address",e.target.value)} /></Field>
