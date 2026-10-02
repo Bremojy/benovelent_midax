@@ -162,10 +162,10 @@ export default function Dependents() {
                 <Field label="Relationship"><select value={form.relationship} onChange={(e)=>set("relationship",e.target.value)} required><option value="">Select</option>{relationships.map((x)=><option key={x}>{x}</option>)}</select></Field>
                 <Field label="Gender"><select value={form.gender} onChange={(e)=>set("gender",e.target.value)} required><option value="">Select</option><option>Male</option><option>Female</option><option>Other</option></select></Field>
               </div>
-              {/* <div className="support-two-col">
+              <div className="support-two-col">
                 <Field label="Date of Birth"><input type="date" value={form.dateOfBirth} onChange={(e)=>set("dateOfBirth",e.target.value)} required /></Field>
-                <Field label="Phone"><input type="tel" inputMode="tel" value={form.phone} onChange={(e)=>set("phone",e.target.value)} /></Field>
-              </div> */}
+                
+              </div>
               <div className="support-two-col">
                 <Field label="National ID"><input type="text" value={form.nationalId} onChange={(e)=>set("nationalId",e.target.value)} /></Field>
                 <Field label="Phone"><input type="tel" inputMode="tel" value={form.phone} onChange={(e)=>set("phone",e.target.value)} /></Field>
