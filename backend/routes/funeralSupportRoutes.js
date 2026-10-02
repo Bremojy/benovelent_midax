@@ -63,9 +63,7 @@ router.post(
     profileCompleted,
     setUploadType("documents"),
     uploadFields([
-        { name: "deathCertificate", maxCount: 1 },
-        { name: "burialPermit", maxCount: 1 },
-        { name: "chiefLetter", maxCount: 1 },
+        { name: "burialPermitChiefLetter", maxCount: 1 },
         { name: "supportingDocuments", maxCount: 10 },
     ]),
 

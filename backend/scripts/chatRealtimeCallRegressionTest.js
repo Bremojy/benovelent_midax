@@ -25,7 +25,7 @@ assert(/sender\.replaceTrack\(audioTrack\)/.test(overlay) && /sender\.replaceTra
 assert(/peer\.ontrack/.test(overlay) && /remoteMediaReadyRef/.test(overlay) && /getTracks\(\)\.forEach\(\(track\)\s*=>\s*track\.stop\(\)\)/.test(overlay.replace(/\n/g,' ')), 'remote media readiness, track handling, and media cleanup exist');
 assert(/socket\.on\("message-reaction", handleReaction\)/.test(windowSource), 'ChatWindow listens for real persisted reaction updates');
 assert(/reactions: Array\.isArray\(normalized\.reactions\) \? normalized\.reactions : \[\]/.test(windowSource), 'reaction state defaults to an empty array rather than a phantom emoji');
-assert(/<Plus size=\{15\} \/>/.test(bubble) && /aria-label="Add reaction"/.test(bubble) && !/aria-label="React to message">❤/.test(bubble), 'message rows no longer render a fake heart as the reaction affordance');
+assert(!/message-reaction-add/.test(bubble) && !/aria-label="Add reaction"/.test(bubble) && !/<Plus size=\{15\} \/>/.test(bubble), 'message rows no longer render the redundant per-message plus reaction control');
 assert(/call\.answered\) return/.test(socket), 'a call can only be answered once');
 assert(/call-mode-offer[\s\S]*!call\.answered/.test(socket) || /!call\.answered/.test(socket), 'renegotiation requires an accepted call');
 assert(/String\(to\) !== String\(call\.callerChatId\)/.test(socket), 'answer signaling is bound to the original caller identity');

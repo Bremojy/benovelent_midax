@@ -1193,3 +1193,96 @@
 .submit-admin-btn { border-radius: 14px; min-height: 50px; padding: 0 20px; box-shadow: 0 10px 24px rgba(255,139,0,.20); }
 .cancel-btn { border-radius: 14px; min-height: 50px; }
 @media (max-width: 720px) { .admin-modal { width: calc(100vw - 24px); } .admin-form, .admin-modal-header { padding-left: 18px; padding-right: 18px; } .admin-form-message { margin-left: 18px; margin-right: 18px; } }
+
+
+/* Production modal repair: the form owns its scrolling region while actions
+   stay reachable and visible on both desktop and short phone viewports. */
+.admin-modal-overlay {
+  padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right))
+    max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+}
+.admin-modal {
+  display: flex;
+  flex-direction: column;
+  width: min(760px, 100%);
+  max-height: min(92dvh, 920px);
+  min-height: 0;
+  overflow: hidden;
+}
+.admin-modal-header {
+  flex: 0 0 auto;
+}
+.admin-form {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+.admin-form-grid {
+  flex: 0 0 auto;
+}
+.admin-form-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: auto;
+  padding: 16px 0 max(4px, env(safe-area-inset-bottom));
+  border-top: 1px solid #ededed;
+  background: linear-gradient(180deg, rgba(255,255,255,.86), #fff 35%);
+}
+.cancel-btn,
+.submit-admin-btn {
+  min-height: 50px;
+  padding: 0 20px;
+  border-radius: 14px;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+.cancel-btn {
+  border: 1px solid #ddd;
+  background: #fff;
+  color: #666;
+}
+.submit-admin-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: none;
+  background: #e87500;
+  color: #fff;
+  box-shadow: 0 10px 24px rgba(255,139,0,.20);
+}
+.submit-admin-btn:disabled,
+.cancel-btn:disabled {
+  opacity: .55;
+  cursor: not-allowed;
+}
+@media (max-width: 560px) {
+  .admin-modal-overlay {
+    align-items: center;
+    padding: 10px;
+  }
+  .admin-modal {
+    width: calc(100vw - 20px);
+    max-height: 94dvh;
+    border-radius: 18px;
+  }
+  .admin-form-actions {
+    flex-direction: column-reverse;
+    align-items: stretch;
+    padding-bottom: max(8px, env(safe-area-inset-bottom));
+  }
+  .cancel-btn,
+  .submit-admin-btn {
+    width: 100%;
+  }
+}

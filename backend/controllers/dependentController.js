@@ -13,7 +13,8 @@ const path = require("path");
 const axios = require("axios");
 const uploadConfig = require("../config/uploadConfig");
 
-const MEMBER_EDIT_FIELDS = ["fullName", "relationship", "gender", "dateOfBirth", "nationalId", "birthCertificateNumber", "phone", "email", "county", "address", "school", "admissionNumber", "educationLevel", "occupation", "employer", "medicalConditions", "isNextOfKin"];
+const MEMBER_EDIT_FIELDS = ["fullName", "relationship", "gender", "dateOfBirth", "nationalId", "phone", "email", "county", "address", "employmentStatus", "medicalConditions", "isNextOfKin"];
+const DEPENDENT_EMPLOYMENT_STATUSES = ["Employed", "Not employed", "Studying", "Prefer not to say"];
 const ADMIN_MODEL_FROM_ROLE = (role) => String(role || "").toLowerCase() === "superadmin" ? "SuperAdmin" : "Admin";
 
 const serializeDocument = (doc, dependentId) => {
@@ -70,6 +71,9 @@ const validateChanges = (changes) => {
   for (const field of MEMBER_EDIT_FIELDS) if (changes?.[field] !== undefined) clean[field] = changes[field];
   if (clean.dateOfBirth && Number.isNaN(new Date(clean.dateOfBirth).getTime())) throw new Error("Date of birth is invalid.");
   if (clean.dateOfBirth && new Date(clean.dateOfBirth).getTime() > Date.now()) throw new Error("Date of birth cannot be in the future.");
+  if (clean.employmentStatus !== undefined && !DEPENDENT_EMPLOYMENT_STATUSES.includes(String(clean.employmentStatus))) {
+    throw new Error(`Employment Status must be one of: ${DEPENDENT_EMPLOYMENT_STATUSES.join(", ")}.`);
+  }
   return clean;
 };
 
@@ -99,12 +103,14 @@ exports.addDependent = async (req, res) => {
   try {
     const member = await Member.findById(req.user._id);
     if (!member) return res.status(404).json({ success: false, message: "Member not found." });
-    const { fullName, relationship, gender, dateOfBirth, nationalId, birthCertificateNumber, phone, email, county, address, school, admissionNumber, educationLevel, occupation, employer, medicalConditions, isNextOfKin } = req.body || {};
+    const { fullName, relationship, gender, dateOfBirth, nationalId, phone, email, county, address, employmentStatus, medicalConditions, isNextOfKin } = req.body || {};
     if (!fullName || !relationship || !gender || !dateOfBirth) return res.status(400).json({ success: false, message: "Full name, relationship, gender and date of birth are required." });
     if (new Date(dateOfBirth).getTime() > Date.now()) return res.status(400).json({ success: false, message: "Date of birth cannot be in the future." });
     const existing = await Dependent.findOne({ member: member._id, fullName: String(fullName).trim(), relationship, dateOfBirth });
     if (existing) return res.status(409).json({ success: false, message: "Dependent already exists." });
-    const dependent = await Dependent.create({ member: member._id, fullName: String(fullName).trim(), relationship, gender, dateOfBirth, nationalId, birthCertificateNumber, phone, email, county, address, school, admissionNumber, educationLevel, occupation, employer, medicalConditions, isNextOfKin });
+    const normalizedEmploymentStatus = employmentStatus === undefined || employmentStatus === "" ? "Prefer not to say" : String(employmentStatus);
+    if (!DEPENDENT_EMPLOYMENT_STATUSES.includes(normalizedEmploymentStatus)) return res.status(400).json({ success: false, message: `Employment Status must be one of: ${DEPENDENT_EMPLOYMENT_STATUSES.join(", ")}.` });
+    const dependent = await Dependent.create({ member: member._id, fullName: String(fullName).trim(), relationship, gender, dateOfBirth, nationalId, phone, email, county, address, employmentStatus: normalizedEmploymentStatus, medicalConditions, isNextOfKin });
     await redisCache.invalidateMany([`member:${member._id}:dashboard`, `member:${member._id}:dependents`]);
     await createAuditLog({ user: member._id, userRole: "member", action: "CREATE", module: "Dependent", description: `Added dependent ${dependent.fullName}`, req });
     res.status(201).json({ success: true, message: "Dependent added successfully. You can now upload supporting documents.", dependent });

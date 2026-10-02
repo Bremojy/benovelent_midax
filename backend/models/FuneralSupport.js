@@ -116,6 +116,13 @@ const funeralSupportSchema = new mongoose.Schema(
     // DOCUMENTS
     // =====================================
 
+    // Current member-facing required document. Legacy document fields below
+    // remain readable so historical applications are not destructively changed.
+    burialPermitChiefLetter:{
+        type:String,
+        default:""
+    },
+
     deathCertificate:{
         type:String,
         default:""

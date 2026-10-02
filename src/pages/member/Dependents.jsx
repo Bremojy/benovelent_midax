@@ -3,7 +3,7 @@ import DashboardLayout from "../../layouts/DashboardLayout";
 import API from "../../services/api";
 import "./Support.css";
 
-const empty = { fullName: "", relationship: "", gender: "", dateOfBirth: "", nationalId: "", birthCertificateNumber: "", phone: "", email: "", county: "", address: "", school: "", admissionNumber: "", educationLevel: "", occupation: "", employer: "", medicalConditions: "", isNextOfKin: false };
+const empty = { fullName: "", relationship: "", gender: "", dateOfBirth: "", nationalId: "", phone: "", email: "", county: "", address: "", employmentStatus: "Prefer not to say", medicalConditions: "", isNextOfKin: false };
 const relationships = ["Spouse", "Son", "Daughter", "Father", "Mother", "Brother", "Sister", "Guardian", "Other"];
 const documentTypes = [
   ["dependent-id-front", "Dependent ID — Front"], ["dependent-id-back", "Dependent ID — Back"],
@@ -168,19 +168,21 @@ export default function Dependents() {
               </div>
               <div className="support-two-col">
                 <Field label="National ID"><input type="text" value={form.nationalId} onChange={(e)=>set("nationalId",e.target.value)} /></Field>
+                <Field label="Phone"><input type="tel" inputMode="tel" value={form.phone} onChange={(e)=>set("phone",e.target.value)} /></Field>
+              </div>
+              <div className="support-two-col">
+                <Field label="Email"><input type="email" value={form.email} onChange={(e)=>set("email",e.target.value)} /></Field>
                 <Field label="County"><input type="text" value={form.county} onChange={(e)=>set("county",e.target.value)} /></Field>
               </div>
-              <Field label="Birth Certificate Number"><input type="text" value={form.birthCertificateNumber} onChange={(e)=>set("birthCertificateNumber",e.target.value)} /></Field>
-              <Field label="School / Institution"><input type="text" value={form.school} onChange={(e)=>set("school",e.target.value)} /></Field>
-              <div className="support-two-col">
-                <Field label="Admission Number"><input type="text" value={form.admissionNumber} onChange={(e)=>set("admissionNumber",e.target.value)} /></Field>
-                <Field label="Education Level"><select value={form.educationLevel} onChange={(e)=>set("educationLevel",e.target.value)}><option value="">Select</option>{["Primary","Junior Secondary","Secondary","College","University","TVET","Other"].map((x)=><option key={x}>{x}</option>)}</select></Field>
-              </div>
-              <div className="support-two-col">
-                <Field label="Occupation"><input type="text" value={form.occupation} onChange={(e)=>set("occupation",e.target.value)} /></Field>
-                <Field label="Employer"><input type="text" value={form.employer} onChange={(e)=>set("employer",e.target.value)} /></Field>
-              </div>
               <Field label="Address"><input type="text" value={form.address} onChange={(e)=>set("address",e.target.value)} /></Field>
+              <Field label="Employment Status">
+                <select value={form.employmentStatus} onChange={(e)=>set("employmentStatus", e.target.value)}>
+                  <option>Employed</option>
+                  <option>Not employed</option>
+                  <option>Studying</option>
+                  <option>Prefer not to say</option>
+                </select>
+              </Field>
               <button className="support-submit-button" type="submit" disabled={saving}>{saving ? "Adding..." : "Add Dependent"}</button>
             </form>
 

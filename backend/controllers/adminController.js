@@ -794,23 +794,48 @@ exports.verifyMember = async (req, res) => {
     member.verificationRequestedAt = null;
     await member.save();
 
-    if (!alreadyVerified) {
-      await createNotification({
-        recipient: member._id,
-        recipientModel: "Member",
-        sender: req.user._id,
-        senderModel: req.user.role === "superadmin" ? "SuperAdmin" : "Admin",
-        title: "Membership verified",
-        message: "Your membership has been verified. You can now add dependents and submit support requests.",
-        type: "system",
-        referenceId: member._id,
-        referenceModel: "Member",
-        icon: "verified",
-        link: "/member/dashboard",
+    // Verification is authoritative once MongoDB has persisted the member.
+    // Secondary side effects are deliberately isolated so they cannot turn a
+    // successful verification into a false HTTP failure.
+    await Promise.allSettled([
+      redisCache.invalidateMany([
+        `member:${member._id}:dashboard`,
+        `member:${member._id}:dependents`,
+        "admin:dashboard",
+        "superadmin:dashboard",
+      ]),
+      !alreadyVerified
+        ? createNotification({
+            recipient: member._id,
+            recipientModel: "Member",
+            sender: req.user._id,
+            senderModel: req.user.role === "superadmin" ? "SuperAdmin" : "Admin",
+            title: "Membership verified",
+            message: "Your membership has been verified. You can now add dependents and submit support requests.",
+            type: "system",
+            referenceId: member._id,
+            referenceModel: "Member",
+            icon: "verified",
+            link: "/member/dashboard",
+          })
+        : Promise.resolve(),
+    ]).then((results) => {
+      results.forEach((result, index) => {
+        if (result.status === "rejected") {
+          console.error(index === 0 ? "Member verification cache invalidation failed after persistence:" : "Member verification notification failed after persistence:", result.reason);
+        }
       });
-    }
+    });
 
-    res.json({ success: true, message: alreadyVerified ? "Member is already verified." : "Member verified successfully.", member: sanitizeMemberForClient(member) });
+    let verifiedMember = member;
+    try {
+      const refreshed = await Member.findById(member._id);
+      if (refreshed) verifiedMember = refreshed;
+      else console.error("Member verification persisted, but the authoritative record could not be reloaded; returning the saved document.");
+    } catch (reloadError) {
+      console.error("Member verification reload failed after successful persistence:", reloadError);
+    }
+    res.json({ success: true, message: alreadyVerified ? "Member is already verified." : "Member verified successfully.", member: sanitizeMemberForClient(verifiedMember) });
   } catch (error) {
     console.error(error);
     res.status(500).json({ success: false, message: error.message });

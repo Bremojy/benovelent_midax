@@ -1421,6 +1421,7 @@ exports.getClaims = async (req, res) => {
                 supportType: "funeral",
                 amount: item.requestedAmount || 0,
                 documents: [
+                    item.burialPermitChiefLetter,
                     item.deathCertificate,
                     item.burialPermit,
                     item.chiefLetter,

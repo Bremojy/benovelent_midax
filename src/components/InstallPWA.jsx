@@ -114,32 +114,34 @@ export default function InstallPWA() {
   const iosMode = !directInstall && iosDevice;
 
   return (
-    <div className="pwa-install-sheet" role="dialog" aria-modal="true" aria-label="Install Benevolent MIDAX">
-      <button type="button" className="pwa-install-sheet-close" onClick={closeFallback} aria-label="Close installation dialog">
-        <X size={18} />
-      </button>
-      <div className="pwa-install-sheet-icon"><Download size={22} /></div>
-      <div className="pwa-install-sheet-copy">
-        <span>BENEVOLENT MIDAX</span>
-        <h2>{directInstall ? "Install Benevolent MIDAX" : iosMode ? "Add to Home Screen" : "Installation notice"}</h2>
-        {directInstall ? (
-          <p>Install the portal for a faster, app-like experience and easier access on your device.</p>
-        ) : iosMode ? (
-          <p><Share2 size={14} /> In Safari, tap <b>Share</b> → <b>Add to Home Screen</b> → <b>Add</b>.</p>
-        ) : statusMessage ? (
-          <p>{statusMessage}</p>
-        ) : androidDevice ? (
-          <p>Open the browser menu and choose <b>Install app</b> when available.</p>
-        ) : (
-          <p>Open your browser menu and choose <b>Install app</b> when available.</p>
-        )}
-      </div>
-      <div className="pwa-install-sheet-actions">
-        {directInstall ? (
-          <button type="button" className="pwa-install-now" onClick={install}><Smartphone size={16} /> Install</button>
-        ) : (
-          <button type="button" className="pwa-help-secondary" onClick={closeFallback}>Close</button>
-        )}
+    <div className="pwa-install-overlay">
+      <div className="pwa-install-sheet" role="dialog" aria-modal="true" aria-label="Install Benevolent MIDAX">
+        <button type="button" className="pwa-install-sheet-close" onClick={closeFallback} aria-label="Close installation dialog">
+          <X size={18} />
+        </button>
+        <div className="pwa-install-sheet-icon"><Download size={22} /></div>
+        <div className="pwa-install-sheet-copy">
+          <span>BENEVOLENT MIDAX</span>
+          <h2>{directInstall ? "Install Benevolent MIDAX" : iosMode ? "Add to Home Screen" : "Installation notice"}</h2>
+          {directInstall ? (
+            <p>Install the portal for a faster, app-like experience and easier access on your device.</p>
+          ) : iosMode ? (
+            <p><Share2 size={14} /> In Safari, tap <b>Share</b> → <b>Add to Home Screen</b> → <b>Add</b>.</p>
+          ) : statusMessage ? (
+            <p>{statusMessage}</p>
+          ) : androidDevice ? (
+            <p>Open the browser menu and choose <b>Install app</b> when available.</p>
+          ) : (
+            <p>Open your browser menu and choose <b>Install app</b> when available.</p>
+          )}
+        </div>
+        <div className="pwa-install-sheet-actions">
+          {directInstall ? (
+            <button type="button" className="pwa-install-now" onClick={install}><Smartphone size={16} /> Install</button>
+          ) : (
+            <button type="button" className="pwa-help-secondary" onClick={closeFallback}>Close</button>
+          )}
+        </div>
       </div>
     </div>
   );

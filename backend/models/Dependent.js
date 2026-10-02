@@ -76,6 +76,19 @@ const dependentSchema = new mongoose.Schema(
         default:""
     },
 
+    employmentStatus:{
+        type:String,
+        enum:[
+            "Employed",
+            "Not employed",
+            "Studying",
+            "Prefer not to say"
+        ],
+        default:"Prefer not to say"
+    },
+
+    // Legacy education/employment fields remain stored for historical records.
+    // They are no longer accepted as current member-controlled dependent fields.
     school:{
         type:String,
         default:""

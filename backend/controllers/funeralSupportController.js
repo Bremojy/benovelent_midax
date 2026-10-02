@@ -44,12 +44,6 @@ exports.applyFuneralSupport = async (req, res) => {
 
             requestedAmount,
 
-            deathCertificate,
-
-            burialPermit,
-
-            chiefLetter,
-
             supportingDocuments
 
         } = req.body;
@@ -90,11 +84,9 @@ exports.applyFuneralSupport = async (req, res) => {
         const fileUrl = (file) =>
             resolveStoredFileUrl(file, `/uploads/${req.uploadType || "support"}`);
 
-        const deathCertificateFile = req.files?.deathCertificate?.[0];
-        const burialPermitFile = req.files?.burialPermit?.[0];
-        const chiefLetterFile = req.files?.chiefLetter?.[0];
-        if (!deathCertificateFile || !burialPermitFile || !chiefLetterFile) {
-            return res.status(400).json({ success:false, code:"REQUIRED_DOCUMENTS_MISSING", message:"Death certificate, burial permit and chief/local authority letter are required for Funeral Support." });
+        const burialPermitChiefLetterFile = req.files?.burialPermitChiefLetter?.[0];
+        if (!burialPermitChiefLetterFile) {
+            return res.status(400).json({ success:false, code:"REQUIRED_DOCUMENT_MISSING", message:"Burial Permit / Chief or Local Authority Letter is required for Funeral Support." });
         }
         if (deceasedType === "Dependent" && !dependent) {
             return res.status(400).json({ success:false, code:"DEPENDENT_REQUIRED", message:"Select the dependent for this Funeral Support application." });
@@ -167,11 +159,7 @@ exports.applyFuneralSupport = async (req, res) => {
 
             requestedAmount,
 
-            deathCertificate: fileUrl(deathCertificateFile) || deathCertificate,
-
-            burialPermit: fileUrl(burialPermitFile) || burialPermit,
-
-            chiefLetter: fileUrl(chiefLetterFile) || chiefLetter,
+            burialPermitChiefLetter: fileUrl(burialPermitChiefLetterFile),
 
             supportingDocuments: [
                 ...(Array.isArray(supportingDocuments) ? supportingDocuments : []),

@@ -62,9 +62,7 @@ export default function Support() {
   const [requiredFiles, setRequiredFiles] = useState({
     feeStructure: null,
     admissionLetter: null,
-    deathCertificate: null,
-    burialPermit: null,
-    chiefLetter: null,
+    burialPermitChiefLetter: null,
   });
 
   const load = async () => {
@@ -239,7 +237,7 @@ export default function Support() {
 
         endpoint = "/funeral/apply";
         if (form.deceasedType === "Dependent" && !form.dependentId) throw new Error("Select the dependent linked to the funeral case.");
-        if (!requiredFiles.deathCertificate || !requiredFiles.burialPermit || !requiredFiles.chiefLetter) throw new Error("Death certificate, burial permit and chief/local authority letter are required.");
+        if (!requiredFiles.burialPermitChiefLetter) throw new Error("Burial Permit / Chief or Local Authority Letter is required.");
         Object.entries({
           deceasedType: form.deceasedType,
           deceasedName: form.deceasedName.trim(),
@@ -250,9 +248,7 @@ export default function Support() {
           requestedAmount: Number(form.requestedAmount),
           ...(form.deceasedType === "Dependent" ? { dependent: form.dependentId } : {}),
         }).forEach(([key, value]) => formData.append(key, String(value)));
-        formData.append("deathCertificate", requiredFiles.deathCertificate);
-        formData.append("burialPermit", requiredFiles.burialPermit);
-        formData.append("chiefLetter", requiredFiles.chiefLetter);
+        formData.append("burialPermitChiefLetter", requiredFiles.burialPermitChiefLetter);
         activeAttachments.forEach((item) => formData.append("supportingDocuments", item.file));
       } else if (form.type === "education") {
         const educationPolicy = policies.find((policy) => policy.slug === "education-policy");
@@ -309,7 +305,7 @@ export default function Support() {
       setSuccess("Your support application and supporting documents were submitted successfully.");
       setForm({ ...initialForm, type: form.type });
       setAttachments([newAttachment()]);
-      setRequiredFiles({ feeStructure: null, admissionLetter: null, deathCertificate: null, burialPermit: null, chiefLetter: null });
+      setRequiredFiles({ feeStructure: null, admissionLetter: null, burialPermitChiefLetter: null });
       await load();
     } catch (err) {
       setError(err.response?.data?.message || err.message || "Unable to submit support application.");
@@ -443,9 +439,7 @@ export default function Support() {
                     </>
                   ) : (
                     <>
-                      <RequiredFileField label="Death Certificate" file={requiredFiles.deathCertificate} onChange={(file) => setRequiredFiles((x) => ({ ...x, deathCertificate: file }))} />
-                      <RequiredFileField label="Burial Permit" file={requiredFiles.burialPermit} onChange={(file) => setRequiredFiles((x) => ({ ...x, burialPermit: file }))} />
-                      <RequiredFileField label="Chief / Local Authority Letter" file={requiredFiles.chiefLetter} onChange={(file) => setRequiredFiles((x) => ({ ...x, chiefLetter: file }))} />
+                      <RequiredFileField label="Burial Permit / Chief or Local Authority Letter" file={requiredFiles.burialPermitChiefLetter} onChange={(file) => setRequiredFiles((x) => ({ ...x, burialPermitChiefLetter: file }))} />
                     </>
                   )}
                   <small className="support-file-hint">These required files are sent using the backend field names for this support type.</small>
