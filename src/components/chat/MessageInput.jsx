@@ -6,6 +6,28 @@ import "./MessageInput.css";
 
 const EMOJIS = ["😊", "😂", "❤️", "🙏", "👍", "🎉", "😎", "😢", "🔥", "🥰", "🤝", "✨"];
 
+const VOICE_MIME_TYPES = [
+  "audio/webm;codecs=opus",
+  "audio/webm",
+  "audio/ogg;codecs=opus",
+  "audio/ogg",
+  "audio/mp4",
+  "audio/mpeg",
+];
+
+function supportedVoiceMimeType() {
+  if (typeof MediaRecorder === "undefined") return "";
+  return VOICE_MIME_TYPES.find((type) => MediaRecorder.isTypeSupported?.(type)) || "";
+}
+
+function voiceExtension(mimeType) {
+  const normalized = String(mimeType || "").toLowerCase();
+  if (normalized.includes("ogg")) return "ogg";
+  if (normalized.includes("mp4")) return "mp4";
+  if (normalized.includes("mpeg")) return "mp3";
+  return "webm";
+}
+
 function getMessageType(file) {
   const type = String(file?.type || "").toLowerCase();
   if (type.startsWith("audio/")) return "audio";
@@ -156,8 +178,10 @@ export default function MessageInput({ onSend, onEdit, editingMessage, replyTo, 
 
   const startRecord = async () => {
     try {
+      if (typeof MediaRecorder === "undefined") throw new Error("Voice recording is not supported by this browser.");
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new MediaRecorder(stream);
+      const mimeType = supportedVoiceMimeType();
+      const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
       recorderRef.current = recorder;
       streamRef.current = stream;
       chunksRef.current = [];
@@ -165,8 +189,10 @@ export default function MessageInput({ onSend, onEdit, editingMessage, replyTo, 
       recorder.onstop = async () => {
         try {
           (streamRef.current?.getTracks() || []).forEach((track) => track.stop());
-          const blob = new Blob(chunksRef.current, { type: recorder.mimeType || "audio/webm" });
-          const file = new File([blob], `voice-${Date.now()}.webm`, { type: blob.type });
+          const blobType = recorder.mimeType || mimeType || "audio/webm";
+          const blob = new Blob(chunksRef.current, { type: blobType });
+          const extension = voiceExtension(blobType);
+          const file = new File([blob], `voice-${Date.now()}.${extension}`, { type: blobType });
           await uploadFile(file, true);
         } catch (err) {
           console.error(err);

@@ -49,7 +49,7 @@ assert(/String\(recipient\?\.chatId \|\| ""\) === String\(caller\?\.chatId \|\| 
 assert(/recipientSockets.*incoming-call/s.test(messageSocket), 'incoming calls are delivered only to intended recipient sockets');
 assert(/reason === "declined".*recordCallSummary\(call, "declined"/s.test(messageSocket), 'declined calls are distinct from missed calls');
 assert(/CALL_TIMEOUT_MS.*markMissedCall/s.test(messageSocket), 'call timeout records missed behavior');
-assert(/socket\.on\(\"disconnect\"[\s\S]*clearCall\(current\.callId\)/.test(messageSocket), 'active call state is cleaned when the initiating/recipient socket disconnects');
+assert(/socket\.on\(\"disconnect\"[\s\S]*scheduleCallSignalingRecovery\(current|scheduleCallSignalingRecovery\(current/.test(messageSocket), 'active calls enter a recoverable signaling grace period on socket disconnect');
 const callStartedIndex = messageSocket.indexOf('emit("call-started"');
 const callNotificationIndex = messageSocket.indexOf('const notification = await deliverCallNotification', callStartedIndex);
 assert(callStartedIndex >= 0 && callNotificationIndex > callStartedIndex, 'caller receives the server call id before notification work can delay early ICE tagging');

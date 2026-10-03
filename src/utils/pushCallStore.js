@@ -25,6 +25,20 @@ export async function getPendingCall(id) {
   } catch { return null; }
 }
 
+export async function storePendingCall(id, value) {
+  if (!id || typeof indexedDB === "undefined") return;
+  try {
+    const db = await openDb();
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(DB_STORE, "readwrite");
+      tx.objectStore(DB_STORE).put(value, id);
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error);
+    });
+    db.close();
+  } catch { /* best effort: realtime UI remains authoritative */ }
+}
+
 export async function removePendingCall(id) {
   if (!id || typeof indexedDB === "undefined") return;
   try {

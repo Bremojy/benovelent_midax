@@ -9,7 +9,8 @@ const DEFAULT_ICE_SERVERS = [
   { urls: "stun:stun.l.google.com:19302" },
   { urls: "stun:stun1.l.google.com:19302" },
 ];
-const RING_TIMEOUT_SECONDS = 35;
+const RING_TIMEOUT_SECONDS = Math.max(10, Math.ceil((Number(import.meta.env.VITE_CALL_TIMEOUT_MS) || 35000) / 1000));
+const SIGNALING_RECOVERY_GRACE_MS = Math.max(5000, Number(import.meta.env.VITE_CALL_SIGNALING_GRACE_MS) || 15000);
 
 export default function CallOverlay({
   socket,
@@ -31,6 +32,9 @@ export default function CallOverlay({
   const [cameraOff, setCameraOff] = useState(callType !== "video");
   const [error, setError] = useState("");
   const [audioPlaybackBlocked, setAudioPlaybackBlocked] = useState(false);
+  const [videoFallbackAvailable, setVideoFallbackAvailable] = useState(false);
+  const [switchingCamera, setSwitchingCamera] = useState(false);
+  const [qualityStatus, setQualityStatus] = useState("");
   const [accepted, setAccepted] = useState(!incomingCall || autoAccept);
   const [duration, setDuration] = useState(0);
   const [ringSecondsLeft, setRingSecondsLeft] = useState(RING_TIMEOUT_SECONDS);
@@ -53,6 +57,12 @@ export default function CallOverlay({
   const iceRestartInFlightRef = useRef(false);
   const recoveryDeadlineRef = useRef(null);
   const connectionRecoveryTimerRef = useRef(null);
+  const errorCloseTimerRef = useRef(null);
+  const qualityTimerRef = useRef(null);
+  const lastQualityTierRef = useRef("unknown");
+  const qualityPausedVideoRef = useRef(false);
+  const cameraFacingModeRef = useRef("user");
+  const activeCallTypeRef = useRef(activeCallType);
   const iceServersRef = useRef(DEFAULT_ICE_SERVERS);
   const iceConfigPromiseRef = useRef(null);
 
@@ -61,6 +71,10 @@ export default function CallOverlay({
   const selfCall = Boolean(me && partnerId && me === partnerId);
   const isVideo = activeCallType === "video";
   const callConversationId = String(conversationId || incomingCall?.conversationId || "");
+
+  useEffect(() => {
+    activeCallTypeRef.current = activeCallType;
+  }, [activeCallType]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -86,12 +100,18 @@ export default function CallOverlay({
       onClose?.();
       return undefined;
     }
-    if (incomingCall && !accepted) ringtoneRef.current = startCallTone();
+    const shouldRing = !connected && (incomingCall ? !accepted : accepted);
+    if (!shouldRing) {
+      ringtoneRef.current?.stop?.();
+      ringtoneRef.current = null;
+      return undefined;
+    }
+    ringtoneRef.current = startCallTone(incomingCall ? "incoming" : "outgoing");
     return () => {
       ringtoneRef.current?.stop?.();
       ringtoneRef.current = null;
     };
-  }, [incomingCall, accepted, selfCall, onClose]);
+  }, [incomingCall, accepted, connected, selfCall, onClose]);
 
   useEffect(() => {
     if (connected) return undefined;
@@ -212,6 +232,24 @@ export default function CallOverlay({
     };
     const handleEnded = () => finish(false);
     const handleRejected = () => finish(false);
+    const handleCallError = ({ message = "The call could not be started.", code = "" } = {}) => {
+      if (endingRef.current) return;
+      setError(String(message));
+      window.clearTimeout(errorCloseTimerRef.current);
+      errorCloseTimerRef.current = window.setTimeout(() => finish(false), code === "CALL_BUSY" ? 1400 : 1800);
+    };
+    const handleCallRecovered = ({ callId: recoveredCallId } = {}) => {
+      const activeId = String(callIdRef.current || callId || incomingCall?.callId || "");
+      if (recoveredCallId && activeId && String(recoveredCallId) !== activeId) return;
+      if (endingRef.current) return;
+      setError("");
+      setStatus(peerRef.current && ["connected", "completed"].includes(peerRef.current.iceConnectionState) ? "Connected" : "Reconnecting...");
+      if (peerRef.current && !["connected", "completed"].includes(peerRef.current.iceConnectionState)) void attemptIceRestart(peerRef.current);
+    };
+    const handleSocketConnect = () => {
+      const activeId = String(callIdRef.current || callId || incomingCall?.callId || "");
+      if (activeId) socket.emit("call-recover", { callId: activeId });
+    };
     const handleSocketDisconnect = () => {
       if (!endingRef.current) setError("The realtime call connection was interrupted. Reconnecting…");
     };
@@ -223,6 +261,9 @@ export default function CallOverlay({
     socket.on("ice-candidate", handleCandidate);
     socket.on("call-ended", handleEnded);
     socket.on("call-rejected", handleRejected);
+    socket.on("call-error", handleCallError);
+    socket.on("call-recovered", handleCallRecovered);
+    socket.on("connect", handleSocketConnect);
     socket.on("disconnect", handleSocketDisconnect);
 
     return () => {
@@ -233,6 +274,9 @@ export default function CallOverlay({
       socket.off("ice-candidate", handleCandidate);
       socket.off("call-ended", handleEnded);
       socket.off("call-rejected", handleRejected);
+      socket.off("call-error", handleCallError);
+      socket.off("call-recovered", handleCallRecovered);
+      socket.off("connect", handleSocketConnect);
       socket.off("disconnect", handleSocketDisconnect);
     };
   }, [socket, partnerId]);
@@ -283,6 +327,7 @@ export default function CallOverlay({
       if (peer.connectionState === "connected") {
         setConnected(true);
         setStatus("Connected");
+        startQualityMonitor(peer);
         ringtoneRef.current?.stop?.();
         stopNativeIncomingCall(callIdRef.current || incomingCall?.callId || "");
       }
@@ -295,6 +340,7 @@ export default function CallOverlay({
         window.clearTimeout(recoveryDeadlineRef.current);
         recoveryDeadlineRef.current = null;
         setStatus("Connected");
+        startQualityMonitor(peer);
         return;
       }
       if (peer.iceConnectionState === "disconnected" || peer.iceConnectionState === "failed") {
@@ -312,6 +358,7 @@ export default function CallOverlay({
         recoveryDeadlineRef.current = null;
         setConnected(true);
         setStatus("Connected");
+        startQualityMonitor(peer);
         ringtoneRef.current?.stop?.();
         stopNativeIncomingCall(callIdRef.current || incomingCall?.callId || "");
       } else if (state === "connected") {
@@ -320,6 +367,7 @@ export default function CallOverlay({
         setConnected(false);
         setStatus("Reconnecting...");
       } else if (["failed", "closed"].includes(state)) {
+        stopQualityMonitor();
         window.clearTimeout(connectionRecoveryTimerRef.current);
         connectionRecoveryTimerRef.current = null;
         setConnected(false);
@@ -394,23 +442,119 @@ export default function CallOverlay({
           setError("The call connection could not recover. Please start the call again.");
           finish(false);
         }
-      }, 10000);
+      }, SIGNALING_RECOVERY_GRACE_MS);
     } catch (error) {
       setError(error?.message || "The call connection could not be recovered.");
       window.clearTimeout(recoveryDeadlineRef.current);
       recoveryDeadlineRef.current = window.setTimeout(() => {
         recoveryDeadlineRef.current = null;
         if (!endingRef.current && peerRef.current === peer) finish(false);
-      }, 5000);
+      }, Math.max(5000, Math.floor(SIGNALING_RECOVERY_GRACE_MS / 2)));
     } finally {
       iceRestartInFlightRef.current = false;
     }
   }
 
-  async function startCall() {
+  function stopQualityMonitor() {
+    if (qualityTimerRef.current) window.clearInterval(qualityTimerRef.current);
+    qualityTimerRef.current = null;
+    lastQualityTierRef.current = "unknown";
+    if (qualityPausedVideoRef.current) {
+      const track = localStreamRef.current?.getVideoTracks?.()[0];
+      if (track) track.enabled = true;
+      qualityPausedVideoRef.current = false;
+    }
+  }
+
+  async function updateCallQuality(peer) {
+    if (!peer || peerRef.current !== peer || endingRef.current || activeCallTypeRef.current !== "video") return;
+    if (!peer.getStats) return;
+    try {
+      const report = await peer.getStats();
+      let rttMs = 0;
+      let packetsLost = 0;
+      let packetsSent = 0;
+      let framesDropped = 0;
+      let framesSent = 0;
+
+      report.forEach((stat) => {
+        if (stat.type === "candidate-pair" && stat.state === "succeeded") {
+          if (typeof stat.currentRoundTripTime === "number") rttMs = Math.max(rttMs, stat.currentRoundTripTime * 1000);
+        }
+        if (stat.type === "remote-inbound-rtp" && (stat.kind === "video" || stat.mediaType === "video")) {
+          packetsLost = Math.max(packetsLost, Number(stat.packetsLost) || 0);
+          packetsSent = Math.max(packetsSent, Number(stat.packetsSent) || 0);
+          if (typeof stat.roundTripTime === "number") rttMs = Math.max(rttMs, stat.roundTripTime * 1000);
+        }
+        if (stat.type === "outbound-rtp" && (stat.kind === "video" || stat.mediaType === "video")) {
+          framesDropped = Math.max(framesDropped, Number(stat.framesDropped) || 0);
+          framesSent = Math.max(framesSent, Number(stat.framesSent) || 0);
+        }
+      });
+
+      const lossRatio = packetsSent + packetsLost > 0 ? packetsLost / (packetsSent + packetsLost) : 0;
+      const dropRatio = framesSent > 0 ? framesDropped / framesSent : 0;
+      let tier = "good";
+      if (lossRatio > 0.18 || rttMs > 700 || dropRatio > 0.25) tier = "very-weak";
+      else if (lossRatio > 0.10 || rttMs > 450 || dropRatio > 0.15) tier = "weak";
+      else if (lossRatio > 0.05 || rttMs > 250 || dropRatio > 0.08) tier = "average";
+
+      if (tier === lastQualityTierRef.current) return;
+      lastQualityTierRef.current = tier;
+
+      const quality = {
+        good: { label: "Good connection", bitrate: 1200000, scale: 1 },
+        average: { label: "Adjusting video quality", bitrate: 700000, scale: 1.5 },
+        weak: { label: "Weak connection • Video reduced", bitrate: 400000, scale: 2 },
+        "very-weak": { label: "Very weak connection • Audio prioritized", bitrate: 180000, scale: 3 },
+      }[tier];
+      setQualityStatus(quality.label);
+
+      const sender = peer.getSenders?.().find((item) => item.track?.kind === "video");
+      if (sender?.getParameters && sender?.setParameters) {
+        const parameters = sender.getParameters();
+        if (!parameters.encodings?.length) parameters.encodings = [{}];
+        parameters.encodings[0].maxBitrate = quality.bitrate;
+        if (Number.isFinite(quality.scale)) parameters.encodings[0].scaleResolutionDownBy = quality.scale;
+        await sender.setParameters(parameters).catch(() => {});
+      }
+
+      const videoTrack = localStreamRef.current?.getVideoTracks?.()[0];
+      if (tier === "very-weak" && videoTrack && videoTrack.enabled) {
+        videoTrack.enabled = false;
+        qualityPausedVideoRef.current = true;
+        setCameraOff(true);
+      } else if (tier !== "very-weak" && qualityPausedVideoRef.current && videoTrack) {
+        videoTrack.enabled = true;
+        qualityPausedVideoRef.current = false;
+        setCameraOff(false);
+      }
+    } catch (_) {
+      // WebRTC statistics are best-effort; call media must continue without them.
+    }
+  }
+
+  function startQualityMonitor(peer) {
+    if (!peer || qualityTimerRef.current || activeCallTypeRef.current !== "video") return;
+    void updateCallQuality(peer);
+    qualityTimerRef.current = window.setInterval(() => void updateCallQuality(peer), 4000);
+  }
+
+  async function startCall(requestedType = activeCallType) {
     if (selfCall || !socket || !partnerId || !accepted || peerRef.current) return;
     await loadIceServers();
-    const stream = await getMedia(activeCallType);
+    let stream;
+    try {
+      stream = await getMedia(requestedType);
+    } catch (error) {
+      if (requestedType === "video") {
+        setVideoFallbackAvailable(true);
+        setError(`${error?.message || "Camera access failed."} You can continue with an audio call.`);
+        return;
+      }
+      throw error;
+    }
+    setVideoFallbackAvailable(false);
     localStreamRef.current = stream;
     if (localVideoRef.current) localVideoRef.current.srcObject = stream;
 
@@ -485,6 +629,7 @@ export default function CallOverlay({
         .forEach((track) => localStreamRef.current?.removeTrack?.(track));
       if (localVideoRef.current) localVideoRef.current.srcObject = localStreamRef.current;
       setCameraOff(true);
+      setQualityStatus("");
       return;
     }
 
@@ -492,7 +637,7 @@ export default function CallOverlay({
     let videoTrack = currentVideoTrack;
     if (!videoTrack) {
       const videoStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } },
+        video: { facingMode: cameraFacingModeRef.current, width: { ideal: 1280 }, height: { ideal: 720 } },
         audio: false,
       });
       videoTrack = videoStream.getVideoTracks()[0];
@@ -534,6 +679,67 @@ export default function CallOverlay({
     } catch (err) {
       setError(err.message || "Could not change the call mode.");
       renegotiatingRef.current = false;
+    }
+  }
+
+  async function continueWithAudio() {
+    if (endingRef.current || peerRef.current) return;
+    setVideoFallbackAvailable(false);
+    setActiveCallType("audio");
+    setCameraOff(true);
+    setError("");
+    try {
+      await startCall("audio");
+    } catch (error) {
+      setError(error?.message || "Microphone access failed.");
+      if (incomingCall) rejectCall("media_error");
+    }
+  }
+
+  async function switchCamera() {
+    if (!isVideo || !peerRef.current || switchingCamera || !navigator.mediaDevices?.getUserMedia) return;
+    setSwitchingCamera(true);
+    const nextFacingMode = cameraFacingModeRef.current === "environment" ? "user" : "environment";
+    let nextStream = null;
+    try {
+      nextStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { exact: nextFacingMode }, width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: false,
+      });
+    } catch (error) {
+      try {
+        nextStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: nextFacingMode, width: { ideal: 1280 }, height: { ideal: 720 } },
+          audio: false,
+        });
+      } catch (fallbackError) {
+        setError(fallbackError?.message || error?.message || "Camera switching is not supported on this device.");
+        setSwitchingCamera(false);
+        return;
+      }
+    }
+    const nextTrack = nextStream.getVideoTracks()[0];
+    const currentTrack = localStreamRef.current?.getVideoTracks?.()[0];
+    try {
+      await videoTransceiverRef.current?.sender?.replaceTrack(nextTrack);
+      if (localStreamRef.current) {
+        if (currentTrack) {
+          localStreamRef.current.removeTrack?.(currentTrack);
+          currentTrack.stop();
+        }
+        localStreamRef.current.addTrack(nextTrack);
+      } else {
+        nextTrack.stop();
+      }
+      if (localVideoRef.current) localVideoRef.current.srcObject = localStreamRef.current;
+      cameraFacingModeRef.current = nextFacingMode;
+      setError("");
+    } catch (error) {
+      nextTrack.stop();
+      setError(error?.message || "Could not switch camera.");
+    } finally {
+      nextStream.getAudioTracks?.().forEach((track) => track.stop());
+      setSwitchingCamera(false);
     }
   }
 
@@ -580,6 +786,8 @@ export default function CallOverlay({
     connectionRecoveryTimerRef.current = null;
     window.clearTimeout(recoveryDeadlineRef.current);
     recoveryDeadlineRef.current = null;
+    window.clearTimeout(errorCloseTimerRef.current);
+    errorCloseTimerRef.current = null;
     iceRestartInFlightRef.current = false;
     peerRef.current?.close();
     peerRef.current = null;
@@ -607,12 +815,17 @@ export default function CallOverlay({
             <span className="call-kicker">{isVideo ? "VIDEO CALL" : "AUDIO CALL"}</span>
             <h2>{partner?.fullName || incomingCall?.callerName || "Member"}</h2>
             <p>
-              {connected ? displayDuration : incomingCall && !accepted ? `${status} • ${ringSecondsLeft}s` : status}
+              {connected ? `${displayDuration}${qualityStatus ? ` • ${qualityStatus}` : ""}` : incomingCall && !accepted ? `${status} • ${ringSecondsLeft}s` : status}
             </p>
           </div>
           <span className={`call-status-dot ${connected ? "connected" : ""}`} />
         </div>
         {error && <div className="call-error" role="alert">{error}</div>}
+        {videoFallbackAvailable && !endingRef.current && (
+          <button type="button" className="call-enable-audio" onClick={() => void continueWithAudio()}>
+            Continue with audio
+          </button>
+        )}
 
         <audio ref={remoteAudioRef} className="call-remote-audio" autoPlay playsInline muted={false} />
         {audioPlaybackBlocked && <button type="button" className="call-enable-audio" onClick={() => void ensureRemoteAudioPlayback()}>
@@ -657,6 +870,9 @@ export default function CallOverlay({
                 {isVideo ? <CameraOff size={18} /> : <Camera size={18} />}
                 {isVideo ? "Audio mode" : "Video mode"}
               </button>
+              {isVideo && <button type="button" className="call-control" onClick={() => void switchCamera()} disabled={switchingCamera} title="Switch front/back camera">
+                <Camera size={18} />{switchingCamera ? "Switching…" : "Flip camera"}
+              </button>}
               {isVideo && <button type="button" className="call-control" onClick={toggleCamera}>
                 {cameraOff ? <VideoOff size={18} /> : <Video size={18} />}{cameraOff ? "Camera on" : "Camera off"}
               </button>}

@@ -52,3 +52,14 @@ export async function stopNativeIncomingCall(callId = "") {
   }
   return false;
 }
+
+export async function subscribeNativeCallEvents({ onAnswered, onEnded } = {}) {
+  const plugin = getCapacitorCallPlugin();
+  if (!plugin?.addListener) return () => {};
+  const handles = [];
+  if (typeof onAnswered === "function") handles.push(await plugin.addListener("callAnswered", onAnswered));
+  if (typeof onEnded === "function") handles.push(await plugin.addListener("callEnded", onEnded));
+  return () => {
+    handles.forEach((handle) => { void handle?.remove?.(); });
+  };
+}

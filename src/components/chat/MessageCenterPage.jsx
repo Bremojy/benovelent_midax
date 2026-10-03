@@ -371,14 +371,6 @@ function MessageCenterPage({
     setMobileChatOpen(false);
   };
 
-  const ensureCallNotifications = async () => {
-    try {
-      if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "default") {
-        await Notification.requestPermission();
-      }
-    } catch (_) {}
-  };
-
   const startCall = async (type) => {
     const actorRole = String(actor?.role || currentUser?.role || authUser?.role || "").toLowerCase();
     const partner = selectedConversation?.partner;
@@ -404,7 +396,6 @@ function MessageCenterPage({
 
     const activeSocket = socket || contextSocket || socketClient;
     try {
-      await ensureCallNotifications();
       if (!activeSocket.connected) {
         toast("Connecting to secure calling…", { icon: "🔒", duration: 2500, id: "secure-call-connect" });
         if (activeSocket.connect) activeSocket.connect();

@@ -13,6 +13,8 @@ final class IncomingCallManager: NSObject, CXProviderDelegate, PKPushRegistryDel
     private let provider: CXProvider
     private let callController = CXCallController()
     private let pushRegistry: PKPushRegistry
+    // Maps the system CallKit UUID to the authoritative backend callId.
+    // Backend call IDs are not required to be UUID strings.
     private var pendingCalls: [UUID: String] = [:]
 
     private override init() {
@@ -33,20 +35,26 @@ final class IncomingCallManager: NSObject, CXProviderDelegate, PKPushRegistryDel
         pushRegistry.desiredPushTypes = [.voIP]
     }
 
-    func reportIncomingCall(callId: UUID, callerName: String, hasVideo: Bool, completion: @escaping (Error?) -> Void) {
+    func reportIncomingCall(backendCallId: String, callerName: String, hasVideo: Bool, completion: @escaping (Error?) -> Void) {
+        if pendingCalls.values.contains(backendCallId) {
+            completion(nil)
+            return
+        }
+        let callUUID = UUID()
         let update = CXCallUpdate()
         update.remoteHandle = CXHandle(type: .generic, value: callerName)
         update.localizedCallerName = callerName
         update.hasVideo = hasVideo
         update.supportsHolding = false
         update.supportsGrouping = false
-        pendingCalls[callId] = callerName
-        provider.reportNewIncomingCall(with: callId, update: update, completion: completion)
+        pendingCalls[callUUID] = backendCallId
+        provider.reportNewIncomingCall(with: callUUID, update: update, completion: completion)
     }
 
-    func end(callId: UUID, reason: CXCallEndedReason = .remoteEnded) {
-        provider.reportCall(with: callId, endedAt: Date(), reason: reason)
-        pendingCalls.removeValue(forKey: callId)
+    func end(backendCallId: String, reason: CXCallEndedReason = .remoteEnded) {
+        guard let callUUID = pendingCalls.first(where: { $0.value == backendCallId })?.key else { return }
+        provider.reportCall(with: callUUID, endedAt: Date(), reason: reason)
+        pendingCalls.removeValue(forKey: callUUID)
     }
 
     // MARK: PushKit
@@ -57,20 +65,24 @@ final class IncomingCallManager: NSObject, CXProviderDelegate, PKPushRegistryDel
 
     func pushRegistry(_ registry: PKPushRegistry, didReceiveIncomingPushWith payload: PKPushPayload, for type: PKPushType, completion: @escaping () -> Void) {
         let data = payload.dictionaryPayload
-        let callId = UUID(uuidString: String(data["callId"] as? String ?? "")) ?? UUID()
+        let backendCallId = String(data["callId"] as? String ?? "")
         let callerName = (data["callerName"] as? String) ?? "Benevolent MIDAX"
         let callType = (data["callType"] as? String) ?? "audio"
-        reportIncomingCall(callId: callId, callerName: callerName, hasVideo: callType == "video") { _ in completion() }
+        guard !backendCallId.isEmpty else { completion(); return }
+        reportIncomingCall(backendCallId: backendCallId, callerName: callerName, hasVideo: callType == "video") { _ in completion() }
     }
 
     // MARK: CallKit
     func providerDidReset(_ provider: CXProvider) { pendingCalls.removeAll() }
     func provider(_ provider: CXProvider, perform action: CXAnswerCallAction) {
-        NotificationCenter.default.post(name: .benevolentCallAnswered, object: action.callUUID)
+        let backendCallId = pendingCalls[action.callUUID] ?? action.callUUID.uuidString
+        pendingCalls.removeValue(forKey: action.callUUID)
+        NotificationCenter.default.post(name: .benevolentCallAnswered, object: backendCallId)
         action.fulfill()
     }
     func provider(_ provider: CXProvider, perform action: CXEndCallAction) {
-        NotificationCenter.default.post(name: .benevolentCallEnded, object: action.callUUID)
+        let backendCallId = pendingCalls[action.callUUID] ?? action.callUUID.uuidString
+        NotificationCenter.default.post(name: .benevolentCallEnded, object: backendCallId)
         pendingCalls.removeValue(forKey: action.callUUID)
         action.fulfill()
     }

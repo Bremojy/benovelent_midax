@@ -1,4 +1,5 @@
 const DEFAULT_RINGTONE_URL = "/sounds/benovelent-call.mp3";
+const DEFAULT_RINGBACK_URL = "/sounds/benovelent-call.mp3";
 let unlockBound = false;
 let activeTone = null;
 
@@ -14,13 +15,16 @@ export function unlockCallAudio() {
   document.addEventListener("visibilitychange", retry);
 }
 
-export function startCallTone() {
+export function startCallTone(kind = "incoming") {
   if (typeof window === "undefined") return { stop() {} };
   if (activeTone) return activeTone;
   unlockCallAudio();
 
-  const configured = String(import.meta.env.VITE_CALL_RINGTONE_URL || "").trim();
-  const src = configured || DEFAULT_RINGTONE_URL;
+  const isOutgoing = kind === "outgoing";
+  const configured = String(
+    isOutgoing ? import.meta.env.VITE_CALL_RINGBACK_URL || "" : import.meta.env.VITE_CALL_RINGTONE_URL || ""
+  ).trim();
+  const src = configured || (isOutgoing ? DEFAULT_RINGBACK_URL : DEFAULT_RINGTONE_URL);
   const audio = new Audio(src);
   audio.loop = true;
   audio.preload = "auto";

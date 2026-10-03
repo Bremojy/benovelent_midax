@@ -9,7 +9,8 @@ const { sendPushToRecipient } = require("../services/pushService");
 const { resolveChatActor, isChatRole } = require("../utils/chatProfile");
 const activeCalls = new Map();
 // Canonical admin mirrors carry portalOwnerId; call/presence routing uses the same actor identity.
-const CALL_TIMEOUT_MS = 35_000;
+const CALL_TIMEOUT_MS = Math.max(10_000, Number.parseInt(process.env.CALL_TIMEOUT_MS || "35000", 10) || 35000);
+const CALL_SIGNALING_GRACE_MS = Math.max(5000, Number.parseInt(process.env.CALL_SIGNALING_GRACE_MS || "15000", 10) || 15000);
 
 function modelName(role) {
   return role === "superadmin" ? "SuperAdmin" : role === "admin" ? "Admin" : "Member";
@@ -105,8 +106,73 @@ async function recordCallSummary(call, status = "completed", durationSeconds = 0
 function clearCall(callId) {
   const call = activeCalls.get(callId);
   if (call?.timeout) clearTimeout(call.timeout);
+  if (call?.signalingRecoveryTimer) clearTimeout(call.signalingRecoveryTimer);
   activeCalls.delete(callId);
   return call;
+}
+
+function emitToCallPeer(call, chatId, socketId, event, payload, allowRoomFallback = true) {
+  const exact = String(socketId || "");
+  if (exact && call?.io?.sockets?.sockets?.has(exact)) {
+    call.io.to(exact).emit(event, payload);
+    return;
+  }
+  if (allowRoomFallback && chatId) call?.io?.to(String(chatId)).emit(event, payload);
+}
+
+function scheduleCallSignalingRecovery(call, socketId, actorChatId) {
+  if (!call || call.ended) return;
+  if (call.signalingRecoveryTimer) clearTimeout(call.signalingRecoveryTimer);
+  call.signalingLostSocketId = String(socketId || "");
+  call.signalingLostActorChatId = String(actorChatId || "");
+  call.signalingRecoveryTimer = setTimeout(async () => {
+    const current = activeCalls.get(call.callId);
+    if (!current || current.signalingLostActorChatId !== String(actorChatId || "")) return;
+    try {
+      if (!current.answered) await markMissedCall(current.callId, "missed");
+      else {
+        const durationSeconds = current.answeredAt ? Math.max(0, Math.round((Date.now() - current.answeredAt) / 1000)) : 0;
+        await recordCallSummary(current, "completed", durationSeconds);
+      }
+    } catch (error) {
+      console.warn("Call signaling recovery expiry failed:", error.message);
+    }
+    const targetChatId = String(actorChatId || "") === String(current.callerChatId) ? current.recipientChatId : current.callerChatId;
+    const targetSocketId = String(actorChatId || "") === String(current.callerChatId) ? current.recipientSocketId : current.callerSocketId;
+    emitToCallPeer(current, targetChatId, targetSocketId, "call-ended", { callId: current.callId, reason: "signaling_timeout" });
+    clearCall(current.callId);
+  }, CALL_SIGNALING_GRACE_MS);
+  call.signalingRecoveryTimer.unref?.();
+}
+
+function recoverCallForSocket(socket, callId) {
+  const normalizedId = String(callId || "");
+  if (!normalizedId) return false;
+  const call = activeCalls.get(normalizedId);
+  const actorChatId = String(socket.data?.chatId || "");
+  if (!call || !actorChatId) return false;
+  if (![String(call.callerChatId), String(call.recipientChatId)].includes(actorChatId)) return false;
+  if (call.signalingLostActorChatId && call.signalingLostActorChatId !== actorChatId) return false;
+
+  if (actorChatId === String(call.callerChatId)) {
+    call.callerSocketId = socket.id;
+  } else {
+    call.recipientSocketId = socket.id;
+    call.answerSocketId = socket.id;
+  }
+  call.signalingLostSocketId = "";
+  call.signalingLostActorChatId = "";
+  if (call.signalingRecoveryTimer) clearTimeout(call.signalingRecoveryTimer);
+  call.signalingRecoveryTimer = null;
+  activeCalls.set(call.callId, call);
+
+  socket.emit("call-recovered", { callId: call.callId, answered: Boolean(call.answered) });
+  if (call.answered && actorChatId === String(call.callerChatId) && call.answer) {
+    socket.emit("call-answered", { answer: call.answer, callId: call.callId });
+  } else if (!call.answered && actorChatId === String(call.recipientChatId)) {
+    socket.emit("incoming-call", call.incomingPayload);
+  }
+  return true;
 }
 
 async function markMissedCall(callId, reason = "missed") {
@@ -225,7 +291,7 @@ module.exports = (io, socket) => {
       offer,
       callId,
     };
-    const active = { io, callerSocketId: socket.id, recipient, caller, recipientChatId: String(recipient.chatId), callerChatId: String(caller.chatId), callType: normalizedType, callId, conversationId: conversationId || "", incomingPayload, answered: false, missedNotified: false, summaryCreated: false, answeredAt: null, timeout: null };
+    const active = { io, callerSocketId: socket.id, recipientSocketId: null, answerSocketId: null, recipient, caller, recipientChatId: String(recipient.chatId), callerChatId: String(caller.chatId), callType: normalizedType, callId, conversationId: conversationId || "", incomingPayload, answered: false, answer: null, missedNotified: false, summaryCreated: false, answeredAt: null, timeout: null, signalingRecoveryTimer: null, signalingLostSocketId: "", signalingLostActorChatId: "" };
     active.timeout = setTimeout(() => {
       void markMissedCall(callId, "missed");
       void recordCallSummary(activeCalls.get(callId), "missed", 0);
@@ -251,11 +317,15 @@ module.exports = (io, socket) => {
         const presence = getPresence(targetId);
         for (const socketId of presence?.sockets || []) recipientSockets.add(String(socketId));
       }
-      recipientSockets.forEach((socketId) => io.to(socketId).emit("incoming-call", incomingPayload));
+      const recipientSocketId = recipientSockets.values().next().value || null;
+      if (recipientSocketId) {
+        active.recipientSocketId = recipientSocketId;
+        io.to(recipientSocketId).emit("incoming-call", incomingPayload);
+      }
 
       const callNotification = { title, message, callType: normalizedType, callId, callerUserId: String(caller.chatId), callerName: incomingPayload.callerName, notification };
-      recipientSockets.forEach((socketId) => io.to(socketId).emit("new-call-notification", callNotification));
-      if (!recipientSockets.size) {
+      if (recipientSocketId) io.to(recipientSocketId).emit("new-call-notification", callNotification);
+      if (!recipientSocketId) {
         io.to(String(caller.chatId)).emit("call-status", { callId, status: "ringing-offline", message: "The recipient is offline. A call notification was queued for their registered device." });
       }
     } catch (error) { console.warn("Could not save/deliver call notification:", error.message); }
@@ -271,10 +341,16 @@ module.exports = (io, socket) => {
     if (call.answered) return;
     call.answered = true;
     call.answerSocketId = socket.id;
+    call.recipientSocketId = socket.id;
+    call.answer = answer;
     call.answeredAt = Date.now();
+    call.signalingLostSocketId = "";
+    call.signalingLostActorChatId = "";
+    if (call.signalingRecoveryTimer) clearTimeout(call.signalingRecoveryTimer);
+    call.signalingRecoveryTimer = null;
     if (call.timeout) clearTimeout(call.timeout);
     activeCalls.set(call.callId, call);
-    io.to(String(call.callerSocketId)).emit("call-answered", { answer, callId: call.callId });
+    emitToCallPeer(call, call.callerChatId, call.callerSocketId, "call-answered", { answer, callId: call.callId });
   });
 
   socket.on("call-mode-offer", async ({ offer, callId, mode }) => {
@@ -282,9 +358,10 @@ module.exports = (io, socket) => {
     if (!call || !offer || !call.answered) return;
     const actorChatId = String(socket.data?.chatId || "");
     if (![String(call.callerChatId), String(call.recipientChatId)].includes(actorChatId)) return;
-    const target = actorChatId === String(call.callerChatId) ? call.recipientChatId : call.callerChatId;
+    const targetChatId = actorChatId === String(call.callerChatId) ? call.recipientChatId : call.callerChatId;
+    const targetSocketId = actorChatId === String(call.callerChatId) ? call.recipientSocketId : call.callerSocketId;
     const normalizedMode = mode === "video" ? "video" : "audio";
-    io.to(String(target)).emit("call-mode-offer", { offer, callId: call.callId, mode: normalizedMode });
+    emitToCallPeer(call, targetChatId, targetSocketId, "call-mode-offer", { offer, callId: call.callId, mode: normalizedMode }, false);
   });
 
   socket.on("call-mode-answer", async ({ answer, callId, mode }) => {
@@ -292,9 +369,10 @@ module.exports = (io, socket) => {
     if (!call || !answer || !call.answered) return;
     const actorChatId = String(socket.data?.chatId || "");
     if (![String(call.callerChatId), String(call.recipientChatId)].includes(actorChatId)) return;
-    const target = actorChatId === String(call.callerChatId) ? call.recipientChatId : call.callerChatId;
+    const targetChatId = actorChatId === String(call.callerChatId) ? call.recipientChatId : call.callerChatId;
+    const targetSocketId = actorChatId === String(call.callerChatId) ? call.recipientSocketId : call.callerSocketId;
     const normalizedMode = mode === "video" ? "video" : "audio";
-    io.to(String(target)).emit("call-mode-answer", { answer, callId: call.callId, mode: normalizedMode });
+    emitToCallPeer(call, targetChatId, targetSocketId, "call-mode-answer", { answer, callId: call.callId, mode: normalizedMode }, false);
   });
 
   socket.on("call-rejected", async ({ callId, reason = "declined" }) => {
@@ -321,8 +399,13 @@ module.exports = (io, socket) => {
     if (!call || !candidate) return;
     const actorChatId = String(socket.data?.chatId || "");
     if (![String(call.callerChatId), String(call.recipientChatId)].includes(actorChatId)) return;
-    const target = actorChatId === String(call.callerChatId) ? call.recipientChatId : call.callerChatId;
-    io.to(String(target)).emit("ice-candidate", { candidate, callId: call.callId });
+    const targetChatId = actorChatId === String(call.callerChatId) ? call.recipientChatId : call.callerChatId;
+    const targetSocketId = actorChatId === String(call.callerChatId) ? call.recipientSocketId : call.callerSocketId;
+    emitToCallPeer(call, targetChatId, targetSocketId, "ice-candidate", { candidate, callId: call.callId }, !call.answered);
+  });
+
+  socket.on("call-recover", ({ callId }) => {
+    recoverCallForSocket(socket, callId);
   });
 
   socket.on("end-call", async ({ callId }) => {
@@ -341,32 +424,19 @@ module.exports = (io, socket) => {
     clearCall(call.callId);
   });
 
-  socket.on("disconnect", async () => {
+  socket.on("disconnect", () => {
     const actorChatId = String(socket.data?.chatId || "");
     const affectedCalls = Array.from(activeCalls.values()).filter((call) => {
-      if (call?.callerSocketId === socket.id) return true;
-      if (actorChatId && String(call?.recipientChatId || "") === actorChatId) {
-        return !getPresence(actorChatId)?.sockets?.size;
-      }
+      if (!call || !actorChatId) return false;
+      if (String(call.callerSocketId || "") === String(socket.id)) return true;
+      if (String(call.recipientSocketId || call.answerSocketId || "") === String(socket.id)) return true;
       return false;
     });
 
     for (const call of affectedCalls) {
       const current = activeCalls.get(call.callId);
-      if (!current) continue;
-      try {
-        if (!current.answered) {
-          await markMissedCall(current.callId, "missed");
-        } else {
-          const durationSeconds = current.answeredAt ? Math.max(0, Math.round((Date.now() - current.answeredAt) / 1000)) : 0;
-          await recordCallSummary(current, "completed", durationSeconds);
-        }
-      } catch (error) {
-        console.warn("Call disconnect cleanup failed:", error.message);
-      }
-      const target = current.callerSocketId === socket.id ? current.recipientChatId : current.callerChatId;
-      io.to(String(target)).emit("call-ended", { callId: current.callId, reason: "disconnect" });
-      clearCall(current.callId);
+      if (!current || current.signalingLostActorChatId) continue;
+      scheduleCallSignalingRecovery(current, socket.id, actorChatId);
     }
   });
 

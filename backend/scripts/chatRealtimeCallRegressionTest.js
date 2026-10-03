@@ -30,7 +30,7 @@ assert(/call\.answered\) return/.test(socket), 'a call can only be answered once
 assert(/call-mode-offer[\s\S]*!call\.answered/.test(socket) || /!call\.answered/.test(socket), 'renegotiation requires an accepted call');
 assert(/String\(to\) !== String\(call\.callerChatId\)/.test(socket), 'answer signaling is bound to the original caller identity');
 assert(/!call\.answered/.test(socket) && /call-mode-offer/.test(socket), 'renegotiation is unavailable before the call is accepted');
-assert(/recipientSockets\.forEach\(\(socketId\) => io\.to\(socketId\)\.emit\("incoming-call"/.test(socket), 'incoming calls are emitted only to authenticated recipient sockets');
+assert(/const recipientSocketId = recipientSockets\.values\(\)\.next\(\)\.value \|\| null/.test(socket) && /io\.to\(recipientSocketId\)\.emit\("incoming-call"/.test(socket), 'incoming calls are emitted only to one authenticated recipient socket owner');
 assert(/isChatRole\(socket\.data\?\.role\)/.test(socket) && /resolveCanonicalChatActorForAuthenticatedUser/.test(read('backend/sockets/socket.js')), 'Socket.IO calls use authenticated server-derived identities and roles');
 assert(/status: "active"/.test(memberController) && /_id: \{ \$nin: actorExclusionIds \}/.test(memberController), 'chat directory is live-data active-only and excludes the current actor');
 assert(/messageIdentityKey\(item\) === identityKey/.test(windowSource) && /function messageIdentityKey\(/.test(windowSource), 'live message events are deduplicated by client id, server id, or stable content fingerprint');

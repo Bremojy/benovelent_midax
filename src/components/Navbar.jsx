@@ -29,9 +29,19 @@ export default function Navbar() {
       </div>
       <header className={`navbar ${scrolled ? "navbar-scrolled" : ""}`}>
       <div className="navbar-container">
-        <Link to="/" className="logo" onClick={close} aria-label="Benevolent Midax home">
-          <span className="logo-icon"><svg viewBox="0 0 64 64" aria-hidden="true"><path d="M12 28c8-18 32-18 40 0-2 16-10 25-20 29C22 53 14 44 12 28Z" fill="none" stroke="currentColor" strokeWidth="4"/><path d="M18 28c7-9 21-9 28 0M22 37c6-5 14-5 20 0" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/></svg></span>
-          <span className="logo-text"><span className="logo-main">Benevolent</span><span className="logo-sub">MIDAX</span></span>
+        <Link to="/" className={`logo ${location.pathname === "/" ? "logo-home-brand" : ""}`} onClick={close} aria-label="Benevolent Midax home">
+          {location.pathname === "/" ? (
+            <picture className="home-logo-picture">
+              <source type="image/webp" srcSet="/images/midax-home-logo-360.webp 360w, /images/midax-home-logo-720.webp 720w" sizes="(max-width: 760px) 72px, 96px" />
+              <source type="image/avif" srcSet="/images/midax-home-logo-360.avif 360w, /images/midax-home-logo-720.avif 720w" sizes="(max-width: 760px) 72px, 96px" />
+              <img className="home-logo-image" src="/images/midax-home-logo.png" width="1448" height="1086" fetchPriority="high" decoding="async" alt="Benevolent MIDAX" />
+            </picture>
+          ) : (
+            <>
+              <span className="logo-icon"><svg viewBox="0 0 64 64" aria-hidden="true"><path d="M12 28c8-18 32-18 40 0-2 16-10 25-20 29C22 53 14 44 12 28Z" fill="none" stroke="currentColor" strokeWidth="4"/><path d="M18 28c7-9 21-9 28 0M22 37c6-5 14-5 20 0" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/></svg></span>
+              <span className="logo-text"><span className="logo-main">Benevolent</span><span className="logo-sub">MIDAX</span></span>
+            </>
+          )}
         </Link>
         <nav className={open ? "nav-links open" : "nav-links"} aria-label="Primary navigation">
           <Link to="/" className={active("/")} onClick={close}>Home</Link>

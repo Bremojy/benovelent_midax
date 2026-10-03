@@ -5,8 +5,8 @@ import { useAuth } from "../context/AuthContext";
 import { useSocket } from "../context/SocketContext";
 import API from "../services/api";
 import { isChatSoundEnabled, playIncomingMessageSound, unlockChatSound } from "../utils/chatSound";
-import { removePendingCall, getPendingCall } from "../utils/pushCallStore";
-import { startNativeIncomingCall as startNativeBridgeCall } from "../utils/nativeCallBridge";
+import { removePendingCall, getPendingCall, storePendingCall } from "../utils/pushCallStore";
+import { startNativeIncomingCall as startNativeBridgeCall, subscribeNativeCallEvents } from "../utils/nativeCallBridge";
 import CallOverlay from "./chat/CallOverlay";
 import "./GlobalCommunicationCenter.css";
 
@@ -32,6 +32,7 @@ function GlobalCommunicationCenter() {
   const missedCallTimersRef = useRef(new Map());
   const pendingCallIdsRef = useRef(new Set());
   const conversationPrefsRef = useRef({});
+  const activeCallRef = useRef(null);
 
   const role = String(user?.role || "member").toLowerCase();
   const actorId = String(user?.chatId || user?._id || user?.id || user?.memberId || "");
@@ -98,6 +99,10 @@ function GlobalCommunicationCenter() {
       // Conversation loading is already owned by portal/chat pages; popup delivery must stay non-blocking.
     }
   }, [actorId, role, user]);
+
+  useEffect(() => {
+    activeCallRef.current = activeCall;
+  }, [activeCall]);
 
   useEffect(() => {
     activeConversationIdRef.current = "";
@@ -206,12 +211,13 @@ function GlobalCommunicationCenter() {
       }
     };
 
-    const onIncomingCall = (payload) => {
+    const onIncomingCall = async (payload) => {
       const callId = String(payload?.callId || "");
       if (!callId || !payload?.offer || !payload?.from) return;
       if (!remember(`incoming-call:${callId}`)) return;
       if (pendingCallIdsRef.current.has(callId)) return;
       pendingCallIdsRef.current.add(callId);
+      await storePendingCall(callId, payload);
       startNativeBridgeCall({
         callerName: payload?.callerName || "Member",
         callType: payload?.callType === "video" ? "video" : "audio",
@@ -268,6 +274,52 @@ function GlobalCommunicationCenter() {
       pendingCallIdsRef.current.clear();
     };
   }, [actorId, clearMessagePopup, clearMissedCall, loadConversationPrefs, markNotificationRead, messagesPath, remember, role, socket, user]);
+
+  useEffect(() => {
+    if (!user) return undefined;
+    let active = true;
+    let unsubscribe = () => {};
+
+    const presentNativePendingCall = async (callId, autoAccept = false) => {
+      const normalizedId = String(callId || "");
+      if (!normalizedId || !active) return;
+      const pending = await getPendingCall(normalizedId);
+      const payload = pending?.data || pending || null;
+      if (!active || !payload?.offer || String(payload?.callId || normalizedId) !== normalizedId) return;
+      pendingCallIdsRef.current.add(normalizedId);
+      setActiveCall({
+        direction: "incoming",
+        incomingCall: payload,
+        autoAccept,
+        callType: payload?.callType === "video" ? "video" : "audio",
+        conversationId: String(payload?.conversationId || ""),
+        partner: {
+          _id: payload?.callerUserId,
+          fullName: payload?.callerName || "Member",
+          profileImage: payload?.callerProfileImage || payload?.profileImage || "",
+        },
+      });
+    };
+
+    const onAnswered = (event = {}) => { void presentNativePendingCall(event.callId, true); };
+    const onEnded = async (event = {}) => {
+      const callId = String(event?.callId || "");
+      if (!callId) return;
+      pendingCallIdsRef.current.delete(callId);
+      if (String(activeCallRef.current?.incomingCall?.callId || "") === callId) setActiveCall(null);
+      await removePendingCall(callId);
+    };
+
+    void subscribeNativeCallEvents({ onAnswered, onEnded }).then((cleanup) => {
+      if (!active) { cleanup?.(); return; }
+      unsubscribe = cleanup || (() => {});
+    });
+
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, [user]);
 
   useEffect(() => {
     let active = true;
