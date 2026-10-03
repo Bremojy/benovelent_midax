@@ -834,7 +834,7 @@ exports.getSettings = async (req, res) => {
     const { getSystemSettings, toPublicConfig } = require("../services/systemSettings");
     const settings = await getSystemSettings();
     if (!settings) return res.status(503).json({ success: false, message: "System settings are not configured." });
-    return res.json({ success: true, settings: toPublicConfig(settings), raw: settings });
+    return res.json({ success: true, settings: toPublicConfig(settings) });
   } catch (error) { return res.status(500).json({ success: false, message: error.message }); }
 };
 
@@ -884,6 +884,15 @@ exports.updateSettings = async (req, res) => {
     await current.save();
     await invalidateSystemSettings();
     const saved = await getSystemSettings({ refresh: true });
+    await createAuditLog({
+      user: req.user._id,
+      userRole: "superadmin",
+      action: "UPDATE",
+      module: "SystemSettings",
+      description: "Updated approved portal/system configuration.",
+      req,
+      metadata: { sections: Object.keys(body).filter((key) => key !== "mpesa" || body.mpesa) },
+    });
     return res.json({ success: true, message: "System settings saved.", settings: toPublicConfig(saved), updatedAt: saved.updatedAt, updatedBy: req.user._id });
   } catch (error) { return res.status(400).json({ success: false, message: error.message }); }
 };

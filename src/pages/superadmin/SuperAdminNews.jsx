@@ -14,7 +14,7 @@ const toForm = (item) => ({
   summary: item?.summary || "",
   content: item?.content || "",
   category: item?.category || "General",
-  published: Boolean(item?.published && item?.status !== "draft"),
+  published: Boolean(item?.published && item?.status === "published"),
   featured: Boolean(item?.featured),
   pinned: Boolean(item?.pinned),
   allowComments: item?.allowComments !== false,
@@ -105,12 +105,12 @@ export default function SuperAdminNews() {
   };
 
   const remove = async (id) => {
-    if (!await confirmAction("Delete this news item permanently?")) return;
+    if (!await confirmAction("Archive this news item? It will be removed from public display while the record is retained.")) return;
     try {
       await deleteManagedNews(id);
       setItems((prev) => prev.filter((item) => item._id !== id));
       if (editing === id) resetEditor();
-      toast.success("News deleted.");
+      toast.success("News archived.");
     } catch (e) {
       toast.error(e.response?.data?.message || "Could not delete news.");
     }
@@ -149,13 +149,13 @@ export default function SuperAdminNews() {
           <div className="portal-module-header"><div><span>CONTENT CONTROL</span><h2>Existing news</h2></div></div>
           <div className="managed-news-list">
             {items.length === 0 ? <div className="portal-empty">No news items have been created yet.</div> : items.map((item) => {
-              const published = item.published && item.status !== "draft";
+              const published = item.published && item.status === "published";
               return <article key={item._id} className="managed-news-item">
-                <div className="managed-news-copy"><div className="managed-news-meta"><span>{item.category || "News"}</span><strong className={published ? "published" : "draft"}>{published ? "Published" : "Draft"}</strong></div><h3>{item.title}</h3><p>{item.summary || item.content}</p><small>{item.createdAt ? new Date(item.createdAt).toLocaleString() : ""}</small></div>
+                <div className="managed-news-copy"><div className="managed-news-meta"><span>{item.category || "News"}</span><strong className={published ? "published" : item.status === "archived" ? "archived" : "draft"}>{published ? "Published" : item.status === "archived" ? "Archived" : "Draft"}</strong></div><h3>{item.title}</h3><p>{item.summary || item.content}</p><small>{item.createdAt ? new Date(item.createdAt).toLocaleString() : ""}</small></div>
                 <div className="managed-news-actions">
                   <button className="icon-btn" type="button" title="Edit news" onClick={() => edit(item)}><Edit3 size={18} /></button>
                   <button className="icon-btn" type="button" title={published ? "Move to draft" : "Publish news"} onClick={() => togglePublished(item)}>{published ? <EyeOff size={18} /> : <CheckCircle2 size={18} />}</button>
-                  <button className="icon-btn danger" type="button" title="Delete news" onClick={() => remove(item._id)}><Trash2 size={18} /></button>
+                  <button className="icon-btn danger" type="button" title="Archive news" onClick={() => remove(item._id)}><Trash2 size={18} /></button>
                 </div>
               </article>;
             })}

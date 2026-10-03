@@ -25,7 +25,7 @@ export const dashboardMenus = {
     { section: "People", title: "People & Access", icon: Users, path: "/superadmin/people", childPaths: ["/superadmin/admins", "/superadmin/members", "/superadmin/leaders", "/superadmin/people"] },
     { section: "Governance", title: "Governance", icon: Landmark, path: "/superadmin/governance", childPaths: ["/superadmin/constitution", "/superadmin/policies", "/superadmin/audit", "/superadmin/governance"] },
     { section: "Finance", title: "Finance & Assistance", icon: Wallet, path: "/superadmin/finance-center", childPaths: ["/superadmin/accounts", "/superadmin/claims", "/superadmin/support", "/superadmin/finance-center"] },
-    { section: "Communications", title: "Website & Communications", icon: Newspaper, path: "/superadmin/communications", childPaths: ["/superadmin/news", "/superadmin/leaders", "/superadmin/policies", "/superadmin/communications"] },
+    { section: "Website", title: "Website Manager", icon: Newspaper, path: "/superadmin/website-manager", childPaths: ["/superadmin/website-manager", "/superadmin/settings", "/superadmin/news", "/superadmin/leaders", "/superadmin/policies", "/superadmin/constitution"] },
     { section: "Reports", title: "Reports & Records", icon: BarChart3, path: "/superadmin/reports" },
     { section: "System", title: "System & Diagnostics", icon: ShieldCheck, path: "/superadmin/system-center", childPaths: ["/superadmin/data-integrity", "/superadmin/system", "/superadmin/notifications", "/superadmin/system-center"] },
     { section: "Settings", title: "Settings", icon: Settings, path: "/superadmin/settings-center", childPaths: ["/superadmin/settings", "/superadmin/password", "/superadmin/settings-center"] },

@@ -222,6 +222,7 @@ const SuperAdminConstitution = lazy(() => import("./pages/superadmin/SuperAdminC
 const SuperAdminNotifications = lazy(() => import("./pages/superadmin/SuperAdminNotifications"));
 const SuperAdminNews = lazy(() => import("./pages/superadmin/SuperAdminNews"));
 const SuperAdminPolicies = lazy(() => import("./pages/superadmin/SuperAdminPolicies"));
+const SuperAdminWebsiteManager = lazy(() => import("./pages/superadmin/SuperAdminWebsiteManager"));
 
 
 // =====================================================
@@ -485,7 +486,7 @@ function AppContent() {
           <Route path="/superadmin/people" element={<ProtectedRoute allowedRoles={["superadmin"]}><PortalSectionPage role="superadmin" sectionKey="people" /></ProtectedRoute>} />
           <Route path="/superadmin/governance" element={<ProtectedRoute allowedRoles={["superadmin"]}><PortalSectionPage role="superadmin" sectionKey="governance" /></ProtectedRoute>} />
           <Route path="/superadmin/finance-center" element={<ProtectedRoute allowedRoles={["superadmin"]}><PortalSectionPage role="superadmin" sectionKey="finance" /></ProtectedRoute>} />
-          <Route path="/superadmin/communications" element={<ProtectedRoute allowedRoles={["superadmin"]}><PortalSectionPage role="superadmin" sectionKey="communications" /></ProtectedRoute>} />
+          <Route path="/superadmin/communications" element={<ProtectedRoute allowedRoles={["superadmin"]}><Navigate to="/superadmin/website-manager" replace /></ProtectedRoute>} />
           <Route path="/superadmin/system-center" element={<ProtectedRoute allowedRoles={["superadmin"]}><PortalSectionPage role="superadmin" sectionKey="system" /></ProtectedRoute>} />
           <Route path="/superadmin/settings-center" element={<ProtectedRoute allowedRoles={["superadmin"]}><PortalSectionPage role="superadmin" sectionKey="settings" /></ProtectedRoute>} />
 
@@ -713,6 +714,7 @@ function AppContent() {
                     <Route path="/superadmin/news" element={<ProtectedRoute allowedRoles={["superadmin"]}><SuperAdminNews /></ProtectedRoute>} />
           <Route path="/superadmin/claims" element={<ProtectedRoute allowedRoles={["superadmin"]}><AdminClaims /></ProtectedRoute>} />
           <Route path="/superadmin/support" element={<ProtectedRoute allowedRoles={["superadmin"]}><AdminSupport /></ProtectedRoute>} />
+          <Route path="/superadmin/website-manager" element={<ProtectedRoute allowedRoles={["superadmin"]}><SuperAdminWebsiteManager /></ProtectedRoute>} />
           <Route path="/superadmin/settings" element={<ProtectedRoute allowedRoles={["superadmin"]}><SuperAdminSettings /></ProtectedRoute>} />
           <Route path="/superadmin/leaders" element={<ProtectedRoute allowedRoles={["superadmin"]}><SuperAdminSettings initialTab="leaders" /></ProtectedRoute>} />
           <Route path="/superadmin/policies" element={<ProtectedRoute allowedRoles={["superadmin"]}><SuperAdminPolicies /></ProtectedRoute>} />

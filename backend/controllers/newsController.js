@@ -3,6 +3,7 @@ const redisCache = require("../services/redisCache");
 const Member = require("../models/Member");
 const Notification = require("../models/Notification");
 const { notifyMembers } = require("../services/memberBroadcastService");
+const createAuditLog = require("../utils/createAuditLog");
 
 const invalidatePublicNewsCache = async () => {
     await redisCache.invalidatePrefix("public:news");
@@ -441,6 +442,15 @@ exports.updateNews = async (req, res) => {
         }
         await invalidatePublicNewsCache();
         await news.populate("author", "fullName profileImage");
+        await createAuditLog({
+            user: req.user._id,
+            userRole: String(req.user.role || "admin").toLowerCase(),
+            action: "UPDATE",
+            module: "News",
+            description: `Updated news item ${news._id}.`,
+            req,
+            metadata: { newsId: String(news._id), published: news.published, status: news.status },
+        });
 
         res.json({
 
@@ -493,15 +503,25 @@ exports.deleteNews = async (req, res) => {
 
         }
 
-        await news.deleteOne();
+        news.published = false;
+        news.status = "archived";
+        await news.save();
         await invalidatePublicNewsCache();
+        await createAuditLog({
+            user: req.user._id,
+            userRole: String(req.user.role || "admin").toLowerCase(),
+            action: "ARCHIVE",
+            module: "News",
+            description: `Archived news item ${news._id} instead of permanently deleting it.`,
+            req,
+            metadata: { newsId: String(news._id), title: news.title },
+        });
 
         res.json({
-
             success: true,
-
-            message: "News deleted successfully."
-
+            archived: true,
+            news,
+            message: "News archived and removed from public display."
         });
 
     }
@@ -548,6 +568,15 @@ exports.publishNews = async (req, res) => {
         await news.save();
         await notifyPublishedNews({ news, actorId: req.user._id, actorModel: String(req.user?.role || "admin").toLowerCase() === "superadmin" ? "SuperAdmin" : "Admin" });
         await invalidatePublicNewsCache();
+        await createAuditLog({
+            user: req.user._id,
+            userRole: String(req.user.role || "admin").toLowerCase(),
+            action: "PUBLISH",
+            module: "News",
+            description: `Published news item ${news._id}.`,
+            req,
+            metadata: { newsId: String(news._id), title: news.title },
+        });
 
         await news.populate("author", "fullName profileImage");
         res.json({ success: true, message: "News published successfully.", news });
@@ -590,6 +619,15 @@ exports.unpublishNews = async (req, res) => {
 
         await news.save();
         await invalidatePublicNewsCache();
+        await createAuditLog({
+            user: req.user._id,
+            userRole: String(req.user.role || "admin").toLowerCase(),
+            action: "UNPUBLISH",
+            module: "News",
+            description: `Unpublished news item ${news._id}.`,
+            req,
+            metadata: { newsId: String(news._id), title: news.title },
+        });
 
         await news.populate("author", "fullName profileImage");
         res.json({ success: true, message: "News moved to drafts.", news });

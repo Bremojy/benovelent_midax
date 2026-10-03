@@ -5,6 +5,7 @@ const { isSuperAdmin } = require("../middleware/roleMiddleware");
 const { uploadSingle, setUploadType } = require("../middleware/upload");
 const { resolveStoredFileUrl } = require("../utils/uploadUrl");
 const redisCache = require("../services/redisCache");
+const createAuditLog = require("../utils/createAuditLog");
 
 const router = express.Router();
 
@@ -16,13 +17,23 @@ router.get("/", async (req, res) => {
       res.set("Cache-Control", "public, max-age=60, stale-while-revalidate=300");
       return res.json(cached);
     }
-    const slides = await Carousel.find().sort({ order: 1, createdAt: -1 }).lean();
+    const slides = await Carousel.find({ isActive: true }).sort({ order: 1, createdAt: -1 }).lean();
     await redisCache.setJson(cacheKey, slides, 120);
     res.set("Cache-Control", "public, max-age=60, stale-while-revalidate=300");
     res.json(slides);
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Failed to fetch carousel slides", error: error.message });
+  }
+});
+
+router.get("/manage", protect, isSuperAdmin, async (_req, res) => {
+  try {
+    const slides = await Carousel.find().sort({ order: 1, createdAt: -1 }).lean();
+    res.json(slides);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: "Failed to fetch managed carousel slides" });
   }
 });
 
@@ -84,6 +95,7 @@ router.post("/upload", protect, isSuperAdmin, setUploadType("carousel"), uploadS
     });
 
     await redisCache.invalidateMany(["public:carousel:all", "public:carousel:active"]);
+    await createAuditLog({ user: req.user._id, userRole: "superadmin", action: "CREATE", module: "Carousel", description: `Created carousel slide ${slide._id}.`, req, metadata: { slideId: String(slide._id), title: slide.title } });
     res.status(201).json({ message: "Carousel image uploaded successfully", slide });
   } catch (error) {
     console.error(error);
@@ -110,6 +122,7 @@ router.post("/", protect, isSuperAdmin, async (req, res) => {
     });
 
     await redisCache.invalidateMany(["public:carousel:all", "public:carousel:active"]);
+    await createAuditLog({ user: req.user._id, userRole: "superadmin", action: "CREATE", module: "Carousel", description: `Created carousel slide ${slide._id}.`, req, metadata: { slideId: String(slide._id), title: slide.title } });
     res.status(201).json({ message: "Carousel slide created successfully", slide });
   } catch (error) {
     console.error(error);
@@ -133,6 +146,7 @@ router.put("/:id", protect, isSuperAdmin, setUploadType("carousel"), uploadSingl
     }
 
     await redisCache.invalidateMany(["public:carousel:all", "public:carousel:active"]);
+    await createAuditLog({ user: req.user._id, userRole: "superadmin", action: "UPDATE", module: "Carousel", description: `Updated carousel slide ${slide._id}.`, req, metadata: { slideId: String(slide._id), isActive: slide.isActive } });
     res.json({ message: "Carousel updated successfully", slide });
   } catch (error) {
     console.error(error);
@@ -142,16 +156,19 @@ router.put("/:id", protect, isSuperAdmin, setUploadType("carousel"), uploadSingl
 
 router.delete("/:id", protect, isSuperAdmin, async (req, res) => {
   try {
-    const slide = await Carousel.findByIdAndDelete(req.params.id);
+    const slide = await Carousel.findById(req.params.id);
     if (!slide) {
       return res.status(404).json({ message: "Carousel slide not found" });
     }
 
+    slide.isActive = false;
+    await slide.save();
     await redisCache.invalidateMany(["public:carousel:all", "public:carousel:active"]);
-    res.json({ message: "Carousel deleted successfully" });
+    await createAuditLog({ user: req.user._id, userRole: "superadmin", action: "ARCHIVE", module: "Carousel", description: `Archived carousel slide ${slide._id}.`, req, metadata: { slideId: String(slide._id), title: slide.title } });
+    res.json({ success: true, archived: true, slide, message: "Carousel slide archived and removed from public display" });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "Failed to delete carousel", error: error.message });
+    res.status(500).json({ message: "Failed to archive carousel slide" });
   }
 });
 

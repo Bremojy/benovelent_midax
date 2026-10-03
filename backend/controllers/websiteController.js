@@ -17,6 +17,7 @@ const invalidateWebsitePublicCache = async () => {
 const { getSystemSettings, toPublicConfig } = require("../services/systemSettings");
 const { resolveStoredFileUrl } = require("../utils/uploadUrl");
 const { useCloudinary, cloudinary, getCloudinaryFolder } = require("../config/uploadConfig");
+const { isAllowedSection, pickSectionPayload, sanitizeValue } = require("../config/websiteManagerRegistry");
 
 const DEFAULT_SECTIONS = ["home", "about", "services", "contact", "footer", "settings", "gallery", "constitution", "privacy-policy", "terms-conditions", "disclaimer", "news", "events", "resources", "chatbot"];
 
@@ -673,18 +674,42 @@ exports.getSection = async (req, res) => {
 
 exports.createSection = async (req, res) => {
     try {
-        const existing = await WebsiteContent.findOne({ section: req.body.section });
+        const sectionKey = String(req.body?.section || "").trim().toLowerCase();
+        if (!isAllowedSection(sectionKey)) {
+            return res.status(400).json({ success: false, message: "This website section is not managed through the Website Manager." });
+        }
 
+        const existing = await WebsiteContent.findOne({ section: sectionKey });
         if (existing) {
             return res.status(400).json({ success: false, message: "Section already exists." });
         }
 
-        const section = await WebsiteContent.create({ ...req.body, updatedBy: req.user._id });
+        const payload = pickSectionPayload(sectionKey, req.body);
+        const section = await WebsiteContent.create({
+            section: sectionKey,
+            title: payload.title || "",
+            subtitle: payload.subtitle || "",
+            description: payload.description || "",
+            content: payload.content || {},
+            images: Array.isArray(payload.images) ? payload.images : [],
+            published: payload.published !== false,
+            updatedBy: req.user._id,
+        });
         await invalidateWebsitePublicCache();
+        await createAuditLog({
+            user: req.user._id,
+            userRole: String(req.user.role || "superadmin").toLowerCase(),
+            action: "CREATE",
+            module: "WebsiteContent",
+            description: `Created website section ${sectionKey}.`,
+            req,
+            metadata: { section: sectionKey, fields: Object.keys(payload) },
+        });
 
         res.status(201).json({ success: true, message: "Section created successfully.", section: toPublicSection(section) });
     } catch (error) {
-        res.status(500).json({ success: false, message: error.message });
+        console.error("Website section create error:", error);
+        res.status(500).json({ success: false, message: "Unable to create website section right now." });
     }
 };
 
@@ -694,39 +719,50 @@ exports.createSection = async (req, res) => {
 
 exports.updateSection = async (req, res) => {
     try {
-        const section = await WebsiteContent.findOne({ section: req.params.section });
+        const sectionKey = String(req.params.section || "").trim().toLowerCase();
+        if (!isAllowedSection(sectionKey)) {
+            return res.status(400).json({ success: false, message: "This website section is not managed through the Website Manager." });
+        }
 
+        const section = await WebsiteContent.findOne({ section: sectionKey });
         if (!section) {
             return res.status(404).json({ success: false, message: "Section not found." });
         }
 
-        section.title = req.body.title ?? section.title;
-        section.subtitle = req.body.subtitle ?? section.subtitle;
-        section.description = req.body.description ?? section.description;
+        const payload = pickSectionPayload(sectionKey, req.body);
+        if (payload.title !== undefined) section.title = String(payload.title).trim();
+        if (payload.subtitle !== undefined) section.subtitle = String(payload.subtitle).trim();
+        if (payload.description !== undefined) section.description = String(payload.description).trim();
 
-        if (req.params.section === "settings") {
-            section.content = {
-                ...(typeof section.content === "object" && section.content ? section.content : {}),
-                ...(typeof req.body.content === "object" && req.body.content ? req.body.content : {}),
-            };
-        } else {
-            section.content = req.body.content ?? section.content;
+        if (payload.content !== undefined) {
+            const incomingContent = sanitizeValue(payload.content);
+            if (sectionKey === "settings" && incomingContent && typeof incomingContent === "object" && !Array.isArray(incomingContent)) {
+                section.content = { ...(section.content && typeof section.content === "object" ? section.content : {}), ...incomingContent };
+            } else {
+                section.content = incomingContent;
+            }
         }
 
-        section.images = req.body.images ?? section.images;
-
-        if (typeof req.body.published === "boolean") {
-            section.published = req.body.published;
-        }
-
+        if (payload.images !== undefined) section.images = Array.isArray(payload.images) ? payload.images : [];
+        if (typeof payload.published === "boolean") section.published = payload.published;
         section.updatedBy = req.user._id;
 
         await section.save();
         await invalidateWebsitePublicCache();
+        await createAuditLog({
+            user: req.user._id,
+            userRole: String(req.user.role || "superadmin").toLowerCase(),
+            action: "UPDATE",
+            module: "WebsiteContent",
+            description: `Updated website section ${sectionKey}.`,
+            req,
+            metadata: { section: sectionKey, fields: Object.keys(payload), published: section.published },
+        });
 
         res.json({ success: true, message: "Website updated successfully.", section: toPublicSection(section) });
     } catch (error) {
-        res.status(500).json({ success: false, message: error.message });
+        console.error("Website section update error:", error);
+        res.status(500).json({ success: false, message: "Unable to update website content right now." });
     }
 };
 

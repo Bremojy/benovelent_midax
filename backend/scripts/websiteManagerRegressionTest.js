@@ -1,0 +1,25 @@
+const fs = require("fs");
+const path = require("path");
+const assert = require("assert");
+const root = path.join(__dirname, "..", "..");
+const read = (p) => fs.readFileSync(path.join(root, p), "utf8");
+const registry = require("../config/websiteManagerRegistry");
+const website = read("backend/controllers/websiteController.js");
+const news = read("backend/controllers/newsController.js");
+const policy = read("backend/controllers/policyController.js");
+const carousel = read("backend/routes/carouselRoutes.js");
+const leader = read("backend/routes/leaderRoutes.js");
+const app = read("src/App.jsx");
+const menu = read("src/config/dashboardMenu.js");
+const page = read("src/pages/superadmin/SuperAdminWebsiteManager.jsx");
+for (const section of ["home", "about", "services", "contact", "footer", "gallery", "privacy-policy", "terms-conditions", "disclaimer", "news", "events", "resources", "chatbot"]) { assert.ok(registry.isAllowedSection(section), `Missing allowlisted section: ${section}`); assert.ok(registry.allowedFields(section).includes("content"), `Missing content allowlist: ${section}`); }
+assert.ok(website.includes("pickSectionPayload") && !website.includes("WebsiteContent.create({ ...req.body"), "WebsiteContent CRUD must use the allowlist.");
+assert.ok(website.includes('action: "CREATE"') && website.includes('action: "UPDATE"'), "WebsiteContent mutations must be audited.");
+assert.ok(news.includes('status = "archived"') && news.includes('action: "ARCHIVE"'), "News deletion must archive and audit.");
+assert.ok(policy.includes('policy.enabled = false') && policy.includes('action: "ARCHIVE"'), "Policy deletion must archive and audit.");
+assert.ok(carousel.includes('router.get("/manage"') && carousel.includes('slide.isActive = false') && carousel.includes('action: "ARCHIVE"'), "Carousel manager/archive/audit contract missing.");
+assert.ok(leader.includes('router.get("/manage"') && leader.includes('leader.isActive = false') && leader.includes('action: "ARCHIVE"'), "Leader manager/archive/audit contract missing.");
+assert.ok(app.includes('/superadmin/website-manager') && app.includes('SuperAdminWebsiteManager'), "Website Manager route missing.");
+assert.ok(menu.includes('title: "Website Manager"') && menu.includes('/superadmin/website-manager'), "Website Manager menu missing.");
+assert.ok(page.includes('/website/manage') && page.includes('/carousel/manage') && page.includes('/leaders/manage') && page.includes('/policies/admin'), "Manager must consume protected live endpoints.");
+console.log("PASS website-manager: allowlisted CMS fields, protected manager endpoints, archive defaults, audit hooks and frontend navigation are wired.");

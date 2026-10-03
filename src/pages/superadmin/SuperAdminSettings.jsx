@@ -1,5 +1,5 @@
 import { confirmAction } from "../../utils/modernDialog";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import {
   Check,
@@ -79,8 +79,10 @@ function normalizeImagePath(src) {
 
 export default function SuperAdminSettings({ initialTab = "website" }) {
   const { user } = useAuth();
-
-  const initialTabValue = ["website", "carousel", "leaders", "gallery", "constitution", "settings", "notifications"].includes(initialTab) ? initialTab : "website";
+  const [searchParams] = useSearchParams();
+  const requestedTab = searchParams.get("tab");
+  const validTabs = ["website", "carousel", "leaders", "gallery", "constitution", "settings", "notifications"];
+  const initialTabValue = validTabs.includes(requestedTab) ? requestedTab : (validTabs.includes(initialTab) ? initialTab : "website");
   const [activeTab, setActiveTab] = useState(initialTabValue);
   const [sections, setSections] = useState(() =>
     Object.fromEntries(SECTION_FIELDS.map((item) => [item.key, EMPTY_SECTION(item.key)]))
@@ -142,8 +144,8 @@ export default function SuperAdminSettings({ initialTab = "website" }) {
         setLoading(true);
         const [websiteRes, carouselRes, leadersRes, galleryRes, systemRes] = await Promise.allSettled([
           API.get("/website/manage"),
-          API.get("/carousel"),
-          API.get("/leaders"),
+          API.get("/carousel/manage"),
+          API.get("/leaders/manage"),
           API.get("/website/gallery"),
           API.get("/superadmin/settings"),
         ]);
@@ -385,12 +387,13 @@ export default function SuperAdminSettings({ initialTab = "website" }) {
   };
 
   const deleteSlide = async (slideId) => {
-    if (!await confirmAction("Delete this carousel slide?")) return;
+    if (!await confirmAction("Archive this carousel slide from the public website? The stored record will be retained.")) return;
     try {
       setError("");
-      await API.delete(`/carousel/${slideId}`);
-      setSlides((prev) => prev.filter((slide) => slide._id !== slideId));
-      setMessage("Carousel slide deleted.");
+      const { data } = await API.delete(`/carousel/${slideId}`);
+      if (data?.slide) setSlides((prev) => prev.map((slide) => (slide._id === slideId ? data.slide : slide)));
+      else setSlides((prev) => prev.map((slide) => slide._id === slideId ? { ...slide, isActive: false } : slide));
+      setMessage("Carousel slide archived.");
     } catch (err) {
       setError(err.response?.data?.message || err.message || "Unable to delete carousel slide.");
     }
@@ -483,6 +486,7 @@ export default function SuperAdminSettings({ initialTab = "website" }) {
       form.append("position", leaderDraft.position.trim());
       form.append("bio", leaderDraft.bio || "");
       form.append("order", String(leaderDraft.order || 0));
+      form.append("isActive", String(leaderDraft.isActive !== false));
       if (leaderFile) form.append("image", leaderFile);
 
       const response = leaderDraft._id
@@ -523,12 +527,13 @@ export default function SuperAdminSettings({ initialTab = "website" }) {
   };
 
   const deleteLeader = async (leaderId) => {
-    if (!await confirmAction("Delete this leader?")) return;
+    if (!await confirmAction("Archive this leader from the public website? The stored record will be retained.")) return;
     try {
       setError("");
-      await API.delete(`/leaders/${leaderId}`);
-      setLeaders((prev) => prev.filter((item) => item._id !== leaderId));
-      setMessage("Leader removed.");
+      const { data } = await API.delete(`/leaders/${leaderId}`);
+      if (data?.leader) setLeaders((prev) => prev.map((item) => (item._id === leaderId ? data.leader : item)));
+      else setLeaders((prev) => prev.map((item) => item._id === leaderId ? { ...item, isActive: false } : item));
+      setMessage("Leader archived.");
     } catch (err) {
       setError(err.response?.data?.message || err.message || "Unable to delete leader.");
     }
@@ -549,7 +554,7 @@ export default function SuperAdminSettings({ initialTab = "website" }) {
         <header className="portal-module-header">
           <div>
             <span>PUBLIC WEBSITE CONTROL</span>
-            <h1>SuperAdmin website editor</h1>
+            <h1>Website Manager content studio</h1>
             <p>See what the public website contains, then edit pages, leaders, gallery images and theme settings from one place.</p>
           </div>
           <div className="portal-actions">
@@ -790,11 +795,19 @@ export default function SuperAdminSettings({ initialTab = "website" }) {
                                 <label>Order</label>
                                 <input type="number" value={slide.order || 0} onChange={(e) => setSlides((prev) => prev.map((x) => x._id === slide._id ? { ...x, order: Number(e.target.value) } : x))} />
                               </div>
+                              <div className="portal-field">
+                                <label>Visibility</label>
+                                <select value={slide.isActive === false ? "archived" : "active"} onChange={(e) => setSlides((prev) => prev.map((x) => x._id === slide._id ? { ...x, isActive: e.target.value === "active" } : x))}>
+                                  <option value="active">Active / published</option>
+                                  <option value="archived">Archived / hidden</option>
+                                </select>
+                              </div>
                             </div>
+                            <span className={`portal-badge ${slide.isActive === false ? "rejected" : "approved"}`}>{slide.isActive === false ? "Archived / hidden" : "Active / published"}</span>
                             <div className="portal-actions">
                               <button className="portal-btn" type="button" onClick={() => updateSlide(slide._id, slide)}>Save</button>
                               <button className="portal-btn danger" type="button" onClick={() => deleteSlide(slide._id)}>
-                                <Trash2 size={16} /> Delete
+                                <Trash2 size={16} /> Archive
                               </button>
                             </div>
                           </div>
@@ -834,6 +847,13 @@ export default function SuperAdminSettings({ initialTab = "website" }) {
                       <label>Photo</label>
                       <input type="file" accept="image/*" onChange={(e) => setLeaderFile(e.target.files?.[0] || null)} />
                     </div>
+                    <div className="portal-field">
+                      <label>Visibility</label>
+                      <select value={leaderDraft.isActive === false ? "archived" : "active"} onChange={(e) => setLeaderDraft((p) => ({ ...p, isActive: e.target.value === "active" }))}>
+                        <option value="active">Active / published</option>
+                        <option value="archived">Archived / hidden</option>
+                      </select>
+                    </div>
                     <div className="portal-field" style={{ gridColumn: "1 / -1" }}>
                       <label>Bio</label>
                       <textarea rows="4" value={leaderDraft.bio} onChange={(e) => setLeaderDraft((p) => ({ ...p, bio: e.target.value }))} />
@@ -871,10 +891,11 @@ export default function SuperAdminSettings({ initialTab = "website" }) {
                             <input type="text" value={leader.name || ""} readOnly />
                             <input type="text" value={leader.position || ""} readOnly />
                             <textarea rows="3" value={leader.bio || ""} readOnly />
+                            <span className={`portal-badge ${leader.isActive === false ? "rejected" : "approved"}`}>{leader.isActive === false ? "Archived / hidden" : "Active / published"}</span>
                             <div className="portal-actions">
                               <button className="portal-btn" type="button" onClick={() => editLeader(leader)}>Edit</button>
                               <button className="portal-btn danger" type="button" onClick={() => deleteLeader(leader._id)}>
-                                <Trash2 size={16} /> Delete
+                                <Trash2 size={16} /> Archive
                               </button>
                             </div>
                           </div>

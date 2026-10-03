@@ -7,6 +7,7 @@ const { isSuperAdmin } = require("../middleware/roleMiddleware");
 const { uploadSingle, setUploadType } = require("../middleware/upload");
 const { resolveStoredFileUrl } = require("../utils/uploadUrl");
 const redisCache = require("../services/redisCache");
+const createAuditLog = require("../utils/createAuditLog");
 
 const router = express.Router();
 
@@ -18,13 +19,23 @@ router.get("/", async (req, res) => {
       res.set("Cache-Control", "public, max-age=120, stale-while-revalidate=600");
       return res.json(cached);
     }
-    const leaders = await Leader.find().sort({ order: 1, createdAt: -1 }).lean();
+    const leaders = await Leader.find({ isActive: true }).sort({ order: 1, createdAt: -1 }).lean();
     await redisCache.setJson(cacheKey, leaders, 300);
     res.set("Cache-Control", "public, max-age=120, stale-while-revalidate=600");
     res.json(leaders);
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Failed to fetch leaders", error: error.message });
+  }
+});
+
+router.get("/manage", protect, isSuperAdmin, async (_req, res) => {
+  try {
+    const leaders = await Leader.find().sort({ order: 1, createdAt: -1 }).lean();
+    res.json(leaders);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: "Failed to fetch managed leaders" });
   }
 });
 
@@ -98,6 +109,7 @@ router.post("/upload", protect, isSuperAdmin, setUploadType("leaders"), uploadSi
     });
 
     await redisCache.invalidateMany(["public:leaders:all", "public:leaders:active"]);
+    await createAuditLog({ user: req.user._id, userRole: "superadmin", action: "CREATE", module: "Leader", description: `Created leader ${leader._id}.`, req, metadata: { leaderId: String(leader._id), name: leader.name } });
     res.status(201).json({ message: "Leader added successfully", leader });
   } catch (error) {
     console.error(error);
@@ -121,6 +133,7 @@ router.put("/:id", protect, isSuperAdmin, setUploadType("leaders"), uploadSingle
     }
 
     await redisCache.invalidateMany(["public:leaders:all", "public:leaders:active"]);
+    await createAuditLog({ user: req.user._id, userRole: "superadmin", action: "UPDATE", module: "Leader", description: `Updated leader ${leader._id}.`, req, metadata: { leaderId: String(leader._id), isActive: leader.isActive } });
     res.json({ message: "Leader updated successfully", leader });
   } catch (error) {
     console.error(error);
@@ -130,16 +143,19 @@ router.put("/:id", protect, isSuperAdmin, setUploadType("leaders"), uploadSingle
 
 router.delete("/:id", protect, isSuperAdmin, async (req, res) => {
   try {
-    const leader = await Leader.findByIdAndDelete(req.params.id);
+    const leader = await Leader.findById(req.params.id);
     if (!leader) {
       return res.status(404).json({ message: "Leader not found" });
     }
 
+    leader.isActive = false;
+    await leader.save();
     await redisCache.invalidateMany(["public:leaders:all", "public:leaders:active"]);
-    res.json({ message: "Leader deleted successfully" });
+    await createAuditLog({ user: req.user._id, userRole: "superadmin", action: "ARCHIVE", module: "Leader", description: `Archived leader ${leader._id}.`, req, metadata: { leaderId: String(leader._id), name: leader.name } });
+    res.json({ success: true, archived: true, leader, message: "Leader archived and removed from public display" });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "Failed to delete leader", error: error.message });
+    res.status(500).json({ message: "Failed to archive leader" });
   }
 });
 

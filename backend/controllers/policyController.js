@@ -1,5 +1,6 @@
 const Policy = require("../models/Policy");
 const redisCache = require("../services/redisCache");
+const createAuditLog = require("../utils/createAuditLog");
 
 const slugify = (value) => String(value || "").toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80);
 const clean = (body = {}) => ({
@@ -48,6 +49,7 @@ exports.create = async (req, res) => {
     if (exists) return res.status(409).json({ success: false, message: "A policy with this name/slug already exists." });
     const policy = await Policy.create(payload);
     await redisCache.invalidateMany(["public:policies:enabled", "assistant:context:public", "assistant:context:member", "assistant:context:admin", "assistant:context:superadmin"]);
+    await createAuditLog({ user: req.user._id, userRole: "superadmin", action: "CREATE", module: "Policy", description: `Created policy ${policy._id}.`, req, metadata: { policyId: String(policy._id), name: policy.name } });
     res.status(201).json({ success: true, policy });
   } catch (error) { res.status(500).json({ success: false, message: error.message }); }
 };
@@ -71,6 +73,7 @@ exports.update = async (req, res) => {
     Object.assign(existing, payload);
     const policy = await existing.save();
     await redisCache.invalidateMany(["public:policies:enabled", "assistant:context:public", "assistant:context:member", "assistant:context:admin", "assistant:context:superadmin"]);
+    await createAuditLog({ user: req.user._id, userRole: "superadmin", action: "UPDATE", module: "Policy", description: `Updated policy ${policy._id}.`, req, metadata: { policyId: String(policy._id), enabled: policy.enabled } });
     res.json({ success: true, policy });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -79,9 +82,12 @@ exports.update = async (req, res) => {
 
 exports.remove = async (req, res) => {
   try {
-    const policy = await Policy.findByIdAndDelete(req.params.id);
+    const policy = await Policy.findById(req.params.id);
     if (!policy) return res.status(404).json({ success: false, message: "Policy not found." });
+    policy.enabled = false;
+    await policy.save();
     await redisCache.invalidateMany(["public:policies:enabled", "assistant:context:public", "assistant:context:member", "assistant:context:admin", "assistant:context:superadmin"]);
-    res.json({ success: true, message: "Policy deleted." });
-  } catch (error) { res.status(500).json({ success: false, message: error.message }); }
+    await createAuditLog({ user: req.user._id, userRole: "superadmin", action: "ARCHIVE", module: "Policy", description: `Archived policy ${policy._id} by disabling public availability.`, req, metadata: { policyId: String(policy._id), name: policy.name } });
+    res.json({ success: true, archived: true, policy, message: "Policy archived and removed from eligible public/member policy lists." });
+  } catch (error) { res.status(500).json({ success: false, message: "Unable to archive policy." }); }
 };

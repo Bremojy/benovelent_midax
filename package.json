@@ -9,7 +9,7 @@
     "lint": "oxlint",
     "preview": "node node_modules/vite/bin/vite.js preview",
     "vercel-build": "npm run build && node scripts/verify-vercel-assets.mjs",
-    "test": "npm run test:package && npm run test:backend-syntax && npm run test:frontend-imports && npm run test:lucide-exports && npm run test:footer && npm run test:integrity && npm run test:routes && npm run test:menu-routes && npm run test:route-page-inventory && npm run test:finance && npm run test:member-ledger-default-period && npm run test:chat-mobile-runtime && npm run test:chat-window-render && npm run test:ledger-date-contract && npm run test:notification && npm run test:chat-notifications && npm run test:chat-1to1 && npm run test:chat-realtime-call && npm run test:chat-lifecycle-call-repair && npm run test:dependent && npm run test:access-control && npm run test:error-handling && npm run test:report && npm run test:mpesa && npm run test:presence && npm run test:superadmin-chat && npm run test:production-contracts && npm run test:latest-fixes && npm run test:master-production-repair && npm run business-policy && npm run test:platform-search-activity && npm run test:verified-repairs && npm run test:workflow-integrity && npm run test:cross-portal-finance && npm run test:audit-cms-security && npm run test:public-cms-wiring && npm run test:national-id && npm run test:dashboard-hero && npm run test:webrtc-config",
+    "test": "npm run test:package && npm run test:backend-syntax && npm run test:frontend-imports && npm run test:lucide-exports && npm run test:footer && npm run test:integrity && npm run test:routes && npm run test:menu-routes && npm run test:route-page-inventory && npm run test:finance && npm run test:member-ledger-default-period && npm run test:chat-mobile-runtime && npm run test:chat-window-render && npm run test:ledger-date-contract && npm run test:notification && npm run test:chat-notifications && npm run test:chat-1to1 && npm run test:chat-realtime-call && npm run test:chat-lifecycle-call-repair && npm run test:dependent && npm run test:access-control && npm run test:error-handling && npm run test:report && npm run test:mpesa && npm run test:presence && npm run test:superadmin-chat && npm run test:production-contracts && npm run test:latest-fixes && npm run test:master-production-repair && npm run business-policy && npm run test:platform-search-activity && npm run test:verified-repairs && npm run test:workflow-integrity && npm run test:cross-portal-finance && npm run test:audit-cms-security && npm run test:public-cms-wiring && npm run test:national-id && npm run test:dashboard-hero && npm run test:webrtc-config && npm run test:website-manager",
     "test:package": "node backend/scripts/packageContractTest.js",
     "test:backend-syntax": "node backend/scripts/backendSyntaxTest.js",
     "test:integrity": "node backend/scripts/staticIntegrityTest.js",
@@ -51,7 +51,8 @@
     "diagnose:national-id": "node backend/scripts/nationalIdIntegrityDiagnostic.js",
     "test:chat-realtime-call": "node backend/scripts/chatRealtimeCallRegressionTest.js",
     "diagnose:calling": "node backend/scripts/callingDiagnostic.js",
-    "test:chat-lifecycle-call-repair": "node backend/scripts/chatLifecycleAndCallRepairRegressionTest.js"
+    "test:chat-lifecycle-call-repair": "node backend/scripts/chatLifecycleAndCallRepairRegressionTest.js",
+    "test:website-manager": "node backend/scripts/websiteManagerRegressionTest.js"
   },
   "dependencies": {
     "axios": "^1.18.1",
