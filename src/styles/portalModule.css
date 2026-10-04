@@ -207,3 +207,62 @@ input[type="password"]{font-variant:normal;letter-spacing:.02em;}
 .portal-table tbody tr[tabindex="0"]{cursor:pointer}.portal-table tbody tr[tabindex="0"]:focus-visible{outline:2px solid currentColor;outline-offset:-2px}
 
 .constitution-ledger-table{min-width:1080px}
+
+/* Fixed review surfaces: the page stays put while long claim/support reviews scroll internally. */
+.claim-review-dialog {
+  display: flex;
+  flex-direction: column;
+  width: min(860px, 100%);
+  max-height: calc(100dvh - 32px);
+  overflow: hidden;
+  padding: 0;
+}
+
+.claim-review-header {
+  flex: 0 0 auto;
+  margin: 0;
+  border-bottom: 1px solid rgba(15, 23, 42, .08);
+}
+
+.claim-review-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 18px 22px 20px;
+}
+
+.claim-review-footer {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px 22px calc(12px + env(safe-area-inset-bottom));
+  border-top: 1px solid rgba(15, 23, 42, .08);
+  background: #fff;
+}
+
+@media (max-width: 700px) {
+  .claim-review-dialog {
+    width: 100%;
+    max-height: calc(100dvh - 12px);
+    border-radius: 18px;
+  }
+
+  .claim-review-header,
+  .claim-review-body {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .claim-review-footer {
+    padding-left: 16px;
+    padding-right: 16px;
+    padding-bottom: calc(12px + env(safe-area-inset-bottom));
+  }
+
+  .claim-review-footer .portal-btn {
+    flex: 1 1 110px;
+    justify-content: center;
+  }
+}

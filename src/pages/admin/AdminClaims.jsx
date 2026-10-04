@@ -1,5 +1,6 @@
 import { confirmAction } from "../../utils/modernDialog";
 import { useEffect, useMemo, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { HeartHandshake, Megaphone, Trash2, Smartphone, WalletCards, LockKeyhole, RefreshCw, CheckCircle2, XCircle } from "lucide-react"
 import { useAuth } from "../../context/AuthContext";
 import DashboardLayout from "../../layouts/DashboardLayout";
@@ -14,6 +15,8 @@ const typeLabel = (v) => String(v || "support").replace(/^./, (c) => c.toUpperCa
 
 export default function AdminClaims() {
   const { role } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
   const isSuperAdmin = String(role || "").toLowerCase() === "superadmin";
   const [claims, setClaims] = useState([]);
   const [community, setCommunity] = useState([]);
@@ -34,17 +37,32 @@ export default function AdminClaims() {
   const [communityDraft, setCommunityDraft] = useState(null);
   const [appealReview, setAppealReview] = useState(null);
   const [appealReason, setAppealReason] = useState("");
+  const [filters, setFilters] = useState({ search: "", status: "", type: "", sort: "newest" });
+  const [page, setPage] = useState(1);
+  const [pages, setPages] = useState(1);
+  const [total, setTotal] = useState(0);
 
-  const load = async () => {
+  const load = async (nextPage = page) => {
     try {
       setLoading(true);
       setError("");
       const [claimsRes, communityRes] = await Promise.all([
-        API.get("/claims"),
+        API.get("/claims", { params: { ...filters, page: nextPage, limit: 12 } }),
         API.get("/payments/community-assistance/admin"),
       ]);
-      setClaims(Array.isArray(claimsRes.data?.claims) ? claimsRes.data.claims : []);
+      const claimPayload = claimsRes.data || {};
+      setClaims(Array.isArray(claimPayload.claims || claimPayload.records) ? (claimPayload.claims || claimPayload.records) : []);
+      setPage(Number(claimPayload.page || nextPage));
+      setPages(Math.max(1, Number(claimPayload.pages || 1)));
+      setTotal(Number(claimPayload.total ?? claimPayload.count ?? 0));
       setCommunity(Array.isArray(communityRes.data?.campaigns) ? communityRes.data.campaigns : []);
+      const params = new URLSearchParams(location.search);
+      const claimId = params.get("claimId");
+      const claimType = params.get("claimType");
+      if (claimId) {
+        const found = (claimPayload.claims || claimPayload.records || []).find((claim) => String(claim._id) === String(claimId) && (!claimType || String(claim.sourceType) === String(claimType)));
+        if (found) open(found);
+      }
     } catch (e) {
       setError(e.response?.data?.message || e.message || "Unable to load claims.");
     } finally {
@@ -52,7 +70,19 @@ export default function AdminClaims() {
     }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(1); }, [filters.search, filters.status, filters.type, filters.sort]);
+  useEffect(() => {
+    const body = document.body;
+    if (!selected && !communityDraft && !appealReview) return undefined;
+    const previous = body.style.overflow;
+    body.style.overflow = "hidden";
+    return () => { body.style.overflow = previous; };
+  }, [selected, communityDraft, appealReview]);
+  useEffect(() => {
+    const onKeyDown = (event) => { if (event.key === "Escape" && selected) setSelected(null); };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [selected]);
 
   const grouped = useMemo(() => claims.reduce((a, c) => {
     const key = c.status || "Pending";
@@ -60,14 +90,27 @@ export default function AdminClaims() {
     return a;
   }, {}), [claims]);
 
-  const open = (claim) => {
+  const open = async (claim) => {
     setSelected(claim);
     setStage(claim.status || "Pending");
     setRemarks("");
-    setApprovedAmount(String(claim.approvedAmount || claim.requestedAmount || ""));
+    setApprovedAmount(String(claim.approvedAmount ?? claim.requestedAmount ?? ""));
     setPaymentReference(String(claim.paymentReference || ""));
     setRepaymentAmount(String(Math.min(Number(claim.balance || 0), Number(claim.monthlyInstallment || claim.balance || 0)) || ""));
     setRepaymentReference("");
+    try {
+      const { data } = await API.get(`/claims/${claim.sourceType}/${claim._id}`);
+      const detail = data?.claim || data?.record;
+      if (detail) {
+        setSelected(detail);
+        setStage(detail.status || "Pending");
+        setApprovedAmount(String(detail.approvedAmount ?? detail.requestedAmount ?? ""));
+        setPaymentReference(String(detail.paymentReference || ""));
+        setRepaymentAmount(String(Math.min(Number(detail.balance || 0), Number(detail.monthlyInstallment || detail.balance || 0)) || ""));
+      }
+    } catch (e) {
+      setError(e.response?.data?.message || e.message || "Unable to load the complete claim details.");
+    }
   };
 
   const openCommunity = (claim) => {
@@ -246,17 +289,19 @@ export default function AdminClaims() {
   };
 
   const deleteClaim = async (c) => {
-    if (!isSuperAdmin || !await confirmAction("Archive this claim? Financial and audit evidence will be preserved, but it will be removed from active claim lists.")) return;
+    if (!isSuperAdmin || String(c.status || "") !== "Closed") return;
+    if (!await confirmAction("Delete this Closed claim permanently? The claim record will be physically removed and cannot be restored through the normal UI. Financial and audit evidence may remain where accounting integrity requires it.")) return;
     try {
-      setBusy(`delete-${c._id}`);
-      await API.delete(`/claims/${c.sourceType}/${c._id}`);
-      setSuccess("Claim archived. Financial and audit evidence was preserved.");
-      await load();
+      setBusy(`delete-${c._id}`); setError(""); setSuccess("");
+      const { data } = await API.delete(`/claims/${c.sourceType}/${c._id}/permanent`);
+      if (!data?.success) throw new Error(data?.message || "Unable to permanently delete claim.");
+      setSelected(null);
+      navigate(location.pathname, { replace: true });
+      setSuccess("Closed claim permanently deleted. Accounting/audit evidence was retained where required.");
+      await load(Math.min(page, pages));
     } catch (e) {
-      setError(e.response?.data?.message || e.message || "Unable to delete claim.");
-    } finally {
-      setBusy("");
-    }
+      setError(e.response?.data?.message || e.message || "Unable to permanently delete claim.");
+    } finally { setBusy(""); }
   };
 
   const reopenClaim = async (c) => {
@@ -289,11 +334,15 @@ export default function AdminClaims() {
         {error && <div className="portal-alert">{error}</div>}
         {success && <div className="portal-alert success" role="status">{success}</div>}
 
-        <section className="portal-stat-grid">
-          {["Pending", "Under Review", "Documents Required", "Eligibility Review", "Approval Review", "Approved", "Disbursement Pending", "Paid", "Completed", "Rejected"].map((s) => (
-            <div className="portal-stat" key={s}><span>{s}</span><strong>{grouped[s]?.length || 0}</strong></div>
-          ))}
+        <section className="portal-panel claim-filter-panel">
+          <div className="portal-form-grid">
+            <div className="portal-field portal-field-wide"><label htmlFor="admin-claims-search">Search</label><input id="admin-claims-search" value={filters.search} onChange={(e) => setFilters((x) => ({ ...x, search: e.target.value }))} placeholder="Member, employee number, hospital, school, request ID…" /></div>
+            <div className="portal-field"><label htmlFor="admin-claims-status">Status</label><select id="admin-claims-status" value={filters.status} onChange={(e) => setFilters((x) => ({ ...x, status: e.target.value }))}><option value="">All statuses</option>{STAGES.map((item) => <option key={item}>{item}</option>)}</select></div>
+            <div className="portal-field"><label htmlFor="admin-claims-type">Type</label><select id="admin-claims-type" value={filters.type} onChange={(e) => setFilters((x) => ({ ...x, type: e.target.value }))}><option value="">All types</option><option value="medical">Medical</option><option value="funeral">Funeral</option><option value="education">Education</option><option value="support">General support</option></select></div>
+            <div className="portal-field"><label htmlFor="admin-claims-sort">Sort</label><select id="admin-claims-sort" value={filters.sort} onChange={(e) => setFilters((x) => ({ ...x, sort: e.target.value }))}><option value="newest">Newest first</option><option value="oldest">Oldest first</option></select></div>
+          </div>
         </section>
+        <div className="portal-list-summary"><span>{loading ? "Loading…" : `${total} authorized claim${total === 1 ? "" : "s"} match the current filters.`}</span><span>Page {page} of {pages}</span></div>
 
         {loading ? <div className="portal-empty">Loading claims…</div> : claims.length === 0 ? (
           <div className="portal-empty"><h3>No claims available</h3><p>Member applications will appear here automatically.</p></div>
@@ -335,7 +384,7 @@ export default function AdminClaims() {
                     {alreadyCommunity && !appealPending && <span className="portal-badge approved">Community support enabled</span>}
                     {["Approved", "Paid", "Completed"].includes(c.status) && <button className="portal-btn secondary" onClick={() => publishClaim(c)} disabled={busy === `publish-${c._id}`}><Megaphone size={15} />{busy === `publish-${c._id}` ? "Publishing…" : "Publish approval"}</button>}
                     {isSuperAdmin && ["Closed", "Rejected", "Cancelled"].includes(String(c.status)) && <button className="portal-btn secondary" onClick={() => reopenClaim(c)} disabled={busy === `reopen-${c._id}`}><RefreshCw size={15} />{busy === `reopen-${c._id}` ? "Reopening…" : "Reopen case"}</button>}
-                    {isSuperAdmin && <button className="portal-btn danger" onClick={() => deleteClaim(c)} disabled={busy === `delete-${c._id}`}><Trash2 size={15} />{busy === `delete-${c._id}` ? "Deleting…" : "Delete claim"}</button>}
+                    {isSuperAdmin && c.status === "Closed" && <button className="portal-btn danger" onClick={() => deleteClaim(c)} disabled={busy === `delete-${c._id}`}><Trash2 size={15} />{busy === `delete-${c._id}` ? "Deleting permanently…" : "Delete permanently"}</button>}
                   </div>
                   {Array.isArray(c.timeline) && c.timeline.length > 0 && <div className="claim-latest"><strong>Latest review</strong><p>{c.timeline[c.timeline.length - 1]?.status}: {c.timeline[c.timeline.length - 1]?.remarks || "—"}</p></div>}
                 </article>
@@ -410,9 +459,10 @@ export default function AdminClaims() {
           </section>
         </div>}
 
-        {selected && <div className="portal-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="claim-review-title">
-          <section className="portal-modal-card">
-            <div className="portal-modal-head"><div><span>PROFESSIONAL REVIEW</span><h2 id="claim-review-title">Review {typeLabel(selected.supportType)} claim</h2><p><strong>{selected.member?.fullName || "Member"}</strong> • {money(selected.requestedAmount)} requested</p></div><button className="portal-btn secondary" onClick={() => setSelected(null)}>Close</button></div>
+        {selected && <div className="portal-modal-backdrop claim-review-backdrop" role="dialog" aria-modal="true" aria-labelledby="claim-review-title">
+          <section className="portal-modal-card claim-review-dialog">
+            <div className="portal-modal-head claim-review-header"><div><span>PROFESSIONAL REVIEW</span><h2 id="claim-review-title">Review {typeLabel(selected.supportType)} claim</h2><p><strong>{selected.member?.fullName || "Member"}</strong> • {money(selected.requestedAmount)} requested</p></div><button className="portal-btn secondary" onClick={() => setSelected(null)}>Close</button></div>
+            <div className="claim-review-body">
             <div className="portal-field"><label htmlFor="claim-stage">Stage</label><select id="claim-stage" value={stage} onChange={(e) => setStage(e.target.value)}>{STAGES.map((x) => <option key={x} value={x}>{x}</option>)}</select></div>
             {stage === "Approved" && <div className="portal-field" style={{ marginTop: 12 }}><label htmlFor="approved-amount">Approved amount</label><input id="approved-amount" type="number" min="0" inputMode="decimal" value={approvedAmount} onChange={(e) => setApprovedAmount(e.target.value)} /></div>}
             {(stage === "Paid" || stage === "Completed") && <div className="portal-field" style={{ marginTop: 12 }}><label htmlFor="payment-reference">Payment transaction/reference</label><input id="payment-reference" type="text" value={paymentReference} onChange={(e) => setPaymentReference(e.target.value)} placeholder="M-PESA receipt, bank reference, or reconciled transaction ID" required /><small>Required payment evidence before Paid/Completed can be recorded.</small></div>}
@@ -427,7 +477,8 @@ export default function AdminClaims() {
                 <button className="portal-btn primary" type="button" onClick={recordEducationRepayment} disabled={busy === `repay-${selected._id}`}>{busy === `repay-${selected._id}` ? "Recording…" : "Record repayment"}</button>
               </section>
             )}
-            <div className="portal-actions"><button className="portal-btn primary" onClick={saveStage} disabled={busy === selected._id}>{busy === selected._id ? "Saving…" : "Save stage"}</button><button className="portal-btn secondary" onClick={() => setSelected(null)}>Cancel</button></div>
+            </div>
+            <footer className="claim-review-footer"><button className="portal-btn primary" onClick={saveStage} disabled={busy === selected._id}>{busy === selected._id ? "Saving…" : "Save stage"}</button><button className="portal-btn secondary" onClick={() => { setSelected(null); navigate(location.pathname, { replace: true }); }}>Cancel</button></footer>
           </section>
         </div>}
       </div>

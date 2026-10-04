@@ -6,6 +6,7 @@ const { isMember, isAdminOrSuperAdmin, isSuperAdmin } = require("../middleware/r
 const profileCompleted = require("../middleware/profileCompletionMiddleware");
 const { uploadArray, setUploadType } = require("../middleware/upload");
 const controller = require("../controllers/supportRequestController");
+const permissionController = require("../controllers/supportPermissionController");
 
 router.post(
   "/",
@@ -18,6 +19,12 @@ router.post(
 );
 
 router.get("/mine", verifyToken, isMember, profileCompleted, controller.mine);
+router.post("/permissions", verifyToken, isMember, profileCompleted, permissionController.create);
+router.get("/permissions/mine", verifyToken, isMember, profileCompleted, permissionController.mine);
+router.get("/permissions", verifyToken, isAdminOrSuperAdmin, permissionController.all);
+router.get("/permissions/:id", verifyToken, isAdminOrSuperAdmin, permissionController.getOne);
+router.put("/permissions/:id/approve", verifyToken, isAdminOrSuperAdmin, (req, res) => { req.body = { ...(req.body || {}), decision: "approve" }; return permissionController.review(req, res); });
+router.put("/permissions/:id/reject", verifyToken, isAdminOrSuperAdmin, (req, res) => { req.body = { ...(req.body || {}), decision: "reject" }; return permissionController.review(req, res); });
 router.put("/mine/:id", verifyToken, isMember, profileCompleted, setUploadType("documents"), uploadArray("documents", 30), controller.memberUpdate);
 router.delete("/mine/:id", verifyToken, isMember, profileCompleted, controller.memberRemove);
 router.get("/", verifyToken, isAdminOrSuperAdmin, controller.all);

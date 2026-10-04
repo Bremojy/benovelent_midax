@@ -10,6 +10,23 @@ const { buildPdf } = require("../utils/simplePdf");
 const createAuditLog = require("../utils/createAuditLog");
 const { getFinanceActor } = require("../utils/financeActor");
 
+const normalizeFinanceRole = (role) => String(role || "").trim().toLowerCase();
+
+const canAdminOwnFinanceMutation = (transaction, actorId) => (
+    normalizeFinanceRole(transaction?.transactedByModel) === "admin"
+    && String(transaction?.transactedBy || "") === String(actorId || "")
+);
+
+const assertFinanceMutationAuthorization = (transaction, req) => {
+    const role = normalizeFinanceRole(req?.user?.role);
+    if (role === "superadmin") return null;
+    if (role !== "admin") return { status: 403, message: "Only Admin or SuperAdmin can modify a financial transaction." };
+    if (!canAdminOwnFinanceMutation(transaction, req?.user?._id)) {
+        return { status: 403, code: "FINANCE_TRANSACTION_OWNERSHIP_FORBIDDEN", message: "You can only modify a finance transaction originally recorded by your Admin account." };
+    }
+    return null;
+};
+
 /* =====================================================
    GENERATE TRANSACTION NUMBER
 ===================================================== */
@@ -341,6 +358,11 @@ exports.updateTransaction = async (req, res) => {
 
         }
 
+        const authorizationError = assertFinanceMutationAuthorization(transaction, req);
+        if (authorizationError) {
+            return res.status(authorizationError.status).json({ success: false, code: authorizationError.code, message: authorizationError.message });
+        }
+
         const linkedContribution = await Contribution.findOne({ finance: transaction._id, isArchived: { $ne: true } });
         const archivedLinkedContribution = await Contribution.findOne({ finance: transaction._id, isArchived: true }).select("_id").lean();
         if (archivedLinkedContribution) {
@@ -471,6 +493,15 @@ exports.updateTransaction = async (req, res) => {
         }
 
         await invalidateFinanceCache();
+        await createAuditLog({
+            user: req.user._id,
+            userRole: req.user.role,
+            action: "FINANCE_TRANSACTION_UPDATED",
+            module: "FINANCE",
+            description: `Finance transaction ${transaction._id} was updated by the authenticated ${normalizeFinanceRole(req.user.role) === "superadmin" ? "SuperAdmin" : "Admin"}.`,
+            req,
+            metadata: { transactionId: transaction._id, type: transaction.type, amount: transaction.amount, transactedBy: transaction.transactedBy, transactedByModel: transaction.transactedByModel },
+        });
         res.json({
 
             success: true,
@@ -540,32 +571,33 @@ exports.hideTransaction = async (req, res) => {
 
 exports.deleteTransaction = async (req, res) => {
     try {
-        const role = String(req.user?.role || "").toLowerCase();
+        const role = normalizeFinanceRole(req.user?.role);
         if (!["admin", "superadmin"].includes(role)) {
             return res.status(403).json({ success: false, message: "Only Admin or SuperAdmin can remove a financial transaction." });
         }
         const transaction = await Finance.findById(req.params.id);
         if (!transaction) {
-            return res.status(404).json({
-                success: false,
-                message: "Transaction not found.",
-            });
+            return res.status(404).json({ success: false, message: "Transaction not found." });
         }
 
-        const linkedContribution = await Contribution.findOne({ finance: transaction._id }).select("_id month year").lean();
+        const authorizationError = assertFinanceMutationAuthorization(transaction, req);
+        if (authorizationError) {
+            return res.status(authorizationError.status).json({ success: false, code: authorizationError.code, message: authorizationError.message });
+        }
+
+        const linkedContribution = await Contribution.findOne({ finance: transaction._id }).select("_id month year isArchived").lean();
         const affectedMember = transaction.member;
         const protectedSettled = transaction.reconciled === true || ["approved", "completed"].includes(String(transaction.status || "").toLowerCase());
-        let action = "deleted";
+        const originalTransaction = transaction.toObject();
+        let action = "archived";
 
-        // A finance delete is always an executed operation. For an approved/settled
-        // record or a transaction linked to a contribution, execute it as an auditable
-        // visibility archive instead of returning a misleading 409. Unsettled, unlinked
-        // records can still be physically deleted by SuperAdmin.
+        // Admin removal remains a controlled archive because the current finance
+        // policy preserves approved/linked accounting evidence. SuperAdmin may
+        // physically delete only an unsettled, unlinked record.
         if (role === "superadmin" && !protectedSettled && !linkedContribution) {
             await transaction.deleteOne();
             action = "deleted";
         } else {
-            const originalTransaction = transaction.toObject();
             let archivedContribution = null;
             let originalContribution = null;
             try {
@@ -573,9 +605,8 @@ exports.deleteTransaction = async (req, res) => {
                 transaction.hiddenAt = new Date();
                 transaction.hiddenBy = req.user._id;
                 await transaction.save();
-                action = "archived";
 
-                if (linkedContribution) {
+                if (linkedContribution && !linkedContribution.isArchived) {
                     archivedContribution = await Contribution.findById(linkedContribution._id);
                     if (archivedContribution && !archivedContribution.isArchived) {
                         originalContribution = archivedContribution.toObject();
@@ -604,11 +635,12 @@ exports.deleteTransaction = async (req, res) => {
             action: action === "deleted" ? "FINANCE_TRANSACTION_DELETED" : "FINANCE_TRANSACTION_ARCHIVED",
             module: "FINANCE",
             description: action === "deleted"
-                ? `SuperAdmin permanently deleted finance transaction ${transaction._id}.`
-                : `Finance transaction ${transaction._id} was archived from the operational ledger by ${role === "superadmin" ? "SuperAdmin" : "Admin"}.`,
+                ? `SuperAdmin permanently deleted finance transaction ${originalTransaction._id}.`
+                : `Finance transaction ${originalTransaction._id} was archived from the operational ledger by ${role === "superadmin" ? "SuperAdmin" : "Admin"}.`,
             req,
-            metadata: { transactionId: transaction._id, status: transaction.status, type: transaction.type, amount: transaction.amount, linkedContribution: Boolean(linkedContribution), protectedSettled },
+            metadata: { transactionId: originalTransaction._id, status: originalTransaction.status, type: originalTransaction.type, amount: originalTransaction.amount, linkedContribution: Boolean(linkedContribution), protectedSettled, transactedBy: originalTransaction.transactedBy, transactedByModel: originalTransaction.transactedByModel },
         });
+
         if (affectedMember) {
             try {
                 await Notification.create({
@@ -618,7 +650,7 @@ exports.deleteTransaction = async (req, res) => {
                     senderModel: role === "superadmin" ? "SuperAdmin" : "Admin",
                     title: "Finance Record Removed",
                     message: `A financial record linked to your account was removed by ${role === "superadmin" ? "SuperAdmin" : "an Admin / leader"}.`,
-                    type: "finance", referenceId: transaction._id, referenceModel: "Finance"
+                    type: "finance", referenceId: originalTransaction._id, referenceModel: "Finance"
                 });
             } catch (notificationError) {
                 console.warn("Finance removal notification failed after persistence:", notificationError.message);
@@ -634,10 +666,7 @@ exports.deleteTransaction = async (req, res) => {
         });
     } catch (error) {
         console.error(error);
-        return res.status(500).json({
-            success: false,
-            message: error.message,
-        });
+        return res.status(500).json({ success: false, message: error.message });
     }
 };
 
@@ -1021,7 +1050,7 @@ exports.exportConstitutionLedger = async (req, res) => {
       "Services: Fuels | Lubricants | LPG Gas | Service | Carwash",
       "",
       "DATE | TRANSACTION | TRANSACTED BY | DESCRIPTION | CATEGORY | AMOUNT | DIRECTION | STATUS | RUNNING BALANCE",
-      ...ledger.entries.map((entry) => `${new Date(entry.date).toISOString().slice(0,10)} | ${entry.transactionNumber} | ${entry.transactedByName || entry.transactedBy?.fullName || entry.transactedBy?.name || entry.approvedBy?.fullName || entry.approvedBy?.name || "Recorded actor unavailable"} | ${entry.description || "-"} | ${entry.category || "-"} | KES ${entry.amount.toFixed(2)} | ${entry.direction} | ${entry.status} | KES ${entry.runningBalance.toFixed(2)}`),
+      ...ledger.entries.map((entry) => `${new Date(entry.date).toISOString().slice(0,10)} | ${entry.transactionNumber} | ${entry.transactedByName || entry.transactedBy?.fullName || entry.transactedBy?.name || "Recorded actor unavailable"} | ${entry.description || "-"} | ${entry.category || "-"} | KES ${entry.amount.toFixed(2)} | ${entry.direction} | ${entry.status} | KES ${entry.runningBalance.toFixed(2)}`),
     ];
     const pdf = buildPdf({ title: "Benevolent Constitution Ledger", subtitle: `A4 ledger report • ${ledger.startDate} to ${ledger.endDate}`, lines: rows });
     res.set({ "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="benevolent-constitution-ledger-${ledger.startDate}-${ledger.endDate}.pdf"`, "Content-Length": pdf.length });
@@ -1054,7 +1083,7 @@ exports.exportConstitutionLedgerCsv = async (req, res) => {
       ["Current live book balance", ledger.currentBookBalance],
       [],
       ["Transaction date", "Transaction/reference", "Transacted by", "Description", "Category", "Amount", "Direction", "Status", "Running balance"],
-      ...ledger.entries.map((entry) => [new Date(entry.date).toISOString(), entry.transactionNumber, entry.transactedByName || entry.transactedBy?.fullName || entry.transactedBy?.name || entry.approvedBy?.fullName || entry.approvedBy?.name || "Recorded actor unavailable", entry.description, entry.category, entry.amount, entry.direction, entry.status, entry.runningBalance]),
+      ...ledger.entries.map((entry) => [new Date(entry.date).toISOString(), entry.transactionNumber, entry.transactedByName || entry.transactedBy?.fullName || entry.transactedBy?.name || "Recorded actor unavailable", entry.description, entry.category, entry.amount, entry.direction, entry.status, entry.runningBalance]),
     ].map((row) => row.map(escape).join(","));
     const csv = lines.join("\r\n");
     res.set({ "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": `attachment; filename="benevolent-constitution-ledger-${startDate}-${endDate}.csv"` });
@@ -1081,3 +1110,6 @@ exports.uploadAttachment = async (req, res) => {
     return res.status(500).json({ success: false, message: error.message });
   }
 };
+
+exports.canAdminOwnFinanceMutation = canAdminOwnFinanceMutation;
+exports.assertFinanceMutationAuthorization = assertFinanceMutationAuthorization;

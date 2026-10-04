@@ -31,16 +31,24 @@ export default function Claims() {
   const [paymentConfigured, setPaymentConfigured] = useState(false);
   const [busy, setBusy] = useState("");
   const [target, setTarget] = useState({});
+  const [filters, setFilters] = useState({ search: "", status: "", type: "", sort: "newest" });
+  const [page, setPage] = useState(1);
+  const [pages, setPages] = useState(1);
+  const [total, setTotal] = useState(0);
 
-  const load = async () => {
+  const load = async (nextPage = page) => {
     try {
       setLoading(true);
       const [claimsRes, casesRes, configRes] = await Promise.all([
-        API.get("/member/claims"),
+        API.get("/member/claims", { params: { ...filters, page: nextPage, limit: 10 } }),
         API.get("/payments/community-assistance"),
         API.get("/payments/config"),
       ]);
-      setClaims(Array.isArray(claimsRes.data?.claims) ? claimsRes.data.claims : []);
+      const claimPayload = claimsRes.data || {};
+      setClaims(Array.isArray(claimPayload.claims || claimPayload.records) ? (claimPayload.claims || claimPayload.records) : []);
+      setPage(Number(claimPayload.page || nextPage));
+      setPages(Math.max(1, Number(claimPayload.pages || 1)));
+      setTotal(Number(claimPayload.total ?? claimPayload.count ?? 0));
       setCampaigns(Array.isArray(casesRes.data?.campaigns) ? casesRes.data.campaigns : []);
       setPaymentConfigured(Boolean(configRes.data?.configured || configRes.data?.manualCollectionReady));
     } catch (e) {
@@ -50,7 +58,7 @@ export default function Claims() {
     }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(1); }, [filters.search, filters.status, filters.type, filters.sort]);
 
   const ownCampaigns = useMemo(() => new Set(claims.map((claim) => String(claim._id))), [claims]);
   const opportunities = useMemo(() => campaigns.filter((campaign) => campaign.enabled && ["open", "target_reached"].includes(campaign.status)), [campaigns]);
@@ -91,6 +99,15 @@ export default function Claims() {
           {!paymentConfigured && <div className="portal-alert" style={{ marginTop: 14 }}>Community cases are visible. Automated STK may be unavailable, but a manual Equity PayBill payment can still be submitted when the collection details are configured.</div>}
         </section>
 
+        <section className="portal-panel claim-filter-panel">
+          <div className="portal-form-grid">
+            <div className="portal-field portal-field-wide"><label htmlFor="member-claims-search">Search</label><input id="member-claims-search" value={filters.search} onChange={(e) => setFilters((x) => ({ ...x, search: e.target.value }))} placeholder="Request ID, hospital, school, description…" /></div>
+            <div className="portal-field"><label htmlFor="member-claims-status">Status</label><select id="member-claims-status" value={filters.status} onChange={(e) => setFilters((x) => ({ ...x, status: e.target.value }))}><option value="">All statuses</option>{STAGES.map((item) => <option key={item}>{item}</option>)}</select></div>
+            <div className="portal-field"><label htmlFor="member-claims-type">Support type</label><select id="member-claims-type" value={filters.type} onChange={(e) => setFilters((x) => ({ ...x, type: e.target.value }))}><option value="">All types</option><option value="medical">Medical</option><option value="funeral">Funeral</option><option value="education">Education</option><option value="support">General support</option></select></div>
+            <div className="portal-field"><label htmlFor="member-claims-sort">Sort</label><select id="member-claims-sort" value={filters.sort} onChange={(e) => setFilters((x) => ({ ...x, sort: e.target.value }))}><option value="newest">Newest first</option><option value="oldest">Oldest first</option></select></div>
+          </div>
+        </section>
+
         {opportunities.length > 0 && <section className="portal-panel">
           <div className="portal-module-header compact-header"><div><span>COMMUNITY M-PESA OPPORTUNITIES</span><h2>Members you can support</h2><p>Only active verified assistance cases are shown here. Never share private medical or identity information in payments.</p></div></div>
           <div className="portal-grid two">
@@ -120,7 +137,9 @@ export default function Claims() {
           </div>
         </section>}
 
-        {loading ? <div className="portal-empty">Loading your claims…</div> : claims.length === 0 ? <div className="portal-empty"><h3>No claims yet</h3><p>Submit a support request from Support and it will appear here.</p></div> : <div className="portal-grid two">
+        <div className="portal-list-summary"><span>{loading ? "Loading…" : `${total} claim${total === 1 ? "" : "s"} match the current filters.`}</span><span>Page {page} of {pages}</span></div>
+
+        {loading ? <div className="portal-empty">Loading your claims…</div> : claims.length === 0 ? <div className="portal-empty"><h3>No claims match your filters</h3><p>Submit a support request from Support and it will appear here.</p></div> : <div className="portal-grid two">
           {claims.map((claim) => {
             const status = claim.status || "Pending";
             const idx = STAGES.indexOf(status);
@@ -143,13 +162,19 @@ export default function Claims() {
                   <small style={{ display: "block", marginTop: 8 }}>Balance after payment is updated only after Safaricom confirmation and reconciliation.</small>
                 </div>
               )}
-              {idx >= 0 && <div style={{ marginTop: 12 }}><strong>Review progress</strong><div style={{ display: "grid", gap: 8, marginTop: 8 }}>{STAGES.map((s, i) => <div key={s} style={{ display: "grid", gridTemplateColumns: "18px 1fr", gap: 8, opacity: i <= idx ? 1 : .42 }}><div style={{ width: 14, height: 14, borderRadius: "50%", background: i <= idx ? "#0f766e" : "#cbd5e1", marginTop: 3 }} /><div><strong>{s}</strong><div style={{ fontSize: 13 }}>{stageCopy[s]}</div></div></div>)}</div></div>}
+              {idx >= 0 && <details className="claim-detail-disclosure" style={{ marginTop: 12 }}><summary style={{ cursor: "pointer", fontWeight: 800 }}>View workflow timeline</summary><div style={{ display: "grid", gap: 8, marginTop: 10 }}>{STAGES.map((s, i) => <div key={s} style={{ display: "grid", gridTemplateColumns: "18px 1fr", gap: 8, opacity: i <= idx ? 1 : .42 }}><div style={{ width: 14, height: 14, borderRadius: "50%", background: i <= idx ? "#0f766e" : "#cbd5e1", marginTop: 3 }} /><div><strong>{s}</strong><div style={{ fontSize: 13 }}>{stageCopy[s]}</div></div></div>)}</div></details>}
               {status === "Rejected" && !campaign && <div className="portal-panel" style={{ marginTop: 14, background: "#fff7ed", border: "1px solid #fed7aa" }}><div className="claim-card-head"><div><h3 style={{ margin: 0 }}>Community support is available</h3><p>Request a voluntary M-PESA community assistance campaign for this declined case.</p></div><HeartHandshake size={22} /></div><div className="portal-field" style={{ marginTop: 10 }}><label htmlFor={`claim-target-${claim._id}`}>Community target (KSh)</label><input id={`claim-target-${claim._id}`} type="number" min="1" inputMode="decimal" value={target[claim._id] ?? (claim.requestedAmount || claim.amount || "")} onChange={(e) => setTarget({ ...target, [claim._id]: e.target.value })} /></div><button className="portal-btn primary" style={{ marginTop: 10 }} onClick={() => requestCommunity(claim)} disabled={busy === `community-${claim._id}`}>{busy === `community-${claim._id}` ? "Creating…" : "Request community support"}</button></div>}
               {campaign && <div className="portal-panel" style={{ marginTop: 14, background: "#f8fafc" }}><div className="claim-card-head"><div><span className="portal-badge">COMMUNITY M-PESA</span><h3>{campaign.title}</h3><p>{campaign.description}</p></div><strong>{money(campaign.raisedAmount)} / {money(campaign.targetAmount)}</strong></div><p style={{ color: "#667085", fontSize: 13 }}>Campaign workflow: {campaign.workflowStatus || "community_campaign_open"}. Contributions open only after administrator approval.</p></div>}
               {status === "Rejected" && <div className="portal-alert" style={{ marginTop: 12 }}><strong>Reason:</strong> {claim.rejectionReason || claim.remarks || "Your application was declined."}</div>}
-              {history.length > 0 && <div style={{ marginTop: 14 }}><h3>Review history</h3>{history.slice().reverse().map((h, i) => <div key={`${h.date}-${i}`} style={{ padding: "10px 0", borderBottom: "1px solid #e5e7eb" }}><strong>{h.status}</strong><div>{h.remarks || "No additional note."}</div><small>{fmt(h.date)}</small></div>)}</div>}
+              {history.length > 0 && <details className="claim-detail-disclosure" style={{ marginTop: 14 }}><summary style={{ cursor: "pointer", fontWeight: 800 }}>View review history</summary><div style={{ marginTop: 10 }}>{history.slice().reverse().map((h, i) => <div key={`${h.date}-${i}`} style={{ padding: "10px 0", borderBottom: "1px solid #e5e7eb" }}><strong>{h.status}</strong><div>{h.remarks || "No additional note."}</div><small>{fmt(h.date)}</small></div>)}</div></details>}
             </article>;
           })}
+        </div>}
+
+        {pages > 1 && <div className="portal-actions" style={{ justifyContent: "center", marginTop: 18, flexWrap: "wrap" }}>
+          <button type="button" className="portal-btn secondary" disabled={page <= 1 || loading} onClick={() => load(page - 1)}>Previous</button>
+          <span style={{ alignSelf: "center", color: "#64748b" }}>Page {page} of {pages}</span>
+          <button type="button" className="portal-btn secondary" disabled={page >= pages || loading} onClick={() => load(page + 1)}>Next</button>
         </div>}
       </div>
     </DashboardLayout>

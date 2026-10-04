@@ -16,7 +16,8 @@ assert(/Finance\.find\(\{ \.\.\.matchBase, transactionDate/.test(finance), "auth
 assert(/memberId: null/.test(controller), "Constitution ledger must not member-scope the shared scheme ledger");
 assert(/ledgerScope: "scheme"/.test(controller), "Constitution ledger response must identify itself as the shared scheme ledger");
 assert(/transactedBy/.test(model) && /transactedByModel/.test(model) && /transactedByName/.test(model), "Finance must persist who recorded each transaction");
-assert(/populate\("approvedBy"/.test(finance), "Historical ledger rows may fall back to their persisted approval actor");
+assert(!/approvedBy[^\n]*Transacted by|Transacted by[^\n]*approvedBy/.test(read("src/components/accounts/ConstitutionLedgerTable.jsx") + read("src/components/accounts/LedgerControls.jsx")), "Constitution ledger must never substitute approvedBy for the transaction actor");
+assert(/Historical actor unavailable/.test(read("src/components/accounts/ConstitutionLedgerTable.jsx")), "Historical ledger rows without actor provenance must display a truthful unavailable actor state");
 assert(/normalizeBookBalanceResponse\(balanceRes\.value\.data\)/.test(member), "Member must read the complete book-balance response");
 assert(/normalizeBookBalanceResponse\(balance\.value\.data\)/.test(admin), "Admin must read the complete book-balance response");
 assert(/normalizeBookBalanceResponse\(balance\.value\.data\)/.test(superadmin), "SuperAdmin must read the complete book-balance response");
@@ -24,4 +25,4 @@ assert(/currentBalanceLabel="Scheme Current Book Balance"/.test(member), "Member
 assert(/ConstitutionLedgerTable/.test(member), "Member must use the canonical shared ledger table");
 
 console.log("SHARED CONSTITUTION LEDGER REGRESSION: PASS");
-console.log("Verified shared scheme scope, persisted transaction actor, canonical balance response handling, and Member/Admin/SuperAdmin Accounts wiring.");
+console.log("Verified shared scheme scope, persisted transaction actor, truthful actor fallback, canonical balance response handling, and Member/Admin/SuperAdmin Accounts wiring.");

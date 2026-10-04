@@ -70,6 +70,7 @@ router.get("/summary", protect, getSummary);
 router.get(
   "/contributions",
   protect,
+  isMember,
   profileCompleted,
   getMemberContributions
 );

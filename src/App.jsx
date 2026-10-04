@@ -23,7 +23,6 @@ import ThemeBootstrap from "./components/ThemeBootstrap";
 import CookieConsent from "./components/CookieConsent";
 import GlobalMotion from "./components/GlobalMotion";
 import InstallPWA from "./components/InstallPWA";
-import SmartAssistant from "./components/SmartAssistant";
 import LoginFeedbackPrompt from "./components/feedback/LoginFeedbackPrompt";
 import GlobalCommunicationCenter from "./components/GlobalCommunicationCenter";
 
@@ -109,6 +108,7 @@ const AdminMembers = lazy(
 );
 
 const AdminAccounts = lazy(() => import("./pages/admin/AdminAccounts"));
+const AdminContributions = lazy(() => import("./pages/admin/AdminContributions"));
 const AdminClaims = lazy(() => import("./pages/admin/AdminClaims"));
 const AdminSupport = lazy(() => import("./pages/admin/AdminSupport"));
 const AdminMessages = lazy(() => import("./pages/admin/AdminMessages"));
@@ -171,6 +171,8 @@ const Announcements = lazy(
     )
 );
 
+const SupportRequests = lazy(() => import("./pages/member/SupportRequests"));
+
 const Support = lazy(
   () =>
     import(
@@ -218,6 +220,7 @@ const SuperAdminSettings = lazy(() => import("./pages/superadmin/SuperAdminSetti
 const SuperAdminSystem = lazy(() => import("./pages/superadmin/SuperAdminSystem"));
 const SuperAdminDataIntegrity = lazy(() => import("./pages/superadmin/SuperAdminDataIntegrity"));
 const SuperAdminAccounts = lazy(() => import("./pages/superadmin/SuperAdminAccounts"));
+const SuperAdminContributions = lazy(() => import("./pages/superadmin/SuperAdminContributions"));
 const SuperAdminConstitution = lazy(() => import("./pages/superadmin/SuperAdminConstitution"));
 const SuperAdminNotifications = lazy(() => import("./pages/superadmin/SuperAdminNotifications"));
 const SuperAdminNews = lazy(() => import("./pages/superadmin/SuperAdminNews"));
@@ -357,7 +360,6 @@ function AppContent() {
       <PublicNavbar />
       <CookieConsent />
       <InstallPWA />
-      {!isLogin && <SmartAssistant />}
       {dashboardRoute && (location.pathname === "/member" || location.pathname === "/admin" || location.pathname === "/superadmin" || location.pathname === "/member/" || location.pathname === "/admin/" || location.pathname === "/superadmin/") && <LoginFeedbackPrompt />}
 
       <Suspense
@@ -523,6 +525,7 @@ function AppContent() {
 
           <Route path="/admin/platform" element={<ProtectedRoute allowedRoles={["admin","superadmin"]}><Navigate to="/admin" replace /></ProtectedRoute>} />
           <Route path="/admin/accounts" element={<ProtectedRoute allowedRoles={["admin"]}><AdminAccounts /></ProtectedRoute>} />
+          <Route path="/admin/contributions" element={<ProtectedRoute allowedRoles={["admin"]}><AdminContributions /></ProtectedRoute>} />
           <Route path="/admin/finance" element={<Navigate to="/admin/accounts" replace />} />
           <Route path="/admin/claims" element={<ProtectedRoute allowedRoles={["admin", "superadmin"]}><AdminClaims /></ProtectedRoute>} />
           <Route path="/admin/support" element={<ProtectedRoute allowedRoles={["admin", "superadmin"]}><AdminSupport /></ProtectedRoute>} />
@@ -585,6 +588,8 @@ function AppContent() {
               </ProtectedRoute>
             }
           />
+
+          <Route path="/member/support/requests" element={<ProtectedRoute allowedRoles={["member"]}><SupportRequests /></ProtectedRoute>} />
 
           <Route
             path="/member/announcements"
@@ -708,6 +713,7 @@ function AppContent() {
           <Route path="/superadmin/platform" element={<ProtectedRoute allowedRoles={["superadmin"]}><Navigate to="/superadmin" replace /></ProtectedRoute>} />
                     <Route path="/superadmin/members" element={<ProtectedRoute allowedRoles={["superadmin"]}><AdminMembers /></ProtectedRoute>} />
           <Route path="/superadmin/accounts" element={<ProtectedRoute allowedRoles={["superadmin"]}><SuperAdminAccounts /></ProtectedRoute>} />
+          <Route path="/superadmin/contributions" element={<ProtectedRoute allowedRoles={["superadmin"]}><SuperAdminContributions /></ProtectedRoute>} />
           <Route path="/superadmin/finance" element={<Navigate to="/superadmin/accounts" replace />} />
           <Route path="/superadmin/audit" element={<ProtectedRoute allowedRoles={["superadmin"]}><SuperAdminAudit /></ProtectedRoute>} />
           <Route path="/superadmin/notifications" element={<ProtectedRoute allowedRoles={["superadmin"]}><SuperAdminNotifications /></ProtectedRoute>} />

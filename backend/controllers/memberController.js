@@ -1347,106 +1347,86 @@ exports.getEligibility = async (req,res)=>{
 exports.getClaims = async (req, res) => {
     try {
         const memberId = req.user._id;
-
-        const [medical, funeral, education, supportRequests] = await Promise.all([
-            MedicalSupport.find({ member: memberId, isDeleted: { $ne: true } })
-                .populate("dependent", "fullName relationship")
-                .sort({ createdAt: -1 })
-                .lean(),
-
-            FuneralSupport.find({ member: memberId, isDeleted: { $ne: true } })
-                .populate("dependent", "fullName relationship")
-                .sort({ createdAt: -1 })
-                .lean(),
-
-            EducationSupport.find({ member: memberId, isDeleted: { $ne: true } })
-                .populate("dependent", "fullName relationship")
-                .sort({ createdAt: -1 })
-                .lean(),
-
-            require("../models/SupportRequest")
-                .find({ member: memberId, isDeleted: { $ne: true } })
-                .sort({ createdAt: -1 })
-                .lean(),
-        ]);
-
-        const normalizeDocuments = (documents = []) =>
-            (Array.isArray(documents) ? documents : [])
-                .map((document) => {
-                    if (!document) return null;
-                    if (typeof document === "string") {
-                        return {
-                            category: "General",
-                            label: "",
-                            fileName: "",
-                            fileUrl: document,
-                            uploadedAt: new Date(),
-                        };
-                    }
-                    const fileUrl = document.fileUrl || document.url || document.path || "";
-                    if (!fileUrl) return null;
-                    return {
-                        category: String(document.category || "General").trim() || "General",
-                        label: String(document.label || "").trim(),
-                        fileName: String(document.fileName || document.label || "").trim(),
-                        fileUrl,
-                        uploadedAt: document.uploadedAt || document.createdAt || new Date(),
-                    };
-                })
-                .filter(Boolean);
-
-        const claims = [
-            ...medical.map(item => ({
-                ...item,
-                supportType: "medical",
-                amount: item.requestedAmount || 0,
-                documents: Array.isArray(item.documents) ? item.documents : [],
-            })),
-            ...funeral.map(item => ({
-                ...item,
-                supportType: "funeral",
-                amount: item.requestedAmount || 0,
-                documents: [
-                    item.burialPermitChiefLetter,
-                    item.deathCertificate,
-                    item.burialPermit,
-                    item.chiefLetter,
-                    ...(item.supportingDocuments || []),
-                ].filter(Boolean),
-            })),
-            ...education.map(item => ({
-                ...item,
-                supportType: "education",
-                amount: item.requestedAmount || 0,
-                documents: [
-                    item.feeStructure,
-                    item.admissionLetter,
-                    ...(item.supportingDocuments || []),
-                ].filter(Boolean),
-            })),
-            ...supportRequests.map(item => ({
-                ...item,
-                supportType: String(item.supportType || "other").toLowerCase(),
-                amount: item.requestedAmount || 0,
-                documents: normalizeDocuments(item.documents),
-            })),
-        ].sort(
-            (a, b) =>
-                new Date(b.createdAt || b.applicationDate) -
-                new Date(a.createdAt || a.applicationDate)
-        );
-
-        return res.json({
-            success: true,
-            count: claims.length,
-            claims,
+        const requestedType = String(req.query?.type || req.query?.sourceType || "").trim().toLowerCase();
+        const requestedStatus = String(req.query?.status || "").trim();
+        const search = String(req.query?.search || "").trim();
+        const sortDirection = String(req.query?.sort || "newest").toLowerCase() === "oldest" ? 1 : -1;
+        const rawPage = Number(req.query?.page || 1);
+        const rawLimit = Number(req.query?.limit || 12);
+        const page = Number.isInteger(rawPage) && rawPage > 0 ? rawPage : 1;
+        const limit = Number.isInteger(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 40) : 12;
+        const MODEL_MAP = {
+            medical: MedicalSupport,
+            funeral: FuneralSupport,
+            education: EducationSupport,
+            support: require("../models/SupportRequest"),
+        };
+        const LABEL_MAP = { medical: "medical", funeral: "funeral", education: "education", support: "support" };
+        if (requestedType && !MODEL_MAP[requestedType]) return res.status(400).json({ success: false, message: "Unsupported claim type filter." });
+        const escapedSearch = search ? search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") : "";
+        const regex = escapedSearch ? new RegExp(escapedSearch, "i") : null;
+        const buildFilter = () => {
+            const filter = { member: memberId, isDeleted: { $ne: true } };
+            if (requestedStatus) filter.status = requestedStatus;
+            if (regex) filter.$or = [
+                { status: regex }, { description: regex }, { purpose: regex }, { hospitalName: regex },
+                { diagnosis: regex }, { deceasedName: regex }, { burialLocation: regex }, { school: regex },
+                { supportType: regex }, { policyName: regex }, { admissionNumber: regex }, { rejectionReason: regex },
+            ];
+            return filter;
+        };
+        const keys = requestedType ? [requestedType] : Object.keys(MODEL_MAP);
+        const sourceLimit = Math.min(page * limit, 1000);
+        const resultSets = await Promise.all(keys.map(async (key) => {
+            const Model = MODEL_MAP[key];
+            const filter = buildFilter();
+            let query = Model.find(filter).sort({ createdAt: sortDirection }).limit(sourceLimit).lean();
+            if (key === "medical") query = query.populate("dependent", "fullName relationship");
+            if (key === "funeral") query = query.populate("dependent", "fullName relationship");
+            if (key === "education") query = query.populate("dependent", "fullName relationship school educationLevel");
+            const [rows, total] = await Promise.all([query, Model.countDocuments(filter)]);
+            return { key, rows, total };
+        }));
+        const normalizeDocuments = (documents = []) => (Array.isArray(documents) ? documents : []).map((document) => {
+            if (!document) return null;
+            if (typeof document === "string") return { category: "General", label: "", fileName: "", fileUrl: document, uploadedAt: new Date() };
+            const fileUrl = document.fileUrl || document.url || document.path || "";
+            if (!fileUrl) return null;
+            return {
+                category: String(document.category || "General").trim() || "General",
+                label: String(document.label || "").trim(),
+                fileName: String(document.fileName || document.label || "").trim(),
+                fileUrl,
+                uploadedAt: document.uploadedAt || document.createdAt || new Date(),
+            };
+        }).filter(Boolean);
+        const claims = resultSets.flatMap(({ key, rows }) => rows.map((item) => ({
+            ...item,
+            supportType: LABEL_MAP[key],
+            sourceType: key,
+            amount: Number(item.requestedAmount || 0),
+            documents: key === "medical" ? normalizeDocuments(item.documents) : key === "funeral" ? normalizeDocuments([item.burialPermitChiefLetter, item.deathCertificate, item.burialPermit, item.chiefLetter, ...(item.supportingDocuments || [])]) : key === "education" ? normalizeDocuments([item.feeStructure, item.admissionLetter, ...(item.supportingDocuments || [])]) : normalizeDocuments(item.documents),
+            timeline: Array.isArray(item.timeline) ? item.timeline : [],
+            ...(key === "education" ? {
+                repaymentEnabled: Boolean(item.repaymentEnabled),
+                repaymentMonths: Number(item.repaymentPeriodMonths || item.repaymentMonths || 12),
+                monthlyInstallment: Number(item.monthlyInstallment || 0),
+                amountPaid: Number(item.amountPaid || 0),
+                balance: Number(item.balance || 0),
+            } : {}),
+        }))).sort((a, b) => {
+            const aDate = new Date(a.createdAt || a.applicationDate || 0).getTime();
+            const bDate = new Date(b.createdAt || b.applicationDate || 0).getTime();
+            return (bDate - aDate) * (sortDirection === 1 ? -1 : 1);
         });
+        const total = resultSets.reduce((sum, item) => sum + item.total, 0);
+        const startIndex = (page - 1) * limit;
+        const pageRows = claims.slice(startIndex, startIndex + limit);
+        const pages = Math.max(1, Math.ceil(total / limit));
+        return res.json({ success: true, count: total, total, page, pages, limit, claims: pageRows, records: pageRows });
     } catch (error) {
         console.error("Get Member Claims Error:", error);
-        return res.status(500).json({
-            success: false,
-            message: "Unable to load your support applications.",
-        });
+        return res.status(500).json({ success: false, message: "Unable to load your support applications." });
     }
 };
 

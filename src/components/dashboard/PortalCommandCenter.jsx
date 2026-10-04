@@ -43,18 +43,14 @@ export default function PortalCommandCenter({ role: providedRole }) {
   const [mode, setMode] = useState("search");
   const [query, setQuery] = useState("");
   const [results, setResults] = useState(emptyResults);
-  const [activity, setActivity] = useState({ notifications: [], support: [], audits: [] });
+  const [activity, setActivity] = useState({ notifications: [], attention: [], attentionCount: 0, conversations: [], audits: [] });
   const [loading, setLoading] = useState(false);
   const [activityLoading, setActivityLoading] = useState(false);
   const [error, setError] = useState("");
   const [activityError, setActivityError] = useState("");
 
   const totalResults = useMemo(() => Object.values(results).reduce((sum, rows) => sum + (Array.isArray(rows) ? rows.length : 0), 0), [results]);
-  const unreadActivity = useMemo(() => {
-    const notifications = Array.isArray(activity.notifications) ? activity.notifications.filter((item) => !item.read).length : 0;
-    const support = Array.isArray(activity.support) ? activity.support.length : 0;
-    return notifications + support;
-  }, [activity]);
+  const unreadActivity = Number(activity.attentionCount || (Array.isArray(activity.attention) ? activity.attention.length : 0));
 
   const openCenter = useCallback((nextMode = "search", initialQuery = "") => {
     setMode(nextMode);
@@ -95,6 +91,12 @@ export default function PortalCommandCenter({ role: providedRole }) {
     closeCenter();
   }, [location.pathname, closeCenter]);
 
+  useEffect(() => {
+    const onRefresh = () => { loadActivity(); };
+    window.addEventListener("benovelent:refresh-action-center", onRefresh);
+    return () => window.removeEventListener("benovelent:refresh-action-center", onRefresh);
+  }, [loadActivity]);
+
   const runSearch = useCallback(async (value) => {
     const term = String(value || "").trim();
     setQuery(value);
@@ -124,7 +126,9 @@ export default function PortalCommandCenter({ role: providedRole }) {
       const payload = data?.data || {};
       setActivity({
         notifications: Array.isArray(payload.notifications) ? payload.notifications : [],
-        support: Array.isArray(payload.support) ? payload.support : [],
+        attention: Array.isArray(payload.attention) ? payload.attention : [],
+        attentionCount: Number(payload.attentionCount || 0),
+        conversations: Array.isArray(payload.conversations) ? payload.conversations : [],
         audits: Array.isArray(payload.audits) ? payload.audits : [],
       });
     } catch (requestError) {
@@ -151,9 +155,14 @@ export default function PortalCommandCenter({ role: providedRole }) {
   const messageTarget = role === "member" ? "/member/messages" : "/admin/messages";
 
   const resultTarget = (group, item) => {
-    if (group === "members") return memberTarget;
-    if (group === "claims") return claimsTarget;
-    if (group === "contributions" || group === "transactions") return financeTarget;
+    if (group === "members") return item?._id ? `${memberTarget}?memberId=${item._id}` : memberTarget;
+    if (group === "claims") {
+      const source = String(item?.source || item?.sourceType || "").toLowerCase();
+      if (role !== "member" && source === "supportrequest") return `${role === "superadmin" ? "/superadmin" : "/admin"}/support?requestId=${item._id}`;
+      return `${claimsTarget}?claimId=${item?._id || ""}&claimType=${source || "support"}`;
+    }
+    if (group === "contributions") return role === "member" ? "/member/contributions" : (role === "superadmin" ? "/superadmin/contributions" : "/admin/contributions");
+    if (group === "transactions") return financeTarget;
     if (group === "notifications") return item?.link || notificationsTarget;
     if (group === "messages") return messageTarget;
     if (group === "news") return "/news";
@@ -193,10 +202,7 @@ export default function PortalCommandCenter({ role: providedRole }) {
   if (!open) return null;
 
   const groups = Object.keys(GROUP_META).filter((key) => Array.isArray(results[key]) && results[key].length > 0);
-  const attentionRows = [
-    ...(Array.isArray(activity.notifications) ? activity.notifications.filter((item) => !item.read).map((item) => ({ type: "notification", item })) : []),
-    ...(Array.isArray(activity.support) ? activity.support.map((item) => ({ type: "support", item })) : []),
-  ];
+  const attentionRows = Array.isArray(activity.attention) ? activity.attention : [];
 
   return (
     <div className="command-center-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) closeCenter(); }}>
@@ -269,16 +275,16 @@ export default function PortalCommandCenter({ role: providedRole }) {
           <div className="command-center-body attention-body">
             {activityLoading && <div className="command-state">Loading your current attention items…</div>}
             {!activityLoading && activityError && <div className="command-state error"><AlertCircle size={18} /> {activityError}</div>}
-            {!activityLoading && !activityError && attentionRows.length === 0 && <div className="command-state"><CheckSquare size={28} /><strong>Nothing needs your attention right now.</strong><span>This state is based on current backend notification and support records.</span></div>}
-            {!activityLoading && !activityError && attentionRows.map(({ type, item }, index) => {
-              const isNotification = type === "notification";
-              const target = isNotification ? (item.link || notificationsTarget) : claimsTarget;
-              const title = isNotification ? item.title : (item.policyName || item.supportType || "Support request");
-              const description = isNotification ? item.message : (item.description || `Status: ${item.status || "Pending"}`);
+            {!activityLoading && !activityError && attentionRows.length === 0 && <div className="command-state"><CheckSquare size={28} /><strong>Nothing needs your attention right now.</strong><span>This state is based on current authorized workflow records and unread notifications.</span></div>}
+            {!activityLoading && !activityError && attentionRows.map((item, index) => {
+              const target = item.link || (item.sourceModel === "SupportRequest" ? `${role === "superadmin" ? "/superadmin" : "/admin"}/support?requestId=${item.sourceId}` : notificationsTarget);
+              const isPermission = item.attentionType === "support_permission";
+              const isClaim = String(item.attentionType || "").includes("claim");
+              const Icon = isPermission ? ShieldCheck : isClaim ? HandHeart : item.attentionType === "notification" ? Bell : CheckSquare;
               return (
-                <button type="button" className="attention-row" key={`${type}-${item?._id || index}`} onClick={() => goTo(target)}>
-                  <div className="attention-icon">{isNotification ? <Bell size={17} /> : <HandHeart size={17} />}</div>
-                  <div className="attention-copy"><strong>{title}</strong><span>{description}</span><small>{item.createdAt || item.updatedAt ? formatDate(item.createdAt || item.updatedAt) : "Current"} · {item.status || (item.read ? "Read" : "Unread")}</small></div>
+                <button type="button" className="attention-row" key={item.id || `${item.attentionType}-${item.sourceId || index}`} onClick={() => goTo(target)}>
+                  <div className="attention-icon"><Icon size={17} /></div>
+                  <div className="attention-copy"><strong>{item.title || "Attention item"}</strong><span>{item.description || "Review this workflow item."}</span><small>{item.updatedAt ? formatDate(item.updatedAt) : "Current"} · {item.status || "Action required"}</small></div>
                   <ArrowUpRight size={16} />
                 </button>
               );

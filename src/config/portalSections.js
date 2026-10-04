@@ -17,7 +17,6 @@ export const portalSections = {
       links: [
         ["Profile", "Your personal and membership details.", "/member/profile", UserRound],
         ["Dependents", "Manage people linked to your membership.", "/member/dependents", Users],
-        ["Documents", "Upload and review your membership documents inside Profile.", "/member/profile#documents", FileText],
         ["Security", "Password and account-security controls.", "/member/settings", ShieldCheck],
       ],
     },
@@ -43,7 +42,7 @@ export const portalSections = {
       path: "/member/support-center",
       links: [
         ["Request Support", "Start a new welfare/support request.", "/member/support", HandHeart],
-        ["My Requests", "Review active and previous support requests.", "/member/support?view=requests", ClipboardList],
+        ["My Requests", "Review active and previous support requests.", "/member/support/requests", ClipboardList],
         ["Claims", "Track claims, status and community-support matters.", "/member/claims", ClipboardList],
         ["Benefits", "See the assistance programmes available to members.", "/member/benefits", HeartPulse],
       ],
@@ -101,7 +100,7 @@ export const portalSections = {
       path: "/admin/finance-center",
       links: [
         ["Accounts", "Open the canonical organizational account ledger.", "/admin/accounts", Wallet],
-        ["Contributions", "Review contribution activity inside Accounts.", "/admin/accounts?tab=contributions", ReceiptText],
+        ["Contributions", "Review the canonical scheme contribution history.", "/admin/contributions", ReceiptText],
         ["Payments", "Review payment activity and M-PESA records.", "/admin/accounts?tab=mpesa", Smartphone],
         ["Community Support", "Review support-related financial activity.", "/admin/support", HandHeart],
       ],
@@ -197,6 +196,7 @@ export const portalSections = {
       path: "/superadmin/finance-center",
       links: [
         ["Accounts", "Open the canonical accounts workspace.", "/superadmin/accounts", Wallet],
+        ["Contributions", "Review the canonical scheme contribution history.", "/superadmin/contributions", ReceiptText],
         ["Claims", "Review organizational claims.", "/superadmin/claims", ClipboardList],
         ["Support", "Review support workflows.", "/superadmin/support", HandHeart],
       ],

@@ -15,6 +15,7 @@ import {
   Wallet,
 } from "lucide-react";
 import DashboardLayout from "../../layouts/DashboardLayout";
+import SmartAssistant from "../../components/SmartAssistant";
 import { useAuth } from "../../context/AuthContext";
 import AnimatedWelcomeDashboardHero from "../../components/dashboard/AnimatedWelcomeDashboardHero";
 import API from "../../services/api";
@@ -67,6 +68,7 @@ export default function SuperAdminDashboard() {
   return (
     <DashboardLayout>
       <div className="superadmin-dashboard v7-portal">
+        <SmartAssistant />
         <AnimatedWelcomeDashboardHero
           role="superadmin"
           displayName={user?.fullName || user?.name || "SuperAdmin"}

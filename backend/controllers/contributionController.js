@@ -307,152 +307,87 @@ exports.createBulkContributionRun = async (req, res) => {
    GET ALL CONTRIBUTIONS
 ===================================================== */
 
-exports.getContributions = async (req,res)=>{
-
-    try{
-
-        const filter={ isArchived: { $ne: true } };
-
-        if(req.query.month){
-
-            filter.month=Number(req.query.month);
-
+exports.getContributions = async (req, res) => {
+    try {
+        const rawPage = Number(req.query?.page || 1);
+        const rawLimit = Number(req.query?.limit || 20);
+        const page = Number.isInteger(rawPage) && rawPage > 0 ? rawPage : 1;
+        const limit = Number.isInteger(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 50) : 20;
+        const filter = { isArchived: { $ne: true } };
+        const year = Number(req.query?.year);
+        const month = Number(req.query?.month);
+        const status = String(req.query?.status || "").trim();
+        const search = String(req.query?.search || req.query?.employeeNumber || "").trim();
+        if (Number.isInteger(year) && year > 0) filter.year = year;
+        if (Number.isInteger(month) && month >= 1 && month <= 12) filter.month = month;
+        if (status) filter.status = status;
+        if (search) {
+            const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+            const regex = new RegExp(escaped, "i");
+            const matchingMembers = await Member.find({ $or: [{ fullName: regex }, { memberNumber: regex }, { email: regex }] }).select("_id").limit(500).lean();
+            filter.$or = matchingMembers.length ? [{ member: { $in: matchingMembers.map((x) => x._id) } }, { receiptNumber: regex }, { mpesaCode: regex }] : [{ receiptNumber: regex }, { mpesaCode: regex }];
         }
-
-        if(req.query.year){
-
-            filter.year=Number(req.query.year);
-
-        }
-
-        if(req.query.status){
-
-            filter.status=req.query.status;
-
-        }
-
-        const contributions=await Contribution.find(filter)
-
-        .populate(
-
-            "member",
-
-            "fullName memberNumber profileImage"
-
-        )
-
-        .populate(
-
-            "approvedBy",
-
-            "fullName"
-
-        )
-
-        .sort({
-
-            paymentDate: -1,
-            year: -1,
-            month: -1,
-            createdAt: -1
-
-        });
-
-        const totalContributed = contributions.reduce(
-            (sum, item) => sum + Number(item.paidAmount || item.amount || 0),
-            0
-        );
-
-        const outstanding = contributions.reduce(
-            (sum, item) =>
-                sum + Math.max(0, Number(item.expectedAmount || 0) - Number(item.paidAmount || 0)),
-            0
-        );
-
+        const sort = { paymentDate: -1, year: -1, month: -1, createdAt: -1 };
+        const [rows, total] = await Promise.all([
+            Contribution.find(filter).populate("member", "fullName memberNumber profileImage").populate("approvedBy", "fullName").sort(sort).skip((page - 1) * limit).limit(limit).lean(),
+            Contribution.countDocuments(filter),
+        ]);
+        const summaryRows = await Contribution.find(filter).select("expectedAmount paidAmount balance year").lean();
+        const totalContributed = summaryRows.reduce((sum, item) => sum + Number(item.paidAmount || item.amount || 0), 0);
+        const outstanding = summaryRows.reduce((sum, item) => sum + Math.max(0, Number(item.expectedAmount || 0) - Number(item.paidAmount || 0)), 0);
         const currentYear = new Date().getFullYear();
-        const currentYearTotal = contributions
-            .filter(item => Number(item.year) === currentYear)
-            .reduce((sum, item) => sum + Number(item.paidAmount || item.amount || 0), 0);
-
+        const currentYearTotal = summaryRows.filter((item) => Number(item.year) === currentYear).reduce((sum, item) => sum + Number(item.paidAmount || item.amount || 0), 0);
         const configuredAmount = await configuredMonthlyContribution();
-
-        res.json({
-            success:true,
-            count:contributions.length,
-            summary: {
-                monthlyContribution: configuredAmount == null ? null : Number(configuredAmount),
-                totalContributed,
-                currentYear: currentYearTotal,
-                outstanding,
-            },
-            contributions
-        });
-
-    }
-
-    catch(error){
-
+        return res.json({ success: true, count: total, total, page, pages: Math.max(1, Math.ceil(total / limit)), limit, summary: {
+            monthlyContribution: configuredAmount == null ? null : Number(configuredAmount),
+            totalContributed, currentYear: currentYearTotal, outstanding,
+        }, contributions: rows });
+    } catch (error) {
         console.error(error);
-
-        res.status(500).json({
-
-            success:false,
-
-            message:error.message
-
-        });
-
+        return res.status(500).json({ success: false, message: error.message });
     }
-
 };
-
 
 
 /* =====================================================
    GET MEMBER CONTRIBUTIONS
 ===================================================== */
 
-exports.getMemberContributions = async (req,res)=>{
-    try{
-        const isMemberRole = String(req.user?.role || '').toLowerCase() === 'member';
-        if (isMemberRole) {
-            const requestedMemberId = req.user._id;
-            const currentYear = Number(req.query.year) || new Date().getFullYear();
-            const query = { member: requestedMemberId, isArchived: { $ne: true } };
-            if (req.query.year !== undefined) query.year = currentYear;
-            const rows = await Contribution.find(query)
-                .populate('finance', 'transactionNumber type category amount paymentMethod receiptNumber referenceNumber transactionDate status notes')
-                .sort({ paymentDate: -1, year: -1, month: -1, createdAt: -1 })
-                .lean();
-            return res.json({
-                success: true,
-                scope: 'member',
-                year: currentYear,
-                count: rows.length,
-                contributions: rows,
-                summary: {
-                    totalExpected: rows.reduce((sum, item) => sum + Number(item.expectedAmount || 0), 0),
-                    totalPaid: rows.reduce((sum, item) => sum + Number(item.paidAmount || 0), 0),
-                    totalBalance: rows.reduce((sum, item) => sum + Math.max(0, Number(item.expectedAmount || 0) - Number(item.paidAmount || 0)), 0),
-                },
-            });
-        }
-
-        const requestedMemberId = req.params.memberId || req.user._id;
-        const requested = String(requestedMemberId);
-        const own = String(req.user._id);
-        if (String(req.user?.role || "").toLowerCase() === "member" && requested !== own) {
+exports.getMemberContributions = async (req, res) => {
+    try {
+        const role = String(req.user?.role || "").toLowerCase();
+        const memberId = role === "member" ? req.user._id : (req.params.memberId || req.user._id);
+        if (role === "member" && req.params.memberId && String(req.params.memberId) !== String(req.user._id)) {
             return res.status(403).json({ success: false, code: "CONTRIBUTION_OWNERSHIP_FORBIDDEN", message: "You can only view your own contribution records." });
         }
-        const contributions=await Contribution.find({ member: requestedMemberId, isArchived: { $ne: true } })
-            .populate('finance', 'transactionNumber type category amount paymentMethod receiptNumber referenceNumber transactionDate status notes')
-            .sort({ paymentDate: -1, year: -1, month: -1, createdAt: -1 });
-        res.json({ success:true, count:contributions.length, contributions });
-    } catch(error){
+        const rawPage = Number(req.query?.page || 1);
+        const rawLimit = Number(req.query?.limit || 12);
+        const page = Number.isInteger(rawPage) && rawPage > 0 ? rawPage : 1;
+        const limit = Number.isInteger(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 40) : 12;
+        const query = { member: memberId, isArchived: { $ne: true } };
+        if (req.query.year !== undefined && Number(req.query.year)) query.year = Number(req.query.year);
+        if (req.query.month !== undefined && Number(req.query.month) >= 1 && Number(req.query.month) <= 12) query.month = Number(req.query.month);
+        if (req.query.status) query.status = String(req.query.status);
+        if (req.query.search) {
+            const escaped = String(req.query.search).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+            query.$or = [{ receiptNumber: new RegExp(escaped, "i") }, { mpesaCode: new RegExp(escaped, "i") }];
+        }
+        const [rows, total] = await Promise.all([
+            Contribution.find(query).populate("finance", "transactionNumber type category amount paymentMethod receiptNumber referenceNumber transactionDate status notes").sort({ paymentDate: -1, year: -1, month: -1, createdAt: -1 }).skip((page - 1) * limit).limit(limit).lean(),
+            Contribution.countDocuments(query),
+        ]);
+        const summaryRows = await Contribution.find(query).select("expectedAmount paidAmount balance year").lean();
+        return res.json({ success: true, scope: role === "member" ? "member" : "member-record", year: req.query.year ? Number(req.query.year) : null, count: total, total, page, pages: Math.max(1, Math.ceil(total / limit)), limit, contributions: rows, summary: {
+            totalExpected: summaryRows.reduce((sum, item) => sum + Number(item.expectedAmount || 0), 0),
+            totalPaid: summaryRows.reduce((sum, item) => sum + Number(item.paidAmount || 0), 0),
+            totalBalance: summaryRows.reduce((sum, item) => sum + Math.max(0, Number(item.expectedAmount || 0) - Number(item.paidAmount || 0)), 0),
+        } });
+    } catch (error) {
         console.error(error);
-        res.status(500).json({ success:false, message:error.message });
+        return res.status(500).json({ success: false, message: error.message });
     }
 };
+
 
 /* =====================================================
    UPDATE CONTRIBUTION

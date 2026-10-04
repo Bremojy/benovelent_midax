@@ -28,7 +28,7 @@ export default function LedgerControls({ data, dates, onLoad, busy = false, titl
     const popup = window.open("", "_blank", "noopener,noreferrer");
     if (!popup) return;
     const rows = (data.entries || []).map((entry) => `
-      <tr><td>${dt(entry.date)}</td><td>${entry.transactionNumber || "—"}</td><td>${entry.transactedByName || entry.transactedBy?.fullName || entry.transactedBy?.name || entry.approvedBy?.fullName || entry.approvedBy?.name || "Recorded actor unavailable"}</td><td>${entry.description || "—"}</td><td>${entry.category || "—"}</td><td>${money(entry.amount)}</td><td>${entry.direction || "—"}</td><td>${entry.status || "—"}</td><td>${money(entry.runningBalance)}</td></tr>
+      <tr><td>${dt(entry.date)}</td><td>${entry.transactionNumber || "—"}</td><td>${entry.transactedByName || entry.transactedBy?.fullName || entry.transactedBy?.name || "Recorded actor unavailable"}</td><td>${entry.description || "—"}</td><td>${entry.category || "—"}</td><td>${money(entry.amount)}</td><td>${entry.direction || "—"}</td><td>${entry.status || "—"}</td><td>${money(entry.runningBalance)}</td></tr>
     `).join("");
     popup.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${title}</title>${printHeadStyles()}<style>@page{size:A4 landscape;margin:10mm}.print-shell{break-after:auto}.ledger-summary{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:0 0 18px}.ledger-summary div{border:1px solid #ddd;padding:8px}.ledger-summary span{display:block;font-size:10px}.ledger-summary strong{font-size:14px}table{font-size:8px}th,td{padding:6px}</style></head><body>
       ${buildPrintHeadHtml({ title, subtitle: `Date range: ${data.startDate} to ${data.endDate}` })}
@@ -58,14 +58,6 @@ export default function LedgerControls({ data, dates, onLoad, busy = false, titl
       </>}
     </div>
     {busy && !data && <div className="portal-empty">Loading ledger…</div>}
-    {data && <div className="account-grid four">
-      <div className="account-card compact"><span>{currentBalanceLabel}</span><strong>{money(data.currentBookBalance)}</strong><small>As of {dt(data.asOf)}</small></div>
-      <div className="account-card compact"><span>Opening balance</span><strong>{money(data.openingBalance)}</strong><small>Balance before selected period</small></div>
-      <div className="account-card compact"><span>Money in</span><strong>{money(data.totals?.credit)}</strong><small>Selected period</small></div>
-      <div className="account-card compact"><span>Money out</span><strong>{money(data.totals?.debit)}</strong><small>Selected period</small></div>
-      <div className="account-card compact"><span>Closing balance</span><strong>{money(data.closingBalance)}</strong><small>Selected period</small></div>
-      {personalContributionTotal !== undefined && <div className="account-card compact"><span>My contribution total</span><strong>{money(personalContributionTotal)}</strong><small>Personal history, not scheme balance</small></div>}
-      {contributionStatus && <div className="account-card compact"><span>Contribution status</span><strong>{contributionStatus}</strong><small>Your current contribution position</small></div>}
-    </div>}
+
   </>;
 }

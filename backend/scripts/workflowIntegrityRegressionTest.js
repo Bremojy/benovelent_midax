@@ -70,7 +70,7 @@ assert(/replies:/.test(contactModel), "contact replies are persisted with messag
 assert(/DELETE_SUPPORT_REQUEST/.test(support), "SuperAdmin support deletion is audited");
 assert(/status = "inactive"/.test(adminController) && /ARCHIVE_MEMBER/.test(adminController), "admin member deletion archives and audits instead of destroying the account");
 assert(!/MIDAX@123/.test(adminMembers), "temporary plaintext-password fallback is absent from Admin Members");
-assert(/isDeleted = true/.test(claims) && /action:"ARCHIVE"/.test(claims), "SuperAdmin claim removal archives and audits instead of permanently deleting evidence");
+assert(/exports\.permanentDelete/.test(claims) && /CLAIM_PERMANENT_DELETE_CLOSED_ONLY/.test(claims) && /await result\.claim\.deleteOne\(\)/.test(claims), "SuperAdmin permanently deletes Closed claims while retaining the legacy archive endpoint separately");
 assert(/service is temporarily unavailable/.test(server) && /app\.use\(compression\(\{ threshold: 1024 \}\)\);\napp\.use\(express\.json/.test(server), "5xx implementation errors are sanitized and duplicate compression is removed");
 assert(/profileCompleted/.test(memberRoutes) && /profileCompleted/.test(paymentRoutes) && /profileCompleted/.test(platformRoutes) && /profileCompleted/.test(voteRoutes), "member finance/platform/voting routes enforce profile completion");
 

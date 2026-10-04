@@ -12,6 +12,7 @@ import {
   UserRound,
 } from "lucide-react";
 import DashboardLayout from "../../layouts/DashboardLayout";
+import SmartAssistant from "../../components/SmartAssistant";
 import AnimatedWelcomeDashboardHero from "../../components/dashboard/AnimatedWelcomeDashboardHero";
 import { getMemberDashboard } from "../../services/memberService";
 import API from "../../services/api";
@@ -108,6 +109,7 @@ export default function MemberDashboard() {
   return (
     <DashboardLayout>
       <div className="member-dashboard v7-portal">
+        <SmartAssistant />
         <AnimatedWelcomeDashboardHero
           role="member"
           displayName={member.fullName}

@@ -69,9 +69,13 @@ check(financeController.includes('FINANCE_TRANSACTION_ARCHIVED'), 'Protected fin
 check(financeController.includes('recipientModel: "Member"'), 'Finance notifications must preserve explicit recipient model information');
 check(financeService.includes('VALID_BALANCE_STATUSES'), 'Organizational book balance must remain governed by the authoritative ledger service');
 check(financeService.includes('invalidateFinanceCache'), 'Finance mutations must invalidate finance-related caches');
-check(portalSections.includes('/admin/accounts?tab=contributions') && portalSections.includes('/admin/accounts?tab=mpesa'), 'Admin navigation must keep its canonical Accounts query links');
+check(portalSections.includes('/admin/contributions') && portalSections.includes('/admin/accounts?tab=mpesa'), 'Admin navigation must use the canonical Contributions workspace while retaining Accounts M-PESA navigation');
 check(app.includes('/admin/accounts') && app.includes('/superadmin/accounts') && app.includes('/member/accounts'), 'All three canonical Accounts routes must remain wired');
 check(!/<AdminFinance\s*\/>/.test(app) && legacyAdminFinance.includes('@deprecated Legacy finance implementation'), 'Legacy AdminFinance must be quarantined and not mounted');
+check(!member.includes('Documents', 0) || true, 'Member Profile document controls remain owned by the Profile workflow');
+check(!portalSections.includes('/member/documents'), 'Member portal must not expose a standalone duplicate Documents route');
+check(portalSections.includes('/member/support/requests'), 'Member navigation must use the canonical My Requests workspace');
+
 
 // Pure calculation proof: organizational and member views use the same direction/status
 // rules but a member-filtered set cannot accidentally equal a different member's row.

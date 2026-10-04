@@ -46,6 +46,9 @@ const communityAssistanceSchema = new mongoose.Schema(
     closedAt: { type: Date, default: null },
     closedBy: { type: mongoose.Schema.Types.ObjectId, default: null },
     createdBy: { type: mongoose.Schema.Types.ObjectId, default: null },
+    sourceRemoved: { type: Boolean, default: false, index: true },
+    sourceRemovedAt: { type: Date, default: null },
+    sourceRemovedBy: { type: mongoose.Schema.Types.ObjectId, default: null },
   },
   { timestamps: true }
 );

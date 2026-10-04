@@ -39,6 +39,7 @@ function DashboardTopbar({
   );
 
   const [unreadMessages, setUnreadMessages] = useState(Number(user?.unreadMessages || 0));
+  const [attentionCount, setAttentionCount] = useState(0);
 
   const normalizedRole =
     (role || user?.role || "member").toLowerCase();
@@ -52,6 +53,14 @@ function DashboardTopbar({
         if (mounted) setUnreadNotifications(Number(data?.unread || 0));
       } catch (error) {
         // Non-blocking.
+      }
+      if (normalizedRole === "admin" || normalizedRole === "superadmin") {
+        try {
+          const { data } = await API.get("/platform/activity");
+          if (mounted) setAttentionCount(Number(data?.data?.attentionCount || 0));
+        } catch {
+          // Non-blocking.
+        }
       }
     };
 
@@ -76,6 +85,7 @@ function DashboardTopbar({
     const onNotificationCount = (count) => {
       if (mounted) setUnreadNotifications(Math.max(0, Number(count) || 0));
     };
+    const onAttentionRefresh = () => { if (mounted) loadUnread(); };
     const onMessage = () => { if (mounted) loadUnreadMessages(); };
 
     if (normalizedRole !== "superadmin") {
@@ -84,10 +94,12 @@ function DashboardTopbar({
       socket.on("new-message", onMessage);
     }
     socket.on("notification-count", onNotificationCount);
+    window.addEventListener("benovelent:refresh-action-center", onAttentionRefresh);
     return () => {
       mounted = false;
       window.clearInterval(interval);
       socket.off("notification-count", onNotificationCount);
+      window.removeEventListener("benovelent:refresh-action-center", onAttentionRefresh);
       if (normalizedRole !== "superadmin") {
         socket.off("new-message", onMessage);
       }
@@ -230,6 +242,7 @@ function DashboardTopbar({
 
         <button type="button" className="icon-btn action-center-btn" onClick={openActionCenter} aria-label="Open action center" title="Action center">
           <ListChecks size={20} />
+          {attentionCount > 0 && <span className="badge">{attentionCount > 99 ? "99+" : attentionCount}</span>}
         </button>
 
         {/* NOTIFICATIONS */}

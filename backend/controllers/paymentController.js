@@ -84,6 +84,7 @@ async function applyGenericSupportRepayment(transaction) {
 async function applyCommunityContribution(transaction) {
   const campaign = await CommunityAssistance.findById(transaction.referenceId).lean();
   if (!campaign) throw new Error("Community assistance case was not found.");
+  if (campaign.sourceRemoved === true) throw new Error("This community assistance case is no longer exposed because its source claim was permanently removed.");
   const closedBeforePayment = campaign.status === "closed" && campaign.closedAt && transaction.initiatedAt && new Date(transaction.initiatedAt) <= new Date(campaign.closedAt);
   if (!campaign.enabled && !closedBeforePayment) throw new Error("This community assistance case is closed.");
   if (!["open", "target_reached", "closed"].includes(String(campaign.status))) throw new Error("This community assistance case is not accepting this payment settlement.");
@@ -339,7 +340,7 @@ exports.stk = async (req, res) => {
     } else if (purpose === "community_assistance") {
       if (!['member', 'admin'].includes(role)) return res.status(403).json({ success: false, code: "COMMUNITY_CONTRIBUTOR_ROLE", message: "Only members and eligible Admin / leader accounts can contribute to community assistance cases." });
       const campaign = await CommunityAssistance.findById(referenceId);
-      if (!campaign || !campaign.enabled || String(campaign.status) !== "open") return res.status(404).json({ success: false, message: "Community assistance case is not available." });
+      if (!campaign || campaign.sourceRemoved === true || !campaign.enabled || String(campaign.status) !== "open") return res.status(404).json({ success: false, message: "Community assistance case is not available." });
       if (String(campaign.recipientMember) === String(req.user._id)) return res.status(400).json({ success: false, message: "You cannot contribute to your own assistance case." });
       const remaining = Number(campaign.targetAmount) - Number(campaign.raisedAmount || 0);
       if (amount > remaining) return res.status(400).json({ success: false, message: `Maximum remaining contribution is KSh ${remaining.toLocaleString("en-KE")}.` });
@@ -548,7 +549,7 @@ exports.manualPayment = async (req, res) => {
     }
     if (purpose === "community_assistance") {
       const campaign = await CommunityAssistance.findById(referenceId);
-      if (!campaign || !campaign.enabled || String(campaign.status) !== "open") return res.status(404).json({ success: false, message: "Community assistance case is not available." });
+      if (!campaign || campaign.sourceRemoved === true || !campaign.enabled || String(campaign.status) !== "open") return res.status(404).json({ success: false, message: "Community assistance case is not available." });
       if (String(campaign.recipientMember) === String(req.user._id)) return res.status(400).json({ success: false, message: "You cannot contribute to your own assistance case." });
       const remaining = Number(campaign.targetAmount) - Number(campaign.raisedAmount || 0);
       if (amount > remaining) return res.status(400).json({ success: false, message: `Maximum remaining contribution is KSh ${remaining.toLocaleString("en-KE")}.` });
@@ -912,6 +913,9 @@ exports.enableCommunityAssistance = async (req, res) => {
     campaign.description = String(description || "The claim was declined by the scheme. Members may voluntarily support this member through M-PESA.").trim();
     campaign.targetAmount = target;
     campaign.enabled = true;
+    campaign.sourceRemoved = false;
+    campaign.sourceRemovedAt = null;
+    campaign.sourceRemovedBy = null;
     campaign.status = Number(campaign.raisedAmount || 0) >= target ? "target_reached" : "open";
     campaign.workflowStatus = "community_campaign_open";
     campaign.reviewedAt = new Date();
@@ -927,7 +931,7 @@ exports.enableCommunityAssistance = async (req, res) => {
 exports.communityCases = async (req, res) => {
   try {
     const isAdminView = ["admin", "superadmin"].includes(String(req.user?.role || "").toLowerCase());
-    const filter = isAdminView ? {} : { enabled: true, status: { $in: ["open", "target_reached"] }, workflowStatus: { $in: ["community_campaign_open", null] } };
+    const filter = isAdminView ? { sourceRemoved: { $ne: true } } : { sourceRemoved: { $ne: true }, enabled: true, status: { $in: ["open", "target_reached"] }, workflowStatus: { $in: ["community_campaign_open", null] } };
     const currentMemberId = String(req.user?._id || "");
     const recipientProjection = isAdminView
       ? "_id fullName memberNumber profileImage department position phone mpesaNumber"
@@ -949,7 +953,7 @@ exports.communityCases = async (req, res) => {
 
 exports.myCommunityCases = async (req, res) => {
   try {
-    const campaigns = await CommunityAssistance.find({ recipientMember: req.user._id }).sort({ createdAt: -1 }).lean();
+    const campaigns = await CommunityAssistance.find({ recipientMember: req.user._id, sourceRemoved: { $ne: true } }).sort({ createdAt: -1 }).lean();
     res.json({ success: true, campaigns });
   } catch (error) { res.status(500).json({ success: false, message: error.message }); }
 };
@@ -957,7 +961,7 @@ exports.myCommunityCases = async (req, res) => {
 exports.payoutCommunity = async (req, res) => {
   try {
     const campaign = await CommunityAssistance.findById(req.params.id);
-    if (!campaign) return res.status(404).json({ success: false, message: "Community assistance case not found." });
+    if (!campaign || campaign.sourceRemoved === true) return res.status(404).json({ success: false, message: "Community assistance case is not available." });
     if (!campaign.enabled || !["open", "target_reached"].includes(String(campaign.status))) return res.status(400).json({ success: false, message: "This community assistance case is not eligible for payout." });
     if (String(campaign.payoutStatus || "not_started") === "pending") return res.status(409).json({ success: false, message: "A payout for this community case is already processing." });
     if (String(campaign.payoutStatus || "not_started") === "successful" || String(campaign.status) === "paid") return res.status(409).json({ success: false, message: "This community case has already been paid." });
@@ -1180,7 +1184,7 @@ exports.deleteCommunity = async (req, res) => {
 
 exports.myCommunityLedger = async (req, res) => {
   try {
-    const campaigns = await CommunityAssistance.find({ recipientMember: req.user._id }).sort({ createdAt: -1 }).lean();
+    const campaigns = await CommunityAssistance.find({ recipientMember: req.user._id, sourceRemoved: { $ne: true } }).sort({ createdAt: -1 }).lean();
     const result = [];
     for (const campaign of campaigns) {
       const payments = await MpesaTransaction.find({ referenceModel: "CommunityAssistance", referenceId: campaign._id, status: { $in: ["pending", "successful", "failed", "reversed", "cancelled", "timeout", "unknown"] } })

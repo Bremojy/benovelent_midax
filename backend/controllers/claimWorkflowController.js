@@ -9,6 +9,8 @@ const Admin = require("../models/Admin");
 const SuperAdmin = require("../models/SuperAdmin");
 const News = require("../models/News");
 const createAuditLog = require("../utils/createAuditLog");
+const Notification = require("../models/Notification");
+const SupportRequestPermissionRequest = require("../models/SupportRequestPermissionRequest");
 
 const MODEL_MAP = { medical: MedicalSupport, funeral: FuneralSupport, education: EducationSupport, support: SupportRequest };
 const LABEL_MAP = { medical: "Medical", funeral: "Funeral", education: "Education", support: "Support" };
@@ -115,32 +117,217 @@ exports.updateStage = async (req, res) => {
 
 exports.list = async (req, res) => {
   try {
-    const [medical, funeral, education, support] = await Promise.all([
-      MedicalSupport.find({ isDeleted: { $ne: true } }).populate("member", "fullName memberNumber phone email profileImage position employer").populate("dependent", "fullName relationship").sort({ createdAt: -1 }).lean(),
-      FuneralSupport.find({ isDeleted: { $ne: true } }).populate("member", "fullName memberNumber phone email profileImage position employer").sort({ createdAt: -1 }).lean(),
-      EducationSupport.find({ isDeleted: { $ne: true } }).populate("member", "fullName memberNumber phone email profileImage position employer").populate("dependent", "fullName relationship school educationLevel").sort({ createdAt: -1 }).lean(),
-      SupportRequest.find({ isDeleted: { $ne: true } }).populate("member", "fullName memberNumber phone email profileImage position employer").sort({ createdAt: -1 }).lean(),
-    ]);
-    const normalize=(key, arr)=>arr.map(x=>({
+    const rawPage = Number(req.query?.page || 1);
+    const rawLimit = Number(req.query?.limit || 20);
+    const page = Number.isInteger(rawPage) && rawPage > 0 ? rawPage : 1;
+    const limit = Number.isInteger(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 50) : 20;
+    const requestedStatus = String(req.query?.status || "").trim();
+    const requestedType = String(req.query?.type || req.query?.sourceType || "").trim().toLowerCase();
+    const search = String(req.query?.search || "").trim();
+    const id = String(req.query?.id || "").trim();
+    const sortDirection = String(req.query?.sort || "newest").toLowerCase() === "oldest" ? 1 : -1;
+
+    if (requestedType && !MODEL_MAP[requestedType]) return res.status(400).json({ success: false, message: "Unsupported claim type filter." });
+    if (id && !require("mongoose").Types.ObjectId.isValid(id)) return res.status(400).json({ success: false, message: "Invalid claim reference." });
+
+    let memberIds = null;
+    if (search) {
+      const safeSearch = search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const memberRegex = new RegExp(safeSearch, "i");
+      const members = await Member.find({
+        isDeleted: { $ne: true },
+        $or: [{ fullName: memberRegex }, { memberNumber: memberRegex }, { email: memberRegex }, { phone: memberRegex }],
+      }).select("_id").limit(200).lean();
+      memberIds = members.map((member) => member._id);
+    }
+
+    const escapedSearch = search ? search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") : "";
+    const searchRegex = escapedSearch ? new RegExp(escapedSearch, "i") : null;
+    const genericSearchFields = [
+      "description", "purpose", "hospitalName", "hospitalLocation", "diagnosis",
+      "deceasedName", "burialLocation", "school", "admissionNumber", "supportType",
+      "policyName", "status", "rejectionReason", "paymentReference", "reviewNotes",
+    ];
+    const buildFilter = () => {
+      const filter = { isDeleted: { $ne: true } };
+      if (id) filter._id = id;
+      if (requestedStatus) filter.status = requestedStatus;
+      if (memberIds) {
+        filter.$or = [
+          ...(memberIds.length ? [{ member: { $in: memberIds } }] : []),
+          ...(searchRegex ? genericSearchFields.map((field) => ({ [field]: searchRegex })) : []),
+        ];
+        if (!filter.$or.length) filter.$or = [{ _id: { $in: [] } }];
+      } else if (searchRegex) {
+        filter.$or = genericSearchFields.map((field) => ({ [field]: searchRegex }));
+      }
+      return filter;
+    };
+
+    const selectedKeys = requestedType ? [requestedType] : Object.keys(MODEL_MAP);
+    // Fetch enough rows from every source to construct the globally sorted page.
+    // Each collection is independently sorted, then the merged slice is returned.
+    const sourceLimit = Math.min(page * limit, 1000);
+    const results = await Promise.all(selectedKeys.map(async (key) => {
+      const Model = MODEL_MAP[key];
+      const filter = buildFilter();
+      let query = Model.find(filter)
+        .populate("member", "fullName memberNumber phone email profileImage position employer")
+        .sort({ createdAt: sortDirection })
+        .limit(sourceLimit)
+        .lean();
+      if (key === "medical") query = query.populate("dependent", "fullName relationship");
+      if (key === "education") query = query.populate("dependent", "fullName relationship school educationLevel");
+      const [rows, total] = await Promise.all([query, Model.countDocuments(filter)]);
+      return { key, rows, total };
+    }));
+
+    const normalize = (key, arr) => arr.map((x) => ({
       ...x,
       supportType: LABEL_MAP[key],
-      sourceType:key,
-      amount:Number(x.approvedAmount || x.requestedAmount || 0),
-      timeline:Array.isArray(x.timeline)?x.timeline:[],
+      sourceType: key,
+      amount: Number(x.approvedAmount || x.requestedAmount || 0),
+      timeline: Array.isArray(x.timeline) ? x.timeline : [],
       ...(key === "education" ? {
-        repaymentEnabled: true,
+        repaymentEnabled: Boolean(x.repaymentEnabled),
         interestRate: Number(x.interestRate || 0),
-        repaymentMonths: Number(x.repaymentPeriodMonths || 12),
+        repaymentMonths: Number(x.repaymentPeriodMonths || x.repaymentMonths || 12),
         monthlyInstallment: Number(x.monthlyInstallment || 0),
         amountPaid: Number(x.amountPaid || 0),
         balance: Number(x.balance || 0),
       } : {}),
     }));
-    const claims=[...normalize("medical",medical),...normalize("funeral",funeral),...normalize("education",education),...normalize("support",support)].sort((a,b)=>new Date(b.createdAt||b.applicationDate)-new Date(a.createdAt||a.applicationDate));
-    res.json({ success:true, count:claims.length, claims, stages:STAGES });
-  } catch (error) { res.status(500).json({ success:false, message:error.message }); }
+    const allRows = results
+      .flatMap(({ key, rows }) => normalize(key, rows))
+      .sort((a, b) => {
+        const aDate = new Date(a.createdAt || a.applicationDate || 0).getTime();
+        const bDate = new Date(b.createdAt || b.applicationDate || 0).getTime();
+        return (bDate - aDate) * (sortDirection === 1 ? -1 : 1);
+      });
+    const total = results.reduce((sum, item) => sum + item.total, 0);
+    const startIndex = (page - 1) * limit;
+    const claims = allRows.slice(startIndex, startIndex + limit);
+    const pages = Math.max(1, Math.ceil(total / limit));
+
+    return res.json({ success: true, count: total, total, page, pages, limit, records: claims, claims, stages: STAGES });
+  } catch (error) {
+    console.error("Claim list error:", error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
 };
 
+exports.getOne = async (req, res) => {
+  try {
+    const result = await getClaim(req.params.type, req.params.id);
+    const normalized = {
+      ...result.claim.toObject(),
+      supportType: LABEL_MAP[result.key],
+      sourceType: result.key,
+      amount: Number(result.claim.approvedAmount || result.claim.requestedAmount || 0),
+      timeline: Array.isArray(result.claim.timeline) ? result.claim.timeline : [],
+    };
+    if (result.key === "education") {
+      normalized.repaymentEnabled = Boolean(result.claim.repaymentEnabled);
+      normalized.repaymentMonths = Number(result.claim.repaymentPeriodMonths || result.claim.repaymentMonths || 12);
+      normalized.monthlyInstallment = Number(result.claim.monthlyInstallment || 0);
+      normalized.amountPaid = Number(result.claim.amountPaid || 0);
+      normalized.balance = Number(result.claim.balance || 0);
+    }
+    await result.claim.populate("member", "fullName memberNumber phone email profileImage position employer");
+    if (result.key === "medical") await result.claim.populate("dependent", "fullName relationship");
+    if (result.key === "education") await result.claim.populate("dependent", "fullName relationship school educationLevel");
+    return res.json({ success: true, claim: { ...normalized, member: result.claim.member, dependent: result.claim.dependent } });
+  } catch (error) {
+    return res.status(error.status || 500).json({ success: false, message: error.message });
+  }
+};
+
+
+exports.permanentDelete = async (req, res) => {
+  try {
+    if (String(req.user?.role || "").toLowerCase() !== "superadmin") {
+      return res.status(403).json({ success: false, code: "CLAIM_PERMANENT_DELETE_FORBIDDEN", message: "Only SuperAdmin can permanently delete a claim." });
+    }
+    const result = await getClaim(req.params.type, req.params.id);
+    const currentStatus = String(result.claim.status || "").trim();
+    if (currentStatus !== "Closed") {
+      return res.status(409).json({ success: false, code: "CLAIM_PERMANENT_DELETE_CLOSED_ONLY", message: "Only Closed claims can be permanently deleted." });
+    }
+
+    const claimSnapshot = result.claim.toObject();
+    // Write an audit record before destructive persistence. The completed
+    // delete is also recorded below; audit failure is isolated by the shared
+    // audit utility so a successfully persisted delete is not reported false.
+    await createAuditLog({
+      user: req.user._id,
+      userRole: req.user.role,
+      action: "CLAIM_PERMANENT_DELETE_REQUESTED",
+      module: "Claim",
+      description: `SuperAdmin requested permanent deletion of Closed ${LABEL_MAP[result.key]} claim ${claimSnapshot._id}.`,
+      req,
+      metadata: { claimId: String(claimSnapshot._id), claimType: result.key, memberId: String(claimSnapshot.member || ""), status: currentStatus },
+    });
+
+    const relatedCampaigns = await CommunityAssistance.find({ referenceModel: result.Model.modelName, referenceId: result.claim._id }).lean();
+    await result.claim.deleteOne();
+
+    // Preserve settlement evidence where funds have already moved. Such a
+    // campaign is de-linked from user-facing workflows but retained as an
+    // accounting record. Unfunded/no-settlement campaigns are safe to remove.
+    for (const campaign of relatedCampaigns) {
+      try {
+        const hasSettlementEvidence = Number(campaign.raisedAmount || 0) > 0
+          || (Array.isArray(campaign.contributionTransactionIds) && campaign.contributionTransactionIds.length > 0)
+          || Number(campaign.payoutAmount || 0) > 0
+          || ["pending", "successful"].includes(String(campaign.payoutStatus || ""))
+          || ["payout_pending", "paid"].includes(String(campaign.status || ""));
+        if (!hasSettlementEvidence) {
+          await CommunityAssistance.deleteOne({ _id: campaign._id });
+        } else {
+          await CommunityAssistance.updateOne(
+            { _id: campaign._id },
+            { $set: { sourceRemoved: true, sourceRemovedAt: new Date(), sourceRemovedBy: req.user._id } }
+          );
+        }
+      } catch (cleanupError) {
+        console.warn("Claim permanent-delete community-assistance cleanup warning:", cleanupError.message);
+      }
+    }
+
+
+    // Remove only derived workflow records that would otherwise point users
+    // back to a physically deleted claim. Audit logs are intentionally retained.
+    const cleanupResults = await Promise.allSettled([
+      Notification.deleteMany({ referenceModel: result.Model.modelName, referenceId: result.claim._id }),
+      SupportRequestPermissionRequest.updateMany(
+        { sourceModel: result.Model.modelName, sourceId: result.claim._id, status: { $in: ["Pending", "Approved"] } },
+        { $set: { status: "Expired", reviewedAt: new Date(), reviewedBy: req.user._id, reviewedByModel: "SuperAdmin", reviewReason: "Source claim was permanently deleted by SuperAdmin." } }
+      ),
+    ]);
+    cleanupResults.filter((entry) => entry.status === "rejected").forEach((entry) => {
+      console.warn("Claim permanent-delete derived cleanup warning:", entry.reason?.message || entry.reason);
+    });
+
+    await createAuditLog({
+      user: req.user._id,
+      userRole: req.user.role,
+      action: "CLAIM_PERMANENT_DELETE_COMPLETED",
+      module: "Claim",
+      description: `SuperAdmin permanently deleted Closed ${LABEL_MAP[result.key]} claim ${claimSnapshot._id}.`,
+      req,
+      metadata: { claimId: String(claimSnapshot._id), claimType: result.key, memberId: String(claimSnapshot.member || ""), status: currentStatus, communityCampaignsFound: relatedCampaigns.length },
+    });
+
+    // Secondary notifications/cache are not allowed to convert a completed
+    // source deletion into a false failure. No claim remains to notify as a
+    // normal claim-reference event, so Search & Attention will disappear by
+    // source query on the next authoritative read.
+    return res.json({ success: true, deleted: true, message: `${LABEL_MAP[result.key]} claim permanently deleted. Accounting evidence remains protected where settlement required it.` });
+  } catch (error) {
+    console.error("Permanent claim delete error:", error);
+    return res.status(error.status || 500).json({ success: false, message: error.message });
+  }
+};
 
 exports.remove = async (req, res) => {
   try {

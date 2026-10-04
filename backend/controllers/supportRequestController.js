@@ -2,6 +2,7 @@ const SupportRequest = require("../models/SupportRequest");
 const Policy = require("../models/Policy");
 const { resolveStoredFileUrl } = require("../utils/uploadUrl");
 const createAuditLog = require("../utils/createAuditLog");
+const { reserveApprovedPermission, releaseConsumedPermission } = require("./supportPermissionController");
 
 const safeParse = (value, fallback) => {
   if (value === undefined || value === null || value === "") return fallback;
@@ -220,87 +221,112 @@ exports.getOne = async (req, res) => {
 };
 
 exports.memberUpdate = async (req, res) => {
+  const permissionRequestId = String(req.body?.permissionRequestId || "").trim();
+  let permissionReserved = false;
   try {
     const item = await SupportRequest.findById(req.params.id);
     if (!item) return res.status(404).json({ success: false, message: "Support request not found." });
     const denied = validateMemberEditable(item, req.user._id);
     if (denied) return res.status(denied.status).json({ success: false, message: denied.message });
 
+    // Validate every client-supplied field before consuming the one-time permission.
     const incomingDocuments = buildAttachmentList(req);
     const keepDocuments = normalizeDocuments(req.body.keepDocuments ? safeParse(req.body.keepDocuments, []) : item.documents);
     const documents = [...keepDocuments, ...incomingDocuments];
     const documentError = validateMinimumDocuments(documents);
     if (documentError) return res.status(400).json({ success: false, message: documentError });
 
-    const { description, requestedAmount, supportType, policySlug } = req.body || {};
-    if (description !== undefined) item.description = asText(description);
-    if (supportType !== undefined) item.supportType = asText(supportType);
-
-    const policyWasChanged = policySlug !== undefined;
-    const finalPolicySlug = policyWasChanged ? asText(policySlug) : asText(item.policySlug);
+    const { description, requestedAmount } = req.body || {};
+    const nextDescription = description === undefined ? item.description : asText(description);
+    let nextAmount = Number(item.requestedAmount || 0);
     const amountWasChanged = requestedAmount !== undefined;
-    if (requestedAmount !== undefined) {
-      const amount = Number(requestedAmount);
-      if (!Number.isFinite(amount) || amount <= 0) return res.status(400).json({ success: false, message: "Requested amount must be a positive number." });
-      item.requestedAmount = amount;
+    if (amountWasChanged) {
+      nextAmount = Number(requestedAmount);
+      if (!Number.isFinite(nextAmount) || nextAmount <= 0) return res.status(400).json({ success: false, message: "Requested amount must be a positive number." });
     }
 
-    // Re-read the active policy whenever the member changes the policy, and
-    // also when an amount is edited for a request that still references a policy.
-    // This prevents members from bypassing policy limits during Under Review edits.
-    const policy = finalPolicySlug
-      ? await Policy.findOne({ slug: finalPolicySlug, ...(policyWasChanged ? { enabled: true } : {}) }).lean()
-      : null;
-    if (policyWasChanged && finalPolicySlug && !policy) {
-      return res.status(400).json({ success: false, message: "The selected support policy is unavailable." });
-    }
-    if (policy && (policyWasChanged || amountWasChanged)) {
-      const amount = Number(item.requestedAmount);
+    if (amountWasChanged && item.policySlug) {
+      const policy = await Policy.findOne({ slug: item.policySlug, enabled: true }).lean();
+      if (!policy) return res.status(409).json({ success: false, message: "The support policy attached to this request is no longer available for amount editing." });
       const policyMin = Number(policy.minAmount || 0);
       const policyMax = Number(policy.maxAmount || 0);
-      if (policyMin > 0 && amount < policyMin) {
-        return res.status(400).json({ success: false, message: `Minimum amount for ${policy.name} is KSh ${policyMin.toLocaleString("en-KE")}.` });
-      }
-      if (policyMax > 0 && amount > policyMax) {
-        return res.status(400).json({ success: false, message: `Maximum amount for ${policy.name} is KSh ${policyMax.toLocaleString("en-KE")}.` });
-      }
-    }
-    if (policy) {
-      item.policySlug = policy.slug;
-      item.policyName = policy.name;
-      const canRepay = Boolean(policy.repaymentEnabled && policy.category === "loan" && policy.slug === "education-policy");
-      item.repaymentEnabled = canRepay;
-      item.repaymentMonths = canRepay ? Number(policy.repaymentMonths || 12) : 12;
-      item.interestRate = canRepay ? Number(policy.interestRate || 0) : 0;
-    } else if (policyWasChanged) {
-      item.policySlug = "";
-      item.policyName = "";
-      item.repaymentEnabled = false;
-      item.repaymentMonths = 12;
-      item.interestRate = 0;
+      if (policyMin > 0 && nextAmount < policyMin) return res.status(400).json({ success: false, message: `Minimum amount for ${policy.name} is KSh ${policyMin.toLocaleString("en-KE")}.` });
+      if (policyMax > 0 && nextAmount > policyMax) return res.status(400).json({ success: false, message: `Maximum amount for ${policy.name} is KSh ${policyMax.toLocaleString("en-KE")}.` });
     }
 
+    await reserveApprovedPermission({
+      memberId: req.user._id,
+      sourceModel: "SupportRequest",
+      sourceType: "support",
+      sourceId: item._id,
+      requestedAction: "edit",
+      permissionRequestId,
+    });
+    permissionReserved = true;
+
+    // Member permission only grants these explicitly allow-listed fields.
+    item.description = nextDescription;
+    if (amountWasChanged) item.requestedAmount = nextAmount;
     item.documents = documents;
-    item.timeline.push({ status: item.status, remarks: "Member updated support request details while Under Review.", updatedBy: req.user._id });
+    item.timeline.push({ status: item.status, remarks: "Member updated an approved support-request field after administrator permission was granted.", updatedBy: req.user._id });
     await item.save();
-    return res.json({ success: true, message: "Support request updated successfully.", request: { ...item.toObject(), documents: normalizeDocuments(item.documents) } });
+
+    await createAuditLog({
+      user: req.user._id,
+      userRole: req.user.role,
+      action: "SUPPORT_REQUEST_UPDATED",
+      module: "Support",
+      description: `Member updated support request ${item._id} using approved permission ${permissionRequestId}.`,
+      req,
+      metadata: { supportRequestId: item._id, permissionRequestId },
+    });
+    permissionReserved = false;
+    return res.json({ success: true, message: "Support request updated successfully with administrator permission.", request: { ...item.toObject(), documents: normalizeDocuments(item.documents) } });
   } catch (error) {
-    return res.status(500).json({ success: false, message: error.message });
+    if (permissionReserved) await releaseConsumedPermission(permissionRequestId, req.user?._id);
+    return res.status(error.status || 500).json({ success: false, code: error.code, message: error.message });
   }
 };
 
+
 exports.memberRemove = async (req, res) => {
+  let permissionRequestId = String(req.body?.permissionRequestId || req.query?.permissionRequestId || "").trim();
+  let permissionReserved = false;
   try {
     const item = await SupportRequest.findById(req.params.id);
     if (!item) return res.status(404).json({ success: false, message: "Support request not found." });
     const denied = validateMemberEditable(item, req.user._id);
     if (denied) return res.status(denied.status).json({ success: false, message: denied.message });
+
+    await reserveApprovedPermission({
+      memberId: req.user._id,
+      sourceModel: "SupportRequest",
+      sourceType: "support",
+      sourceId: item._id,
+      requestedAction: "delete",
+      permissionRequestId,
+    });
+    permissionReserved = true;
+
+    const deletedId = item._id;
     await item.deleteOne();
-    return res.json({ success: true, message: "Support request deleted successfully while it was still Under Review." });
+    await createAuditLog({
+      user: req.user._id,
+      userRole: req.user.role,
+      action: "SUPPORT_REQUEST_DELETED",
+      module: "Support",
+      description: `Member deleted support request ${deletedId} using approved permission ${permissionRequestId}.`,
+      req,
+      metadata: { supportRequestId: deletedId, permissionRequestId },
+    });
+    permissionReserved = false;
+    return res.json({ success: true, message: "Support request deleted successfully with administrator permission." });
   } catch (error) {
-    return res.status(500).json({ success: false, message: error.message });
+    if (permissionReserved) await releaseConsumedPermission(permissionRequestId, req.user?._id);
+    return res.status(error.status || 500).json({ success: false, code: error.code, message: error.message });
   }
 };
+
 
 exports.update = async (req, res) => {
   try {

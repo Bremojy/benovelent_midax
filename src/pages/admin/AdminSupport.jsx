@@ -1,8 +1,9 @@
 import { confirmAction } from "../../utils/modernDialog";
 
 import { useEffect, useState } from "react";
-import { BellRing, Mail, Phone, UserPlus, Megaphone, MessageSquareText, ClipboardList, Reply, Archive, CheckCircle2 } from "lucide-react";
+import { BellRing, Mail, Phone, UserPlus, Megaphone, MessageSquareText, ClipboardList, Reply, Archive, CheckCircle2, ShieldCheck, XCircle } from "lucide-react";
 import DashboardLayout from "../../layouts/DashboardLayout";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import API from "../../services/api";
 import { createAdminMember, getAdminMembers } from "../../services/adminService";
@@ -10,10 +11,25 @@ import "../../styles/portalModule.css";
 
 export default function AdminSupport() {
   const { role } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
   const isSuperAdmin = String(role || "").toLowerCase() === "superadmin";
   const [members, setMembers] = useState([]);
   const [contactMessages, setContactMessages] = useState([]);
   const [supportRequests, setSupportRequests] = useState([]);
+  const [permissionRequests, setPermissionRequests] = useState([]);
+  const [selectedPermission, setSelectedPermission] = useState(null);
+  const [permissionBusy, setPermissionBusy] = useState(false);
+  const [permissionError, setPermissionError] = useState("");
+  const [permissionReviewReason, setPermissionReviewReason] = useState("");
+  const [selectedSupport, setSelectedSupport] = useState(null);
+  const [supportDetailLoading, setSupportDetailLoading] = useState(false);
+  const [supportStage, setSupportStage] = useState("");
+  const [supportApprovedAmount, setSupportApprovedAmount] = useState("");
+  const [supportPaymentReference, setSupportPaymentReference] = useState("");
+  const [supportRemarks, setSupportRemarks] = useState("");
+  const [supportBusy, setSupportBusy] = useState(false);
+  const [supportReviewError, setSupportReviewError] = useState("");
   const [form, setForm] = useState({ recipient: "", title: "", message: "" });
   const [invite, setInvite] = useState({ memberNumber: "", fullName: "", username: "", phone: "", email: "", department: "", position: "",  });
   const [loading, setLoading] = useState(true);
@@ -32,15 +48,17 @@ export default function AdminSupport() {
   const load = async () => {
     try {
       setLoading(true);
-      const [membersRes, contactsRes, supportRes] = await Promise.all([
+      const [membersRes, contactsRes, supportRes, permissionsRes] = await Promise.all([
         getAdminMembers({ page: 1, limit: 100 }),
         API.get("/contact"),
         API.get("/member/support-requests"),
+        API.get("/member/support-requests/permissions"),
       ]);
 
       setMembers(Array.isArray(membersRes?.members) ? membersRes.members : []);
       setContactMessages(Array.isArray(contactsRes?.data?.messages) ? contactsRes.data.messages : []);
       setSupportRequests(Array.isArray(supportRes?.data?.requests) ? supportRes.data.requests : []);
+      setPermissionRequests(Array.isArray(permissionsRes?.data?.permissionRequests) ? permissionsRes.data.permissionRequests : []);
     } catch (e) {
       setError(e.response?.data?.message || e.message || "Unable to load support data.");
     } finally {
@@ -51,6 +69,147 @@ export default function AdminSupport() {
   useEffect(() => {
     load();
   }, []);
+
+  const openSupportRequest = async (request) => {
+    if (!request?._id) return;
+    setSupportReviewError("");
+    setSupportStage(request.status || "");
+    setSupportApprovedAmount(request.approvedAmount ?? "");
+    setSupportPaymentReference(request.paymentReference || "");
+    setSupportRemarks("");
+    setSelectedSupport(request);
+    setSupportDetailLoading(true);
+    try {
+      const { data } = await API.get(`/member/support-requests/${request._id}`);
+      if (data?.success && data.request) {
+        const detail = data.request;
+        setSelectedSupport(detail);
+        setSupportStage(detail.status || "");
+        setSupportApprovedAmount(detail.approvedAmount ?? "");
+        setSupportPaymentReference(detail.paymentReference || "");
+      }
+    } catch (e) {
+      setSupportReviewError(e.response?.data?.message || e.message || "Unable to load the complete support request.");
+    } finally {
+      setSupportDetailLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const requestId = new URLSearchParams(location.search).get("requestId");
+    if (!requestId) {
+      setSelectedSupport(null);
+      return;
+    }
+    const existing = supportRequests.find((item) => String(item._id) === String(requestId));
+    if (existing) {
+      openSupportRequest(existing);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await API.get(`/member/support-requests/${requestId}`);
+        if (!cancelled && data?.success && data.request) openSupportRequest(data.request);
+      } catch (e) {
+        if (!cancelled) setSupportReviewError(e.response?.data?.message || e.message || "Unable to open this support request.");
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [location.search, supportRequests]);
+
+  useEffect(() => {
+    if (!selectedSupport && !selectedPermission) return;
+    const onKeyDown = (event) => {
+      if (event.key !== "Escape" || permissionBusy || supportBusy) return;
+      if (selectedSupport) setSelectedSupport(null);
+      if (selectedPermission) setSelectedPermission(null);
+    };
+    document.addEventListener("keydown", onKeyDown);
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.body.style.overflow = previous;
+    };
+  }, [selectedSupport, selectedPermission, permissionBusy, supportBusy]);
+
+  const saveSupportReview = async () => {
+    if (!selectedSupport?._id || !supportStage) return;
+    try {
+      setSupportBusy(true);
+      setSupportReviewError("");
+      const payload = {
+        status: supportStage,
+        approvedAmount: supportStage === "Approved" ? Number(supportApprovedAmount || selectedSupport.requestedAmount || 0) : selectedSupport.approvedAmount,
+        paymentReference: supportPaymentReference.trim(),
+        remarks: supportRemarks.trim(),
+      };
+      if (supportStage === "Rejected") payload.rejectionReason = supportRemarks.trim();
+      const { data } = await API.put(`/member/support-requests/${selectedSupport._id}`, payload);
+      if (!data?.success) throw new Error(data?.message || "Unable to update support request.");
+      setSuccess(data.message || `Support request moved to ${supportStage}.`);
+      setSelectedSupport(null);
+      navigate(location.pathname, { replace: true });
+      await load();
+      window.dispatchEvent(new Event("benovelent:refresh-action-center"));
+    } catch (e) {
+      setSupportReviewError(e.response?.data?.message || e.message || "Unable to update support request.");
+    } finally {
+      setSupportBusy(false);
+    }
+  };
+
+  useEffect(() => {
+    const permissionRequestId = new URLSearchParams(location.search).get("permissionRequestId");
+    if (!permissionRequestId) {
+      setSelectedPermission(null);
+      return;
+    }
+    const existing = permissionRequests.find((item) => String(item._id) === String(permissionRequestId));
+    if (existing) {
+      setSelectedPermission(existing);
+      setPermissionReviewReason("");
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await API.get(`/member/support-requests/permissions/${permissionRequestId}`);
+        if (!cancelled && data?.success) {
+          setSelectedPermission(data.permissionRequest || null);
+          setPermissionReviewReason("");
+        }
+      } catch (e) {
+        if (!cancelled) setPermissionError(e.response?.data?.message || "Unable to open this permission request.");
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [location.search, permissionRequests]);
+
+  const reviewPermission = async (decision) => {
+    if (!selectedPermission?._id) return;
+    if (decision === "reject" && !permissionReviewReason.trim()) {
+      setPermissionError("A rejection reason is required.");
+      return;
+    }
+    try {
+      setPermissionBusy(true);
+      setPermissionError("");
+      const path = decision === "approve" ? "approve" : "reject";
+      const { data } = await API.put(`/member/support-requests/permissions/${selectedPermission._id}/${path}`, { reviewReason: permissionReviewReason.trim() });
+      if (!data?.success) throw new Error(data?.message || "Unable to review permission request.");
+      setSuccess(data.message || (decision === "approve" ? "Permission approved." : "Permission rejected."));
+      setSelectedPermission(null);
+      window.history.replaceState({}, "", window.location.pathname);
+      await load();
+      window.dispatchEvent(new Event("benovelent:refresh-action-center"));
+    } catch (e) {
+      setPermissionError(e.response?.data?.message || e.message || "Unable to review permission request.");
+    } finally {
+      setPermissionBusy(false);
+    }
+  };
 
   const send = async (e) => {
     e.preventDefault();
@@ -303,6 +462,41 @@ export default function AdminSupport() {
         </section>
 
         <section className="portal-panel" style={{ marginTop: 18 }}>
+          <div className="portal-panel-header" style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <ShieldCheck size={18} />
+            <div>
+              <h2 style={{ margin: 0 }}>Support edit/delete permissions</h2>
+              <p style={{ margin: "4px 0 0", color: "#64748b" }}>Review member requests before any support request can be changed or removed.</p>
+            </div>
+          </div>
+          {permissionRequests.length === 0 ? (
+            <div className="portal-empty">No pending support permission requests.</div>
+          ) : (
+            <div style={{ display: "grid", gap: 10 }}>
+              {permissionRequests.map((item) => {
+                const member = item.member || {};
+                const request = item.sourceRequest || {};
+                return (
+                  <article key={item._id} className="portal-card" style={{ border: "1px solid rgba(15,23,42,.08)" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start", flexWrap: "wrap" }}>
+                      <div>
+                        <strong>{member.fullName || "Member"}{member.memberNumber ? ` • ${member.memberNumber}` : ""}</strong>
+                        <div style={{ marginTop: 5, color: "#64748b" }}>{request.supportType || "Support request"} • {String(item.requestedAction || "").toUpperCase()} • {item.sourceId}</div>
+                        <p style={{ margin: "8px 0 0", lineHeight: 1.6 }}>{item.reason || "No reason supplied."}</p>
+                      </div>
+                      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                        <span className="portal-badge">{item.status}</span>
+                        <button type="button" className="portal-btn secondary" onClick={() => { setPermissionError(""); setPermissionReviewReason(""); setSelectedPermission(item); }}><ShieldCheck size={15} /> Review</button>
+                      </div>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          )}
+        </section>
+
+        <section className="portal-panel" style={{ marginTop: 18 }}>
           <div className="portal-panel-header"><h2>Support requests</h2></div>
           {supportRequests.length === 0 ? (
             <div className="portal-empty">No custom support requests.</div>
@@ -322,6 +516,7 @@ export default function AdminSupport() {
                       </div>
                       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
                         <span className="portal-badge">{request.status}</span>
+                        <button type="button" className="portal-btn secondary" onClick={() => openSupportRequest(request)}>Review</button>
                         {isSuperAdmin && (
                           <button type="button" className="portal-btn danger" onClick={() => deleteSupportRequest(request._id)}>
                             Delete
@@ -415,6 +610,137 @@ export default function AdminSupport() {
             </div>
           )}
         </section>
+
+        {selectedSupport && (
+          <div className="portal-modal-backdrop claim-review-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !supportBusy) setSelectedSupport(null); }}>
+            <section className="portal-modal-card claim-review-dialog" role="dialog" aria-modal="true" aria-labelledby="support-review-title">
+              <div className="portal-modal-head claim-review-header">
+                <div>
+                  <span>SUPPORT REQUEST REVIEW</span>
+                  <h2 id="support-review-title">Review support request</h2>
+                  <p>{selectedSupport.member?.fullName || "Member"} • {selectedSupport.supportType || "Support"} • {selectedSupport._id}</p>
+                </div>
+                <button type="button" className="portal-btn secondary" disabled={supportBusy} onClick={() => { setSelectedSupport(null); navigate(location.pathname, { replace: true }); }}>Close</button>
+              </div>
+              <div className="claim-review-body">
+                {supportDetailLoading && <div className="portal-empty">Loading complete request details…</div>}
+                <div className="portal-form-grid">
+                  <div><strong>Member</strong><div>{selectedSupport.member?.fullName || "—"}</div></div>
+                  <div><strong>Employee number</strong><div>{selectedSupport.member?.memberNumber || "—"}</div></div>
+                  <div><strong>Support type</strong><div>{selectedSupport.supportType || "—"}</div></div>
+                  <div><strong>Policy</strong><div>{selectedSupport.policyName || selectedSupport.policySlug || "—"}</div></div>
+                  <div><strong>Current status</strong><div>{selectedSupport.status || "—"}</div></div>
+                  <div><strong>Requested amount</strong><div>{money(selectedSupport.requestedAmount)}</div></div>
+                  <div><strong>Approved amount</strong><div>{selectedSupport.approvedAmount === null || selectedSupport.approvedAmount === undefined ? "Unavailable" : money(selectedSupport.approvedAmount)}</div></div>
+                  <div><strong>Submitted</strong><div>{selectedSupport.createdAt ? new Date(selectedSupport.createdAt).toLocaleString() : "—"}</div></div>
+                  <div><strong>Last updated</strong><div>{selectedSupport.updatedAt ? new Date(selectedSupport.updatedAt).toLocaleString() : "—"}</div></div>
+                  {selectedSupport.paymentReference && <div><strong>Payment reference</strong><div>{selectedSupport.paymentReference}</div></div>}
+                </div>
+
+                <div className="portal-card" style={{ marginTop: 14, background: "#f8fafc" }}>
+                  <strong>Description</strong>
+                  <p style={{ margin: "8px 0 0", lineHeight: 1.7 }}>{selectedSupport.description || "No description supplied."}</p>
+                </div>
+
+                {Array.isArray(selectedSupport.documents) && selectedSupport.documents.length > 0 && (
+                  <div className="portal-card" style={{ marginTop: 14 }}>
+                    <strong>Documents</strong>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 10 }}>
+                      {selectedSupport.documents.map((doc, index) => {
+                        const href = doc?.fileUrl || doc?.url || doc?.path || (typeof doc === "string" ? doc : "");
+                        return href ? <a key={`${selectedSupport._id}-review-doc-${index}`} href={href.startsWith("http") ? href : `${API.defaults.baseURL.replace(/\/api$/, "")}${href}`} target="_blank" rel="noreferrer" className="portal-btn secondary">{doc?.label || doc?.fileName || `Document ${index + 1}`}</a> : null;
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {Array.isArray(selectedSupport.timeline) && selectedSupport.timeline.length > 0 && (
+                  <div className="portal-card" style={{ marginTop: 14 }}>
+                    <strong>Workflow timeline</strong>
+                    <div style={{ display: "grid", gap: 9, marginTop: 10 }}>
+                      {[...selectedSupport.timeline].reverse().map((entry, index) => (
+                        <div key={`${selectedSupport._id}-timeline-${index}`} style={{ padding: 10, borderRadius: 10, background: "#f8fafc" }}>
+                          <strong>{entry.status || "Workflow update"}</strong>
+                          <div style={{ marginTop: 4, lineHeight: 1.6 }}>{entry.remarks || entry.reason || "—"}</div>
+                          {entry.updatedAt && <small style={{ color: "#64748b" }}>{new Date(entry.updatedAt).toLocaleString()}</small>}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="portal-form-grid" style={{ marginTop: 14 }}>
+                  <div className="portal-field">
+                    <label htmlFor="support-review-stage">Workflow stage</label>
+                    <select id="support-review-stage" value={supportStage} onChange={(event) => setSupportStage(event.target.value)}>
+                      {['Pending','Under Review','Documents Required','Eligibility Review','Approval Review','Approved','Disbursement Pending','Paid','Completed','Rejected','Cancelled','Closed'].map((item) => <option key={item} value={item}>{item}</option>)}
+                    </select>
+                  </div>
+                  {supportStage === "Approved" && (
+                    <div className="portal-field">
+                      <label htmlFor="support-review-approved-amount">Approved amount</label>
+                      <input id="support-review-approved-amount" type="number" min="0" inputMode="decimal" value={supportApprovedAmount} onChange={(event) => setSupportApprovedAmount(event.target.value)} />
+                    </div>
+                  )}
+                  {(supportStage === "Paid" || supportStage === "Completed") && (
+                    <div className="portal-field">
+                      <label htmlFor="support-review-payment-reference">Payment reference</label>
+                      <input id="support-review-payment-reference" value={supportPaymentReference} onChange={(event) => setSupportPaymentReference(event.target.value)} placeholder="M-PESA receipt / bank reference" />
+                    </div>
+                  )}
+                </div>
+                <div className="portal-field" style={{ marginTop: 14 }}>
+                  <label htmlFor="support-review-remarks">Review notes {supportStage === "Rejected" ? "(required for rejection)" : ""}</label>
+                  <textarea id="support-review-remarks" rows="5" value={supportRemarks} onChange={(event) => setSupportRemarks(event.target.value)} placeholder="Record the decision, missing evidence, or processing notes." />
+                </div>
+                {supportReviewError && <div className="portal-alert" role="alert">{supportReviewError}</div>}
+              </div>
+              <footer className="claim-review-footer">
+                <button type="button" className="portal-btn primary" disabled={supportBusy || supportDetailLoading} onClick={saveSupportReview}>{supportBusy ? "Saving…" : "Save review"}</button>
+                <button type="button" className="portal-btn secondary" disabled={supportBusy} onClick={() => { setSelectedSupport(null); navigate(location.pathname, { replace: true }); }}>Cancel</button>
+              </footer>
+            </section>
+          </div>
+        )}
+
+        {selectedPermission && (
+          <div className="portal-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !permissionBusy) setSelectedPermission(null); }}>
+            <section className="portal-modal-card claim-review-dialog" role="dialog" aria-modal="true" aria-labelledby="support-permission-review-title">
+              <div className="portal-modal-head claim-review-header">
+                <div>
+                  <span>PERMISSION REVIEW</span>
+                  <h2 id="support-permission-review-title">Support {selectedPermission.requestedAction} permission</h2>
+                  <p>{selectedPermission.member?.fullName || "Member"} • Request {selectedPermission.sourceId}</p>
+                </div>
+                <button type="button" className="portal-btn secondary" disabled={permissionBusy} onClick={() => setSelectedPermission(null)}>Close</button>
+              </div>
+              <div className="claim-review-body">
+                <div className="portal-form-grid">
+                  <div><strong>Member</strong><div>{selectedPermission.member?.fullName || "—"}</div></div>
+                  <div><strong>Employee number</strong><div>{selectedPermission.member?.memberNumber || "—"}</div></div>
+                  <div><strong>Request type</strong><div>{selectedPermission.sourceRequest?.supportType || "Support"}</div></div>
+                  <div><strong>Current status</strong><div>{selectedPermission.sourceRequest?.status || "—"}</div></div>
+                  <div><strong>Requested action</strong><div>{selectedPermission.requestedAction}</div></div>
+                  <div><strong>Permission requested</strong><div>{selectedPermission.requestedAt ? new Date(selectedPermission.requestedAt).toLocaleString() : "—"}</div></div>
+                </div>
+                <div className="portal-card" style={{ marginTop: 14, background: "#f8fafc" }}>
+                  <strong>Member reason</strong>
+                  <p style={{ margin: "8px 0 0", lineHeight: 1.7 }}>{selectedPermission.reason || "No reason supplied."}</p>
+                </div>
+                <div className="portal-field" style={{ marginTop: 14 }}>
+                  <label htmlFor="support-permission-review-reason">Review reason {selectedPermission.requestedAction === "delete" ? "(optional for approval, required for rejection)" : "(optional for approval, required for rejection)"}</label>
+                  <textarea id="support-permission-review-reason" rows="4" value={permissionReviewReason} onChange={(event) => setPermissionReviewReason(event.target.value)} placeholder="Explain the decision for the audit trail." />
+                </div>
+                {permissionError && <div className="portal-alert" role="alert">{permissionError}</div>}
+              </div>
+              <footer className="claim-review-footer">
+                <button type="button" className="portal-btn primary" disabled={permissionBusy} onClick={() => reviewPermission("approve")}><CheckCircle2 size={15} /> {permissionBusy ? "Working…" : "Approve"}</button>
+                <button type="button" className="portal-btn danger" disabled={permissionBusy} onClick={() => reviewPermission("reject")}><XCircle size={15} /> Reject</button>
+                <button type="button" className="portal-btn secondary" disabled={permissionBusy} onClick={() => setSelectedPermission(null)}>Cancel</button>
+              </footer>
+            </section>
+          </div>
+        )}
       </div>
     </DashboardLayout>
   );

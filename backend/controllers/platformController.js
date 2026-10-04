@@ -39,6 +39,8 @@ const AuditLog = require("../models/AuditLog");
 const Event = require("../models/Event");
 const WebsiteContent = require("../models/WebsiteContent");
 const Policy = require("../models/Policy");
+const CommunityAssistance = require("../models/CommunityAssistance");
+const SupportRequestPermissionRequest = require("../models/SupportRequestPermissionRequest");
 const SystemSettings = require("../models/SystemSettings");
 const { getSystemSettings, toPublicConfig } = require("../services/systemSettings");
 const redisCache = require("../services/redisCache");
@@ -60,29 +62,114 @@ const safeUser = (user) => ({
 });
 
 exports.activityCenter = async (req, res) => {
-  const role = req.userRole;
+  const role = String(req.userRole || req.user?.role || "member").toLowerCase();
   const recipient = req.user._id;
   const recipientModel = asUserModel(role);
-  const supportFilter = role === "member"
-    ? { member: recipient }
-    : { status: { $in: ["Pending", "Under Review"] } };
-  const auditFilter = role === "superadmin"
-    ? {}
-    : { user: recipient, userModel: recipientModel };
+  const portalPrefix = role === "superadmin" ? "/superadmin" : "/admin";
+  const auditFilter = role === "superadmin" ? {} : { user: recipient, userModel: recipientModel };
   const conversationFilter = role === "superadmin" ? { _id: null } : { participants: recipient };
 
-  const [notifications, support, conversations, audits] = await Promise.all([
-    Notification.find({ recipient, recipientModel }).sort({ createdAt: -1 }).limit(15).lean(),
-    SupportRequest.find({ ...supportFilter, isDeleted: { $ne: true } }).sort({ updatedAt: -1 }).limit(8).lean(),
+  const [notifications, conversations, audits] = await Promise.all([
+    Notification.find({ recipient, recipientModel }).sort({ createdAt: -1 }).limit(30).lean(),
     Conversation.find(conversationFilter).sort({ lastMessageTime: -1 }).limit(8).lean(),
     AuditLog.find(auditFilter).sort({ createdAt: -1 }).limit(8).lean(),
   ]);
 
+  const attention = [];
+  const pushAttention = (item) => {
+    if (!item?.sourceId || !item?.attentionType) return;
+    const sourceKey = `${item.attentionType}:${item.sourceModel || ""}:${String(item.sourceId)}`;
+    if (attention.some((row) => row.key === sourceKey)) return;
+    attention.push({ key: sourceKey, ...item, id: sourceKey });
+  };
+
+  if (role === "admin" || role === "superadmin") {
+    const claimStatuses = ["Pending", "Under Review", "Documents Required", "Eligibility Review", "Approval Review", "Disbursement Pending"];
+    const [support, medical, funeral, education, permissionRequests, appeals, verification] = await Promise.all([
+      SupportRequest.find({ isDeleted: { $ne: true }, status: { $in: claimStatuses } })
+        .populate("member", "fullName memberNumber")
+        .sort({ updatedAt: -1 }).limit(30).lean(),
+      MedicalSupport.find({ isDeleted: { $ne: true }, status: { $in: claimStatuses } })
+        .populate("member", "fullName memberNumber")
+        .sort({ updatedAt: -1 }).limit(25).lean(),
+      FuneralSupport.find({ isDeleted: { $ne: true }, status: { $in: claimStatuses } })
+        .populate("member", "fullName memberNumber")
+        .sort({ updatedAt: -1 }).limit(25).lean(),
+      EducationSupport.find({ isDeleted: { $ne: true }, status: { $in: claimStatuses } })
+        .populate("member", "fullName memberNumber")
+        .sort({ updatedAt: -1 }).limit(25).lean(),
+      SupportRequestPermissionRequest.find({ status: "Pending" })
+        .populate("member", "fullName memberNumber")
+        .sort({ createdAt: -1 }).limit(25).lean(),
+      CommunityAssistance.find({ sourceRemoved: { $ne: true }, workflowStatus: "community_appeal_pending_review" })
+        .populate("recipientMember", "fullName memberNumber")
+        .sort({ appealRequestedAt: -1, updatedAt: -1 }).limit(25).lean(),
+      Member.find({ role: "member", isDeleted: { $ne: true }, status: "active", verified: { $ne: true }, profileCompletion: 100 })
+        .select("_id fullName memberNumber updatedAt verificationRequestedAt")
+        .sort({ verificationRequestedAt: -1, updatedAt: -1 }).limit(25).lean(),
+    ]);
+
+    support.forEach((row) => pushAttention({
+      attentionType: "support_request", sourceModel: "SupportRequest", sourceId: row._id,
+      title: `${row.supportType || row.policyName || "Support request"} requires attention`,
+      description: `${row.member?.fullName || "Member"}${row.member?.memberNumber ? ` · ${row.member.memberNumber}` : ""} · ${row.status || "Pending"}`,
+      status: row.status, updatedAt: row.updatedAt || row.createdAt, priority: "normal", link: `${portalPrefix}/support?requestId=${row._id}`,
+    }));
+    [["medical","MedicalSupport",medical,"Medical support"],["funeral","FuneralSupport",funeral,"Funeral support"],["education","EducationSupport",education,"Education support"]].forEach(([type, model, rows, label]) => rows.forEach((row) => pushAttention({
+      attentionType: `${type}_claim`, sourceModel: model, sourceId: row._id,
+      title: `${label} claim requires attention`, description: `${row.member?.fullName || "Member"}${row.member?.memberNumber ? ` · ${row.member.memberNumber}` : ""} · ${row.status || "Pending"}`,
+      status: row.status, updatedAt: row.updatedAt || row.createdAt, priority: ["Pending","Under Review","Approval Review"].includes(row.status) ? "high" : "normal", link: `${portalPrefix}/claims?claimId=${row._id}&claimType=${type}`,
+    })));
+    permissionRequests.forEach((row) => pushAttention({
+      attentionType: "support_permission", sourceModel: "SupportRequestPermissionRequest", sourceId: row._id,
+      title: `Support ${row.requestedAction} permission request`, description: `${row.member?.fullName || "Member"}${row.member?.memberNumber ? ` · ${row.member.memberNumber}` : ""} · ${String(row.reason || "").slice(0, 120)}`,
+      status: row.status, updatedAt: row.createdAt, priority: "high", link: `${portalPrefix}/support?permissionRequestId=${row._id}`,
+    }));
+    appeals.forEach((row) => pushAttention({
+      attentionType: "community_appeal", sourceModel: "CommunityAssistance", sourceId: row._id,
+      title: "Community assistance appeal awaiting review", description: `${row.recipientMember?.fullName || "Member"} · ${row.title || "Community assistance"}`,
+      status: row.workflowStatus, updatedAt: row.appealRequestedAt || row.updatedAt, priority: "high", link: `${portalPrefix}/claims?communityAppealId=${row._id}`,
+    }));
+    verification.forEach((row) => pushAttention({
+      attentionType: "member_verification", sourceModel: "Member", sourceId: row._id,
+      title: "Member verification requires review", description: `${row.fullName || "Member"}${row.memberNumber ? ` · ${row.memberNumber}` : ""}`,
+      status: "Verification Pending", updatedAt: row.verificationRequestedAt || row.updatedAt, priority: "normal", link: `${portalPrefix}/members?memberId=${row._id}`,
+    }));
+  }
+
+  // Notifications remain visible, but a notification that points at an already
+  // represented workflow item is not counted twice in Attention.
+  const attentionSourceKeys = new Set(attention.map((row) => `${row.referenceModel || row.sourceModel || ""}:${String(row.referenceId || row.sourceId || "")}`));
+  notifications.filter((item) => !item.read).forEach((item) => {
+    const key = `${item.referenceModel || ""}:${String(item.referenceId || "")}`;
+    if (key !== ":" && attentionSourceKeys.has(key)) return;
+    pushAttention({
+      attentionType: "notification", sourceModel: item.referenceModel || "Notification", sourceId: item._id,
+      referenceModel: item.referenceModel || null, referenceId: item.referenceId || null,
+      title: item.title || "Notification", description: item.message || "Unread notification",
+      status: "Unread", updatedAt: item.createdAt, priority: "normal", link: item.link || (role === "member" ? "/member/notifications" : role === "superadmin" ? "/superadmin/notifications" : "/admin/notifications"),
+    });
+  });
+
+  attention.sort((a, b) => {
+    const priority = { high: 0, normal: 1 };
+    const p = (priority[a.priority] ?? 1) - (priority[b.priority] ?? 1);
+    return p || (new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime());
+  });
+
+  // Members receive only their own unread notifications and personal audit/activity context.
   res.json({
     success: true,
-    data: { notifications, support, conversations, audits },
+    data: {
+      notifications,
+      conversations,
+      audits,
+      attention: attention.slice(0, 100),
+      attentionCount: attention.length,
+    },
   });
 };
+
 
 exports.directory = async (req, res) => {
   const q = String(req.query.q || "").trim();
