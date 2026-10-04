@@ -205,3 +205,5 @@ input[type="password"]{font-variant:normal;letter-spacing:.02em;}
 @media (max-width:680px){.portal-module form,.portal-panel form{width:100%;}.portal-module button,.portal-panel button,.portal-field button{min-height:44px;}.portal-table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}}
 
 .portal-table tbody tr[tabindex="0"]{cursor:pointer}.portal-table tbody tr[tabindex="0"]:focus-visible{outline:2px solid currentColor;outline-offset:-2px}
+
+.constitution-ledger-table{min-width:1080px}

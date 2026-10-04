@@ -6,6 +6,7 @@ const { sanitizeDocument } = require("../utils/clientSanitizer");
 const SystemSettings = require("../models/SystemSettings");
 const { invalidateFinanceCache } = require("../services/financeLedgerService");
 const createAuditLog = require("../utils/createAuditLog");
+const { getFinanceActor } = require("../utils/financeActor");
 
 async function safeContributionNotification(payload) {
   try { await Notification.create(payload); } catch (error) {
@@ -68,6 +69,8 @@ exports.createContribution = async (req, res) => {
       return res.status(400).json({ success: false, message: "Contribution for this month already exists." });
     }
 
+    const financeActor = getFinanceActor(req);
+
     const contribution = await Contribution.create({
       member: memberId,
       month,
@@ -99,6 +102,9 @@ exports.createContribution = async (req, res) => {
           status: "approved",
           approvedBy: req.user._id,
           approvedAt: new Date(),
+          transactedBy: financeActor.id,
+          transactedByModel: financeActor.model,
+          transactedByName: financeActor.name,
         });
         createdFinanceId = finance._id;
         contribution.finance = finance._id;
@@ -179,6 +185,7 @@ exports.createBulkContributionRun = async (req, res) => {
     let updated = 0;
     let collected = 0;
     const failures = [];
+    const financeActor = getFinanceActor(req);
 
     for (const member of members) {
       let createdContribution = null;
@@ -254,6 +261,9 @@ exports.createBulkContributionRun = async (req, res) => {
               status: "approved",
               approvedBy: req.user._id,
               approvedAt: new Date(),
+              transactedBy: financeActor.id,
+              transactedByModel: financeActor.model,
+              transactedByName: financeActor.name,
               notes,
             });
             createdFinance = finance;
@@ -449,6 +459,7 @@ exports.getMemberContributions = async (req,res)=>{
 ===================================================== */
 
 exports.updateContribution = async (req, res) => {
+    const financeActor = getFinanceActor(req);
     try {
         const contribution = await Contribution.findById(req.params.id);
         if (!contribution || contribution.isArchived) {
@@ -512,6 +523,9 @@ exports.updateContribution = async (req, res) => {
                         status: "approved",
                         approvedBy: req.user._id,
                         approvedAt: new Date(),
+                        transactedBy: financeActor.id,
+                        transactedByModel: financeActor.model,
+                        transactedByName: financeActor.name,
                         notes: contribution.notes || "",
                     });
                     contribution.finance = createdFinance._id;

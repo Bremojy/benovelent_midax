@@ -5,8 +5,10 @@ import API from "../../services/api";
 import MpesaPaymentButton from "../../components/payments/MpesaPaymentButton";
 import { MpesaStatusBadge, MpesaTransactionButton } from "../../components/accounts/MpesaTransactionViewer";
 import LedgerControls from "../../components/accounts/LedgerControls";
+import ConstitutionLedgerTable from "../../components/accounts/ConstitutionLedgerTable";
 import "../../styles/portalModule.css";
 import { getDefaultLedgerRange, normalizeLedgerDateRange } from "../../utils/ledgerDateRange";
+import { normalizeBookBalanceResponse } from "../../utils/bookBalance";
 import "./Accounts.css";
 
 const money = (v) => {
@@ -57,7 +59,7 @@ export default function MemberAccounts() {
     if (paymentsRes.status === "fulfilled") setPayments(Array.isArray(paymentsRes.value.data?.transactions) ? paymentsRes.value.data.transactions : []);
     if (communityRes.status === "fulfilled") setCommunity(Array.isArray(communityRes.value.data?.campaigns) ? communityRes.value.data.campaigns : []);
     if (ledgerRes.status === "fulfilled") setCommunityLedger(Array.isArray(ledgerRes.value.data?.cases) ? ledgerRes.value.data.cases : []);
-    if (balanceRes.status === "fulfilled") setBookBalance(balanceRes.value.data?.bookBalance || balanceRes.value.data || null);
+    if (balanceRes.status === "fulfilled") setBookBalance(normalizeBookBalanceResponse(balanceRes.value.data));
     setBusy(false);
   }, []);
 
@@ -111,7 +113,7 @@ export default function MemberAccounts() {
 
     {tab === "constitution" && <>
       <section className="account-grid four"><div className="portal-panel account-card"><span>Scheme Current Book Balance</span><strong>{bookBalance === null ? (loadErrors.bookBalance ? "Unavailable" : "Loading…") : money(bookBalance?.balance)}</strong><small>{loadErrors.bookBalance || (bookBalance === null ? "Waiting for the authoritative response" : bookBalance?.asOf ? `As of ${new Date(bookBalance.asOf).toLocaleString("en-KE")}` : "Timestamp unavailable")}</small><div className="account-live-flow" style={{display:"flex",gap:12,flexWrap:"wrap",marginTop:8}}><small>Money in: {bookBalance === null ? (loadErrors.bookBalance ? "Unavailable" : "Loading…") : money(bookBalance?.moneyIn)}</small><small>Money out: {bookBalance === null ? (loadErrors.bookBalance ? "Unavailable" : "Loading…") : money(bookBalance?.moneyOut)}</small></div></div><div className="portal-panel account-card"><span>Your contributions</span><strong>{summary === null ? "Loading…" : money(summary?.totalContributed)}</strong><small>Recorded member contributions</small></div><div className="portal-panel account-card"><span>Contribution status</span><strong>{summary === null ? "Loading…" : summary?.contributionStatus || "Not available"}</strong><small>Your personal contribution position</small></div><div className="portal-panel account-card"><span>What this balance means</span><strong style={{fontSize:14}}>Scheme funds</strong><small>Based on approved financial transactions</small></div></section>
-      <section className="portal-panel"><div className="account-panel-head"><div><span>BENOVELENT CONSTITUTION</span><h2>Constitution Ledger</h2><p>The Constitution Book Balance represents the current recorded scheme funds based on approved financial transactions. A selected date range changes the ledger view, not the historical opening balance.</p></div><Landmark size={23}/></div><LedgerControls data={constitution} dates={{start:dates.start,end:dates.end,setStart:(v)=>setDates(d=>({...d,start:v})),setEnd:(v)=>setDates(d=>({...d,end:v}))}} onLoad={loadConstitution} busy={ledgerBusy} currentBalanceLabel="My Personal Ledger Balance" personalContributionTotal={summary?.totalContributed} contributionStatus={summary?.contributionStatus} />{loadErrors.constitution ? <div className="portal-alert error">{loadErrors.constitution}</div> : constitution?.entries && <div className="portal-table-wrap"><table className="portal-table"><thead><tr><th>Date</th><th>Transaction / reference</th><th>Description</th><th>Category</th><th>Direction</th><th>Amount</th><th>Running balance</th><th>Status</th></tr></thead><tbody>{constitution.entries.length ? constitution.entries.map((entry)=><tr key={entry._id || `${entry.date}-${entry.transactionNumber}`}><td>{entry.date ? new Date(entry.date).toLocaleDateString("en-KE") : "—"}</td><td>{entry.transactionNumber || entry.referenceNumber || "—"}</td><td>{entry.description || "—"}</td><td>{entry.category || "—"}</td><td>{entry.direction}</td><td>{money(entry.amount)}</td><td>{money(entry.runningBalance)}</td><td>{entry.status || "—"}</td></tr>) : <tr><td colSpan="8">No valid accounting transactions occurred in this period.</td></tr>}</tbody></table></div>}</section>
+      <section className="portal-panel"><div className="account-panel-head"><div><span>BENOVELENT CONSTITUTION</span><h2>Constitution Ledger</h2><p>The Constitution Book Balance represents the current recorded scheme funds based on approved financial transactions. A selected date range changes the ledger view, not the historical opening balance.</p></div><Landmark size={23}/></div><LedgerControls data={constitution} dates={{start:dates.start,end:dates.end,setStart:(v)=>setDates(d=>({...d,start:v})),setEnd:(v)=>setDates(d=>({...d,end:v}))}} onLoad={loadConstitution} busy={ledgerBusy} currentBalanceLabel="Scheme Current Book Balance" personalContributionTotal={summary?.totalContributed} contributionStatus={summary?.contributionStatus} />{loadErrors.constitution ? <div className="portal-alert error">{loadErrors.constitution}</div> : constitution?.entries && <ConstitutionLedgerTable entries={constitution.entries || []} />}</section>
     </>}
 
     {tab === "mpesa" && <>

@@ -109,7 +109,9 @@ const getLedger = async ({ startDate, endDate, memberId = null, includeHidden = 
     Finance.find({ ...matchBase, transactionDate: { $lt: start } }).sort({ transactionDate: 1, createdAt: 1 }).lean(),
     Finance.find({ ...matchBase, transactionDate: { $gte: start, $lte: end } })
       .populate("member", "fullName memberNumber")
-      .populate("contributor", "fullName memberNumber")
+      .populate("contributor", "fullName memberNumber name email")
+      .populate("transactedBy", "fullName name email")
+      .populate("approvedBy", "fullName name email")
       .sort({ transactionDate: 1, createdAt: 1 }).lean(),
     memberId ? getCurrentBookBalanceForMember(memberId, asOf) : getCurrentBookBalance({ asOf }),
   ]);

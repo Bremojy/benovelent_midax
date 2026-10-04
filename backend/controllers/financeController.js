@@ -8,6 +8,7 @@ const { resolveStoredFileUrl } = require("../utils/uploadUrl");
 const { getLedger: getAuthoritativeLedger, getCurrentBookBalance, invalidateFinanceCache } = require("../services/financeLedgerService");
 const { buildPdf } = require("../utils/simplePdf");
 const createAuditLog = require("../utils/createAuditLog");
+const { getFinanceActor } = require("../utils/financeActor");
 
 /* =====================================================
    GENERATE TRANSACTION NUMBER
@@ -109,6 +110,7 @@ exports.createTransaction = async (req, res) => {
         }
         const transactionDateValue = transactionDate ? new Date(transactionDate) : new Date();
         if (Number.isNaN(transactionDateValue.getTime())) return res.status(400).json({ success: false, message: "A valid transaction date is required." });
+        const financeActor = getFinanceActor(req);
 
         const transaction = await Finance.create({
             member: memberId,
@@ -116,6 +118,9 @@ exports.createTransaction = async (req, res) => {
             type, category, amount: Number(amount), description, paymentMethod: type === "contribution" ? "Payroll" : paymentMethod,
             referenceNumber, receiptNumber, notes,
             contributorType: scope, contributor, contributorModel, contributorName,
+            transactedBy: financeActor.id,
+            transactedByModel: financeActor.model,
+            transactedByName: financeActor.name,
             transactionDate: transactionDateValue,
             status: "approved",
             approvedBy: req.user._id,
@@ -299,7 +304,7 @@ exports.getTransaction = async (req, res) => {
         }
         if (role === "member") {
             const transaction = await Finance.findOne({ _id: req.params.id, member: req.user._id })
-                .select("transactionNumber type category amount description paymentMethod referenceNumber receiptNumber notes transactionDate status contributorType contributorName hidden createdAt updatedAt")
+                .select("transactionNumber type category amount description paymentMethod referenceNumber receiptNumber notes transactionDate status contributorType contributorName transactedBy transactedByModel transactedByName hidden createdAt updatedAt")
                 .lean();
             if (!transaction) return res.status(404).json({ success: false, message: "Transaction not found." });
             return res.json({ success: true, transaction });
@@ -307,6 +312,7 @@ exports.getTransaction = async (req, res) => {
         const transaction = await Finance.findById(req.params.id)
             .populate("member", "fullName memberNumber email phone")
             .populate("approvedBy", "fullName")
+            .populate("transactedBy", "fullName name email")
             .lean();
         if (!transaction) return res.status(404).json({ success: false, message: "Transaction not found." });
         return res.json({ success: true, transaction });
@@ -923,31 +929,83 @@ exports.constitutionLedger = async (req, res) => {
     const role = String(req.user?.role || "").toLowerCase();
     const startDate = String(req.query?.startDate || "").trim();
     const endDate = String(req.query?.endDate || "").trim();
+
+    // The Benevolent Constitution ledger is the shared organizational ledger.
+    // Members therefore use the same authoritative scheme ledger as Admin and
+    // SuperAdmin, while personal contribution totals remain member-scoped in
+    // /api/member/summary. Other members' identifying details are masked below.
     const ledger = await getAuthoritativeLedger({
       startDate: startDate || undefined,
       endDate: endDate || undefined,
-      memberId: role === "member" ? req.user._id : null,
+      memberId: null,
       includeHidden: role === "superadmin" && String(req.query.includeHidden || "false").toLowerCase() === "true",
     });
-    return res.json({ success: true, ...ledger });
+
+    if (role === "member") {
+      const ownId = String(req.user._id);
+      ledger.entries = ledger.entries.map((entry) => {
+        const memberRef = entry.member?._id || entry.member;
+        const entryMemberId = memberRef ? String(memberRef) : "";
+        const ownRecord = Boolean(entryMemberId && entryMemberId === ownId);
+        const isMemberSpecific = Boolean(entryMemberId) || entry.contributorType === "member";
+        const safe = { ...entry };
+
+        if (isMemberSpecific && !ownRecord) {
+          safe.member = null;
+          safe.contributor = null;
+          safe.contributorName = entry.type === "contribution" ? "Member contribution" : "Member-related transaction";
+        } else if (ownRecord && entry.type === "contribution") {
+          safe.contributorName = "Your contribution";
+        }
+        return safe;
+      });
+    }
+
+    return res.json({
+      success: true,
+      ledgerScope: "scheme",
+      ...ledger,
+      schemeBookBalance: ledger.currentBookBalance,
+    });
   } catch (error) {
     console.error("Constitution ledger error:", error);
-    return res.status(400).json({ success: false, message: error.message });
+    return res.status(400).json({ success: false, message: error.message, code: "CONSTITUTION_LEDGER_LOAD_FAILED" });
   }
 };
 
+
+
+const prepareMemberSafeLedger = (ledger, req) => {
+  if (String(req.user?.role || "").toLowerCase() !== "member") return ledger;
+  const ownId = String(req.user._id);
+  return { ...ledger, entries: ledger.entries.map((entry) => {
+    const memberRef = entry.member?._id || entry.member;
+    const entryMemberId = memberRef ? String(memberRef) : "";
+    const ownRecord = Boolean(entryMemberId && entryMemberId === ownId);
+    const safe = { ...entry };
+    if ((entryMemberId || entry.contributorType === "member") && !ownRecord) {
+      safe.member = null;
+      safe.contributor = null;
+      safe.contributorName = entry.type === "contribution" ? "Member contribution" : "Member-related transaction";
+    } else if (ownRecord && entry.type === "contribution") {
+      safe.contributorName = "Your contribution";
+    }
+    return safe;
+  }) };
+};
 
 exports.exportConstitutionLedger = async (req, res) => {
   try {
     const role = String(req.user?.role || "").toLowerCase();
     const startDate = String(req.query?.startDate || "").trim();
     const endDate = String(req.query?.endDate || "").trim();
-    const ledger = await getAuthoritativeLedger({
+    let ledger = await getAuthoritativeLedger({
       startDate: startDate || undefined,
       endDate: endDate || undefined,
-      memberId: role === "member" ? req.user._id : null,
+      memberId: null,
       includeHidden: role === "superadmin" && String(req.query.includeHidden || "false").toLowerCase() === "true",
     });
+    ledger = prepareMemberSafeLedger(ledger, req);
     const rows = [
       "Benevolent Constitution",
       `Date range: ${ledger.startDate} to ${ledger.endDate}`,
@@ -962,8 +1020,8 @@ exports.exportConstitutionLedger = async (req, res) => {
       "Email: marketing@midax.co.ke / info@midax.co.ke",
       "Services: Fuels | Lubricants | LPG Gas | Service | Carwash",
       "",
-      "DATE | TRANSACTION | DESCRIPTION | CATEGORY | AMOUNT | DIRECTION | STATUS | RUNNING BALANCE",
-      ...ledger.entries.map((entry) => `${new Date(entry.date).toISOString().slice(0,10)} | ${entry.transactionNumber} | ${entry.description || "-"} | ${entry.category || "-"} | KES ${entry.amount.toFixed(2)} | ${entry.direction} | ${entry.status} | KES ${entry.runningBalance.toFixed(2)}`),
+      "DATE | TRANSACTION | TRANSACTED BY | DESCRIPTION | CATEGORY | AMOUNT | DIRECTION | STATUS | RUNNING BALANCE",
+      ...ledger.entries.map((entry) => `${new Date(entry.date).toISOString().slice(0,10)} | ${entry.transactionNumber} | ${entry.transactedByName || entry.transactedBy?.fullName || entry.transactedBy?.name || entry.approvedBy?.fullName || entry.approvedBy?.name || "Recorded actor unavailable"} | ${entry.description || "-"} | ${entry.category || "-"} | KES ${entry.amount.toFixed(2)} | ${entry.direction} | ${entry.status} | KES ${entry.runningBalance.toFixed(2)}`),
     ];
     const pdf = buildPdf({ title: "Benevolent Constitution Ledger", subtitle: `A4 ledger report • ${ledger.startDate} to ${ledger.endDate}`, lines: rows });
     res.set({ "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="benevolent-constitution-ledger-${ledger.startDate}-${ledger.endDate}.pdf"`, "Content-Length": pdf.length });
@@ -978,12 +1036,13 @@ exports.exportConstitutionLedgerCsv = async (req, res) => {
     const role = String(req.user?.role || "").toLowerCase();
     const startDate = String(req.query?.startDate || "").trim();
     const endDate = String(req.query?.endDate || "").trim();
-    const ledger = await getAuthoritativeLedger({
+    let ledger = await getAuthoritativeLedger({
       startDate: startDate || undefined,
       endDate: endDate || undefined,
-      memberId: role === "member" ? req.user._id : null,
+      memberId: null,
       includeHidden: role === "superadmin" && String(req.query.includeHidden || "false").toLowerCase() === "true",
     });
+    ledger = prepareMemberSafeLedger(ledger, req);
     const escape = (value) => `"${String(value ?? "").replace(/"/g, '""')}"`;
     const lines = [
       ["Benevolent Constitution Ledger"],
@@ -994,8 +1053,8 @@ exports.exportConstitutionLedgerCsv = async (req, res) => {
       ["Closing balance", ledger.closingBalance],
       ["Current live book balance", ledger.currentBookBalance],
       [],
-      ["Transaction date", "Transaction/reference", "Description", "Category", "Amount", "Direction", "Status", "Running balance"],
-      ...ledger.entries.map((entry) => [new Date(entry.date).toISOString(), entry.transactionNumber, entry.description, entry.category, entry.amount, entry.direction, entry.status, entry.runningBalance]),
+      ["Transaction date", "Transaction/reference", "Transacted by", "Description", "Category", "Amount", "Direction", "Status", "Running balance"],
+      ...ledger.entries.map((entry) => [new Date(entry.date).toISOString(), entry.transactionNumber, entry.transactedByName || entry.transactedBy?.fullName || entry.transactedBy?.name || entry.approvedBy?.fullName || entry.approvedBy?.name || "Recorded actor unavailable", entry.description, entry.category, entry.amount, entry.direction, entry.status, entry.runningBalance]),
     ].map((row) => row.map(escape).join(","));
     const csv = lines.join("\r\n");
     res.set({ "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": `attachment; filename="benevolent-constitution-ledger-${startDate}-${endDate}.csv"` });

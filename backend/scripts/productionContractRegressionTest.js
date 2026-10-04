@@ -37,7 +37,7 @@ assert(/Promise\.all\(/.test(memberMessages) && !/Promise\.allSettled/.test(memb
 assert(/Promise\.all\(/.test(adminMessages) && !/Promise\.allSettled/.test(adminMessages), 'admin chat loader propagates API failures');
 assert(!/setPeople\(\[\]\)[\s\S]*setConversations\(\[\]\)/.test(messageCenter), 'shared chat loader does not convert failures into empty data');
 assert(/bookBalance/.test(finance) && /moneyIn/.test(finance) && /moneyOut/.test(finance), 'authoritative finance service exposes live balance metrics');
-assert((financeController.match(/memberId: role === "member" \? req\.user\._id : null/g) || []).length >= 5, 'member-accessible ledger endpoints are explicitly member-scoped');
+assert(/requestedMemberId = req\.params\.memberId \|\| req\.user\._id/.test(financeController) && /only view your own finance records/.test(financeController), 'member transaction history remains explicitly member-owned even though the Constitution ledger is shared');
 assert(accountsPages.every((page) => /finance\/book-balance/.test(page) && /bookBalance/.test(page)), 'all three Accounts pages load the live book balance independently');
 assert(/BROADCAST_IN_PROGRESS/.test(notificationController) && /targetedUsers/.test(notificationController) && /pushSent/.test(notificationController), 'broadcast contract is idempotent and reports delivery channels separately');
 assert(/Promise\.all\(/.test(adminSupport) && !/Promise\.allSettled/.test(adminSupport), 'Support & Broadcast page propagates independent load failures');

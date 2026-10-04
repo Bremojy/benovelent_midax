@@ -11,6 +11,7 @@ import LedgerControls from "../../components/accounts/LedgerControls";
 import { resolveMpesaPayer } from "../../utils/mpesaPayer";
 import "../../styles/portalModule.css";
 import { getDefaultLedgerRange, normalizeLedgerDateRange } from "../../utils/ledgerDateRange";
+import { normalizeBookBalanceResponse } from "../../utils/bookBalance";
 import "../member/Accounts.css";
 
 const { start: yearStart, end: today } = getDefaultLedgerRange();
@@ -33,7 +34,7 @@ export default function AdminAccounts({ superAdmin=false }){
    if(c.status==="fulfilled")setCommunity(Array.isArray(c.value.data?.campaigns)?c.value.data.campaigns:[]);
    if(mem.status==="fulfilled")setMembers(Array.isArray(mem.value.data?.members)?mem.value.data.members:[]);
    if(adm.status==="fulfilled")setAdmins(Array.isArray(adm.value.data?.colleagues)?adm.value.data.colleagues:[]);
-   if(balance.status==="fulfilled")setBookBalance(balance.value.data?.bookBalance || balance.value.data || null);
+   if(balance.status==="fulfilled")setBookBalance(normalizeBookBalanceResponse(balance.value.data));
    setBusy(false);
  },[readFailure]);
  const loadLedger=useCallback(async(range)=>{const selectedRange=range || {start:yearStart,end:today};const normalized=normalizeLedgerDateRange(selectedRange);if(!normalized.ok){setError(normalized.message);return false}setDates(current=>current.start===normalized.start&&current.end===normalized.end?current:{...current,start:normalized.start,end:normalized.end});setLedgerBusy(true);setLoadErrors(current=>({...current,ledger:null}));try{const {data}=await API.get("/finance/constitution-ledger",{params:{startDate:normalized.start,endDate:normalized.end}});setEntries(data);return true}catch(e){setLoadErrors(current=>({...current,ledger:e.response?.data?.message||e.message||"Unable to load constitution ledger."}));return false}finally{setLedgerBusy(false)}},[]);

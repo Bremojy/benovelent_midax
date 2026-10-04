@@ -121,6 +121,27 @@ const financeSchema = new mongoose.Schema({
         default: ""
     },
 
+    // The authenticated actor who originally recorded the accounting event.
+    // This is deliberately separate from contributor/payer identity and from
+    // approvedBy so the ledger can answer "Transacted by" even when the entry
+    // was recorded by a SuperAdmin.
+    transactedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        refPath: "transactedByModel",
+        default: null
+    },
+
+    transactedByModel: {
+        type: String,
+        enum: ["Admin", "SuperAdmin"],
+        default: null
+    },
+
+    transactedByName: {
+        type: String,
+        default: ""
+    },
+
     attachment: {
         url: { type: String, default: "" },
         name: { type: String, default: "" },

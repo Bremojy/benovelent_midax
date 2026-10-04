@@ -14,6 +14,8 @@ const contributionController = read('backend/controllers/contributionController.
 const contributionModel = read('backend/models/Contribution.js');
 const financeController = read('backend/controllers/financeController.js');
 const financeService = read('backend/services/financeLedgerService.js');
+const transactionActorModel = read('backend/models/Finance.js');
+const constitutionTable = read('src/components/accounts/ConstitutionLedgerTable.jsx');
 const payerHelper = read('src/utils/mpesaPayer.js');
 const portalSections = read('src/config/portalSections.js');
 const app = read('src/App.jsx');
@@ -85,4 +87,18 @@ check(organization.closingBalance === 155, 'Organizational ledger math must incl
 check(memberA.closingBalance === 80, 'Member-scoped ledger math must remain isolated from another member');
 check(organization.closingBalance !== memberA.closingBalance, 'Scheme and personal ledger semantics must remain distinct');
 
+
+assert(/normalizeBookBalanceResponse/.test(member) && /normalizeBookBalanceResponse/.test(admin) && /normalizeBookBalanceResponse/.test(superadmin), 'all Accounts portals must normalize the real /finance/book-balance response object instead of treating numeric bookBalance as an object');
+assert(/currentBalanceLabel="Scheme Current Book Balance"/.test(member), 'Member Constitution ledger must use the shared scheme balance, not a member-scoped balance');
+assert(/ConstitutionLedgerTable/.test(member), 'Member Constitution ledger must render the shared canonical ledger table');
+assert(/<th>Transacted by<\/th>/.test(read('src/components/accounts/ConstitutionLedgerTable.jsx')), 'Constitution ledger must show who recorded each transaction');
+assert(/populate\("transactedBy"/.test(read('backend/services/financeLedgerService.js')), 'Authoritative ledger must hydrate the transaction actor');
+assert(/transactedByModel/.test(read('backend/models/Finance.js')) && /transactedByName/.test(read('backend/models/Finance.js')), 'Finance must persist transaction actor identity independently from contributor/payer');
+assert(/ledgerScope: "scheme"/.test(read('backend/controllers/financeController.js')), 'Constitution ledger API must declare shared scheme scope');
+
+check(/transactedBy: financeActor\.id/.test(financeController), 'Direct Admin/SuperAdmin finance creation must persist the authenticated transaction actor');
+check(/transactedBy: financeActor\.id/.test(contributionController), 'Contribution-generated finance events must persist the authenticated transaction actor');
+check(/memberId: null[\s\S]*ledgerScope: "scheme"/.test(financeController), 'Constitution ledger must be organization-scoped for the shared three-portal view');
+check(transactionActorModel.includes('transactedByModel') && transactionActorModel.includes('transactedByName'), 'Finance must persist transaction actor model and display name');
+check(constitutionTable.includes('Transacted by'), 'Canonical ledger table must display the transaction actor');
 console.log('PASS Accounts / Finance three-portal regression contracts verified');
