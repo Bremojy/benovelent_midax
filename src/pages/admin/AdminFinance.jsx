@@ -8,6 +8,8 @@ import { buildPrintHeadHtml, printHeadStyles } from "../../utils/printHead";
 import "../../styles/portalModule.css";
 import "./adminFinance.css";
 
+/** @deprecated Legacy finance implementation. The canonical Admin Accounts workspace is /admin/accounts (AdminAccounts.jsx). Retained only for source compatibility; it is not mounted by App.jsx. */
+
 const today = new Date().toISOString().slice(0, 10);
 
 const EMPTY_FORM = {

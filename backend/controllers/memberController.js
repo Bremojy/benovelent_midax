@@ -6,6 +6,7 @@ const Member = require("../models/Member");
 const Admin = require("../models/Admin");
 const SuperAdmin = require("../models/SuperAdmin");
 const Contribution = require("../models/Contribution");
+const SystemSettings = require("../models/SystemSettings");
 const News = require("../models/News");
 const Message = require("../models/Message");
 const Notification = require("../models/Notification");
@@ -900,106 +901,91 @@ exports.getSummary = async (req, res) => {
         if (cached?.dashboard?.member) cached.dashboard.member.online = live;
         return res.json(cached);
     }
-    const __originalJson = res.json.bind(res);
-    res.json = (body) => { redisCache.setJson(cacheKey, body, 30).catch(() => {}); return __originalJson(body); };
-
 
     try {
-
-        const member =
-            await Member.findById(req.user._id)
+        const member = await Member.findById(req.user._id)
             .select("-password -monthlyIncome")
             .lean();
 
         if (!member) {
-
-            return res.status(404).json({
-
-                success: false,
-
-                message: "Member not found."
-
-            });
-
+            return res.status(404).json({ success: false, message: "Member not found." });
         }
 
-        const completion =
-            calculateProfileCompletion(member);
+        const completion = calculateProfileCompletion(member);
+        const [dependents, settings, contributions] = await Promise.all([
+            Dependent.countDocuments({ member: member._id, active: true }),
+            SystemSettings.findOne({ singletonKey: "primary" }).select("scheme.monthlyContribution").lean(),
+            Contribution.find({ member: member._id, isArchived: { $ne: true } })
+                .select("month year expectedAmount paidAmount balance paymentDate status finance")
+                .sort({ year: -1, month: -1, paymentDate: -1, createdAt: -1 })
+                .lean(),
+        ]);
 
-        const dependents =
-            await Dependent.countDocuments({
+        const monthlyContribution = settings?.scheme?.monthlyContribution ?? null;
+        const totalContributed = contributions.reduce(
+            (sum, item) => sum + Number(item.paidAmount || 0),
+            0
+        );
 
-                member: member._id,
+        const now = new Date();
+        const currentMonth = now.getMonth() + 1;
+        const currentYear = now.getFullYear();
+        const currentContribution = contributions.find(
+            (item) => Number(item.month) === currentMonth && Number(item.year) === currentYear
+        ) || null;
 
-                active: true
+        let contributionStatus = "not_recorded";
+        if (currentContribution) {
+            contributionStatus = currentContribution.status || (
+                Number(currentContribution.paidAmount || 0) >= Number(currentContribution.expectedAmount || monthlyContribution || 0)
+                    ? "paid"
+                    : Number(currentContribution.paidAmount || 0) > 0
+                        ? "partial"
+                        : "pending"
+            );
+        } else if (monthlyContribution == null) {
+            contributionStatus = "not_configured";
+        }
 
-            });
+        const summary = {
+            memberNumber: member.memberNumber,
+            fullName: member.fullName,
+            username: member.username,
+            email: member.email,
+            phone: member.phone,
+            status: member.status,
+            verified: member.verified,
+            online: member.online,
+            profileCompletion: completion,
+            profileCompletionPercentage: completion.percentage,
+            dependents,
+            joinDate: member.joinDate,
+            lastLogin: member.lastLogin,
+            lastSeen: member.lastSeen,
+            monthlyContribution,
+            totalContributed,
+            contributionStatus,
+            currentMonthContribution: currentContribution ? {
+                month: currentContribution.month,
+                year: currentContribution.year,
+                expectedAmount: Number(currentContribution.expectedAmount || 0),
+                paidAmount: Number(currentContribution.paidAmount || 0),
+                balance: Number(currentContribution.balance || 0),
+                status: currentContribution.status,
+                paymentDate: currentContribution.paymentDate,
+                finance: currentContribution.finance || null,
+            } : null,
+        };
 
-        res.json({
-
-            success: true,
-
-            summary: {
-
-                memberNumber:
-                    member.memberNumber,
-
-                fullName:
-                    member.fullName,
-
-                username:
-                    member.username,
-
-                email:
-                    member.email,
-
-                phone:
-                    member.phone,
-
-                status:
-                    member.status,
-
-                verified:
-                    member.verified,
-
-                online:
-                    member.online,
-
-                profileCompletion: completion,
-                profileCompletionPercentage:
-                    completion.percentage,
-
-                dependents,
-
-                joinDate:
-                    member.joinDate,
-
-                lastLogin:
-                    member.lastLogin,
-
-                lastSeen:
-                    member.lastSeen
-
-            }
-
-        });
-
-    }
-
-    catch (error) {
-
+        const body = { success: true, summary };
+        const live = getLiveUsers().some((user) => String(user.userId) === String(req.user._id));
+        body.summary.online = live;
+        await redisCache.setJson(cacheKey, body, 30).catch(() => {});
+        return res.json(body);
+    } catch (error) {
         console.error(error);
-
-        res.status(500).json({
-
-            success: false,
-
-            message: error.message
-
-        });
-
+        return res.status(500).json({ success: false, message: "Unable to load the member account summary." });
     }
-
 };
 
 // ==========================================

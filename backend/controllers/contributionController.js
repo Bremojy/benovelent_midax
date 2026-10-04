@@ -5,6 +5,13 @@ const Notification = require("../models/Notification");
 const { sanitizeDocument } = require("../utils/clientSanitizer");
 const SystemSettings = require("../models/SystemSettings");
 const { invalidateFinanceCache } = require("../services/financeLedgerService");
+const createAuditLog = require("../utils/createAuditLog");
+
+async function safeContributionNotification(payload) {
+  try { await Notification.create(payload); } catch (error) {
+    console.warn("Contribution notification failed after persistence:", error.message);
+  }
+}
 
 async function configuredMonthlyContribution() {
   const settings = await SystemSettings.findOne({ singletonKey: "primary" }).select("scheme.monthlyContribution").lean();
@@ -76,26 +83,36 @@ exports.createContribution = async (req, res) => {
     });
 
     if (Number(paidAmount || 0) > 0) {
-      const finance = await Finance.create({
-        member: memberId,
-        transactionNumber: `TRX-${Date.now()}`,
-        type: "contribution",
-        category: "Monthly Contribution",
-        amount: Number(paidAmount),
-        paymentMethod: "Payroll",
-        receiptNumber,
-        referenceNumber: mpesaCode,
-        description: `Contribution ${month}/${year}`,
-        status: "approved",
-        approvedBy: req.user._id,
-        approvedAt: new Date(),
-      });
-      contribution.finance = finance._id;
-      await contribution.save();
-      await invalidateFinanceCache();
+      let createdFinanceId = null;
+      try {
+        const finance = await Finance.create({
+          member: memberId,
+          transactionNumber: `TRX-${Date.now()}-${String(contribution._id).slice(-6)}`,
+          type: "contribution",
+          category: "Monthly Contribution",
+          amount: Number(paidAmount),
+          paymentMethod: "Payroll",
+          receiptNumber,
+          referenceNumber: mpesaCode,
+          description: `Contribution ${month}/${year}`,
+          transactionDate: paymentDate || new Date(),
+          status: "approved",
+          approvedBy: req.user._id,
+          approvedAt: new Date(),
+        });
+        createdFinanceId = finance._id;
+        contribution.finance = finance._id;
+        await contribution.save();
+      } catch (syncError) {
+        if (createdFinanceId) await Finance.findByIdAndDelete(createdFinanceId).catch(() => {});
+        await contribution.deleteOne().catch(() => {});
+        throw new Error(`Contribution/finance synchronization failed: ${syncError.message}`);
+      }
     }
 
-    await Notification.create({
+    await invalidateFinanceCache();
+
+    await safeContributionNotification({
       recipient: memberId,
       recipientModel: "Member",
       sender: req.user._id,
@@ -164,6 +181,9 @@ exports.createBulkContributionRun = async (req, res) => {
     const failures = [];
 
     for (const member of members) {
+      let createdContribution = null;
+      let createdFinance = null;
+      let originalContribution = null;
       try {
         const paidAmount = recordAsCollected ? amount : 0;
         let contribution = await Contribution.findOne({ member: member._id, month, year });
@@ -171,6 +191,10 @@ exports.createBulkContributionRun = async (req, res) => {
         // A payroll run is idempotent, but it must never silently overwrite a
         // contribution that has already been deducted/paid. Re-running the
         // same month should leave the existing accounting event intact.
+        if (contribution?.isArchived) {
+          failures.push({ memberNumber: member.memberNumber, name: member.fullName, message: "The monthly contribution record is archived and cannot be reused for another payroll event." });
+          continue;
+        }
         if (contribution && Number(contribution.paidAmount || 0) > 0) {
           updated += 1;
           continue;
@@ -190,8 +214,10 @@ exports.createBulkContributionRun = async (req, res) => {
             approvedAt: new Date(),
           });
           await contribution.save();
+          createdContribution = contribution;
           created += 1;
         } else {
+          originalContribution = contribution.toObject();
           contribution.expectedAmount = amount;
           contribution.paymentMethod = paymentMethod;
           contribution.notes = notes;
@@ -230,12 +256,23 @@ exports.createBulkContributionRun = async (req, res) => {
               approvedAt: new Date(),
               notes,
             });
+            createdFinance = finance;
           }
           contribution.finance = finance._id;
           await contribution.save();
           collected += 1;
         }
       } catch (memberError) {
+        if (createdFinance) await Finance.findByIdAndDelete(createdFinance._id).catch(() => {});
+        if (createdContribution) {
+          await Contribution.findByIdAndDelete(createdContribution._id).catch(() => {});
+        } else if (originalContribution) {
+          const existing = await Contribution.findById(originalContribution._id);
+          if (existing) {
+            Object.assign(existing, originalContribution);
+            await existing.save().catch(() => {});
+          }
+        }
         failures.push({ memberNumber: member.memberNumber, name: member.fullName, message: memberError.message });
       }
     }
@@ -264,7 +301,7 @@ exports.getContributions = async (req,res)=>{
 
     try{
 
-        const filter={};
+        const filter={ isArchived: { $ne: true } };
 
         if(req.query.month){
 
@@ -333,7 +370,7 @@ exports.getContributions = async (req,res)=>{
             success:true,
             count:contributions.length,
             summary: {
-                monthlyContribution: Number(configuredAmount || 0),
+                monthlyContribution: configuredAmount == null ? null : Number(configuredAmount),
                 totalContributed,
                 currentYear: currentYearTotal,
                 outstanding,
@@ -371,7 +408,7 @@ exports.getMemberContributions = async (req,res)=>{
         if (isMemberRole) {
             const requestedMemberId = req.user._id;
             const currentYear = Number(req.query.year) || new Date().getFullYear();
-            const query = { member: requestedMemberId };
+            const query = { member: requestedMemberId, isArchived: { $ne: true } };
             if (req.query.year !== undefined) query.year = currentYear;
             const rows = await Contribution.find(query)
                 .populate('finance', 'transactionNumber type category amount paymentMethod receiptNumber referenceNumber transactionDate status notes')
@@ -397,7 +434,7 @@ exports.getMemberContributions = async (req,res)=>{
         if (String(req.user?.role || "").toLowerCase() === "member" && requested !== own) {
             return res.status(403).json({ success: false, code: "CONTRIBUTION_OWNERSHIP_FORBIDDEN", message: "You can only view your own contribution records." });
         }
-        const contributions=await Contribution.find({ member: requestedMemberId })
+        const contributions=await Contribution.find({ member: requestedMemberId, isArchived: { $ne: true } })
             .populate('finance', 'transactionNumber type category amount paymentMethod receiptNumber referenceNumber transactionDate status notes')
             .sort({ paymentDate: -1, year: -1, month: -1, createdAt: -1 });
         res.json({ success:true, count:contributions.length, contributions });
@@ -412,122 +449,113 @@ exports.getMemberContributions = async (req,res)=>{
 ===================================================== */
 
 exports.updateContribution = async (req, res) => {
-
     try {
-
         const contribution = await Contribution.findById(req.params.id);
-
-        if (!contribution) {
-
-            return res.status(404).json({
-                success: false,
-                message: "Contribution not found."
-            });
-
+        if (!contribution || contribution.isArchived) {
+            return res.status(404).json({ success: false, message: "Contribution not found." });
         }
 
-        const fields = [
-
-            "expectedAmount",
-
-            "paidAmount",
-
-            "receiptNumber",
-
-            "mpesaCode",
-
-            "paymentDate",
-
-            "notes"
-
-        ];
-
+        const fields = ["expectedAmount", "paidAmount", "receiptNumber", "mpesaCode", "paymentDate", "notes"];
         if (req.body.paymentMethod !== undefined && String(req.body.paymentMethod).toLowerCase() !== "payroll") {
             return res.status(400).json({ success: false, code: "PAYROLL_ONLY_CONTRIBUTIONS", message: "Ordinary Benevolent MIDAX contributions are recorded from payroll only." });
         }
+
+        const finance = contribution.finance ? await Finance.findById(contribution.finance) : null;
+        const originalContribution = contribution.toObject();
+        const originalFinance = finance ? finance.toObject() : null;
+
         contribution.source = "payroll";
         contribution.paymentMethod = "Payroll";
-
-        fields.forEach(field => {
-
-            if (req.body[field] !== undefined) {
-
-                contribution[field] = req.body[field];
-
-            }
-
+        fields.forEach((field) => {
+            if (req.body[field] !== undefined) contribution[field] = req.body[field];
         });
 
-        await contribution.save();
+        if (!Number.isFinite(Number(contribution.expectedAmount)) || Number(contribution.expectedAmount) < 0) {
+            return res.status(400).json({ success: false, message: "Expected contribution amount must be a valid non-negative number." });
+        }
+        if (!Number.isFinite(Number(contribution.paidAmount)) || Number(contribution.paidAmount) < 0) {
+            return res.status(400).json({ success: false, message: "Paid contribution amount must be a valid non-negative number." });
+        }
 
-        // Keep the linked finance ledger entry synchronized with the
-        // contribution record. A contribution and its finance transaction
-        // represent one accounting event in this application.
-        if (contribution.finance) {
-            const finance = await Finance.findById(contribution.finance);
-            if (finance) {
-                finance.member = contribution.member;
-                finance.type = "contribution";
-                finance.category = finance.category || "Monthly Contribution";
-                finance.amount = Number(contribution.paidAmount || 0);
-                finance.paymentMethod = "Payroll";
-                finance.receiptNumber = contribution.receiptNumber || "";
-                finance.referenceNumber = contribution.mpesaCode || "";
-                finance.transactionDate = contribution.paymentDate || finance.transactionDate;
-                finance.description = `Contribution ${contribution.month}/${contribution.year}`;
-                finance.notes = contribution.notes || "";
+        let createdFinance = null;
+        try {
+            await contribution.save();
+            if (Number(contribution.paidAmount || 0) > 0) {
+                if (finance) {
+                    finance.member = contribution.member;
+                    finance.type = "contribution";
+                    finance.category = finance.category || "Monthly Contribution";
+                    finance.amount = Number(contribution.paidAmount || 0);
+                    finance.paymentMethod = "Payroll";
+                    finance.receiptNumber = contribution.receiptNumber || "";
+                    finance.referenceNumber = contribution.mpesaCode || "";
+                    finance.transactionDate = contribution.paymentDate || finance.transactionDate;
+                    finance.description = `Contribution ${contribution.month}/${contribution.year}`;
+                    finance.notes = contribution.notes || "";
+                    finance.hidden = false;
+                    finance.hiddenAt = null;
+                    finance.hiddenBy = null;
+                    finance.status = "approved";
+                    await finance.save();
+                } else {
+                    createdFinance = await Finance.create({
+                        member: contribution.member,
+                        transactionNumber: `TRX-${Date.now()}-${String(contribution._id).slice(-6)}`,
+                        type: "contribution",
+                        category: "Monthly Contribution",
+                        amount: Number(contribution.paidAmount || 0),
+                        paymentMethod: "Payroll",
+                        receiptNumber: contribution.receiptNumber || "",
+                        referenceNumber: contribution.mpesaCode || "",
+                        description: `Contribution ${contribution.month}/${contribution.year}`,
+                        transactionDate: contribution.paymentDate || new Date(),
+                        status: "approved",
+                        approvedBy: req.user._id,
+                        approvedAt: new Date(),
+                        notes: contribution.notes || "",
+                    });
+                    contribution.finance = createdFinance._id;
+                    await contribution.save();
+                }
+            } else if (finance) {
+                // Preserve the accounting evidence but remove it from the normal
+                // scheme balance when a previously-collected contribution is reset.
+                finance.hidden = true;
+                finance.hiddenAt = new Date();
+                finance.hiddenBy = req.user._id;
+                finance.status = "rejected";
                 await finance.save();
             }
-        } else if (Number(contribution.paidAmount || 0) > 0) {
-            const finance = await Finance.create({
-                member: contribution.member,
-                transactionNumber: `TRX-${Date.now()}-${String(contribution._id).slice(-6)}`,
-                type: "contribution",
-                category: "Monthly Contribution",
-                amount: Number(contribution.paidAmount || 0),
-                paymentMethod: "Payroll",
-                receiptNumber: contribution.receiptNumber || "",
-                referenceNumber: contribution.mpesaCode || "",
-                description: `Contribution ${contribution.month}/${contribution.year}`,
-                transactionDate: contribution.paymentDate || new Date(),
-                status: "approved",
-                approvedBy: req.user._id,
-                approvedAt: new Date(),
-                notes: contribution.notes || "",
-            });
-            contribution.finance = finance._id;
-            await contribution.save();
+        } catch (syncError) {
+            Object.assign(contribution, originalContribution);
+            await contribution.save().catch(() => {});
+            if (finance && originalFinance) {
+                Object.assign(finance, originalFinance);
+                await finance.save().catch(() => {});
+            }
+            if (createdFinance) await Finance.findByIdAndDelete(createdFinance._id).catch(() => {});
+            throw new Error(`Contribution/finance synchronization failed: ${syncError.message}`);
         }
 
         await invalidateFinanceCache();
-        res.json({
-
-            success: true,
-
-            message: "Contribution updated successfully.",
-
-            contribution: sanitizeDocument(contribution)
-
+        await safeContributionNotification({
+            recipient: contribution.member,
+            recipientModel: "Member",
+            sender: req.user._id,
+            senderModel: String(req.user.role || "admin") === "superadmin" ? "SuperAdmin" : "Admin",
+            title: "Contribution Updated",
+            message: `Your contribution for ${contribution.month}/${contribution.year} has been updated.`,
+            type: "contribution",
+            referenceId: contribution._id,
+            referenceModel: "Contribution"
         });
 
-    }
-
-    catch (error) {
-
+        return res.json({ success: true, message: "Contribution updated successfully.", contribution: sanitizeDocument(contribution) });
+    } catch (error) {
         console.error(error);
-
-        res.status(500).json({
-
-            success: false,
-
-            message: error.message
-
-        });
-
+        return res.status(500).json({ success: false, message: error.message });
     }
-
 };
-
 
 
 /* =====================================================
@@ -535,59 +563,62 @@ exports.updateContribution = async (req, res) => {
 ===================================================== */
 
 exports.deleteContribution = async (req, res) => {
-
     try {
-
         const contribution = await Contribution.findById(req.params.id);
+        if (!contribution) return res.status(404).json({ success: false, message: "Contribution not found." });
+        if (contribution.isArchived) return res.status(409).json({ success: false, code: "CONTRIBUTION_ALREADY_ARCHIVED", message: "This contribution is already archived." });
 
-        if (!contribution) {
+        const finance = contribution.finance ? await Finance.findById(contribution.finance) : null;
+        const protectedRecord = Boolean(finance) || Number(contribution.paidAmount || 0) > 0 || contribution.status === "paid";
 
-            return res.status(404).json({
-
-                success: false,
-
-                message: "Contribution not found."
-
-            });
-
-        }
-
-        if (contribution.finance) {
-
-            await Finance.findByIdAndDelete(contribution.finance);
+        if (!protectedRecord) {
+            await contribution.deleteOne();
             await invalidateFinanceCache();
-
+            return res.json({ success: true, action: "deleted", message: "Uncollected contribution deleted successfully." });
         }
 
-        await contribution.deleteOne();
+        const originalContribution = contribution.toObject();
+        const originalFinance = finance ? finance.toObject() : null;
+        try {
+            contribution.isArchived = true;
+            contribution.archivedAt = new Date();
+            contribution.archivedBy = req.user._id;
+            contribution.archivedByModel = String(req.user?.role || "").toLowerCase() === "superadmin" ? "SuperAdmin" : "Admin";
+            contribution.archiveReason = String(req.body?.reason || "Removed from the operational ledger; accounting evidence retained.").slice(0, 500);
+            await contribution.save();
+
+            if (finance) {
+                finance.hidden = true;
+                finance.hiddenAt = new Date();
+                finance.hiddenBy = req.user._id;
+                await finance.save();
+            }
+        } catch (syncError) {
+            Object.assign(contribution, originalContribution);
+            await contribution.save().catch(() => {});
+            if (finance && originalFinance) {
+                Object.assign(finance, originalFinance);
+                await finance.save().catch(() => {});
+            }
+            throw new Error(`Contribution/finance archive synchronization failed: ${syncError.message}`);
+        }
+
+        await createAuditLog({
+            user: req.user._id,
+            userRole: req.user.role,
+            action: "CONTRIBUTION_ARCHIVED",
+            module: "CONTRIBUTIONS",
+            description: `Contribution ${contribution._id} was archived with its linked finance evidence retained.`,
+            req,
+            metadata: { contributionId: contribution._id, financeId: finance?._id || null, month: contribution.month, year: contribution.year, amount: contribution.paidAmount },
+        });
         await invalidateFinanceCache();
-
-        res.json({
-
-            success: true,
-
-            message: "Contribution deleted successfully."
-
-        });
-
-    }
-
-    catch (error) {
-
+        return res.json({ success: true, action: "archived", message: "Settled/linked contribution archived successfully and retained for auditability." });
+    } catch (error) {
         console.error(error);
-
-        res.status(500).json({
-
-            success: false,
-
-            message: error.message
-
-        });
-
+        return res.status(500).json({ success: false, message: "Unable to remove the contribution safely." });
     }
-
 };
-
 
 
 /* =====================================================
@@ -617,9 +648,9 @@ exports.approveContribution = async (req, res) => {
         contribution.approvedAt = new Date();
 
         await contribution.save();
+        await invalidateFinanceCache();
 
-        await Notification.create({
-
+        await safeContributionNotification({
             recipient: contribution.member,
 
             sender: req.user._id,
@@ -695,9 +726,9 @@ exports.rejectContribution = async (req, res) => {
         contribution.approvedAt = new Date();
 
         await contribution.save();
+        await invalidateFinanceCache();
 
-        await Notification.create({
-
+        await safeContributionNotification({
             recipient: contribution.member,
 
             sender: req.user._id,
@@ -754,7 +785,8 @@ exports.getMemberContributionSummary = async (req, res) => {
 
         const contributions = await Contribution.find({
 
-            member: req.params.memberId
+            member: req.params.memberId,
+            isArchived: { $ne: true }
 
         });
 

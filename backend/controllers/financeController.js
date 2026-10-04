@@ -167,15 +167,19 @@ exports.createTransaction = async (req, res) => {
         }
 
         if (memberId) {
-            await Notification.create({
-                recipient: memberId,
-                recipientModel: "Member",
-                sender: req.user._id,
-                senderModel: String(req.user.role || "admin") === "superadmin" ? "SuperAdmin" : "Admin",
-                title: "Finance Update",
-                message: `A ${type} transaction of KSh ${amount} has been recorded.`,
-                type: "finance", referenceId: transaction._id, referenceModel: "Finance"
-            });
+            try {
+                await Notification.create({
+                    recipient: memberId,
+                    recipientModel: "Member",
+                    sender: req.user._id,
+                    senderModel: String(req.user.role || "admin").toLowerCase() === "superadmin" ? "SuperAdmin" : "Admin",
+                    title: "Finance Update",
+                    message: `A ${type} transaction of KSh ${amount} has been recorded.`,
+                    type: "finance", referenceId: transaction._id, referenceModel: "Finance"
+                });
+            } catch (notificationError) {
+                console.warn("Finance creation notification failed after persistence:", notificationError.message);
+            }
         }
         await invalidateFinanceCache();
         return res.status(201).json({ success: true, message: "Transaction created successfully.", transaction });
@@ -331,9 +335,16 @@ exports.updateTransaction = async (req, res) => {
 
         }
 
-        const linkedContribution = await Contribution.findOne({ finance: transaction._id });
+        const linkedContribution = await Contribution.findOne({ finance: transaction._id, isArchived: { $ne: true } });
+        const archivedLinkedContribution = await Contribution.findOne({ finance: transaction._id, isArchived: true }).select("_id").lean();
+        if (archivedLinkedContribution) {
+            return res.status(409).json({ success: false, code: "ARCHIVED_CONTRIBUTION_FINANCE_PROTECTED", message: "This finance record is linked to an archived contribution and cannot be edited independently." });
+        }
         if (linkedContribution && req.body.type && req.body.type !== "contribution") {
             return res.status(400).json({ success: false, message: "Linked contribution transactions must remain type 'contribution'. Edit the amount/date/payment details instead." });
+        }
+        if (linkedContribution && req.body.contributorType && String(req.body.contributorType).toLowerCase() !== "member") {
+            return res.status(400).json({ success: false, code: "LINKED_CONTRIBUTION_SCOPE_PROTECTED", message: "A member payroll contribution cannot be converted into an Admin or organisation-wide finance event." });
         }
 
         const fields = [
@@ -355,6 +366,12 @@ exports.updateTransaction = async (req, res) => {
                 transaction[field] = req.body[field];
             }
         });
+        if (req.body.amount !== undefined && (!Number.isFinite(Number(req.body.amount)) || Number(req.body.amount) <= 0)) {
+            return res.status(400).json({ success: false, message: "Transaction amount must be a positive number." });
+        }
+        if (linkedContribution && req.body.amount !== undefined && Number(req.body.amount) <= 0) {
+            return res.status(400).json({ success: false, code: "LINKED_CONTRIBUTION_AMOUNT_PROTECTED", message: "A linked payroll contribution must retain a positive amount." });
+        }
 
         if (req.body.employeeNumber !== undefined) {
             const employeeNumber = String(req.body.employeeNumber || "").trim();
@@ -378,6 +395,9 @@ exports.updateTransaction = async (req, res) => {
             if (scope === "member") {
                 const memberId = transaction.member;
                 if (!memberId || !await Member.exists({ _id: memberId })) return res.status(400).json({ success: false, message: "A valid member is required for this contribution." });
+                if (linkedContribution && String(memberId) !== String(linkedContribution.member)) {
+                    return res.status(409).json({ success: false, code: "LINKED_CONTRIBUTION_MEMBER_PROTECTED", message: "The member on a linked payroll contribution cannot be changed. Create a separate accounting event instead." });
+                }
                 const member = await Member.findById(memberId).select("fullName").lean();
                 transaction.contributor = memberId;
                 transaction.contributorModel = "Member";
@@ -397,33 +417,50 @@ exports.updateTransaction = async (req, res) => {
                 transaction.contributorName = "All members & admins";
             }
         }
-        await transaction.save();
-        if (transaction.member) {
-            await Notification.create({
-                recipient: transaction.member,
-                recipientModel: "Member",
-                sender: req.user._id,
-                senderModel: String(req.user.role || "admin") === "superadmin" ? "SuperAdmin" : "Admin",
-                title: "Finance Record Updated",
-                message: `Your linked ${transaction.type} account record was updated to KSh ${Number(transaction.amount || 0).toLocaleString("en-KE")}.`,
-                type: "finance", referenceId: transaction._id, referenceModel: "Finance"
-            });
-        }
+        const originalTransaction = transaction.toObject();
+        const linked = transaction.type === "contribution"
+            ? await Contribution.findOne({ finance: transaction._id, isArchived: { $ne: true } })
+            : null;
+        const originalLinked = linked ? linked.toObject() : null;
 
-        // A contribution finance transaction and its Contribution record are one accounting event.
-        if (transaction.type === "contribution") {
-            const linked = await Contribution.findOne({ finance: transaction._id });
+        try {
+            await transaction.save();
+
             if (linked) {
                 linked.member = transaction.member || linked.member;
                 linked.expectedAmount = Number(transaction.amount || 0);
                 linked.paidAmount = Number(transaction.amount || 0);
                 linked.source = "payroll";
                 linked.paymentMethod = "Payroll";
-                linked.receiptNumber = transaction.receiptNumber || linked.receiptNumber;
-                linked.mpesaCode = transaction.referenceNumber || linked.mpesaCode;
+                linked.receiptNumber = transaction.receiptNumber || "";
+                linked.mpesaCode = transaction.referenceNumber || "";
                 linked.paymentDate = transaction.transactionDate;
-                linked.notes = transaction.notes || linked.notes;
+                linked.notes = transaction.notes || "";
                 await linked.save();
+            }
+        } catch (syncError) {
+            Object.assign(transaction, originalTransaction);
+            await transaction.save().catch(() => {});
+            if (linked && originalLinked) {
+                Object.assign(linked, originalLinked);
+                await linked.save().catch(() => {});
+            }
+            throw new Error(`Contribution/finance synchronization failed: ${syncError.message}`);
+        }
+
+        if (transaction.member) {
+            try {
+                await Notification.create({
+                    recipient: transaction.member,
+                    recipientModel: "Member",
+                    sender: req.user._id,
+                    senderModel: String(req.user.role || "admin") === "superadmin" ? "SuperAdmin" : "Admin",
+                    title: "Finance Record Updated",
+                    message: `Your linked ${transaction.type} account record was updated to KSh ${Number(transaction.amount || 0).toLocaleString("en-KE")}.`,
+                    type: "finance", referenceId: transaction._id, referenceModel: "Finance"
+                });
+            } catch (notificationError) {
+                console.warn("Finance notification failed after persistence:", notificationError.message);
             }
         }
 
@@ -522,11 +559,37 @@ exports.deleteTransaction = async (req, res) => {
             await transaction.deleteOne();
             action = "deleted";
         } else {
-            transaction.hidden = true;
-            transaction.hiddenAt = new Date();
-            transaction.hiddenBy = req.user._id;
-            await transaction.save();
-            action = "archived";
+            const originalTransaction = transaction.toObject();
+            let archivedContribution = null;
+            let originalContribution = null;
+            try {
+                transaction.hidden = true;
+                transaction.hiddenAt = new Date();
+                transaction.hiddenBy = req.user._id;
+                await transaction.save();
+                action = "archived";
+
+                if (linkedContribution) {
+                    archivedContribution = await Contribution.findById(linkedContribution._id);
+                    if (archivedContribution && !archivedContribution.isArchived) {
+                        originalContribution = archivedContribution.toObject();
+                        archivedContribution.isArchived = true;
+                        archivedContribution.archivedAt = new Date();
+                        archivedContribution.archivedBy = req.user._id;
+                        archivedContribution.archivedByModel = role === "superadmin" ? "SuperAdmin" : "Admin";
+                        archivedContribution.archiveReason = "Linked finance transaction was archived; accounting evidence retained.";
+                        await archivedContribution.save();
+                    }
+                }
+            } catch (syncError) {
+                Object.assign(transaction, originalTransaction);
+                await transaction.save().catch(() => {});
+                if (archivedContribution && originalContribution) {
+                    Object.assign(archivedContribution, originalContribution);
+                    await archivedContribution.save().catch(() => {});
+                }
+                throw new Error(`Finance/contribution archive synchronization failed: ${syncError.message}`);
+            }
         }
 
         await createAuditLog({
@@ -541,15 +604,19 @@ exports.deleteTransaction = async (req, res) => {
             metadata: { transactionId: transaction._id, status: transaction.status, type: transaction.type, amount: transaction.amount, linkedContribution: Boolean(linkedContribution), protectedSettled },
         });
         if (affectedMember) {
-            await Notification.create({
-                recipient: affectedMember,
-                recipientModel: "Member",
-                sender: req.user._id,
-                senderModel: role === "superadmin" ? "SuperAdmin" : "Admin",
-                title: "Finance Record Removed",
-                message: `A financial record linked to your account was removed by ${role === "superadmin" ? "SuperAdmin" : "an Admin / leader"}.`,
-                type: "finance", referenceId: transaction._id, referenceModel: "Finance"
-            });
+            try {
+                await Notification.create({
+                    recipient: affectedMember,
+                    recipientModel: "Member",
+                    sender: req.user._id,
+                    senderModel: role === "superadmin" ? "SuperAdmin" : "Admin",
+                    title: "Finance Record Removed",
+                    message: `A financial record linked to your account was removed by ${role === "superadmin" ? "SuperAdmin" : "an Admin / leader"}.`,
+                    type: "finance", referenceId: transaction._id, referenceModel: "Finance"
+                });
+            } catch (notificationError) {
+                console.warn("Finance removal notification failed after persistence:", notificationError.message);
+            }
         }
         await invalidateFinanceCache();
         return res.json({
@@ -575,77 +642,68 @@ exports.deleteTransaction = async (req, res) => {
 ===================================================== */
 
 exports.approveTransaction = async (req, res) => {
-
     try {
-
         const transaction = await Finance.findById(req.params.id);
+        if (!transaction) return res.status(404).json({ success: false, message: "Transaction not found." });
 
-        if (!transaction) {
+        const linkedContribution = transaction.type === "contribution"
+            ? await Contribution.findOne({ finance: transaction._id, isArchived: { $ne: true } })
+            : null;
+        const originalTransaction = transaction.toObject();
+        const originalContribution = linkedContribution ? linkedContribution.toObject() : null;
 
-            return res.status(404).json({
+        try {
+            transaction.status = "approved";
+            transaction.approvedBy = req.user._id;
+            transaction.approvedAt = new Date();
+            await transaction.save();
 
-                success: false,
-
-                message: "Transaction not found."
-
-            });
-
+            if (linkedContribution) {
+                linkedContribution.member = transaction.member || linkedContribution.member;
+                linkedContribution.paidAmount = Number(transaction.amount || 0);
+                linkedContribution.expectedAmount = Number(transaction.amount || linkedContribution.expectedAmount || 0);
+                linkedContribution.paymentMethod = "Payroll";
+                linkedContribution.paymentDate = transaction.transactionDate;
+                linkedContribution.receiptNumber = transaction.receiptNumber || "";
+                linkedContribution.mpesaCode = transaction.referenceNumber || "";
+                linkedContribution.approvedBy = req.user._id;
+                linkedContribution.approvedAt = new Date();
+                await linkedContribution.save();
+            }
+        } catch (syncError) {
+            Object.assign(transaction, originalTransaction);
+            await transaction.save().catch(() => {});
+            if (linkedContribution && originalContribution) {
+                Object.assign(linkedContribution, originalContribution);
+                await linkedContribution.save().catch(() => {});
+            }
+            throw new Error(`Finance/contribution approval synchronization failed: ${syncError.message}`);
         }
 
-        transaction.status = "approved";
-
-        transaction.approvedBy = req.user._id;
-
-        transaction.approvedAt = new Date();
-
-        await transaction.save();
-
-        await Notification.create({
-
-            recipient: transaction.member,
-
-            sender: req.user._id,
-
-            title: "Transaction Approved",
-
-            message: `Your ${transaction.type} of KSh ${transaction.amount} has been approved.`,
-
-            type: "finance",
-
-            referenceId: transaction._id,
-
-            referenceModel: "Finance"
-
-        });
-
-        res.json({
-
-            success: true,
-
-            message: "Transaction approved successfully.",
-
-            transaction
-
-        });
-
-    }
-
-    catch (error) {
-
+        if (transaction.member) {
+            try {
+                await Notification.create({
+                    recipient: transaction.member,
+                    recipientModel: "Member",
+                    sender: req.user._id,
+                    senderModel: String(req.user.role || "admin").toLowerCase() === "superadmin" ? "SuperAdmin" : "Admin",
+                    title: "Transaction Approved",
+                    message: `Your ${transaction.type} of KSh ${transaction.amount} has been approved.`,
+                    type: "finance",
+                    referenceId: transaction._id,
+                    referenceModel: "Finance"
+                });
+            } catch (notificationError) {
+                console.warn("Finance approval notification failed after persistence:", notificationError.message);
+            }
+        }
+        await invalidateFinanceCache();
+        return res.json({ success: true, message: "Transaction approved successfully.", transaction });
+    } catch (error) {
         console.error(error);
-
-        res.status(500).json({
-
-            success: false,
-
-            message: error.message
-
-        });
-
+        return res.status(500).json({ success: false, message: error.message });
     }
-
 };
-
 
 
 /* =====================================================
@@ -653,77 +711,63 @@ exports.approveTransaction = async (req, res) => {
 ===================================================== */
 
 exports.rejectTransaction = async (req, res) => {
-
     try {
-
         const transaction = await Finance.findById(req.params.id);
+        if (!transaction) return res.status(404).json({ success: false, message: "Transaction not found." });
 
-        if (!transaction) {
+        const linkedContribution = transaction.type === "contribution"
+            ? await Contribution.findOne({ finance: transaction._id, isArchived: { $ne: true } })
+            : null;
+        const originalTransaction = transaction.toObject();
+        const originalContribution = linkedContribution ? linkedContribution.toObject() : null;
 
-            return res.status(404).json({
+        try {
+            transaction.status = "rejected";
+            transaction.approvedBy = req.user._id;
+            transaction.approvedAt = new Date();
+            await transaction.save();
 
-                success: false,
-
-                message: "Transaction not found."
-
-            });
-
+            if (linkedContribution) {
+                linkedContribution.paidAmount = 0;
+                linkedContribution.paymentDate = null;
+                linkedContribution.approvedBy = req.user._id;
+                linkedContribution.approvedAt = new Date();
+                await linkedContribution.save();
+            }
+        } catch (syncError) {
+            Object.assign(transaction, originalTransaction);
+            await transaction.save().catch(() => {});
+            if (linkedContribution && originalContribution) {
+                Object.assign(linkedContribution, originalContribution);
+                await linkedContribution.save().catch(() => {});
+            }
+            throw new Error(`Finance/contribution rejection synchronization failed: ${syncError.message}`);
         }
 
-        transaction.status = "rejected";
-
-        transaction.approvedBy = req.user._id;
-
-        transaction.approvedAt = new Date();
-
-        await transaction.save();
-
-        await Notification.create({
-
-            recipient: transaction.member,
-
-            sender: req.user._id,
-
-            title: "Transaction Rejected",
-
-            message: `Your ${transaction.type} of KSh ${transaction.amount} has been rejected.`,
-
-            type: "finance",
-
-            referenceId: transaction._id,
-
-            referenceModel: "Finance"
-
-        });
-
-        res.json({
-
-            success: true,
-
-            message: "Transaction rejected successfully.",
-
-            transaction
-
-        });
-
-    }
-
-    catch (error) {
-
+        if (transaction.member) {
+            try {
+                await Notification.create({
+                    recipient: transaction.member,
+                    recipientModel: "Member",
+                    sender: req.user._id,
+                    senderModel: String(req.user.role || "admin").toLowerCase() === "superadmin" ? "SuperAdmin" : "Admin",
+                    title: "Transaction Rejected",
+                    message: `Your ${transaction.type} of KSh ${transaction.amount} has been rejected.`,
+                    type: "finance",
+                    referenceId: transaction._id,
+                    referenceModel: "Finance"
+                });
+            } catch (notificationError) {
+                console.warn("Finance rejection notification failed after persistence:", notificationError.message);
+            }
+        }
+        await invalidateFinanceCache();
+        return res.json({ success: true, message: "Transaction rejected successfully.", transaction });
+    } catch (error) {
         console.error(error);
-
-        res.status(500).json({
-
-            success: false,
-
-            message: error.message
-
-        });
-
+        return res.status(500).json({ success: false, message: error.message });
     }
-
 };
-
 
 
 /* =====================================================

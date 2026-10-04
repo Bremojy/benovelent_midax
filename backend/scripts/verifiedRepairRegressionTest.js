@@ -49,7 +49,7 @@ assert(/submitted for administrator review/.test(memberClaims), "Member UI must 
 assert(/claims\/community\/\$\{appealReview\._id\}\/review/.test(adminClaims), "Admin UI must call the community appeal review endpoint.");
 assert(/Approve & open campaign/.test(adminClaims), "Admin UI must expose an explicit approve/open action.");
 assert(/MpesaPaymentButton/.test(adminClaims) && /!isSuperAdmin/.test(adminClaims), "Admin UI must allow eligible Admin/leader community contributions and exclude SuperAdmin.");
-assert(/payerId\?\.fullName/.test(adminAccounts), "Admin Accounts must display payer identity when the transaction is not a member payment.");
+assert(/resolveMpesaPayer/.test(adminAccounts) && /payer\?\.fullName/.test(read("src/utils/mpesaPayer.js")), "Admin Accounts must display canonical payer identity when the transaction is not a member payment.");
 
 console.log("VERIFIED REPAIR REGRESSION: PASS — verified");
 console.log("Checked community workflow, payer-role model, payment authorization, notification idempotency, M-Pesa config defaults, meeting-minutes media upload, and role-aware portal UI contracts.");

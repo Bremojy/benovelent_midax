@@ -2,7 +2,11 @@ import { Download, FileDown, Printer, RefreshCw } from "lucide-react";
 import API from "../../services/api";
 import { buildPrintHeadHtml, printHeadStyles } from "../../utils/printHead";
 
-const money = (v) => new Intl.NumberFormat("en-KE", { style: "currency", currency: "KES", maximumFractionDigits: 2 }).format(Number(v || 0));
+const money = (v) => {
+  if (v === null || v === undefined || v === "") return "—";
+  const amount = Number(v);
+  return Number.isFinite(amount) ? new Intl.NumberFormat("en-KE", { style: "currency", currency: "KES", maximumFractionDigits: 2 }).format(amount) : "—";
+};
 const dt = (v) => v ? new Date(v).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" }) : "—";
 
 async function downloadBlob(url, params, fallbackName, type) {
@@ -18,7 +22,7 @@ async function downloadBlob(url, params, fallbackName, type) {
   URL.revokeObjectURL(href);
 }
 
-export default function LedgerControls({ data, dates, onLoad, busy = false, title = "Benevolent Constitution Ledger", personalContributionTotal, contributionStatus }) {
+export default function LedgerControls({ data, dates, onLoad, busy = false, title = "Benevolent Constitution Ledger", personalContributionTotal, contributionStatus, currentBalanceLabel = "Scheme Current Book Balance" }) {
   const printLedger = () => {
     if (!data) return;
     const popup = window.open("", "_blank", "noopener,noreferrer");
@@ -29,7 +33,7 @@ export default function LedgerControls({ data, dates, onLoad, busy = false, titl
     popup.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${title}</title>${printHeadStyles()}<style>@page{size:A4 landscape;margin:10mm}.print-shell{break-after:auto}.ledger-summary{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:0 0 18px}.ledger-summary div{border:1px solid #ddd;padding:8px}.ledger-summary span{display:block;font-size:10px}.ledger-summary strong{font-size:14px}table{font-size:8px}th,td{padding:6px}</style></head><body>
       ${buildPrintHeadHtml({ title, subtitle: `Date range: ${data.startDate} to ${data.endDate}` })}
       <p class="print-note">Generated ${dt(new Date())}. Current live book balance reflects valid approved/completed scheme transactions as of the timestamp below.</p>
-      <div class="ledger-summary"><div><span>Opening balance</span><strong>${money(data.openingBalance)}</strong></div><div><span>Money in</span><strong>${money(data.totals?.credit)}</strong></div><div><span>Money out</span><strong>${money(data.totals?.debit)}</strong></div><div><span>Closing balance</span><strong>${money(data.closingBalance)}</strong></div><div><span>Current book balance</span><strong>${money(data.currentBookBalance)}</strong></div>${personalContributionTotal !== undefined ? `<div><span>My contributions</span><strong>${money(personalContributionTotal)}</strong></div>` : ""}${contributionStatus ? `<div><span>Contribution status</span><strong>${contributionStatus}</strong></div>` : ""}<div><span>As of</span><strong>${dt(data.asOf)}</strong></div></div>
+      <div class="ledger-summary"><div><span>${currentBalanceLabel}</span><strong>${money(data.currentBookBalance)}</strong></div><div><span>Opening balance</span><strong>${money(data.openingBalance)}</strong></div><div><span>Money in</span><strong>${money(data.totals?.credit)}</strong></div><div><span>Money out</span><strong>${money(data.totals?.debit)}</strong></div><div><span>Closing balance</span><strong>${money(data.closingBalance)}</strong></div>${personalContributionTotal !== undefined && personalContributionTotal !== null ? `<div><span>My contributions</span><strong>${money(personalContributionTotal)}</strong></div>` : ""}${contributionStatus ? `<div><span>Contribution status</span><strong>${contributionStatus}</strong></div>` : ""}<div><span>As of</span><strong>${dt(data.asOf)}</strong></div></div>
       <table><thead><tr><th>Date</th><th>Transaction/reference</th><th>Description</th><th>Category</th><th>Amount</th><th>Direction</th><th>Status</th><th>Running balance</th></tr></thead><tbody>${rows || '<tr><td colspan="8">No valid ledger entries were recorded for this date range.</td></tr>'}</tbody></table>
       <script>window.addEventListener('load',()=>setTimeout(()=>window.print(),100));</script></body></html>`);
     popup.document.close();
@@ -53,8 +57,9 @@ export default function LedgerControls({ data, dates, onLoad, busy = false, titl
         <button className="portal-btn secondary" type="button" onClick={() => runDownload("csv")}><FileDown size={16} /> Download CSV</button>
       </>}
     </div>
+    {busy && !data && <div className="portal-empty">Loading ledger…</div>}
     {data && <div className="account-grid four">
-      <div className="account-card compact"><span>Current Constitution Book Balance</span><strong>{money(data.currentBookBalance)}</strong><small>As of {dt(data.asOf)}</small></div>
+      <div className="account-card compact"><span>{currentBalanceLabel}</span><strong>{money(data.currentBookBalance)}</strong><small>As of {dt(data.asOf)}</small></div>
       <div className="account-card compact"><span>Opening balance</span><strong>{money(data.openingBalance)}</strong><small>Balance before selected period</small></div>
       <div className="account-card compact"><span>Money in</span><strong>{money(data.totals?.credit)}</strong><small>Selected period</small></div>
       <div className="account-card compact"><span>Money out</span><strong>{money(data.totals?.debit)}</strong><small>Selected period</small></div>

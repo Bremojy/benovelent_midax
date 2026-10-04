@@ -96,6 +96,34 @@ const contributionSchema = new mongoose.Schema({
     notes:{
         type:String,
         default:""
+    },
+
+    isArchived:{
+        type:Boolean,
+        default:false,
+        index:true
+    },
+
+    archivedAt:{
+        type:Date,
+        default:null
+    },
+
+    archivedBy:{
+        type:mongoose.Schema.Types.ObjectId,
+        default:null,
+        refPath:"archivedByModel"
+    },
+
+    archivedByModel:{
+        type:String,
+        enum:["Admin","SuperAdmin"],
+        default:undefined
+    },
+
+    archiveReason:{
+        type:String,
+        default:""
     }
 
 },
