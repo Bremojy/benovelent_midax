@@ -234,6 +234,15 @@ const funeralSupportSchema = new mongoose.Schema(
         ref:"Member"
     },
 
+    // Reversible member-facing visibility state. Historical documents without
+    // this field remain visible because member queries filter only explicit false.
+    memberVisible: { type: Boolean, default: true, index: true },
+    hiddenAt: { type: Date, default: null },
+    hiddenBy: { type: mongoose.Schema.Types.ObjectId, default: null },
+    publishedNewsId: { type: mongoose.Schema.Types.ObjectId, ref: "News", default: null },
+    publishedToNews: { type: Boolean, default: false },
+    publishedAt: { type: Date, default: null },
+
     isDeleted: { type: Boolean, default: false, index: true },
     deletedAt: { type: Date, default: null },
     deletedBy: { type: mongoose.Schema.Types.ObjectId, default: null },

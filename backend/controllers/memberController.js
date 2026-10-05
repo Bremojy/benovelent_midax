@@ -1366,7 +1366,7 @@ exports.getClaims = async (req, res) => {
         const escapedSearch = search ? search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") : "";
         const regex = escapedSearch ? new RegExp(escapedSearch, "i") : null;
         const buildFilter = () => {
-            const filter = { member: memberId, isDeleted: { $ne: true } };
+            const filter = { member: memberId, isDeleted: { $ne: true }, memberVisible: { $ne: false } };
             if (requestedStatus) filter.status = requestedStatus;
             if (regex) filter.$or = [
                 { status: regex }, { description: regex }, { purpose: regex }, { hospitalName: regex },

@@ -203,6 +203,15 @@ const educationSupportSchema = new mongoose.Schema(
         reference: { type: String, default: "" },
       },
     ],
+    // Explicit false hides a claim from its member; missing legacy values remain
+    // visible so historical applications are not accidentally concealed.
+    memberVisible: { type: Boolean, default: true, index: true },
+    hiddenAt: { type: Date, default: null },
+    hiddenBy: { type: mongoose.Schema.Types.ObjectId, default: null },
+    publishedNewsId: { type: mongoose.Schema.Types.ObjectId, ref: "News", default: null },
+    publishedToNews: { type: Boolean, default: false },
+    publishedAt: { type: Date, default: null },
+
     isDeleted: { type: Boolean, default: false, index: true },
     deletedAt: { type: Date, default: null },
     deletedBy: { type: mongoose.Schema.Types.ObjectId, default: null },

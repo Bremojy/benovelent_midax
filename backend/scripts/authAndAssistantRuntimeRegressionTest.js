@@ -15,7 +15,7 @@ const refreshEffectIndex = commandCenter.indexOf('window.addEventListener("benov
 const refreshDependencyIndex = commandCenter.indexOf("}, [loadActivity]);", refreshEffectIndex);
 check(loaderIndex >= 0 && refreshEffectIndex > loaderIndex && refreshDependencyIndex > loaderIndex, "PortalCommandCenter initializes loadActivity before any dependency array references it");
 check((app.match(/import SmartAssistant from/g) || []).length === 1, "App imports one SmartAssistant component");
-check((app.match(/<SmartAssistant \/>/g) || []).length === 1 && app.includes("!dashboardRoute && !isLogin"), "App renders the public Assistant outside portal routes and Login");
+check((app.match(/<SmartAssistant \/>/g) || []).length === 1 && !app.includes("!dashboardRoute && !isLogin"), "App mounts one route-aware SmartAssistant globally rather than duplicating it in portal dashboards");
 check(!main.includes('/notifications/push/subscribe'), "Global service-worker bootstrap does not POST to protected push-subscribe before authentication");
 check(main.includes('navigator.serviceWorker.register("/sw.js", { updateViaCache: "none" })'), "Service-worker registration remains enabled globally");
 check(auth.includes("const hasCachedSession = Boolean(getStoredUser()?.id)"), "Auth bootstrap distinguishes an expected anonymous 401 from an expired authenticated session");

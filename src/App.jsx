@@ -361,7 +361,7 @@ function AppContent() {
       <PublicNavbar />
       <CookieConsent />
       <InstallPWA />
-      {!dashboardRoute && !isLogin && location.pathname !== "/members" && <SmartAssistant />}
+      <SmartAssistant />
       {dashboardRoute && (location.pathname === "/member" || location.pathname === "/admin" || location.pathname === "/superadmin" || location.pathname === "/member/" || location.pathname === "/admin/" || location.pathname === "/superadmin/") && <LoginFeedbackPrompt />}
 
       <Suspense

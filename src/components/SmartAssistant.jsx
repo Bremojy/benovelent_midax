@@ -8,6 +8,27 @@ import "../styles/smart-assistant.css";
 const STORAGE_KEY_PREFIX = "benovelentMidaxAssistantHistory";
 const MAX_MESSAGES = 30;
 
+// The assistant is mounted once by App and decides visibility from the current
+// route. Portal pages stay eligible, while authentication, reset and full-call
+// surfaces remain intentionally distraction-free.
+const ASSISTANT_HIDDEN_EXACT_ROUTES = new Set([
+  "/login",
+  "/forgot-password",
+  "/reset-password",
+]);
+const ASSISTANT_HIDDEN_PATTERNS = [
+  /\/call(?:\/|$)/i,
+  /\/(?:audio|video)-?call(?:\/|$)/i,
+  /\/incoming-call(?:\/|$)/i,
+];
+
+const isAssistantAllowedRoute = (pathname) => {
+  const path = String(pathname || "/");
+  if (ASSISTANT_HIDDEN_EXACT_ROUTES.has(path)) return false;
+  if (ASSISTANT_HIDDEN_PATTERNS.some((pattern) => pattern.test(path))) return false;
+  return true;
+};
+
 const FAQ = [
   { keys: ["hello", "hi", "hey", "good morning", "good afternoon", "good evening"], answer: "Hello! Welcome to Benevolent MIDAX. I can guide you around the public website and the secure member, admin and superadmin portals." },
   { keys: ["who are you", "what can you do", "help"], answer: "I’m the Benevolent Assistant. I explain published website information, show you where features are located and help with portal navigation, notifications, chat and calls." },
@@ -96,11 +117,14 @@ export default function SmartAssistant() {
   const [input, setInput] = useState("");
   const [typing, setTyping] = useState(false);
   const [showTeaser, setShowTeaser] = useState(true);
+  const [callActive, setCallActive] = useState(false);
   const [messages, setMessages] = useState(() => loadHistory(roleName, location.pathname));
   const endRef = useRef(null);
   const inputRef = useRef(null);
   const path = location.pathname;
   const isPortal = /^\/(member|admin|superadmin)(?:\/|$)/.test(path);
+  const assistantAllowed = isAssistantAllowedRoute(path);
+  const assistantVisible = assistantAllowed && !callActive;
 
   useEffect(() => {
     try {
@@ -110,8 +134,16 @@ export default function SmartAssistant() {
       );
     } catch (_) {}
   }, [messages, roleName, path]);
+  useEffect(() => {
+    const syncCallVisibility = () => setCallActive(Boolean(document.querySelector(".call-overlay")));
+    syncCallVisibility();
+    const observer = new MutationObserver(syncCallVisibility);
+    observer.observe(document.body, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  }, []);
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }); }, [messages, typing]);
   useEffect(() => {
+    if (!assistantVisible) return undefined;
     if (open) {
       setShowTeaser(false);
       const focusTimer = window.setTimeout(() => inputRef.current?.focus(), 120);
@@ -136,7 +168,15 @@ export default function SmartAssistant() {
       window.clearTimeout(hideTimer);
       window.clearTimeout(showTimer);
     };
-  }, [open, path]);
+  }, [open, path, assistantVisible]);
+  useEffect(() => {
+    if (!assistantVisible) {
+      setOpen(false);
+      setShowTeaser(false);
+    } else {
+      setShowTeaser(true);
+    }
+  }, [assistantVisible, path]);
   useEffect(() => {
     if (!open) return undefined;
     const onKeyDown = (event) => { if (event.key === "Escape") setOpen(false); };
@@ -166,6 +206,8 @@ export default function SmartAssistant() {
       setMessages((items) => [...items, makeMessage("bot", fallbackAnswer(clean, roleName))]);
     } finally { setTyping(false); }
   };
+
+  if (!assistantVisible) return null;
 
   return <div className={`smart-assistant ${open ? "is-open" : ""} ${isPortal ? "is-portal" : ""}`}>
     {showTeaser && !open && <button type="button" className="smart-assistant-teaser" onClick={() => { setOpen(true); setShowTeaser(false); }} aria-label="Open MIDAX help">

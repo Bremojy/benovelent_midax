@@ -220,6 +220,16 @@ const medicalSupportSchema = new mongoose.Schema(
         ref:"Admin"
     },
 
+    // Visibility is a staff-governed presentation state. Hidden claims remain
+    // stored and available to authorized staff, but are filtered server-side
+    // from member claim responses.
+    memberVisible: { type: Boolean, default: true, index: true },
+    hiddenAt: { type: Date, default: null },
+    hiddenBy: { type: mongoose.Schema.Types.ObjectId, default: null },
+    publishedNewsId: { type: mongoose.Schema.Types.ObjectId, ref: "News", default: null },
+    publishedToNews: { type: Boolean, default: false },
+    publishedAt: { type: Date, default: null },
+
     isDeleted:{ type:Boolean, default:false, index:true },
     deletedAt:{ type:Date, default:null },
     deletedBy:{ type:mongoose.Schema.Types.ObjectId, default:null }

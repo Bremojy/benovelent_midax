@@ -1,7 +1,7 @@
 import { confirmAction } from "../../utils/modernDialog";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { HeartHandshake, Megaphone, Trash2, Smartphone, WalletCards, LockKeyhole, RefreshCw, CheckCircle2, XCircle } from "lucide-react"
+import { Eye, HeartHandshake, Megaphone, Trash2, Smartphone, WalletCards, LockKeyhole, RefreshCw, CheckCircle2, XCircle, ShieldAlert } from "lucide-react"
 import { useAuth } from "../../context/AuthContext";
 import DashboardLayout from "../../layouts/DashboardLayout";
 import API, { resolveApiUrl } from "../../services/api";
@@ -37,10 +37,15 @@ export default function AdminClaims() {
   const [communityDraft, setCommunityDraft] = useState(null);
   const [appealReview, setAppealReview] = useState(null);
   const [appealReason, setAppealReason] = useState("");
+  const [deleteDialog, setDeleteDialog] = useState(null);
+  const [deleteConfirmation, setDeleteConfirmation] = useState("");
+  const [publishDialog, setPublishDialog] = useState(null);
+  const [publishPreview, setPublishPreview] = useState(null);
   const [filters, setFilters] = useState({ search: "", status: "", type: "", sort: "newest" });
   const [page, setPage] = useState(1);
   const [pages, setPages] = useState(1);
   const [total, setTotal] = useState(0);
+  const detailRequestRef = useRef(0);
 
   const load = async (nextPage = page) => {
     try {
@@ -73,13 +78,13 @@ export default function AdminClaims() {
   useEffect(() => { load(1); }, [filters.search, filters.status, filters.type, filters.sort]);
   useEffect(() => {
     const body = document.body;
-    if (!selected && !communityDraft && !appealReview) return undefined;
+    if (!selected && !communityDraft && !appealReview && !deleteDialog && !publishDialog) return undefined;
     const previous = body.style.overflow;
     body.style.overflow = "hidden";
     return () => { body.style.overflow = previous; };
-  }, [selected, communityDraft, appealReview]);
+  }, [selected, communityDraft, appealReview, deleteDialog, publishDialog]);
   useEffect(() => {
-    const onKeyDown = (event) => { if (event.key === "Escape" && selected) setSelected(null); };
+    const onKeyDown = (event) => { if (event.key !== "Escape") return; if (selected) setSelected(null); else if (communityDraft) setCommunityDraft(null); else if (appealReview) setAppealReview(null); else if (deleteDialog) setDeleteDialog(null); else if (publishDialog) { setPublishDialog(null); setPublishPreview(null); } };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [selected]);
@@ -91,7 +96,8 @@ export default function AdminClaims() {
   }, {}), [claims]);
 
   const open = async (claim) => {
-    setSelected(claim);
+    const requestId = ++detailRequestRef.current;
+    setSelected({ ...claim });
     setStage(claim.status || "Pending");
     setRemarks("");
     setApprovedAmount(String(claim.approvedAmount ?? claim.requestedAmount ?? ""));
@@ -100,6 +106,7 @@ export default function AdminClaims() {
     setRepaymentReference("");
     try {
       const { data } = await API.get(`/claims/${claim.sourceType}/${claim._id}`);
+      if (requestId !== detailRequestRef.current) return;
       const detail = data?.claim || data?.record;
       if (detail) {
         setSelected(detail);
@@ -109,7 +116,19 @@ export default function AdminClaims() {
         setRepaymentAmount(String(Math.min(Number(detail.balance || 0), Number(detail.monthlyInstallment || detail.balance || 0)) || ""));
       }
     } catch (e) {
+      if (requestId !== detailRequestRef.current) return;
       setError(e.response?.data?.message || e.message || "Unable to load the complete claim details.");
+    }
+  };
+
+
+  const openDocument = async (claim, url) => {
+    try {
+      await API.post(`/admin/claims/${claim.sourceType}/${claim._id}/open`);
+      const target = resolveApiUrl(url);
+      if (target) window.open(target, "_blank", "noopener,noreferrer");
+    } catch (e) {
+      setError(e.response?.data?.message || e.message || "Unable to record document access.");
     }
   };
 
@@ -226,15 +245,48 @@ export default function AdminClaims() {
     }
   };
 
-  const publishClaim = async (c) => {
+  const preparePublishClaim = async (c) => {
+    try {
+      setBusy(`preview-${c._id}`);
+      setError("");
+      const { data } = await API.get(`/claims/${c.sourceType}/${c._id}/publish-news-preview`);
+      if (!data?.success || !data.preview) throw new Error(data?.message || "Unable to prepare the public-safe News preview.");
+      setPublishPreview(data.preview);
+      setPublishDialog(c);
+    } catch (e) {
+      if (e.response?.data?.code === "CLAIM_ALREADY_PUBLISHED") {
+        setSuccess("This claim has already been published to News.");
+      } else {
+        setError(e.response?.data?.message || e.message || "Unable to prepare the public-safe News preview.");
+      }
+    } finally {
+      setBusy("");
+    }
+  };
+
+  const publishClaim = async () => {
+    if (!publishDialog) return;
+    const c = publishDialog;
     try {
       setBusy(`publish-${c._id}`);
-      setError("");
+      setError(""); setSuccess("");
       const { data } = await API.post(`/claims/${c.sourceType}/${c._id}/publish-news`);
-      if (!data?.success) throw new Error(data?.message || "Unable to publish.");
-      setSuccess("Public approval update published to News without exposing private claim details.");
+      if (!data?.success) throw Object.assign(new Error(data?.message || "The claim could not be published to News."), { response: { data } });
+      setPublishDialog(null);
+      setPublishPreview(null);
+      setSuccess(data.message || "Claim published to News successfully. The article is now available on the News page and a notification has been created.");
+      await load();
     } catch (e) {
-      setError(e.response?.data?.message || e.message || "Unable to publish to News.");
+      if (e.response?.data?.code === "CLAIM_ALREADY_PUBLISHED") {
+        setSuccess("This claim has already been published to News.");
+        setPublishDialog(null); setPublishPreview(null);
+      } else if (e.response?.data?.code === "CLAIM_NEWS_NOTIFICATION_FAILED") {
+        setError(e.response?.data?.message || "The News article was published, but the publication notification could not be confirmed.");
+        setPublishDialog(null); setPublishPreview(null);
+        await load();
+      } else {
+        setError(e.response?.data?.message || e.message || "The claim could not be published to News. No incomplete publication was reported.");
+      }
     } finally {
       setBusy("");
     }
@@ -288,35 +340,41 @@ export default function AdminClaims() {
     }
   };
 
-  const deleteClaim = async (c) => {
-    if (!isSuperAdmin || String(c.status || "") !== "Closed") return;
-    if (!await confirmAction("Delete this Closed claim permanently? The claim record will be physically removed and cannot be restored through the normal UI. Financial and audit evidence may remain where accounting integrity requires it.")) return;
+  const hideClaim = async (c) => {
+    if (!await confirmAction("Hide this claim from the member?\n\nThe claim will remain stored and available to authorized staff, but it will no longer appear on the member's Claims page.\n\nThis does not permanently delete the claim.", { title: "Hide claim from member", confirmText: "Hide Claim", danger: false })) return;
+    try {
+      setBusy(`hide-${c._id}`); setError(""); setSuccess("");
+      const { data } = await API.post(`/claims/${c.sourceType}/${c._id}/hide`);
+      if (!data?.success) throw new Error(data?.message || "The claim could not be hidden.");
+      setSuccess(data.message || "Claim hidden from the member view. The claim remains available to authorized staff.");
+      setClaims((prev) => prev.map((item) => String(item._id) === String(c._id) && item.sourceType === c.sourceType ? { ...item, memberVisible: false, hiddenAt: new Date().toISOString() } : item));
+    } catch (e) {
+      if (e.response?.data?.code === "CLAIM_ALREADY_HIDDEN") setSuccess("This claim is already hidden from the member view.");
+      else setError(e.response?.data?.message || e.message || "The claim could not be hidden. No changes were made.");
+    } finally { setBusy(""); }
+  };
+
+  const openDeleteDialog = (c) => {
+    setDeleteConfirmation("");
+    setDeleteDialog(c);
+  };
+
+  const deleteClaim = async () => {
+    if (!deleteDialog || deleteConfirmation !== "DELETE") return;
+    const c = deleteDialog;
     try {
       setBusy(`delete-${c._id}`); setError(""); setSuccess("");
       const { data } = await API.delete(`/claims/${c.sourceType}/${c._id}/permanent`);
       if (!data?.success) throw new Error(data?.message || "Unable to permanently delete claim.");
-      setSelected(null);
-      navigate(location.pathname, { replace: true });
-      setSuccess("Closed claim permanently deleted. Accounting/audit evidence was retained where required.");
-      await load(Math.min(page, pages));
+      setDeleteDialog(null);
+      setDeleteConfirmation("");
+      setSuccess("Claim permanently deleted successfully.");
+      await load();
     } catch (e) {
-      setError(e.response?.data?.message || e.message || "Unable to permanently delete claim.");
-    } finally { setBusy(""); }
-  };
-
-  const reopenClaim = async (c) => {
-    if (!await confirmAction(`Reopen this ${typeLabel(c.supportType)} case and return it to Under Review?`)) return;
-    try {
-      setBusy(`reopen-${c._id}`); setError(""); setSuccess("");
-      const { data } = await API.put(`/claims/${c.sourceType}/${c._id}/stage`, { status: "Under Review", remarks: "Case reopened by SuperAdmin for further review." });
-      if (!data?.success) throw new Error(data?.message || "Unable to reopen case.");
-      setSuccess("Case reopened successfully and returned to Under Review."); await load();
-    } catch (e) { setError(e.response?.data?.message || e.message || "Unable to reopen case."); } finally { setBusy(""); }
-  };
-
-  const openDocument = async (claim, url) => {
-    if (!url) return;
-    window.open(url.startsWith("http") ? url : resolveApiUrl(url), "_blank", "noopener,noreferrer");
+      setError(e.response?.data?.message || e.message || "The claim could not be permanently deleted. No unsafe partial deletion was reported.");
+    } finally {
+      setBusy("");
+    }
   };
 
   return (
@@ -374,7 +432,7 @@ export default function AdminClaims() {
                     })}
                   </div>
                   <div className="portal-actions">
-                    <button className="portal-btn" onClick={() => open(c)}>Review / update</button>
+                    <button className="portal-btn" onClick={() => open(c)} aria-label={`Open ${typeLabel(c.supportType)} claim details`}><Eye size={15} /> View Details</button><button className="portal-btn secondary" onClick={() => { setSelected(c); open(c); }}>Review / update</button>
                     {c.status === "Rejected" && !alreadyCommunity && (
                       <button className="portal-btn primary" onClick={() => openCommunity(c)}>
                         <HeartHandshake size={15} /> Enable community M-PESA
@@ -382,9 +440,12 @@ export default function AdminClaims() {
                     )}
                     {appealPending && <span className="portal-badge">Community appeal pending review</span>}
                     {alreadyCommunity && !appealPending && <span className="portal-badge approved">Community support enabled</span>}
-                    {["Approved", "Paid", "Completed"].includes(c.status) && <button className="portal-btn secondary" onClick={() => publishClaim(c)} disabled={busy === `publish-${c._id}`}><Megaphone size={15} />{busy === `publish-${c._id}` ? "Publishing…" : "Publish approval"}</button>}
+                    {["Approved", "Paid", "Completed"].includes(c.status) && !c.publishedToNews && !c.publishedNewsId && <button className="portal-btn secondary" onClick={() => preparePublishClaim(c)} disabled={busy === `preview-${c._id}`}><Megaphone size={15} />{busy === `preview-${c._id}` ? "Preparing…" : "Publish to News"}</button>}
+                    {c.publishedToNews && <span className="portal-badge approved">Published to News</span>}
                     {isSuperAdmin && ["Closed", "Rejected", "Cancelled"].includes(String(c.status)) && <button className="portal-btn secondary" onClick={() => reopenClaim(c)} disabled={busy === `reopen-${c._id}`}><RefreshCw size={15} />{busy === `reopen-${c._id}` ? "Reopening…" : "Reopen case"}</button>}
-                    {isSuperAdmin && c.status === "Closed" && <button className="portal-btn danger" onClick={() => deleteClaim(c)} disabled={busy === `delete-${c._id}`}><Trash2 size={15} />{busy === `delete-${c._id}` ? "Deleting permanently…" : "Delete permanently"}</button>}
+                    {isSuperAdmin && c.memberVisible === false && <span className="portal-badge hidden-claim-badge"><ShieldAlert size={13} /> Hidden from member</span>}
+                    {isSuperAdmin && c.memberVisible !== false && <button className="portal-btn secondary" onClick={() => hideClaim(c)} disabled={busy === `hide-${c._id}`}><ShieldAlert size={15} />{busy === `hide-${c._id}` ? "Hiding…" : "Hide"}</button>}
+                    {isSuperAdmin && c.status === "Closed" && <button className="portal-btn danger" onClick={() => openDeleteDialog(c)} disabled={busy === `delete-${c._id}`}><Trash2 size={15} />Delete permanently</button>}
                   </div>
                   {Array.isArray(c.timeline) && c.timeline.length > 0 && <div className="claim-latest"><strong>Latest review</strong><p>{c.timeline[c.timeline.length - 1]?.status}: {c.timeline[c.timeline.length - 1]?.remarks || "—"}</p></div>}
                 </article>
@@ -459,10 +520,64 @@ export default function AdminClaims() {
           </section>
         </div>}
 
+        {publishDialog && publishPreview && <div className="portal-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="claim-news-publish-title">
+          <section className="portal-modal-card claim-news-preview-dialog">
+            <div className="portal-modal-head"><div><span>PUBLIC NEWS REVIEW</span><h2 id="claim-news-publish-title">Publish this claim as News?</h2><p>Only the public-safe article below will be published. Private member information and evidence are excluded.</p></div><button className="portal-btn secondary" onClick={() => { setPublishDialog(null); setPublishPreview(null); }}>Close</button></div>
+            <div className="claim-news-preview-card"><span className="portal-badge">{publishPreview.category}</span><h3>{publishPreview.title}</h3><p className="claim-news-summary">{publishPreview.summary}</p><div className="claim-news-content">{publishPreview.content}</div></div>
+            <div className="portal-alert" style={{ marginTop: 14 }}><strong>Privacy check:</strong> The preview contains no member name, member number, phone/email, private financial amount, internal review note, or evidence attachment.</div>
+            <div className="portal-actions"><button className="portal-btn primary" onClick={publishClaim} disabled={busy === `publish-${publishDialog._id}`}><Megaphone size={16} />{busy === `publish-${publishDialog._id}` ? "Publishing…" : "Publish to News"}</button><button className="portal-btn secondary" onClick={() => { setPublishDialog(null); setPublishPreview(null); }}>Cancel</button></div>
+          </section>
+        </div>}
+
+        {deleteDialog && <div className="portal-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="claim-delete-title">
+          <section className="portal-modal-card claim-delete-dialog">
+            <div className="portal-modal-head"><div><span>DESTRUCTIVE ACTION</span><h2 id="claim-delete-title">Permanently delete this claim?</h2><p>This action cannot be undone. The claim record will be permanently removed from the database. Accounting and audit evidence will be protected where required.</p></div><button className="portal-btn secondary" onClick={() => { setDeleteDialog(null); setDeleteConfirmation(""); }}>Close</button></div>
+            <div className="portal-alert" style={{ marginTop: 8 }}><strong>Claim:</strong> {typeLabel(deleteDialog.supportType)} • {deleteDialog.member?.fullName || "Member"} • {deleteDialog._id}</div>
+            <div className="portal-field" style={{ marginTop: 14 }}><label htmlFor="claim-delete-confirmation">Type DELETE to confirm</label><input id="claim-delete-confirmation" value={deleteConfirmation} onChange={(event) => setDeleteConfirmation(event.target.value)} autoComplete="off" spellCheck="false" placeholder="DELETE" /></div>
+            <div className="portal-actions"><button className="portal-btn danger" onClick={deleteClaim} disabled={deleteConfirmation !== "DELETE" || busy === `delete-${deleteDialog._id}`}><Trash2 size={16} />{busy === `delete-${deleteDialog._id}` ? "Deleting…" : "Permanently Delete"}</button><button className="portal-btn secondary" onClick={() => { setDeleteDialog(null); setDeleteConfirmation(""); }}>Cancel</button></div>
+          </section>
+        </div>}
+
         {selected && <div className="portal-modal-backdrop claim-review-backdrop" role="dialog" aria-modal="true" aria-labelledby="claim-review-title">
           <section className="portal-modal-card claim-review-dialog">
             <div className="portal-modal-head claim-review-header"><div><span>PROFESSIONAL REVIEW</span><h2 id="claim-review-title">Review {typeLabel(selected.supportType)} claim</h2><p><strong>{selected.member?.fullName || "Member"}</strong> • {money(selected.requestedAmount)} requested</p></div><button className="portal-btn secondary" onClick={() => setSelected(null)}>Close</button></div>
             <div className="claim-review-body">
+            <section className="claim-detail-section" aria-labelledby="claim-submitted-details">
+              <div className="claim-detail-section-head"><div><span>SUBMITTED CLAIM</span><h3 id="claim-submitted-details">Complete authorized claim details</h3><p>The information below is loaded from the selected claim record. Nothing is fabricated in the interface.</p></div></div>
+              <div className="claim-detail-grid">
+                <div><span>Claim reference</span><strong>{selected._id || "—"}</strong></div>
+                <div><span>Claim type</span><strong>{typeLabel(selected.supportType)}</strong></div>
+                <div><span>Status</span><strong>{selected.status || "—"}</strong></div>
+                <div><span>Submitted</span><strong>{formatDate(selected.createdAt || selected.applicationDate)}</strong></div>
+                <div><span>Last updated</span><strong>{formatDate(selected.updatedAt)}</strong></div>
+                <div><span>Requested amount</span><strong>{money(selected.requestedAmount)}</strong></div>
+                <div><span>Approved amount</span><strong>{money(selected.approvedAmount)}</strong></div>
+                <div><span>Payment reference</span><strong>{selected.paymentReference || "—"}</strong></div>
+              </div>
+              <div className="claim-detail-grid claim-member-grid">
+                <div><span>Member name</span><strong>{selected.member?.fullName || "—"}</strong></div>
+                <div><span>Employee / member number</span><strong>{selected.member?.memberNumber || selected.memberNumber || "—"}</strong></div>
+                <div><span>Email</span><strong>{selected.member?.email || "—"}</strong></div>
+                <div><span>Phone</span><strong>{selected.member?.phone || "—"}</strong></div>
+                <div><span>Position</span><strong>{selected.member?.position || "—"}</strong></div>
+                <div><span>Employer</span><strong>{selected.member?.employer || "—"}</strong></div>
+              </div>
+              {(selected.description || selected.purpose || selected.caseDescription || selected.reason || selected.diagnosis || selected.treatment || selected.remarks || selected.rejectionReason) && <div className="claim-detail-texts">
+                {[["Description", selected.description], ["Purpose", selected.purpose], ["Case description", selected.caseDescription], ["Reason", selected.reason], ["Diagnosis", selected.diagnosis], ["Treatment", selected.treatment], ["Review notes", selected.reviewNotes || selected.remarks], ["Rejection reason", selected.rejectionReason]].filter(([, value]) => String(value || "").trim()).map(([label, value]) => <div key={label}><span>{label}</span><p>{value}</p></div>)}
+              </div>}
+              {(selected.dependent || selected.dependentName || selected.relationship) && <div className="claim-detail-subpanel"><strong>Dependent / beneficiary</strong><div className="claim-detail-grid"><div><span>Name</span><strong>{selected.dependent?.fullName || selected.dependentName || "—"}</strong></div><div><span>Relationship</span><strong>{selected.dependent?.relationship || selected.relationship || "—"}</strong></div><div><span>School</span><strong>{selected.dependent?.school || selected.school || "—"}</strong></div><div><span>Education level</span><strong>{selected.dependent?.educationLevel || selected.educationLevel || "—"}</strong></div></div></div>}
+              <div className="claim-detail-subpanel"><strong>Evidence & attachments</strong>
+                {(selected.documents || []).length === 0 && !(selected.burialPermitChiefLetter || selected.deathCertificate || selected.burialPermit || selected.chiefLetter || selected.feeStructure || selected.admissionLetter || (selected.supportingDocuments || []).length) ? <p className="claim-detail-empty">No evidence files are recorded on this claim.</p> : <div className="claim-documents">
+                  {(selected.documents || []).map((doc, index) => { const url = typeof doc === "string" ? doc : doc?.fileUrl || doc?.url; return url ? <button key={`doc-${index}`} type="button" className="portal-btn secondary" onClick={() => openDocument(selected, url)}>{doc?.label || doc?.fileName || `Document ${index + 1}`}</button> : null; })}
+                  {[["Burial permit / authority letter", selected.burialPermitChiefLetter], ["Legacy death certificate", selected.deathCertificate], ["Legacy burial permit", selected.burialPermit], ["Legacy chief letter", selected.chiefLetter], ["Fee structure", selected.feeStructure], ["Admission letter", selected.admissionLetter]].map(([label, url]) => url ? <button key={label} type="button" className="portal-btn secondary" onClick={() => openDocument(selected, url)}>{label}</button> : null)}
+                  {(selected.supportingDocuments || []).map((url, index) => url ? <button key={`supporting-${index}`} type="button" className="portal-btn secondary" onClick={() => openDocument(selected, url)}>Supporting document {index + 1}</button> : null)}
+                </div>}
+              </div>
+              <div className="claim-detail-subpanel"><strong>Workflow history</strong>
+                {(selected.timeline || []).length ? <ol className="claim-detail-timeline">{selected.timeline.map((entry, index) => <li key={`${entry.date || index}-${index}`}><div><strong>{entry.status || "Update"}</strong><time>{formatDate(entry.date)}</time></div><p>{entry.remarks || "—"}</p></li>)}</ol> : <p className="claim-detail-empty">No workflow timeline entries are recorded.</p>}
+              </div>
+            </section>
+            <div className="claim-detail-subpanel claim-additional-fields"><strong>Additional submitted fields</strong><div className="claim-additional-grid">{Object.entries(selected).filter(([key, value]) => !["_id","__v","member","dependent","documents","timeline","supportingDocuments","burialPermitChiefLetter","deathCertificate","burialPermit","chiefLetter","feeStructure","admissionLetter","createdAt","updatedAt","status","requestedAmount","approvedAmount","paymentReference","remarks","reviewNotes","rejectionReason","supportType","sourceType","amount","memberVisible","hiddenAt","hiddenBy","publishedNewsId","publishedToNews","publishedAt"].includes(key) && value !== null && value !== undefined && typeof value !== "object" && String(value).trim() !== "").map(([key, value]) => <div key={key}><span>{key.replace(/([A-Z])/g, " $1").replace(/^./, (ch) => ch.toUpperCase())}</span><strong>{String(value)}</strong></div>)}</div></div>
             <div className="portal-field"><label htmlFor="claim-stage">Stage</label><select id="claim-stage" value={stage} onChange={(e) => setStage(e.target.value)}>{STAGES.map((x) => <option key={x} value={x}>{x}</option>)}</select></div>
             {stage === "Approved" && <div className="portal-field" style={{ marginTop: 12 }}><label htmlFor="approved-amount">Approved amount</label><input id="approved-amount" type="number" min="0" inputMode="decimal" value={approvedAmount} onChange={(e) => setApprovedAmount(e.target.value)} /></div>}
             {(stage === "Paid" || stage === "Completed") && <div className="portal-field" style={{ marginTop: 12 }}><label htmlFor="payment-reference">Payment transaction/reference</label><input id="payment-reference" type="text" value={paymentReference} onChange={(e) => setPaymentReference(e.target.value)} placeholder="M-PESA receipt, bank reference, or reconciled transaction ID" required /><small>Required payment evidence before Paid/Completed can be recorded.</small></div>}

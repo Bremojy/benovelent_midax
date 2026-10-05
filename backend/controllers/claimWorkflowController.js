@@ -11,10 +11,59 @@ const News = require("../models/News");
 const createAuditLog = require("../utils/createAuditLog");
 const Notification = require("../models/Notification");
 const SupportRequestPermissionRequest = require("../models/SupportRequestPermissionRequest");
+const mongoose = require("mongoose");
+const crypto = require("crypto");
+const redisCache = require("../services/redisCache");
 
 const MODEL_MAP = { medical: MedicalSupport, funeral: FuneralSupport, education: EducationSupport, support: SupportRequest };
 const LABEL_MAP = { medical: "Medical", funeral: "Funeral", education: "Education", support: "Support" };
 const STAGES = ["Pending", "Under Review", "Documents Required", "Eligibility Review", "Approval Review", "Approved", "Disbursement Pending", "Paid", "Completed", "Rejected", "Cancelled", "Closed"];
+
+const buildPublicClaimNews = ({ key, claim, now = new Date() }) => {
+  const label = LABEL_MAP[key] || "Support";
+  const sourceKey = `${key}:${String(claim?._id || "")}`;
+  const hash = crypto.createHash("sha256").update(sourceKey).digest("hex");
+  const title = `Benevolent MIDAX ${label} Support Update`;
+  const summary = `A ${label.toLowerCase()} support case has been approved through the Benevolent MIDAX support process.`;
+  const content = [
+    `Benevolent MIDAX has approved a ${label.toLowerCase()} support case through its member support process.`,
+    "",
+    "This public update intentionally excludes member identity, contact details, personal identifiers, financial amounts, private circumstances, internal review notes and submitted evidence.",
+    "",
+    `Publication date: ${new Date(now).toLocaleDateString("en-KE", { day: "2-digit", month: "long", year: "numeric", timeZone: "Africa/Nairobi" })}.`,
+  ].join("\n");
+  return {
+    title,
+    summary,
+    content,
+    category: "Announcement",
+    slug: `claim-${key}-${hash.slice(0, 20)}`,
+    newsId: new mongoose.Types.ObjectId(hash.slice(0, 24)),
+  };
+};
+
+const notifyNewsPublication = async ({ news, actorId, actorModel }) => {
+  const members = await Member.find({ status: "active", isDeleted: false }).select("_id").lean();
+  if (!members.length) return { targeted: 0, created: 0 };
+  const rows = await Promise.all(members.map(async (member) => {
+    const notification = await createNotification({
+      recipient: member._id,
+      recipientModel: "Member",
+      sender: actorId,
+      senderModel: actorModel,
+      title: "New Benevolent MIDAX News Published",
+      message: "A new Benevolent MIDAX news update has been published. Open News to view the latest update.",
+      type: "news",
+      referenceId: news._id,
+      referenceModel: "News",
+      link: `/news?newsId=${news._id}`,
+      icon: "campaign",
+      metadata: { publication: "claim", sourceModel: news.sourceModel, sourceId: news.sourceId },
+    });
+    return notification;
+  }));
+  return { targeted: members.length, created: rows.filter(Boolean).length };
+};
 
 function modelFor(type) {
   const key = String(type || "").toLowerCase();
@@ -216,6 +265,24 @@ exports.list = async (req, res) => {
   }
 };
 
+exports.publishNewsPreview = async (req, res) => {
+  try {
+    const result = await getClaim(req.params.type, req.params.id);
+    const status = String(result.claim.status || "Pending");
+    if (!["Approved", "Paid", "Completed"].includes(status)) {
+      return res.status(400).json({ success: false, message: "Only an approved, paid, or completed support case can be published as public News." });
+    }
+    if (result.claim.publishedToNews || result.claim.publishedNewsId) {
+      const existing = result.claim.publishedNewsId ? await News.findById(result.claim.publishedNewsId).lean() : await News.findOne({ sourceModel: result.Model.modelName, sourceId: String(result.claim._id) }).lean();
+      if (existing) return res.status(409).json({ success: false, code: "CLAIM_ALREADY_PUBLISHED", message: "This claim has already been published to News.", news: existing });
+    }
+    const preview = buildPublicClaimNews({ key: result.key, claim: result.claim });
+    return res.json({ success: true, preview: { title: preview.title, summary: preview.summary, content: preview.content, category: preview.category } });
+  } catch (error) {
+    return res.status(error.status || 500).json({ success: false, message: error.message });
+  }
+};
+
 exports.getOne = async (req, res) => {
   try {
     const result = await getClaim(req.params.type, req.params.id);
@@ -242,6 +309,34 @@ exports.getOne = async (req, res) => {
   }
 };
 
+
+exports.hideFromMember = async (req, res) => {
+  try {
+    if (String(req.user?.role || "").toLowerCase() !== "superadmin") {
+      return res.status(403).json({ success: false, code: "CLAIM_HIDE_FORBIDDEN", message: "Only SuperAdmin can hide a claim from the member view." });
+    }
+    const result = await getClaim(req.params.type, req.params.id);
+    if (result.claim.memberVisible === false) {
+      return res.status(409).json({ success: false, code: "CLAIM_ALREADY_HIDDEN", message: "This claim is already hidden from the member view." });
+    }
+    result.claim.memberVisible = false;
+    result.claim.hiddenAt = new Date();
+    result.claim.hiddenBy = req.user._id;
+    await result.claim.save();
+    await createAuditLog({
+      user: req.user._id,
+      userRole: "superadmin",
+      action: "CLAIM_HIDDEN_FROM_MEMBER",
+      module: "Claim",
+      description: `SuperAdmin hid ${LABEL_MAP[result.key]} claim ${result.claim._id} from the member view.`,
+      req,
+      metadata: { claimId: String(result.claim._id), claimType: result.key, memberId: String(result.claim.member || "") },
+    });
+    return res.json({ success: true, hidden: true, claimId: result.claim._id, message: "Claim hidden from the member view. The claim remains available to authorized staff." });
+  } catch (error) {
+    return res.status(error.status || 500).json({ success: false, message: error.message });
+  }
+};
 
 exports.permanentDelete = async (req, res) => {
   try {
@@ -311,7 +406,7 @@ exports.permanentDelete = async (req, res) => {
     await createAuditLog({
       user: req.user._id,
       userRole: req.user.role,
-      action: "CLAIM_PERMANENT_DELETE_COMPLETED",
+      action: "CLAIM_PERMANENTLY_DELETED",
       module: "Claim",
       description: `SuperAdmin permanently deleted Closed ${LABEL_MAP[result.key]} claim ${claimSnapshot._id}.`,
       req,
@@ -352,20 +447,110 @@ exports.publishClaimToNews = async (req, res) => {
     const result = await getClaim(req.params.type, req.params.id);
     const status = String(result.claim.status || "Pending");
     if (!["Approved", "Paid", "Completed"].includes(status)) {
-      return res.status(400).json({ success: false, message: "Only an approved, paid, or completed support case can be published as a support approval." });
+      return res.status(400).json({ success: false, code: "CLAIM_NEWS_STATUS_FORBIDDEN", message: "Only an approved, paid, or completed support case can be published as public News." });
     }
-    const member = await Member.findById(result.claim.member).select("fullName memberNumber").lean();
+
     const sourceModel = result.Model.modelName;
     const sourceId = String(result.claim._id);
-    let news = await News.findOne({ sourceModel, sourceId });
-    const title = `${LABEL_MAP[result.key]} Support Approved`;
-    const approvedAmount = Number(result.claim.approvedAmount || result.claim.requestedAmount || 0);
-    const content = `${title}.\n\nBenevolent MIDAX has approved KSh ${approvedAmount.toLocaleString("en-KE")} in ${LABEL_MAP[result.key].toLowerCase()} support for ${member?.fullName || "a member"}. This public update confirms the support decision without exposing private medical, education, funeral, or identity details.\n\nReference: ${member?.memberNumber || "Member support case"}.`;
-    const payload = { title, summary: `A ${LABEL_MAP[result.key].toLowerCase()} support case has been approved.`, content, category: "Announcement", published: true, status: "published", publishDate: new Date(), author: req.user._id, sourceModel, sourceId };
-    if (news) { Object.assign(news, payload); await news.save(); }
-    else news = await News.create(payload);
-    return res.json({ success: true, news, message: "Support approval published to public News." });
-  } catch (error) { return res.status(error.status || 500).json({ success: false, message: error.message }); }
+    if (result.claim.publishedToNews || result.claim.publishedNewsId) {
+      const existing = result.claim.publishedNewsId
+        ? await News.findById(result.claim.publishedNewsId)
+        : await News.findOne({ sourceModel, sourceId });
+      if (existing) return res.status(409).json({ success: false, code: "CLAIM_ALREADY_PUBLISHED", message: "This claim has already been published to News.", news: existing });
+    }
+
+    const existingBySource = await News.findOne({ sourceModel, sourceId });
+    if (existingBySource) {
+      if (existingBySource.published && existingBySource.status === "published") {
+        result.claim.publishedNewsId = existingBySource._id;
+        result.claim.publishedToNews = true;
+        result.claim.publishedAt = existingBySource.publishDate || existingBySource.createdAt || new Date();
+        await result.claim.save();
+        return res.status(409).json({ success: false, code: "CLAIM_ALREADY_PUBLISHED", message: "This claim has already been published to News.", news: existingBySource });
+      }
+      return res.status(409).json({ success: false, code: "CLAIM_NEWS_SOURCE_CONFLICT", message: "A News record already exists for this claim and must be reconciled from the News manager before publishing again." });
+    }
+
+    const preview = buildPublicClaimNews({ key: result.key, claim: result.claim });
+    const now = new Date();
+    const payload = {
+      title: preview.title,
+      slug: preview.slug,
+      summary: preview.summary,
+      content: preview.content,
+      category: preview.category,
+      published: true,
+      status: "published",
+      publishDate: now,
+      author: req.user._id,
+      authorModel: String(req.user?.role || "admin").toLowerCase() === "superadmin" ? "SuperAdmin" : "Admin",
+      sourceModel,
+      sourceId,
+      _id: preview.newsId,
+    };
+
+    let news;
+    try {
+      news = await News.create(payload);
+    } catch (error) {
+      if (error?.code === 11000) {
+        news = await News.findOne({ _id: preview.newsId }) || await News.findOne({ sourceModel, sourceId });
+        if (!news) throw error;
+        if (news.published && news.status === "published") {
+          result.claim.publishedNewsId = news._id;
+          result.claim.publishedToNews = true;
+          result.claim.publishedAt = news.publishDate || new Date();
+          await result.claim.save();
+          return res.status(409).json({ success: false, code: "CLAIM_ALREADY_PUBLISHED", message: "This claim has already been published to News.", news });
+        }
+      } else {
+        throw error;
+      }
+    }
+
+    result.claim.publishedNewsId = news._id;
+    result.claim.publishedToNews = true;
+    result.claim.publishedAt = news.publishDate || now;
+    await result.claim.save();
+
+    await createAuditLog({
+      user: req.user._id,
+      userRole: req.user.role,
+      action: "CLAIM_PUBLISHED_TO_NEWS",
+      module: "Claim",
+      description: `Published ${LABEL_MAP[result.key]} claim ${result.claim._id} as public-safe News ${news._id}.`,
+      req,
+      metadata: { claimId: sourceId, claimType: result.key, newsId: String(news._id), publicSafe: true },
+    });
+
+    let notificationResult = { targeted: 0, created: 0 };
+    try {
+      notificationResult = await notifyNewsPublication({
+        news,
+        actorId: req.user._id,
+        actorModel: payload.authorModel,
+      });
+    } catch (notificationError) {
+      console.error("Claim-to-News notification creation failed after publication:", notificationError);
+    }
+
+    await redisCache.invalidatePrefix("public:news");
+
+    if (notificationResult.targeted > 0 && notificationResult.created === 0) {
+      return res.status(500).json({ success: false, code: "CLAIM_NEWS_NOTIFICATION_FAILED", published: true, newsId: news._id, message: "The News article was published, but the publication notification could not be confirmed. The article remains available on the News page." });
+    }
+
+    return res.status(201).json({
+      success: true,
+      published: true,
+      news,
+      notification: { targeted: notificationResult.targeted, created: notificationResult.created },
+      message: "Claim published to News successfully. The article is now available on the News page and a notification has been created.",
+    });
+  } catch (error) {
+    console.error("Claim-to-News publication error:", error);
+    return res.status(error.status || 500).json({ success: false, message: error.message || "The claim could not be published to News. No incomplete publication was reported." });
+  }
 };
 
 exports.publishCommunityToNews = async (req, res) => {

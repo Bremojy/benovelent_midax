@@ -17,7 +17,6 @@ import {
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import DashboardLayout from "../../layouts/DashboardLayout";
-import SmartAssistant from "../../components/SmartAssistant";
 import { useAuth } from "../../context/AuthContext";
 import AnimatedWelcomeDashboardHero from "../../components/dashboard/AnimatedWelcomeDashboardHero";
 import {
@@ -98,7 +97,6 @@ export default function AdminDashboard() {
   return (
     <DashboardLayout>
       <div className="admin-dashboard v7-portal">
-        <SmartAssistant />
         <AnimatedWelcomeDashboardHero
           role="admin"
           displayName={user?.fullName || user?.name || stats?.adminProfile?.name || "Admin"}
