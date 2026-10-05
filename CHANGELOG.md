@@ -1,3 +1,10 @@
+## 18.5.3 — 2026-10-05
+
+- Repaired SuperAdmin Community M-PESA permanent deletion so the destructive cleanup no longer refuses requests merely because test funds were collected or disbursed.
+- Community deletion now removes the campaign, linked application-side M-PESA collection records, B2C payout records, related finance/notification/news records, and supports both MongoDB transactional and ordered-cascade environments.
+- Added transaction-capability detection/fallback so MongoDB deployments without multi-document transaction support do not surface a generic service-unavailable error for this cleanup operation.
+- Preserved an explicit warning that application-record deletion cannot reverse money already moved through Safaricom.
+
 ## 18.5.2 — 2026-10-02
 
 - Replaced the invalid `Instagram` import from `lucide-react` with a lightweight inline Instagram SVG in the existing footer.

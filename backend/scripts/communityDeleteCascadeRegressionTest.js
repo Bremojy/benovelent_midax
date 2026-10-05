@@ -14,6 +14,8 @@ const checks = [
   [controller.includes('Notification.deleteMany'), "related notifications are deleted"],
   [controller.includes('News.deleteMany'), "related CommunityAssistance News records are deleted"],
   [controller.includes('CommunityAssistance.deleteOne'), "community assistance request itself is deleted"],
+  [controller.includes('canUseMongoTransactions') && controller.includes('ordered_cascade_fallback'), "Community deletion has a transaction-aware fallback for MongoDB environments without transaction support"],
+  [controller.includes('contributionTransactionIds') && controller.includes('{ _id: { $in: campaignLinkedTransactionIds } }'), "Community deletion also captures M-PESA transactions linked through the campaign contribution list"],
   [!controller.includes('FUNDS_ALREADY_RECORDED'), "funded test requests are not blocked from permanent deletion"],
   [adminClaims.includes('does not reverse money already moved through the real Safaricom M-PESA system'), "SuperAdmin Claims dialog explains real-money non-reversal"],
   [superAccounts.includes('including M-PESA transaction records'), "SuperAdmin Accounts delete confirmation covers M-PESA records"],

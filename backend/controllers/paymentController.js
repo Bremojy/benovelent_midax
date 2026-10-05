@@ -1169,96 +1169,151 @@ exports.cancelTransaction = async (req, res) => {
 };
 
 exports.deleteCommunity = async (req, res) => {
-  let session;
-  try {
-    const campaign = await CommunityAssistance.findById(req.params.id).lean();
-    if (!campaign) return res.status(404).json({ success: false, message: "Community assistance request not found." });
+  const isTransactionUnsupported = (error) => {
+    const message = String(error?.message || "").toLowerCase();
+    const code = Number(error?.code);
+    return code === 20
+      || /transaction numbers are only allowed|transactions are not supported|does not support transactions|replica set|mongos/.test(message);
+  };
 
-    // This is an explicit SuperAdmin destructive cleanup operation. It removes the
-    // application records created for this community request, including successful
-    // M-PESA collection records. It does NOT reverse a real Safaricom movement.
-    const mpesaTransactions = await MpesaTransaction.find({
+  const canUseMongoTransactions = () => {
+    try {
+      const client = mongoose.connection?.getClient?.();
+      const topologyType = client?.topology?.description?.type;
+      return topologyType === "ReplicaSetWithPrimary" || topologyType === "Sharded";
+    } catch (_) {
+      return false;
+    }
+  };
+
+  const deleteCommunityRecords = async ({ session } = {}) => {
+    const options = session ? { session } : {};
+
+    await MpesaTransaction.deleteMany({
       referenceModel: "CommunityAssistance",
       referenceId: campaign._id,
+    }, options);
+
+    await MpesaB2CTransaction.deleteMany({
+      _id: { $in: payoutIds },
+    }, options);
+
+    await Finance.deleteMany({ $or: financeOr }, options);
+    await Notification.deleteMany({ $or: notificationOr }, options);
+    await News.deleteMany({ sourceModel: "CommunityAssistance", sourceId: String(campaign._id) }, options);
+    await CommunityAssistance.deleteOne({ _id: campaign._id }, options);
+  };
+
+  let session;
+  let campaign;
+  let mpesaTransactionCount = 0;
+  let payoutTransactionCount = 0;
+  let financeOr;
+  let notificationOr;
+  let payoutIds = [];
+  let mpesaIds = [];
+  let financeReferences = [];
+  let payoutIdentifiers = [];
+  let deletedWithTransaction = false;
+
+  try {
+    campaign = await CommunityAssistance.findById(req.params.id).lean();
+    if (!campaign) return res.status(404).json({ success: false, message: "Community assistance request not found." });
+
+    // SuperAdmin destructive testing cleanup: remove the community campaign and
+    // all application-side records created for it, including successful M-PESA
+    // collection records and B2C payout records. This does not reverse any real Safaricom movement already processed outside this application's database.
+    const campaignLinkedTransactionIds = Array.isArray(campaign.contributionTransactionIds)
+      ? campaign.contributionTransactionIds.filter(Boolean)
+      : [];
+    const mpesaTransactions = await MpesaTransaction.find({
+      $or: [
+        { referenceModel: "CommunityAssistance", referenceId: campaign._id },
+        ...(campaignLinkedTransactionIds.length ? [{ _id: { $in: campaignLinkedTransactionIds } }] : []),
+      ],
     }).select("_id mpesaReceiptNumber manualTransactionCode checkoutRequestId requestId").lean();
-    const mpesaIds = mpesaTransactions.map((transaction) => transaction._id);
-    const financeReferences = mpesaTransactions.flatMap((transaction) => [
+    mpesaIds = mpesaTransactions.map((transaction) => transaction._id);
+    financeReferences = mpesaTransactions.flatMap((transaction) => [
       transaction.mpesaReceiptNumber,
       transaction.manualTransactionCode,
       transaction.checkoutRequestId,
       transaction.requestId,
     ]).filter(Boolean).map(String);
+    mpesaTransactionCount = mpesaIds.length;
 
-    const payoutIdentifiers = [campaign.payoutConversationId, campaign.payoutOriginatorConversationId].filter(Boolean).map(String);
+    payoutIdentifiers = [campaign.payoutConversationId, campaign.payoutOriginatorConversationId].filter(Boolean).map(String);
     const legacyPayoutReference = `CASE-${String(campaign._id).slice(-8)}`;
     const payoutTransactions = await MpesaB2CTransaction.find({
       $or: [
         { requestReference: legacyPayoutReference },
-        ...(payoutIdentifiers.length ? [{ conversationId: { $in: payoutIdentifiers } }, { originatorConversationId: { $in: payoutIdentifiers } }] : []),
+        ...(payoutIdentifiers.length ? [
+          { conversationId: { $in: payoutIdentifiers } },
+          { originatorConversationId: { $in: payoutIdentifiers } },
+        ] : []),
       ],
     }).select("_id conversationId originatorConversationId").lean();
-    const payoutIds = payoutTransactions.map((transaction) => transaction._id);
+    payoutIds = payoutTransactions.map((transaction) => transaction._id);
+    payoutTransactionCount = payoutIds.length;
 
-    session = await mongoose.startSession();
-    await session.withTransaction(async () => {
-      await createAuditLog({
-        user: req.user._id,
-        userRole: req.user.role,
-        action: "COMMUNITY_COLLECTION_DELETE_REQUESTED",
-        module: "M-PESA",
-        description: `SuperAdmin requested permanent deletion of community M-PESA request ${campaign.title}.`,
-        req,
-        metadata: {
-          campaignId: campaign._id,
-          raisedAmount: Number(campaign.raisedAmount || 0),
-          payoutAmount: Number(campaign.payoutAmount || 0),
-          mpesaTransactionCount: mpesaIds.length,
-          b2cTransactionCount: payoutIds.length,
-        },
-      });
+    financeOr = [
+      { transactionNumber: `BMX-PAYOUT-${campaign._id}` },
+      ...(payoutIds.length ? [{ transactionNumber: { $in: payoutIds.map((id) => `BMX-B2C-${id}`) } }] : []),
+      ...(financeReferences.length ? [{ referenceNumber: { $in: financeReferences } }] : []),
+      ...(payoutIdentifiers.length ? [{ referenceNumber: { $in: payoutIdentifiers } }] : []),
+    ];
 
-      await MpesaTransaction.deleteMany(
-        { _id: { $in: mpesaIds } },
-        { session }
-      );
-      await MpesaB2CTransaction.deleteMany(
-        { _id: { $in: payoutIds } },
-        { session }
-      );
+    notificationOr = [
+      { referenceModel: "CommunityAssistance", referenceId: campaign._id },
+      ...(mpesaIds.length ? [{ referenceModel: "MpesaTransaction", referenceId: { $in: mpesaIds } }] : []),
+      ...(payoutIds.length ? [{ referenceModel: "MpesaB2CTransaction", referenceId: { $in: payoutIds } }] : []),
+    ];
 
-      const financeOr = [
-        { transactionNumber: `BMX-PAYOUT-${campaign._id}` },
-        ...(payoutIds.length ? [{ transactionNumber: { $in: payoutIds.map((id) => `BMX-B2C-${id}`) } }] : []),
-        ...(financeReferences.length ? [{ referenceNumber: { $in: financeReferences } }] : []),
-        ...(payoutIdentifiers.length ? [{ referenceNumber: { $in: payoutIdentifiers } }] : []),
-      ];
-      await Finance.deleteMany({ $or: financeOr }, { session });
+    await createAuditLog({
+      user: req.user._id,
+      userRole: req.user.role,
+      action: "COMMUNITY_COLLECTION_DELETE_REQUESTED",
+      module: "M-PESA",
+      description: `SuperAdmin requested permanent deletion of community M-PESA request ${campaign.title}.`,
+      req,
+      metadata: {
+        campaignId: campaign._id,
+        raisedAmount: Number(campaign.raisedAmount || 0),
+        payoutAmount: Number(campaign.payoutAmount || 0),
+        mpesaTransactionCount,
+        b2cTransactionCount: payoutTransactionCount,
+      },
+    });
 
-      const notificationOr = [
-        { referenceModel: "CommunityAssistance", referenceId: campaign._id },
-        ...(mpesaIds.length ? [{ referenceModel: "MpesaTransaction", referenceId: { $in: mpesaIds } }] : []),
-        ...(payoutIds.length ? [{ referenceModel: "MpesaB2CTransaction", referenceId: { $in: payoutIds } }] : []),
-      ];
-      await Notification.deleteMany({ $or: notificationOr }, { session });
+    if (canUseMongoTransactions()) {
+      session = await mongoose.startSession();
+      try {
+        await session.withTransaction(async () => {
+          await deleteCommunityRecords({ session });
+        });
+        deletedWithTransaction = true;
+      } finally {
+        await session.endSession().catch(() => {});
+        session = undefined;
+      }
+    } else {
+      await deleteCommunityRecords();
+    }
 
-      await News.deleteMany({ sourceModel: "CommunityAssistance", sourceId: String(campaign._id) }, { session });
-      await CommunityAssistance.deleteOne({ _id: campaign._id }, { session });
-
-      await createAuditLog({
-        user: req.user._id,
-        userRole: req.user.role,
-        action: "COMMUNITY_COLLECTION_DELETED",
-        module: "M-PESA",
-        description: `SuperAdmin permanently deleted community M-PESA request ${campaign.title} and its application-side related records.`,
-        req,
-        metadata: {
-          campaignId: campaign._id,
-          raisedAmount: Number(campaign.raisedAmount || 0),
-          payoutAmount: Number(campaign.payoutAmount || 0),
-          mpesaTransactionCount: mpesaIds.length,
-          b2cTransactionCount: payoutIds.length,
-        },
-      });
+    await createAuditLog({
+      user: req.user._id,
+      userRole: req.user.role,
+      action: "COMMUNITY_COLLECTION_DELETED",
+      module: "M-PESA",
+      description: `SuperAdmin permanently deleted community M-PESA request ${campaign.title} and its application-side related records.`,
+      req,
+      metadata: {
+        campaignId: campaign._id,
+        raisedAmount: Number(campaign.raisedAmount || 0),
+        payoutAmount: Number(campaign.payoutAmount || 0),
+        mpesaTransactionCount,
+        b2cTransactionCount: payoutTransactionCount,
+        deletionMode: deletedWithTransaction ? "mongo_transaction" : "ordered_cascade",
+      },
     });
 
     await invalidateFinanceCache();
@@ -1266,19 +1321,74 @@ exports.deleteCommunity = async (req, res) => {
 
     return res.json({
       success: true,
-      message: "Community M-PESA request and all related application records were permanently deleted. This does not reverse any real M-PESA movement already processed by Safaricom.",
+      message: "Community M-PESA request and all related application records were permanently deleted. This does not reverse any real Safaricom movement already processed by Safaricom.",
       deleted: {
         communityRequest: true,
-        mpesaTransactions: mpesaIds.length,
-        b2cTransactions: payoutIds.length,
+        mpesaTransactions: mpesaTransactionCount,
+        b2cTransactions: payoutTransactionCount,
         relatedNews: true,
       },
     });
   } catch (error) {
-    console.error("Delete community assistance error:", error);
-    return res.status(500).json({ success: false, code: "COMMUNITY_DELETE_FAILED", message: "The community M-PESA request could not be permanently deleted. No completed deletion should be assumed." });
-  } finally {
-    if (session) await session.endSession().catch(() => {});
+    if (session) await session.abortTransaction().catch(() => {});
+    console.error("Delete community assistance error:", {
+      message: error?.message,
+      code: error?.code,
+      name: error?.name,
+      requestId: req.requestId,
+    });
+
+    // Older/standalone Mongo deployments do not support multi-document
+    // transactions. If that is the only failure, retry the same precomputed
+    // cascade in ordered non-transactional mode instead of returning a generic
+    // 503 to the SuperAdmin. Other database failures remain hard failures.
+    if (!deletedWithTransaction && isTransactionUnsupported(error) && campaign && financeOr && notificationOr) {
+      try {
+        await deleteCommunityRecords();
+        await createAuditLog({
+          user: req.user._id,
+          userRole: req.user.role,
+          action: "COMMUNITY_COLLECTION_DELETED",
+          module: "M-PESA",
+          description: `SuperAdmin permanently deleted community M-PESA request ${campaign.title} and its application-side related records using ordered cascade mode.`,
+          req,
+          metadata: {
+            campaignId: campaign._id,
+            raisedAmount: Number(campaign.raisedAmount || 0),
+            payoutAmount: Number(campaign.payoutAmount || 0),
+            mpesaTransactionCount,
+            b2cTransactionCount: payoutTransactionCount,
+            deletionMode: "ordered_cascade_fallback",
+          },
+        });
+        await invalidateFinanceCache();
+        await redisCache.invalidatePrefix("public:news");
+        return res.json({
+          success: true,
+          message: "Community M-PESA request and all related application records were permanently deleted. This does not reverse any real Safaricom movement already processed by Safaricom.",
+          deleted: {
+            communityRequest: true,
+            mpesaTransactions: mpesaTransactionCount,
+            b2cTransactions: payoutTransactionCount,
+            relatedNews: true,
+          },
+        });
+      } catch (fallbackError) {
+        console.error("Community assistance ordered cascade fallback error:", {
+          message: fallbackError?.message,
+          code: fallbackError?.code,
+          name: fallbackError?.name,
+          requestId: req.requestId,
+        });
+      }
+    }
+
+    return res.status(500).json({
+      success: false,
+      code: "COMMUNITY_DELETE_FAILED",
+      message: "The community M-PESA request could not be permanently deleted. No completed deletion should be assumed.",
+      requestId: req.requestId,
+    });
   }
 };
 
