@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const { verifyToken } = require("../middleware/authMiddleware");
-const { isAdminOrSuperAdmin } = require("../middleware/roleMiddleware");
+const { isAdminOrSuperAdmin, isSuperAdmin } = require("../middleware/roleMiddleware");
 const controller = require("../controllers/claimWorkflowController");
 const verified = require("../middleware/verifiedMiddleware");
 const memberStatus = require("../middleware/memberStatusMiddleware");
