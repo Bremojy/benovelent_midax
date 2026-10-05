@@ -91,6 +91,26 @@ export default function PortalCommandCenter({ role: providedRole }) {
     closeCenter();
   }, [location.pathname, closeCenter]);
 
+  const loadActivity = useCallback(async () => {
+    try {
+      setActivityLoading(true);
+      setActivityError("");
+      const { data } = await API.get("/platform/activity");
+      const payload = data?.data || {};
+      setActivity({
+        notifications: Array.isArray(payload.notifications) ? payload.notifications : [],
+        attention: Array.isArray(payload.attention) ? payload.attention : [],
+        attentionCount: Number(payload.attentionCount || 0),
+        conversations: Array.isArray(payload.conversations) ? payload.conversations : [],
+        audits: Array.isArray(payload.audits) ? payload.audits : [],
+      });
+    } catch (requestError) {
+      setActivityError(requestError?.response?.data?.message || "Your attention items could not be loaded right now.");
+    } finally {
+      setActivityLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     const onRefresh = () => { loadActivity(); };
     window.addEventListener("benovelent:refresh-action-center", onRefresh);
@@ -115,26 +135,6 @@ export default function PortalCommandCenter({ role: providedRole }) {
       setError(requestError?.response?.data?.message || "Search is unavailable right now.");
     } finally {
       setLoading(false);
-    }
-  }, []);
-
-  const loadActivity = useCallback(async () => {
-    try {
-      setActivityLoading(true);
-      setActivityError("");
-      const { data } = await API.get("/platform/activity");
-      const payload = data?.data || {};
-      setActivity({
-        notifications: Array.isArray(payload.notifications) ? payload.notifications : [],
-        attention: Array.isArray(payload.attention) ? payload.attention : [],
-        attentionCount: Number(payload.attentionCount || 0),
-        conversations: Array.isArray(payload.conversations) ? payload.conversations : [],
-        audits: Array.isArray(payload.audits) ? payload.audits : [],
-      });
-    } catch (requestError) {
-      setActivityError(requestError?.response?.data?.message || "Your attention items could not be loaded right now.");
-    } finally {
-      setActivityLoading(false);
     }
   }, []);
 

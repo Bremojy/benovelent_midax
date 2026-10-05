@@ -372,13 +372,21 @@ export function AuthProvider({
             ].includes(code);
 
           if (definitiveAuthFailure) {
-            console.warn("Session verification rejected:", error);
-            clearSession();
-            setAuthError(
-              error.response?.data?.message ||
-              error.message ||
-              "Your session has expired."
-            );
+            const hasCachedSession = Boolean(getStoredUser()?.id);
+            if (hasCachedSession) {
+              console.warn("Session verification rejected:", error.response?.data || error.message);
+              clearSession();
+              setAuthError(
+                error.response?.data?.message ||
+                error.message ||
+                "Your session has expired."
+              );
+            } else {
+              // A fresh public/login visit normally has no authenticated cookie.
+              // Treat the protected /auth/me 401 as an expected anonymous state.
+              setAuthError("");
+              clearStoredSession();
+            }
             return null;
           }
 

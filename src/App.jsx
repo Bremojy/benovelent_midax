@@ -25,6 +25,7 @@ import GlobalMotion from "./components/GlobalMotion";
 import InstallPWA from "./components/InstallPWA";
 import LoginFeedbackPrompt from "./components/feedback/LoginFeedbackPrompt";
 import GlobalCommunicationCenter from "./components/GlobalCommunicationCenter";
+import SmartAssistant from "./components/SmartAssistant";
 
 import "./App.css";
 import "./styles/interaction-system.css";
@@ -360,6 +361,7 @@ function AppContent() {
       <PublicNavbar />
       <CookieConsent />
       <InstallPWA />
+      {!dashboardRoute && !isLogin && location.pathname !== "/members" && <SmartAssistant />}
       {dashboardRoute && (location.pathname === "/member" || location.pathname === "/admin" || location.pathname === "/superadmin" || location.pathname === "/member/" || location.pathname === "/admin/" || location.pathname === "/superadmin/") && <LoginFeedbackPrompt />}
 
       <Suspense

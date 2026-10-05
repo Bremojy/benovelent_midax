@@ -73,7 +73,7 @@ check(!sections.includes('/admin/accounts?tab=contributions'), "Obsolete Admin A
 
 check(/claim-review-dialog[\s\S]*max-height: calc\(100dvh/.test(portalCss) && /claim-review-body[\s\S]*overflow: auto/.test(portalCss) && /safe-area-inset-bottom/.test(portalCss), "Claim/support review modals use fixed viewport geometry with internal scrolling and safe-area actions");
 check(memberClaims.includes('member-claims-search') && memberClaims.includes('member-claims-status') && memberClaims.includes('member-claims-type') && memberClaims.includes('portal-list-summary') && memberClaims.includes('load(page + 1)'), "Member Claims presentation retains scalable server-side search/filter/pagination UI");
-check(!app.includes('SmartAssistant'), "SmartAssistant has no global App mount");
+check((app.match(/<SmartAssistant/g) || []).length === 1 && app.includes('!dashboardRoute && !isLogin'), "SmartAssistant is mounted once in App for public pages while excluding login and portal pages");
 check((memberDashboard.match(/<SmartAssistant/g) || []).length === 1 && (adminDashboard.match(/<SmartAssistant/g) || []).length === 1 && (superDashboard.match(/<SmartAssistant/g) || []).length === 1, "SmartAssistant appears exactly once on Member, Admin, and SuperAdmin dashboards");
 
 console.log("ALL MASTER PRODUCTION REPAIR V2 CONTRACTS PASSED");

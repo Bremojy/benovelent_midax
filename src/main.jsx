@@ -66,22 +66,10 @@ if ("serviceWorker" in navigator) {
         return;
       }
 
-      const registration = await navigator.serviceWorker.register("/sw.js", { updateViaCache: "none" });
-      if ("Notification" in window && "PushManager" in window && Notification.permission === "granted") {
-        // The settings page remains responsible for first-time permission prompts.
-        // Once permission exists, refresh the subscription automatically after each login/app load.
-        const { default: API } = await import("./services/api");
-        const { data } = await API.get("/notifications/push/vapid-public-key");
-        if (data?.configured && data?.publicKey) {
-          const key = data.publicKey;
-          const padding = "=".repeat((4 - (key.length % 4)) % 4);
-          const raw = window.atob((key + padding).replace(/-/g, "+").replace(/_/g, "/"));
-          const appServerKey = Uint8Array.from([...raw].map((c) => c.charCodeAt(0)));
-          let subscription = await registration.pushManager.getSubscription();
-          if (!subscription) subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: appServerKey });
-          if (subscription) await API.post("/notifications/push/subscribe", { subscription: subscription.toJSON() });
-        }
-      }
+      await navigator.serviceWorker.register("/sw.js", { updateViaCache: "none" });
+      // Push subscription persistence is intentionally handled by AuthContext after
+      // the server has confirmed a real authenticated account. This prevents the
+      // public website/login page from POSTing to the protected subscribe endpoint.
     } catch (error) {
       console.debug("Service worker/push bootstrap skipped:", error?.message || error);
     }
