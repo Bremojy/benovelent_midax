@@ -39,6 +39,8 @@ export default function AdminClaims() {
   const [appealReason, setAppealReason] = useState("");
   const [deleteDialog, setDeleteDialog] = useState(null);
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
+  const [communityDeleteDialog, setCommunityDeleteDialog] = useState(null);
+  const [communityDeleteConfirmation, setCommunityDeleteConfirmation] = useState("");
   const [publishDialog, setPublishDialog] = useState(null);
   const [publishPreview, setPublishPreview] = useState(null);
   const [filters, setFilters] = useState({ search: "", status: "", type: "", sort: "newest" });
@@ -78,13 +80,13 @@ export default function AdminClaims() {
   useEffect(() => { load(1); }, [filters.search, filters.status, filters.type, filters.sort]);
   useEffect(() => {
     const body = document.body;
-    if (!selected && !communityDraft && !appealReview && !deleteDialog && !publishDialog) return undefined;
+    if (!selected && !communityDraft && !appealReview && !deleteDialog && !communityDeleteDialog && !publishDialog) return undefined;
     const previous = body.style.overflow;
     body.style.overflow = "hidden";
     return () => { body.style.overflow = previous; };
-  }, [selected, communityDraft, appealReview, deleteDialog, publishDialog]);
+  }, [selected, communityDraft, appealReview, deleteDialog, communityDeleteDialog, publishDialog]);
   useEffect(() => {
-    const onKeyDown = (event) => { if (event.key !== "Escape") return; if (selected) setSelected(null); else if (communityDraft) setCommunityDraft(null); else if (appealReview) setAppealReview(null); else if (deleteDialog) setDeleteDialog(null); else if (publishDialog) { setPublishDialog(null); setPublishPreview(null); } };
+    const onKeyDown = (event) => { if (event.key !== "Escape") return; if (selected) setSelected(null); else if (communityDraft) setCommunityDraft(null); else if (appealReview) setAppealReview(null); else if (deleteDialog) { setDeleteDialog(null); setDeleteConfirmation(""); } else if (communityDeleteDialog) { setCommunityDeleteDialog(null); setCommunityDeleteConfirmation(""); } else if (publishDialog) { setPublishDialog(null); setPublishPreview(null); } };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [selected]);
@@ -299,8 +301,34 @@ export default function AdminClaims() {
       const { data } = await API.post(`/claims/community/${c._id}/publish-news`);
       if (!data?.success) throw new Error(data?.message || "Unable to publish.");
       setSuccess("Community support request published to News.");
+      await load();
     } catch (e) {
       setError(e.response?.data?.message || e.message || "Unable to publish community request.");
+    } finally {
+      setBusy("");
+    }
+  };
+
+  const openCommunityDeleteDialog = (campaign) => {
+    setCommunityDeleteConfirmation("");
+    setCommunityDeleteDialog(campaign);
+  };
+
+  const deleteCommunity = async () => {
+    if (!communityDeleteDialog || communityDeleteConfirmation !== "DELETE") return;
+    const campaign = communityDeleteDialog;
+    try {
+      setBusy(`delete-community-${campaign._id}`);
+      setError("");
+      setSuccess("");
+      const { data } = await API.delete(`/payments/community-assistance/${campaign._id}`);
+      if (!data?.success) throw new Error(data?.message || "Unable to permanently delete community assistance request.");
+      setCommunityDeleteDialog(null);
+      setCommunityDeleteConfirmation("");
+      setSuccess(data.message || "Community M-PESA request permanently deleted.");
+      await load();
+    } catch (e) {
+      setError(e.response?.data?.message || e.message || "The community M-PESA request could not be permanently deleted. No unsafe partial deletion was reported.");
     } finally {
       setBusy("");
     }
@@ -471,7 +499,7 @@ export default function AdminClaims() {
                     <div className="claim-card-head"><div><span className="portal-badge">{c.referenceModel}</span><h3>{c.title}</h3><p>{c.recipientMember?.fullName || "Member"}</p></div><span className="portal-badge">{c.workflowStatus || "Pending review"}</span></div>
                     <p>{c.description}</p>
                     <div className="portal-stat-grid compact"><div className="portal-stat"><span>Requested target</span><strong>{money(c.targetAmount)}</strong></div><div className="portal-stat"><span>Raised</span><strong>{money(c.raisedAmount)}</strong></div></div>
-                    <div className="portal-actions"><button className="portal-btn primary" onClick={() => { setAppealReview(c); setAppealReason(""); }}><CheckCircle2 size={15}/> Review appeal</button></div>
+                    <div className="portal-actions"><button className="portal-btn primary" onClick={() => { setAppealReview(c); setAppealReason(""); }}><CheckCircle2 size={15}/> Review appeal</button>{isSuperAdmin && <button className="portal-btn danger" onClick={() => openCommunityDeleteDialog(c)} disabled={busy === `delete-community-${c._id}`}><Trash2 size={15} />{busy === `delete-community-${c._id}` ? "Deleting…" : "Delete permanently"}</button>}</div>
                   </article>
                 ))}
               </div>
@@ -490,6 +518,7 @@ export default function AdminClaims() {
                     {!["closed", "paid"].includes(c.status) && <button className="portal-btn secondary" onClick={() => publishCommunity(c)} disabled={busy === `publish-community-${c._id}`}><Megaphone size={15} />{busy === `publish-community-${c._id}` ? "Publishing…" : "Publish to News"}</button>}
                     {isSuperAdmin && Number(c.raisedAmount) > 0 && ["open", "target_reached"].includes(c.status) && <button className="portal-btn primary" onClick={() => payoutCommunity(c)} disabled={busy === `payout-${c._id}`}><WalletCards size={15} />{busy === `payout-${c._id}` ? "Submitting…" : "Disburse raised funds"}</button>}
                     {isSuperAdmin && ["open", "target_reached"].includes(c.status) && <button className="portal-btn danger" onClick={() => closeCommunity(c)} disabled={busy === `close-${c._id}`}><LockKeyhole size={15} />{busy === `close-${c._id}` ? "Closing…" : "Close collection"}</button>}
+                    {isSuperAdmin && <button className="portal-btn danger" onClick={() => openCommunityDeleteDialog(c)} disabled={busy === `delete-community-${c._id}`}><Trash2 size={15} />{busy === `delete-community-${c._id}` ? "Deleting…" : "Delete permanently"}</button>}
                     {!isSuperAdmin && <span className="portal-badge">SuperAdmin controls required for payout / close</span>}
                   </div>
                 </article>
@@ -526,6 +555,16 @@ export default function AdminClaims() {
             <div className="claim-news-preview-card"><span className="portal-badge">{publishPreview.category}</span><h3>{publishPreview.title}</h3><p className="claim-news-summary">{publishPreview.summary}</p><div className="claim-news-content">{publishPreview.content}</div></div>
             <div className="portal-alert" style={{ marginTop: 14 }}><strong>Privacy check:</strong> The preview contains no member name, member number, phone/email, private financial amount, internal review note, or evidence attachment.</div>
             <div className="portal-actions"><button className="portal-btn primary" onClick={publishClaim} disabled={busy === `publish-${publishDialog._id}`}><Megaphone size={16} />{busy === `publish-${publishDialog._id}` ? "Publishing…" : "Publish to News"}</button><button className="portal-btn secondary" onClick={() => { setPublishDialog(null); setPublishPreview(null); }}>Cancel</button></div>
+          </section>
+        </div>}
+
+        {communityDeleteDialog && <div className="portal-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="community-delete-title">
+          <section className="portal-modal-card claim-delete-dialog">
+            <div className="portal-modal-head"><div><span>DESTRUCTIVE ACTION</span><h2 id="community-delete-title">Permanently delete this community request?</h2><p>This action permanently removes the community assistance campaign. It does not delete recorded M-PESA financial transactions. Requests with collected or disbursed funds are protected from permanent deletion so the financial record remains intact.</p></div><button className="portal-btn secondary" onClick={() => { setCommunityDeleteDialog(null); setCommunityDeleteConfirmation(""); }}>Close</button></div>
+            <div className="portal-alert" style={{ marginTop: 8 }}><strong>Request:</strong> {communityDeleteDialog.title || "Community assistance"} • {communityDeleteDialog._id}</div>
+            {Number(communityDeleteDialog.raisedAmount || 0) > 0 && <div className="portal-alert" style={{ marginTop: 10 }}><strong>Financial protection:</strong> This request has recorded contributions of {money(communityDeleteDialog.raisedAmount)}. The backend will refuse permanent deletion so contribution and payout history cannot be erased.</div>}
+            <div className="portal-field" style={{ marginTop: 14 }}><label htmlFor="community-delete-confirmation">Type DELETE to confirm</label><input id="community-delete-confirmation" value={communityDeleteConfirmation} onChange={(event) => setCommunityDeleteConfirmation(event.target.value)} autoComplete="off" spellCheck="false" placeholder="DELETE" /></div>
+            <div className="portal-actions"><button className="portal-btn danger" onClick={deleteCommunity} disabled={communityDeleteConfirmation !== "DELETE" || busy === `delete-community-${communityDeleteDialog._id}`}><Trash2 size={16} />{busy === `delete-community-${communityDeleteDialog._id}` ? "Deleting…" : "Permanently Delete"}</button><button className="portal-btn secondary" onClick={() => { setCommunityDeleteDialog(null); setCommunityDeleteConfirmation(""); }}>Cancel</button></div>
           </section>
         </div>}
 
