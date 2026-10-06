@@ -1,150 +1,24 @@
+const escapeHtml = (input) => String(input ?? "").replace(/[&<>"']/g, (character) => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[character]));
+const sanitizeFilename = (value) => String(value || "document").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 100) || "document";
+const formatGeneratedAt = (value) => { const date = value ? new Date(value) : new Date(); return Number.isNaN(date.getTime()) ? new Date().toLocaleString("en-GB") : date.toLocaleString("en-GB", { dateStyle:"medium", timeStyle:"short" }); };
 
-function escapeHtml(input) {
-  return String(input || "").replace(/[&<>"']/g, (character) => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    '"': "&quot;",
-    "'": "&#39;",
-  }[character]));
+export function escapePrintHtml(value) { return escapeHtml(value); }
+
+export function buildPrintHeadHtml({ title="Benevolent MIDAX Report", subtitle="", portal="", documentType="Report", generatedAt=new Date(), dateRange="", classification="Official Record", organizationName="Benevolent MIDAX", logoUrl="/print-letterhead.png" } = {}) {
+  return `<div class="print-shell"><header class="print-header"><div class="print-brand"><img class="print-letterhead-logo" src="${escapeHtml(logoUrl)}" alt="Official Benevolent MIDAX letterhead" /><div><span class="print-eyebrow">${escapeHtml(documentType)}</span><h1>${escapeHtml(organizationName)}</h1><p>${escapeHtml(classification)}${portal ? ` • ${escapeHtml(portal)}` : ""}</p></div></div><div class="print-meta"><strong>Generated</strong><span>${escapeHtml(formatGeneratedAt(generatedAt))}</span>${dateRange ? `<strong>Period</strong><span>${escapeHtml(dateRange)}</span>` : ""}</div></header><div class="print-accent-divider"></div><section class="print-title-block"><h2>${escapeHtml(title)}</h2>${subtitle ? `<p>${escapeHtml(subtitle)}</p>` : ""}</section></div>`;
 }
 
-export function buildPrintHeadHtml({
-  title = "Benevolent Midax Report",
-  subtitle = "",
-  bodyClass = "",
-} = {}) {
-  return `
-    <div class="print-shell ${bodyClass}">
-      <header class="print-header">
-        <div class="print-header-left">
-          <img class="print-letterhead-logo" src="/print-letterhead.png" alt="Midax letterhead" />
-          <div class="print-header-copy">
-            <p class="print-eyebrow">Benevolent Fund Scheme</p>
-            <h1>Benevolent Midax</h1>
-            <p class="print-subtitle">${escapeHtml(subtitle || "Standing together in trust, accountability and support.")}</p>
-          </div>
-        </div>
-        <div class="print-header-right">
-          <p><strong>Midax Petroleum Marketing</strong></p>
-          <p>P.O. Box 7432 - 00300 Nairobi</p>
-          <p>Website: www.midax.co.ke</p>
-          <p>Email: marketing@midax.co.ke / info@midax.co.ke</p>
-          <p>Services: Fuels • Lubricants • LPG Gas • Service • Carwash</p>
-        </div>
-      </header>
-      <section class="print-title-block">
-        <h2>${escapeHtml(title)}</h2>
-      </section>
-    </div>
-  `;
+export function printHeadStyles({ orientation="portrait" } = {}) {
+  const size = orientation === "landscape" ? "A4 landscape" : "A4 portrait";
+  return `<style>@page{size:${size};margin:12mm 12mm 16mm}html,body{margin:0;padding:0}body{font-family:Arial,Helvetica,sans-serif;color:#1f2937;background:#fff;font-size:12px;line-height:1.45}.print-shell{width:100%}.print-header{display:flex;justify-content:space-between;gap:24px;align-items:flex-start}.print-brand{display:flex;align-items:center;gap:14px;min-width:0}.print-letterhead-logo{width:min(210px,34vw);height:auto;max-height:62px;object-fit:contain}.print-brand h1{margin:2px 0 2px;font-size:18px;letter-spacing:.01em}.print-brand p{margin:0;color:#667085;font-size:10px}.print-eyebrow{display:block;font-size:9px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#6b7280}.print-meta{display:grid;grid-template-columns:auto auto;gap:3px 10px;text-align:right;color:#667085;font-size:9.5px;flex:none}.print-meta strong{color:#344054}.print-accent-divider{height:3px;margin:9px 0 15px;border-radius:99px;background:linear-gradient(90deg,#f97316 0%,#ea580c 55%,#e5e7eb 100%)}.print-title-block{margin-bottom:16px}.print-title-block h2{margin:0;font-size:21px;line-height:1.15}.print-title-block p{margin:5px 0 0;color:#667085}.print-note{margin:0 0 14px;color:#667085}.print-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin:0 0 16px}.print-summary>div{border:1px solid #e5e7eb;border-radius:7px;padding:8px;background:#fafafa}.print-summary span{display:block;color:#667085;font-size:9px}.print-summary strong{display:block;margin-top:2px;font-size:12px}.print-table-wrap{width:100%;overflow:visible}table{width:100%;border-collapse:collapse;margin:0 0 15px}thead{display:table-header-group}tr{break-inside:avoid}th,td{padding:7px 6px;border-bottom:1px solid #e5e7eb;text-align:left;vertical-align:top}th{font-size:9px;text-transform:uppercase;letter-spacing:.05em;color:#667085;background:#f8fafc}td{font-size:10px}.print-footer{margin-top:18px;padding-top:8px;border-top:1px solid #e5e7eb;color:#667085;font-size:9px;display:flex;justify-content:space-between;gap:12px}.print-footer strong{color:#344054}@media print{.print-header{break-inside:avoid}.print-title-block{break-after:auto}.print-footer{position:running(printFooter)}.print-letterhead-logo{width:190px}}@media(max-width:600px){.print-header{flex-direction:column}.print-meta{text-align:left;grid-template-columns:auto auto}.print-letterhead-logo{width:190px}}</style>`;
 }
 
-export function printHeadStyles() {
-  return `
-    <style>
-      /* Browser print uses the letterhead image extracted from public/LETTER HEAD.docx. */
-      @page { size: A4; margin: 12mm; }
-      body {
-        font-family: Arial, sans-serif;
-        color: #1f2328;
-        background: #ffffff;
-      }
-      .print-shell { width: 100%; }
-      .print-header {
-        display: flex;
-        justify-content: space-between;
-        gap: 24px;
-        align-items: flex-start;
-        border-bottom: 3px solid #d61f26;
-        padding-bottom: 16px;
-        margin-bottom: 18px;
-      }
-      .print-header-left {
-        display: flex;
-        gap: 16px;
-        align-items: center;
-        min-width: 0;
-      }
-      .print-letterhead-logo {
-        width: 220px;
-        max-width: 40vw;
-        height: auto;
-        object-fit: contain;
-        flex: none;
-      }
-      .print-header-copy {
-        min-width: 0;
-      }
-      .print-eyebrow {
-        margin: 0 0 4px;
-        font-size: 12px;
-        letter-spacing: .12em;
-        text-transform: uppercase;
-        color: #8a1d1d;
-        font-weight: 800;
-      }
-      .print-header h1 {
-        margin: 0;
-        font-size: 24px;
-      }
-      .print-subtitle {
-        margin: 6px 0 0;
-        max-width: 420px;
-        color: #555;
-        line-height: 1.5;
-      }
-      .print-header-right {
-        text-align: right;
-        font-size: 12px;
-        line-height: 1.5;
-        color: #444;
-      }
-      .print-header-right p { margin: 0; }
-      .print-title-block h2 {
-        margin: 0 0 12px;
-        font-size: 20px;
-      }
-      table { width: 100%; border-collapse: collapse; }
-      th, td {
-        padding: 10px;
-        border-bottom: 1px solid #e4e7eb;
-        text-align: left;
-        vertical-align: top;
-      }
-      th {
-        text-transform: uppercase;
-        font-size: 11px;
-        letter-spacing: .06em;
-        color: #667085;
-      }
-      .print-note { margin: 0 0 14px; color: #5b6572; }
-      .bar {
-        height: 10px;
-        border-radius: 999px;
-        background: #ffd8d9;
-        overflow: hidden;
-      }
-      .bar > div { height: 100%; background: #d61f26; }
-      @media print {
-        .print-header-right { font-size: 11px; }
-        .print-letterhead-logo { width: 210px; }
-      }
-    </style>
-  `;
-}
-
-
-export function escapePrintHtml(value) {
-  return escapeHtml(value);
-}
-
-export function openPrintDocument({ title = "Benevolent Midax Report", subtitle = "", bodyHtml = "", extraStyles = "" } = {}) {
-  const popup = window.open("", "_blank", "width=1200,height=850");
+export function openPrintDocument({ title="Benevolent MIDAX Report", subtitle="", portal="", documentType="Report", generatedAt=new Date(), dateRange="", classification="Official Record", bodyHtml="", extraStyles="", orientation="portrait", filename="" } = {}) {
+  const popup = window.open("", "_blank", "width=1200,height=850,noopener,noreferrer");
   if (!popup) return false;
-  popup.document.open();
-  popup.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${escapeHtml(title)}</title>${printHeadStyles()}<style>${extraStyles}</style></head><body>${buildPrintHeadHtml({ title, subtitle })}${bodyHtml}<script>window.addEventListener('load',()=>setTimeout(()=>window.print(),100));</script></body></html>`);
-  popup.document.close();
-  popup.focus();
+  const safeBody = String(bodyHtml ?? "");
+  const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(title)}</title>${printHeadStyles({ orientation })}<style>${extraStyles}</style></head><body>${buildPrintHeadHtml({title,subtitle,portal,documentType,generatedAt,dateRange,classification,organizationName,logoUrl})}${safeBody}<footer class="print-footer"><span><strong>${escapeHtml(organizationName)}</strong> • Official record • Generated ${escapeHtml(formatGeneratedAt(generatedAt))}</span><span>${escapeHtml(documentType)}</span></footer><script>window.addEventListener('load',()=>setTimeout(()=>window.print(),100));</script></body></html>`;
+  popup.document.open(); popup.document.write(html); popup.document.close(); popup.focus();
+  try { popup.document.title = `${sanitizeFilename(filename || title)} — Benevolent MIDAX`; } catch (_) {}
   return true;
 }

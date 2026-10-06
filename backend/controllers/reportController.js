@@ -9,6 +9,7 @@ const AuditLog = require("../models/AuditLog");
 const News = require("../models/News");
 const { getLedger: getAuthoritativeLedger } = require("../services/financeLedgerService");
 const { buildPdf } = require("../utils/simplePdf");
+const { getSystemSettings } = require("../services/systemSettings");
 
 const parseRange = (startDate, endDate) => {
   const start = new Date(`${String(startDate || "").trim()}T00:00:00.000Z`);
@@ -45,6 +46,11 @@ const buildManagementReports = async ({ startDate, endDate } = {}) => {
       claims: { $sum: { $cond: [{ $in: ["$type", ["claim", "expense", "withdrawal"]] }, "$amount", 0] } },
     } }]),
   ]);
+  const systemSettings = await getSystemSettings();
+  const organization = {
+    name: systemSettings?.website?.siteTitle || systemSettings?.displayName || systemSettings?.organizationName || "Benevolent MIDAX",
+    contact: systemSettings?.website?.publicContactInformation || [systemSettings?.email, systemSettings?.phone, systemSettings?.address].filter(Boolean).join(" | "),
+  };
   const financeAgg = financeRows[0] || {};
   const statusMap = Object.fromEntries(supportAgg.map((x) => [x._id, x]));
   const financial = {
@@ -62,12 +68,12 @@ const buildManagementReports = async ({ startDate, endDate } = {}) => {
     approvedAmount: supportAgg.reduce((n, x) => n + Number(x.approved || 0), 0),
     disbursedAmount: supportAgg.reduce((n, x) => n + Number(x.disbursed || 0), 0),
   };
-  return { success: true, period: { startDate: startText, endDate: endText }, generatedAt: new Date().toISOString(), financial, members: { total: totalMembers, active: activeMembers, inactive: inactiveMembers, suspended: suspendedMembers, administrators: admins }, contributions: { expected: Number(contributionAgg?.[0]?.expected || 0), paid: Number(contributionAgg?.[0]?.paid || 0), outstanding: Number(contributionAgg?.[0]?.outstanding || 0), membersCharged: contributionAgg?.[0]?.members?.length || 0 }, support, dependents: { total: totalDependents, requiringVerification: pendingDependentVerifications, pendingEditRequests }, activity: { auditEvents: auditCount, newsCreated: newsCount, newsPublished: publishedNews }, ledger: { entries: ledger.entries || [], totals: ledger.totals || {}, openingBalance: ledger.openingBalance, closingBalance: ledger.closingBalance, currentBookBalance: ledger.currentBookBalance, asOf: ledger.asOf } };
+  return { success: true, organization, period: { startDate: startText, endDate: endText }, generatedAt: new Date().toISOString(), financial, members: { total: totalMembers, active: activeMembers, inactive: inactiveMembers, suspended: suspendedMembers, administrators: admins }, contributions: { expected: Number(contributionAgg?.[0]?.expected || 0), paid: Number(contributionAgg?.[0]?.paid || 0), outstanding: Number(contributionAgg?.[0]?.outstanding || 0), membersCharged: contributionAgg?.[0]?.members?.length || 0 }, support, dependents: { total: totalDependents, requiringVerification: pendingDependentVerifications, pendingEditRequests }, activity: { auditEvents: auditCount, newsCreated: newsCount, newsPublished: publishedNews }, ledger: { entries: ledger.entries || [], totals: ledger.totals || {}, openingBalance: ledger.openingBalance, closingBalance: ledger.closingBalance, currentBookBalance: ledger.currentBookBalance, asOf: ledger.asOf } };
 };
 
 const csv = (report) => {
   const lines = [
-    ["Benevolent Constitution Management Report"], ["Midax Petroleum Marketing"], ["P.O. Box 7432 - 00300 Nairobi"], ["Website", "www.midax.co.ke"], ["Email", "marketing@midax.co.ke / info@midax.co.ke"], ["Services", "Fuels | Lubricants | LPG Gas | Service | Carwash"], ["Period", report.period.startDate, report.period.endDate], ["Generated At", report.generatedAt], [],
+    [report.organization?.name || "Benevolent MIDAX"], ["Public contact", report.organization?.contact || "Current official contact details are not configured."], ["Period", report.period.startDate, report.period.endDate], ["Generated At", report.generatedAt], [],
     ["FINANCIAL"], ["Opening Balance", report.financial.openingBalance], ["Money In", report.financial.moneyIn], ["Money Out", report.financial.moneyOut], ["Closing Balance", report.financial.closingBalance], ["Current Book Balance", report.financial.currentBookBalance], ["Transactions", report.financial.transactions], ["Contributions", report.financial.contributions], ["Support Payments", report.financial.supportPayments], ["Claims", report.financial.claims], [],
     ["MEMBERS"], ["Total", report.members.total], ["Active", report.members.active], ["Inactive", report.members.inactive], ["Suspended", report.members.suspended], ["Administrators", report.members.administrators], [],
     ["CONTRIBUTIONS"], ["Expected", report.contributions.expected], ["Paid", report.contributions.paid], ["Outstanding", report.contributions.outstanding], ["Members Charged", report.contributions.membersCharged], [],
@@ -82,7 +88,12 @@ const csv = (report) => {
 
 const pdf = (report) => buildPdf({
   title: "Benevolent Constitution Management Report",
-  subtitle: `${report.period.startDate} to ${report.period.endDate} • Generated ${new Date(report.generatedAt).toLocaleString()}`,
+  subtitle: "Governance and scheme-management report.",
+  organizationName: "Benevolent MIDAX",
+  documentType: "Management Report",
+  classification: "Official Record",
+  dateRange: `${report.period.startDate} to ${report.period.endDate}`,
+  generatedAt: report.generatedAt,
   lines: [
     "REPORT REFERENCE: " + `REPORT-${report.period.startDate}-${report.period.endDate}`,
     "",

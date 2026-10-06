@@ -867,7 +867,25 @@ exports.updateSettings = async (req, res) => {
       current.scheme = { ...current.scheme?.toObject?.(), ...patch };
     }
     if (body.support && typeof body.support === "object") current.support = { ...current.support?.toObject?.(), ...body.support };
-    if (body.branding && typeof body.branding === "object") current.branding = { ...current.branding?.toObject?.(), ...body.branding };
+    if (body.branding && typeof body.branding === "object") {
+      const allowedBranding = ["preset","accentColor","secondaryColor","primary","secondary","background","surface","elevatedSurface","text","mutedText","border","focus","success","warning","danger","header","sidebar","buttons","links","logoUrl","faviconUrl"];
+      const colorFields = new Set(["accentColor","secondaryColor","primary","secondary","background","surface","elevatedSurface","text","mutedText","border","focus","success","warning","danger","header","sidebar","buttons","links"]);
+      const brandingPatch = {};
+      for (const key of allowedBranding) {
+        if (body.branding[key] === undefined) continue;
+        if (colorFields.has(key)) {
+          const value = String(body.branding[key] || "").trim();
+          if (!/^#[0-9a-fA-F]{6}$/.test(value)) return res.status(400).json({ success:false, message:`Invalid ${key} color. Use a six-digit HEX value.` });
+          brandingPatch[key] = value.toLowerCase();
+        } else if (key === "preset") brandingPatch[key] = String(body.branding[key] || "custom").trim().slice(0, 40);
+        else brandingPatch[key] = String(body.branding[key] || "").trim().slice(0, 500);
+      }
+      current.branding = { ...current.branding?.toObject?.(), ...brandingPatch };
+      if (!current.branding.primary && current.branding.accentColor) current.branding.primary = current.branding.accentColor;
+      if (!current.branding.secondary && current.branding.secondaryColor) current.branding.secondary = current.branding.secondaryColor;
+      current.branding.accentColor = current.branding.primary || current.branding.accentColor || "#f97316";
+      current.branding.secondaryColor = current.branding.secondary || current.branding.secondaryColor || "#ea580c";
+    }
     if (body.homepage && typeof body.homepage === "object") current.homepage = { ...current.homepage?.toObject?.(), ...body.homepage };
     if (body.notificationReadiness && typeof body.notificationReadiness === "object") current.notificationReadiness = { ...current.notificationReadiness?.toObject?.(), ...body.notificationReadiness };
     if (body.featureToggles && typeof body.featureToggles === "object") current.featureToggles = body.featureToggles;

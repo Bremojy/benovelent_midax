@@ -66,7 +66,7 @@
     width:58px;
     height:58px;
     border-radius:50%;
-    background:linear-gradient(135deg,#ff7a00,#ffb347);
+    background:linear-gradient(135deg,var(--color-primary),var(--color-primary));
     color:#fff;
     display:flex;
     justify-content:center;
@@ -100,11 +100,11 @@
 }
 
 .verified{
-    color:#ff7a00;
+    color:var(--color-primary);
 }
 
 .pin{
-    color:#ff7a00;
+    color:var(--color-primary);
 }
 
 /* ========================================
@@ -164,7 +164,7 @@
 
 .feed-actions button:hover{
     background:#fff4ea;
-    color:#ff7a00;
+    color:var(--color-primary);
 }
 
 /* ========================================

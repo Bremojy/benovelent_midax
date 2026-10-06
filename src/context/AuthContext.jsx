@@ -725,7 +725,12 @@ export function AuthProvider({
   // ======================================
 
   useEffect(() => {
-    const color = user?.themeColor || "#ff7a00";
+    // Organization branding is authoritative. Keep legacy per-user theme data
+    // available for backward compatibility, but do not let it override the
+    // SuperAdmin-managed semantic theme on portal pages.
+    if (document.documentElement.getAttribute("data-theme-preset")) return;
+    const color = user?.themeColor;
+    if (!/^#[0-9a-fA-F]{6}$/.test(String(color || ""))) return;
     document.documentElement.style.setProperty("--portal-accent", color);
     document.documentElement.style.setProperty("--portal-accent-soft", `${color}18`);
   }, [user?.themeColor]);

@@ -7,7 +7,15 @@ const schemeSchema = new mongoose.Schema({ monthlyContribution:{type:Number,min:
 const supportFlagSchema = new mongoose.Schema({ enabled:{type:Boolean,default:null} }, {_id:false});
 const supportSchema = new mongoose.Schema({ funeral:{type:supportFlagSchema,default:()=>({})}, medical:{type:supportFlagSchema,default:()=>({})}, education:{type:supportFlagSchema,default:()=>({})} }, {_id:false});
 const mpesaSchema = new mongoose.Schema({ manualPaybill:{type:String,default:""}, manualAccountReference:{type:String,default:""}, displayLabel:{type:String,default:"M-PESA"}, manualPaymentEnabled:{type:Boolean,default:false}, stkEnabled:{type:Boolean,default:false}, environment:{type:String,enum:["sandbox","production","unknown"],default:"production"}, operationalShortcode:{type:String,default:""}, operationalStatus:{type:String,enum:["unknown","ready","not-configured","degraded"],default:"unknown"} }, {_id:false});
-const brandingSchema = new mongoose.Schema({ accentColor:{type:String,default:""}, secondaryColor:{type:String,default:""}, logoUrl:{type:String,default:""}, faviconUrl:{type:String,default:""} }, {_id:false});
+const hexColor = { type:String, default:"", trim:true, match:/^#[0-9A-Fa-f]{6}$/ };
+const brandingSchema = new mongoose.Schema({
+  preset:{type:String,default:"orange",trim:true,maxlength:40},
+  accentColor:hexColor, secondaryColor:hexColor,
+  primary:hexColor, secondary:hexColor, background:hexColor, surface:hexColor, elevatedSurface:hexColor,
+  text:hexColor, mutedText:hexColor, border:hexColor, focus:hexColor, success:hexColor, warning:hexColor, danger:hexColor,
+  header:hexColor, sidebar:hexColor, buttons:hexColor, links:hexColor,
+  logoUrl:{type:String,default:"",trim:true,maxlength:500}, faviconUrl:{type:String,default:"",trim:true,maxlength:500}
+}, {_id:false});
 const homepageSchema = new mongoose.Schema({ showCarousel:{type:Boolean,default:true}, showLeaders:{type:Boolean,default:true}, showPolicies:{type:Boolean,default:true} }, {_id:false});
 const notificationReadinessSchema = new mongoose.Schema({ browserPushEnabled:{type:Boolean,default:false}, incomingCallPushEnabled:{type:Boolean,default:false} }, {_id:false});
 

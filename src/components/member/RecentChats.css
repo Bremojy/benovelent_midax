@@ -64,7 +64,7 @@ height:55px;
 
 border-radius:50%;
 
-background:#ff7a00;
+background:var(--color-primary);
 
 color:white;
 
@@ -132,7 +132,7 @@ gap:8px;
 
 .chat-badge{
 
-background:#ff7a00;
+background:var(--color-primary);
 
 color:white;
 
@@ -166,7 +166,7 @@ border:none;
 
 border-radius:14px;
 
-background:#ff7a00;
+background:var(--color-primary);
 
 color:white;
 

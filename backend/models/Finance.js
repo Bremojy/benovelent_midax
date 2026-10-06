@@ -148,6 +148,10 @@ const financeSchema = new mongoose.Schema({
         type: { type: String, default: "" }
     },
 
+
+    sourceId:{ type:mongoose.Schema.Types.ObjectId, default:null, index:true },
+    sourceModel:{ type:String, enum:["MedicalSupport","FuneralSupport","EducationSupport","SupportRequest","CommunityAssistance"], default:null },
+
     hidden: {
         type: Boolean,
         default: false,

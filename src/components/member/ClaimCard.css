@@ -21,7 +21,7 @@ color:white;
 }
 
 .status.pending{
-background:#ff9800;
+background:var(--color-primary);
 }
 
 .status.approved{

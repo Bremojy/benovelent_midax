@@ -14,6 +14,7 @@ const SupportRequestPermissionRequest = require("../models/SupportRequestPermiss
 const mongoose = require("mongoose");
 const crypto = require("crypto");
 const redisCache = require("../services/redisCache");
+const Finance = require("../models/Finance");
 
 const MODEL_MAP = { medical: MedicalSupport, funeral: FuneralSupport, education: EducationSupport, support: SupportRequest };
 const LABEL_MAP = { medical: "Medical", funeral: "Funeral", education: "Education", support: "Support" };
@@ -78,6 +79,21 @@ async function getClaim(type, id) {
   return { ...meta, claim };
 }
 
+
+const actorModelForRequest = (req) => {
+  const role = String(req.user?.role || "").toLowerCase();
+  return role === "superadmin" ? "SuperAdmin" : role === "admin" ? "Admin" : "Member";
+};
+
+async function getSettlementCandidates(claim) {
+  const sourceModel = claim?.constructor?.modelName || "";
+  const linked = claim?.settlementTransactionId ? await Finance.findById(claim.settlementTransactionId).lean() : null;
+  const filter = { type:"claim", member:claim.member || null, status:{ $in:["approved","completed"] }, amount:{ $gt:0 } };
+  const rows = await Finance.find(filter).sort({ transactionDate:-1, createdAt:-1 }).limit(100).lean();
+  const candidates = rows.filter((row) => !row.sourceId || (String(row.sourceId) === String(claim._id) && String(row.sourceModel || "") === sourceModel) || String(row._id) === String(claim.settlementTransactionId));
+  return { linked, candidates };
+}
+
 function validateTransition(current, next) {
   const allowed = {
     Pending: ["Under Review", "Documents Required", "Rejected", "Cancelled"],
@@ -108,9 +124,19 @@ exports.updateStage = async (req, res) => {
     const terminalStatuses = ["Closed", "Rejected", "Cancelled"];
     const reopenStatuses = ["Pending", "Under Review", "Documents Required", "Eligibility Review", "Approval Review"];
     const reopening = isSuperAdmin && terminalStatuses.includes(currentStatus) && reopenStatuses.includes(nextStatus);
-    if (!reopening && !validateTransition(currentStatus, nextStatus)) return res.status(409).json({ success: false, message: `Cannot move a ${currentStatus} claim directly to ${nextStatus}.` });
-    const suppliedPaymentReference = String(req.body?.paymentReference || result.claim.paymentReference || "").trim();
-    if ((nextStatus === "Paid" || nextStatus === "Completed") && !suppliedPaymentReference) return res.status(400).json({ success:false, code:"PAYMENT_EVIDENCE_REQUIRED", message:"A payment transaction/reference is required before a claim can be marked Paid or Completed." });
+    // SuperAdmin is permitted to correct any valid stage directly. Admins
+    // remain constrained by the approved workflow transition matrix.
+    if (!isSuperAdmin && !validateTransition(currentStatus, nextStatus)) {
+      return res.status(409).json({ success: false, message: `Cannot move a ${currentStatus} claim directly to ${nextStatus}.` });
+    }
+    const settlementId = String(req.body?.settlementTransactionId || result.claim.settlementTransactionId || "").trim();
+    if ((nextStatus === "Paid" || nextStatus === "Completed")) {
+      if (!settlementId || !mongoose.Types.ObjectId.isValid(settlementId)) return res.status(400).json({ success:false, code:"SETTLEMENT_TRANSACTION_REQUIRED", message:"Select an authoritative Finance settlement transaction before marking this claim Paid or Completed." });
+      const settlement = await Finance.findOne({ _id:settlementId, type:"claim", status:"completed" }).lean();
+      if (!settlement) return res.status(409).json({ success:false, code:"SETTLEMENT_TRANSACTION_INVALID", message:"The selected settlement is not a completed authoritative claim-finance transaction." });
+      if (settlement.member && String(settlement.member) !== String(result.claim.member)) return res.status(409).json({ success:false, code:"SETTLEMENT_MEMBER_MISMATCH", message:"The selected settlement belongs to a different member." });
+      if (settlement.sourceId && String(settlement.sourceId) !== String(result.claim._id)) return res.status(409).json({ success:false, code:"SETTLEMENT_SOURCE_MISMATCH", message:"The selected settlement is linked to a different claim." });
+    }
     if (nextStatus === "Rejected" && !reason && !remarks) return res.status(400).json({ success: false, message: "A rejection reason is required." });
 
     if (req.body?.approvedAmount !== undefined) result.claim.approvedAmount = Math.max(0, Number(req.body.approvedAmount) || 0);
@@ -143,11 +169,12 @@ exports.updateStage = async (req, res) => {
     result.claim.remarks = remarks || result.claim.remarks || "";
     result.claim.reviewNotes = remarks || result.claim.reviewNotes || "";
     result.claim.reviewedAt = new Date();
-    if ("processedBy" in result.claim) result.claim.processedBy = req.user._id;
-    if ("updatedBy" in result.claim) result.claim.updatedBy = req.user._id;
+    const actorModel = actorModelForRequest(req);
+    if ("processedBy" in result.claim) { result.claim.processedBy = req.user._id; result.claim.processedByModel = actorModel === "Member" ? null : actorModel; }
+    if ("updatedBy" in result.claim) { result.claim.updatedBy = req.user._id; result.claim.updatedByModel = actorModel; }
     if (nextStatus === "Approved" && "approvalDate" in result.claim) result.claim.approvalDate = new Date();
     if (nextStatus === "Disbursement Pending" && "disbursementDate" in result.claim) result.claim.disbursementDate = null;
-    if ((nextStatus === "Paid" || nextStatus === "Completed") && "paymentReference" in result.claim) result.claim.paymentReference = suppliedPaymentReference;
+    if ((nextStatus === "Paid" || nextStatus === "Completed") && "settlementTransactionId" in result.claim) result.claim.settlementTransactionId = new mongoose.Types.ObjectId(settlementId);
     if (nextStatus === "Paid" && "paidAmount" in result.claim) {
       const paidAmount = Number(req.body?.paidAmount ?? result.claim.approvedAmount ?? result.claim.requestedAmount ?? 0);
       if (!Number.isFinite(paidAmount) || paidAmount <= 0) return res.status(400).json({ success: false, code: "PAID_AMOUNT_REQUIRED", message: "Enter the amount actually paid before marking this claim Paid." });
@@ -156,7 +183,7 @@ exports.updateStage = async (req, res) => {
     if ((nextStatus === "Paid" || nextStatus === "Completed") && "disbursementDate" in result.claim && !result.claim.disbursementDate) result.claim.disbursementDate = new Date();
 
     if (!Array.isArray(result.claim.timeline)) result.claim.timeline = [];
-    result.claim.timeline.push({ status: nextStatus, remarks: remarks || reason || `Claim moved to ${nextStatus}.`, updatedBy: req.user._id, date: new Date() });
+    result.claim.timeline.push({ status: nextStatus, remarks: remarks || reason || `Claim moved to ${nextStatus}.`, updatedBy: req.user._id, updatedByModel: actorModel, date: new Date() });
     await result.claim.save();
 
     await createNotification({ recipient: result.claim.member, recipientModel: "Member", sender: req.user._id, senderModel: req.user.role === "superadmin" ? "SuperAdmin" : "Admin", title: `${LABEL_MAP[result.key]} claim: ${nextStatus}`, message: reopening ? (remarks || `Your ${LABEL_MAP[result.key].toLowerCase()} claim has been reopened for further review.`) : (remarks || reason || `Your ${LABEL_MAP[result.key].toLowerCase()} claim has moved to ${nextStatus}.`), type: "claim", referenceId: result.claim._id, referenceModel: result.Model.modelName, icon: reopening ? "history" : nextStatus === "Rejected" ? "cancel" : nextStatus === "Approved" ? "check_circle" : "pending" });
@@ -194,8 +221,8 @@ exports.list = async (req, res) => {
     const searchRegex = escapedSearch ? new RegExp(escapedSearch, "i") : null;
     const genericSearchFields = [
       "description", "purpose", "hospitalName", "hospitalLocation", "diagnosis",
-      "deceasedName", "burialLocation", "school", "admissionNumber", "supportType",
-      "policyName", "status", "rejectionReason", "paymentReference", "reviewNotes",
+      "deceasedName", "burialLocation", "supportType",
+      "policyName", "status", "rejectionReason", "reviewNotes",
     ];
     const buildFilter = () => {
       const filter = { isDeleted: { $ne: true } };
@@ -225,8 +252,8 @@ exports.list = async (req, res) => {
         .sort({ createdAt: sortDirection })
         .limit(sourceLimit)
         .lean();
-      if (key === "medical") query = query.populate("dependent", "fullName relationship");
-      if (key === "education") query = query.populate("dependent", "fullName relationship school educationLevel");
+      if (key === "medical") query = query.populate("dependent", "fullName relationship gender dateOfBirth nationalId phone email county address employmentStatus medicalConditions isNextOfKin");
+      if (key !== "support") query = query.populate("dependent", "fullName relationship gender dateOfBirth nationalId phone email county address employmentStatus medicalConditions isNextOfKin");
       const [rows, total] = await Promise.all([query, Model.countDocuments(filter)]);
       return { key, rows, total };
     }));
@@ -237,6 +264,7 @@ exports.list = async (req, res) => {
       sourceType: key,
       amount: Number(x.approvedAmount || x.requestedAmount || 0),
       timeline: Array.isArray(x.timeline) ? x.timeline : [],
+      provenance: { createdBy:x.createdBy || null, createdByModel:x.createdByModel || null, processedBy:x.processedBy || null, processedByModel:x.processedByModel || null, updatedBy:x.updatedBy || null, updatedByModel:x.updatedByModel || null, approvedBy:x.approvedBy || null, approvedByModel:x.approvedByModel || null, hiddenBy:x.hiddenBy || null, hiddenByModel:x.hiddenByModel || null, deletedBy:x.deletedBy || null, deletedByModel:x.deletedByModel || null },
       ...(key === "education" ? {
         repaymentEnabled: Boolean(x.repaymentEnabled),
         interestRate: Number(x.interestRate || 0),
@@ -265,6 +293,14 @@ exports.list = async (req, res) => {
   }
 };
 
+exports.settlements = async (req, res) => {
+  try {
+    const result = await getClaim(req.params.type, req.params.id);
+    const { linked, candidates } = await getSettlementCandidates(result.claim);
+    return res.json({ success:true, linked: linked ? { ...linked, sourceType: result.key } : null, settlements:candidates.map((row) => ({ _id:row._id, transactionNumber:row.transactionNumber, amount:Number(row.amount||0), status:row.status, paymentMethod:row.paymentMethod, receiptNumber:row.receiptNumber || "", referenceNumber:row.referenceNumber || "", transactionDate:row.transactionDate, sourceId:row.sourceId || null, sourceModel:row.sourceModel || null })) });
+  } catch (error) { return res.status(error.status || 500).json({ success:false, message:error.message }); }
+};
+
 exports.publishNewsPreview = async (req, res) => {
   try {
     const result = await getClaim(req.params.type, req.params.id);
@@ -274,7 +310,14 @@ exports.publishNewsPreview = async (req, res) => {
     }
     if (result.claim.publishedToNews || result.claim.publishedNewsId) {
       const existing = result.claim.publishedNewsId ? await News.findById(result.claim.publishedNewsId).lean() : await News.findOne({ sourceModel: result.Model.modelName, sourceId: String(result.claim._id) }).lean();
-      if (existing) return res.status(409).json({ success: false, code: "CLAIM_ALREADY_PUBLISHED", message: "This claim has already been published to News.", news: existing });
+      if (existing) {
+        if (!result.claim.publishedBy && existing.author) {
+          result.claim.publishedBy = existing.author;
+          result.claim.publishedByModel = existing.authorModel || null;
+          await result.claim.save();
+        }
+        return res.status(409).json({ success: false, code: "CLAIM_ALREADY_PUBLISHED", message: "This claim has already been published to News.", news: existing });
+      }
     }
     const preview = buildPublicClaimNews({ key: result.key, claim: result.claim });
     return res.json({ success: true, preview: { title: preview.title, summary: preview.summary, content: preview.content, category: preview.category } });
@@ -286,12 +329,38 @@ exports.publishNewsPreview = async (req, res) => {
 exports.getOne = async (req, res) => {
   try {
     const result = await getClaim(req.params.type, req.params.id);
+    await result.claim.populate("member", "fullName memberNumber phone email profileImage position employer");
+    if (result.key !== "support") {
+      await result.claim.populate("dependent", "fullName relationship gender dateOfBirth nationalId phone email county address employmentStatus medicalConditions isNextOfKin");
+    }
+    await result.claim.populate([
+      "createdBy",
+      "processedBy",
+      "updatedBy",
+      "approvedBy",
+      "hiddenBy",
+      "deletedBy",
+      "publishedBy",
+      "timeline.updatedBy",
+      { path: "publishedNewsId", select: "author authorModel publishDate status published", populate: { path: "author", select: "fullName email" } },
+    ]);
     const normalized = {
       ...result.claim.toObject(),
       supportType: LABEL_MAP[result.key],
       sourceType: result.key,
       amount: Number(result.claim.approvedAmount || result.claim.requestedAmount || 0),
+      paidAmount: Number(result.claim.paidAmount ?? result.claim.amountPaid ?? result.claim.amountPaidOut ?? 0),
       timeline: Array.isArray(result.claim.timeline) ? result.claim.timeline : [],
+      provenance: {
+        createdBy: result.claim.createdBy || null, createdByModel: result.claim.createdByModel || null,
+        processedBy: result.claim.processedBy || null, processedByModel: result.claim.processedByModel || null,
+        updatedBy: result.claim.updatedBy || null, updatedByModel: result.claim.updatedByModel || null,
+        approvedBy: result.claim.approvedBy || null, approvedByModel: result.claim.approvedByModel || null,
+        hiddenBy: result.claim.hiddenBy || null, hiddenByModel: result.claim.hiddenByModel || null,
+        deletedBy: result.claim.deletedBy || null, deletedByModel: result.claim.deletedByModel || null,
+        publishedBy: result.claim.publishedBy || result.claim.publishedNewsId?.author || null,
+        publishedByModel: result.claim.publishedByModel || result.claim.publishedNewsId?.authorModel || null,
+      },
     };
     if (result.key === "education") {
       normalized.repaymentEnabled = Boolean(result.claim.repaymentEnabled);
@@ -300,10 +369,7 @@ exports.getOne = async (req, res) => {
       normalized.amountPaid = Number(result.claim.amountPaid || 0);
       normalized.balance = Number(result.claim.balance || 0);
     }
-    await result.claim.populate("member", "fullName memberNumber phone email profileImage position employer");
-    if (result.key === "medical") await result.claim.populate("dependent", "fullName relationship");
-    if (result.key === "education") await result.claim.populate("dependent", "fullName relationship school educationLevel");
-    return res.json({ success: true, claim: { ...normalized, member: result.claim.member, dependent: result.claim.dependent } });
+    return res.json({ success: true, claim: normalized });
   } catch (error) {
     return res.status(error.status || 500).json({ success: false, message: error.message });
   }
@@ -312,8 +378,8 @@ exports.getOne = async (req, res) => {
 
 exports.hideFromMember = async (req, res) => {
   try {
-    if (String(req.user?.role || "").toLowerCase() !== "superadmin") {
-      return res.status(403).json({ success: false, code: "CLAIM_HIDE_FORBIDDEN", message: "Only SuperAdmin can hide a claim from the member view." });
+    if (!["admin","superadmin"].includes(String(req.user?.role || "").toLowerCase())) {
+      return res.status(403).json({ success: false, code: "CLAIM_HIDE_FORBIDDEN", message: "Only authorized Admin or SuperAdmin accounts can hide a claim from the member view." });
     }
     const result = await getClaim(req.params.type, req.params.id);
     if (result.claim.memberVisible === false) {
@@ -322,13 +388,14 @@ exports.hideFromMember = async (req, res) => {
     result.claim.memberVisible = false;
     result.claim.hiddenAt = new Date();
     result.claim.hiddenBy = req.user._id;
+    result.claim.hiddenByModel = actorModelForRequest(req);
     await result.claim.save();
     await createAuditLog({
       user: req.user._id,
-      userRole: "superadmin",
+      userRole: req.user.role,
       action: "CLAIM_HIDDEN_FROM_MEMBER",
       module: "Claim",
-      description: `SuperAdmin hid ${LABEL_MAP[result.key]} claim ${result.claim._id} from the member view.`,
+      description: `${actorModelForRequest(req)} hid ${LABEL_MAP[result.key]} claim ${result.claim._id} from the member view.`,
       req,
       metadata: { claimId: String(result.claim._id), claimType: result.key, memberId: String(result.claim.member || "") },
     });
@@ -338,16 +405,41 @@ exports.hideFromMember = async (req, res) => {
   }
 };
 
+exports.unhideForMember = async (req, res) => {
+  try {
+    const role = String(req.user?.role || "").toLowerCase();
+    if (!["admin","superadmin"].includes(role)) return res.status(403).json({ success:false, code:"CLAIM_UNHIDE_FORBIDDEN", message:"Only Admin or SuperAdmin can unhide a claim." });
+    const result = await getClaim(req.params.type, req.params.id);
+    if (result.claim.memberVisible !== false) return res.status(409).json({ success:false, code:"CLAIM_ALREADY_VISIBLE", message:"This claim is already visible to the member." });
+    result.claim.memberVisible = true; result.claim.hiddenAt = null; result.claim.hiddenBy = null; result.claim.hiddenByModel = null;
+    if ("updatedBy" in result.claim) { result.claim.updatedBy = req.user._id; result.claim.updatedByModel = actorModelForRequest(req); }
+    await result.claim.save();
+    await createAuditLog({ user:req.user._id, userRole:req.user.role, action:"CLAIM_UNHIDDEN_FOR_MEMBER", module:"Claims", description:`Unhid ${result.key} claim ${result.claim._id} for member visibility.`, req, metadata:{ claimId:result.claim._id, claimType:result.key } });
+    return res.json({ success:true, claim:result.claim, message:"Claim is visible to the member again." });
+  } catch (error) { return res.status(error.status || 500).json({ success:false, message:error.message }); }
+};
+
+exports.permanentDeleteImpact = async (req, res) => {
+  try {
+    if (String(req.user?.role || "").toLowerCase() !== "superadmin") return res.status(403).json({ success:false, code:"CLAIM_DELETE_FORBIDDEN", message:"Only SuperAdmin can permanently delete claims." });
+    const result = await getClaim(req.params.type, req.params.id);
+    const [communityCount, notificationCount, newsCount, settlement] = await Promise.all([
+      CommunityAssistance.countDocuments({ referenceModel:result.Model.modelName, referenceId:result.claim._id }),
+      Notification.countDocuments({ referenceModel:result.Model.modelName, referenceId:result.claim._id }),
+      News.countDocuments({ sourceModel:result.Model.modelName, sourceId:String(result.claim._id) }),
+      result.claim.settlementTransactionId ? Finance.findById(result.claim.settlementTransactionId).select("transactionNumber amount status transactionDate paymentMethod").lean() : null,
+    ]);
+    return res.json({ success:true, impact:{ type:result.key, status:result.claim.status, member:result.claim.member || null, linkedFinancialRecords:settlement ? 1 : 0, settlement, communityAssistance:communityCount, notifications:notificationCount, publications:newsCount } });
+  } catch (error) { return res.status(error.status || 500).json({ success:false, message:error.message }); }
+};
+
 exports.permanentDelete = async (req, res) => {
   try {
     if (String(req.user?.role || "").toLowerCase() !== "superadmin") {
       return res.status(403).json({ success: false, code: "CLAIM_PERMANENT_DELETE_FORBIDDEN", message: "Only SuperAdmin can permanently delete a claim." });
     }
     const result = await getClaim(req.params.type, req.params.id);
-    const currentStatus = String(result.claim.status || "").trim();
-    if (currentStatus !== "Closed") {
-      return res.status(409).json({ success: false, code: "CLAIM_PERMANENT_DELETE_CLOSED_ONLY", message: "Only Closed claims can be permanently deleted." });
-    }
+    const currentStatus = String(result.claim.status || "Pending").trim();
 
     const claimSnapshot = result.claim.toObject();
     // Write an audit record before destructive persistence. The completed
@@ -358,7 +450,7 @@ exports.permanentDelete = async (req, res) => {
       userRole: req.user.role,
       action: "CLAIM_PERMANENT_DELETE_REQUESTED",
       module: "Claim",
-      description: `SuperAdmin requested permanent deletion of Closed ${LABEL_MAP[result.key]} claim ${claimSnapshot._id}.`,
+      description: `SuperAdmin requested permanent deletion of ${LABEL_MAP[result.key]} claim ${claimSnapshot._id}.`,
       req,
       metadata: { claimId: String(claimSnapshot._id), claimType: result.key, memberId: String(claimSnapshot.member || ""), status: currentStatus },
     });
@@ -394,11 +486,18 @@ exports.permanentDelete = async (req, res) => {
     // back to a physically deleted claim. Audit logs are intentionally retained.
     const cleanupResults = await Promise.allSettled([
       Notification.deleteMany({ referenceModel: result.Model.modelName, referenceId: result.claim._id }),
+      News.deleteMany({ sourceModel: result.Model.modelName, sourceId: String(result.claim._id) }),
       SupportRequestPermissionRequest.updateMany(
         { sourceModel: result.Model.modelName, sourceId: result.claim._id, status: { $in: ["Pending", "Approved"] } },
         { $set: { status: "Expired", reviewedAt: new Date(), reviewedBy: req.user._id, reviewedByModel: "SuperAdmin", reviewReason: "Source claim was permanently deleted by SuperAdmin." } }
       ),
     ]);
+    try {
+      const { invalidatePublicNewsCache } = require("../services/newsCache");
+      await invalidatePublicNewsCache();
+    } catch (cacheError) {
+      console.warn("Claim permanent-delete news-cache cleanup warning:", cacheError.message);
+    }
     cleanupResults.filter((entry) => entry.status === "rejected").forEach((entry) => {
       console.warn("Claim permanent-delete derived cleanup warning:", entry.reason?.message || entry.reason);
     });
@@ -408,7 +507,7 @@ exports.permanentDelete = async (req, res) => {
       userRole: req.user.role,
       action: "CLAIM_PERMANENTLY_DELETED",
       module: "Claim",
-      description: `SuperAdmin permanently deleted Closed ${LABEL_MAP[result.key]} claim ${claimSnapshot._id}.`,
+      description: `SuperAdmin permanently deleted ${LABEL_MAP[result.key]} claim ${claimSnapshot._id}.`,
       req,
       metadata: { claimId: String(claimSnapshot._id), claimType: result.key, memberId: String(claimSnapshot.member || ""), status: currentStatus, communityCampaignsFound: relatedCampaigns.length },
     });
@@ -434,6 +533,8 @@ exports.remove = async (req, res) => {
     result.claim.isDeleted = true;
     result.claim.deletedAt = new Date();
     result.claim.deletedBy = req.user._id;
+    if ("deletedByModel" in result.claim) result.claim.deletedByModel = actorModelForRequest(req);
+    if ("updatedBy" in result.claim) { result.claim.updatedBy = req.user._id; result.claim.updatedByModel = actorModelForRequest(req); }
     await result.claim.save();
     await createAuditLog({ user:req.user._id, userRole:"superadmin", action:"ARCHIVE", module:"Claim", description:`Archived ${LABEL_MAP[result.key]} claim ${result.claim._id}`, req, metadata:{ claimId:String(result.claim._id), claimType:result.key, memberId:String(result.claim.member || "") } });
     return res.json({ success: true, message: `${LABEL_MAP[result.key]} claim archived. Financial and audit evidence has been preserved.` });
@@ -465,6 +566,8 @@ exports.publishClaimToNews = async (req, res) => {
         result.claim.publishedNewsId = existingBySource._id;
         result.claim.publishedToNews = true;
         result.claim.publishedAt = existingBySource.publishDate || existingBySource.createdAt || new Date();
+        result.claim.publishedBy = existingBySource.author || req.user._id;
+        result.claim.publishedByModel = existingBySource.authorModel || (String(req.user?.role || "").toLowerCase() === "superadmin" ? "SuperAdmin" : "Admin");
         await result.claim.save();
         return res.status(409).json({ success: false, code: "CLAIM_ALREADY_PUBLISHED", message: "This claim has already been published to News.", news: existingBySource });
       }
@@ -500,6 +603,8 @@ exports.publishClaimToNews = async (req, res) => {
           result.claim.publishedNewsId = news._id;
           result.claim.publishedToNews = true;
           result.claim.publishedAt = news.publishDate || new Date();
+          result.claim.publishedBy = news.author || req.user._id;
+          result.claim.publishedByModel = news.authorModel || (String(req.user?.role || "").toLowerCase() === "superadmin" ? "SuperAdmin" : "Admin");
           await result.claim.save();
           return res.status(409).json({ success: false, code: "CLAIM_ALREADY_PUBLISHED", message: "This claim has already been published to News.", news });
         }
@@ -511,6 +616,8 @@ exports.publishClaimToNews = async (req, res) => {
     result.claim.publishedNewsId = news._id;
     result.claim.publishedToNews = true;
     result.claim.publishedAt = news.publishDate || now;
+    result.claim.publishedBy = news.author || req.user._id;
+    result.claim.publishedByModel = news.authorModel || (String(req.user?.role || "").toLowerCase() === "superadmin" ? "SuperAdmin" : "Admin");
     await result.claim.save();
 
     await createAuditLog({

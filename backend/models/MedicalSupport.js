@@ -107,12 +107,6 @@ const medicalSupportSchema = new mongoose.Schema(
         type:Date
     },
 
-    paymentReference:{
-        type:String,
-        trim:true,
-        default:""
-    },
-
     // ==========================
     // DOCUMENTS
     // ==========================
@@ -162,10 +156,8 @@ const medicalSupportSchema = new mongoose.Schema(
       default: "Admin",
     },
 
-    processedBy:{
-        type:mongoose.Schema.Types.ObjectId,
-        ref:"Admin"
-    },
+    processedBy:{ type:mongoose.Schema.Types.ObjectId, refPath:"processedByModel", default:null },
+    processedByModel:{ type:String, enum:["Admin","SuperAdmin"], default:null },
 
     approvalDate:{
         type:Date
@@ -188,10 +180,8 @@ const medicalSupportSchema = new mongoose.Schema(
         {
             status:String,
             remarks:String,
-            updatedBy:{
-                type:mongoose.Schema.Types.ObjectId,
-                ref:"Admin"
-            },
+            updatedBy:{ type:mongoose.Schema.Types.ObjectId, refPath:"updatedByModel", default:null },
+    updatedByModel:{ type:String, enum:["Member","Admin","SuperAdmin"], default:null },
             date:{
                 type:Date,
                 default:Date.now
@@ -210,29 +200,35 @@ const medicalSupportSchema = new mongoose.Schema(
     // ==========================
     // AUDIT
     // ==========================
-    createdBy:{
-        type:mongoose.Schema.Types.ObjectId,
-        ref:"Member"
-    },
+    createdBy:{ type:mongoose.Schema.Types.ObjectId, refPath:"createdByModel" },
+    createdByModel:{ type:String, enum:["Member","Admin","SuperAdmin"], default:"Member" },
 
-    updatedBy:{
-        type:mongoose.Schema.Types.ObjectId,
-        ref:"Admin"
-    },
+    updatedBy:{ type:mongoose.Schema.Types.ObjectId, refPath:"updatedByModel", default:null },
+    updatedByModel:{ type:String, enum:["Member","Admin","SuperAdmin"], default:null },
+
+    // Authoritative finance settlement for Paid/Completed claims. The legacy
+    // claim-level payment reference is deliberately no longer part of the
+    // active workflow. Historical records are migrated where safely matched.
+    settlementTransactionId:{ type:mongoose.Schema.Types.ObjectId, ref:"Finance", default:null },
+    settlementTransactionModel:{ type:String, enum:["Finance"], default:"Finance" },
 
     // Visibility is a staff-governed presentation state. Hidden claims remain
     // stored and available to authorized staff, but are filtered server-side
     // from member claim responses.
     memberVisible: { type: Boolean, default: true, index: true },
     hiddenAt: { type: Date, default: null },
-    hiddenBy: { type: mongoose.Schema.Types.ObjectId, default: null },
+    hiddenBy: { type: mongoose.Schema.Types.ObjectId, refPath:"hiddenByModel", default:null },
+    hiddenByModel: { type:String, enum:["Member","Admin","SuperAdmin"], default:null },
     publishedNewsId: { type: mongoose.Schema.Types.ObjectId, ref: "News", default: null },
     publishedToNews: { type: Boolean, default: false },
     publishedAt: { type: Date, default: null },
+    publishedBy: { type: mongoose.Schema.Types.ObjectId, refPath: "publishedByModel", default: null },
+    publishedByModel: { type: String, enum: ["Admin", "SuperAdmin"], default: null },
 
     isDeleted:{ type:Boolean, default:false, index:true },
     deletedAt:{ type:Date, default:null },
-    deletedBy:{ type:mongoose.Schema.Types.ObjectId, default:null }
+    deletedBy:{ type:mongoose.Schema.Types.ObjectId, refPath:"deletedByModel", default:null },
+    deletedByModel:{ type:String, enum:["Member","Admin","SuperAdmin"], default:null }
 
 },
 {

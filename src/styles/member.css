@@ -18,7 +18,7 @@
   gap: 18px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
   transition: 0.25s ease;
-  border-left: 5px solid #ff7a00;
+  border-left: 5px solid var(--color-primary);
 }
 
 .member-stat-card:hover {
@@ -31,7 +31,7 @@
   height: 58px;
   border-radius: 14px;
   background: rgba(255, 122, 0, 0.12);
-  color: #ff7a00;
+  color: var(--color-primary);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -106,7 +106,7 @@ margin-bottom:18px;
 
 .member-item svg{
 
-color:#ff7a00;
+color:var(--color-primary);
 
 }
 
@@ -126,7 +126,7 @@ margin-bottom:18px;
 
 .announcement-item svg{
 
-color:#ff7a00;
+color:var(--color-primary);
 
 }
 

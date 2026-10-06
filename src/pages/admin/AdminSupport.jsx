@@ -26,7 +26,8 @@ export default function AdminSupport() {
   const [supportDetailLoading, setSupportDetailLoading] = useState(false);
   const [supportStage, setSupportStage] = useState("");
   const [supportApprovedAmount, setSupportApprovedAmount] = useState("");
-  const [supportPaymentReference, setSupportPaymentReference] = useState("");
+  const [supportSettlementOptions, setSupportSettlementOptions] = useState([]);
+  const [supportSettlementTransactionId, setSupportSettlementTransactionId] = useState("");
   const [supportRemarks, setSupportRemarks] = useState("");
   const [supportBusy, setSupportBusy] = useState(false);
   const [supportReviewError, setSupportReviewError] = useState("");
@@ -75,7 +76,8 @@ export default function AdminSupport() {
     setSupportReviewError("");
     setSupportStage(request.status || "");
     setSupportApprovedAmount(request.approvedAmount ?? "");
-    setSupportPaymentReference(request.paymentReference || "");
+    setSupportSettlementTransactionId(String(request.settlementTransactionId || ""));
+    setSupportSettlementOptions([]);
     setSupportRemarks("");
     setSelectedSupport(request);
     setSupportDetailLoading(true);
@@ -86,7 +88,9 @@ export default function AdminSupport() {
         setSelectedSupport(detail);
         setSupportStage(detail.status || "");
         setSupportApprovedAmount(detail.approvedAmount ?? "");
-        setSupportPaymentReference(detail.paymentReference || "");
+        setSupportSettlementTransactionId(String(detail.settlementTransactionId || ""));
+        const settlementResponse = await API.get(`/claims/support/${detail._id}/settlements`).catch(() => ({ data:{ settlements:[] } }));
+        setSupportSettlementOptions(Array.isArray(settlementResponse.data?.settlements) ? settlementResponse.data.settlements : []);
       }
     } catch (e) {
       setSupportReviewError(e.response?.data?.message || e.message || "Unable to load the complete support request.");
@@ -142,9 +146,9 @@ export default function AdminSupport() {
       const payload = {
         status: supportStage,
         approvedAmount: supportStage === "Approved" ? Number(supportApprovedAmount || selectedSupport.requestedAmount || 0) : selectedSupport.approvedAmount,
-        paymentReference: supportPaymentReference.trim(),
         remarks: supportRemarks.trim(),
       };
+      if (supportStage === "Paid" || supportStage === "Completed") payload.settlementTransactionId = supportSettlementTransactionId;
       if (supportStage === "Rejected") payload.rejectionReason = supportRemarks.trim();
       const { data } = await API.put(`/member/support-requests/${selectedSupport._id}`, payload);
       if (!data?.success) throw new Error(data?.message || "Unable to update support request.");
@@ -634,7 +638,7 @@ export default function AdminSupport() {
                   <div><strong>Approved amount</strong><div>{selectedSupport.approvedAmount === null || selectedSupport.approvedAmount === undefined ? "Unavailable" : money(selectedSupport.approvedAmount)}</div></div>
                   <div><strong>Submitted</strong><div>{selectedSupport.createdAt ? new Date(selectedSupport.createdAt).toLocaleString() : "—"}</div></div>
                   <div><strong>Last updated</strong><div>{selectedSupport.updatedAt ? new Date(selectedSupport.updatedAt).toLocaleString() : "—"}</div></div>
-                  {selectedSupport.paymentReference && <div><strong>Payment reference</strong><div>{selectedSupport.paymentReference}</div></div>}
+                  {selectedSupport.settlementTransactionId && <div><strong>Settlement transaction</strong><div>{supportSettlementOptions.find((row) => String(row._id) === String(selectedSupport.settlementTransactionId))?.transactionNumber || "Linked authoritative finance transaction"}</div></div>}
                 </div>
 
                 <div className="portal-card" style={{ marginTop: 14, background: "#f8fafc" }}>
@@ -684,8 +688,12 @@ export default function AdminSupport() {
                   )}
                   {(supportStage === "Paid" || supportStage === "Completed") && (
                     <div className="portal-field">
-                      <label htmlFor="support-review-payment-reference">Payment reference</label>
-                      <input id="support-review-payment-reference" value={supportPaymentReference} onChange={(event) => setSupportPaymentReference(event.target.value)} placeholder="M-PESA receipt / bank reference" />
+                      <label htmlFor="support-review-settlement">Authoritative settlement</label>
+                      <select id="support-review-settlement" value={supportSettlementTransactionId} onChange={(event) => setSupportSettlementTransactionId(event.target.value)} required>
+                        <option value="">Select a completed claim-finance settlement</option>
+                        {supportSettlementOptions.map((row) => <option key={row._id} value={row._id}>{row.transactionNumber} • {money(row.amount)} • {row.paymentMethod || "—"}</option>)}
+                      </select>
+                      {supportSettlementOptions.length === 0 && <small>No completed linked claim-finance settlement is available.</small>}
                     </div>
                   )}
                 </div>

@@ -54,9 +54,9 @@ check(migrationRunner.includes('012_backfill_finance_actor_provenance') && migra
 check(financeController.includes('normalizeFinanceRole(transaction?.transactedByModel) === "admin"') && financeController.includes('String(transaction?.transactedBy || "") === String(actorId || "")'), "Finance ownership comparison uses the authenticated Admin against the transaction actor model/id");
 check(financeController.includes('if (role === "superadmin") return null;'), "SuperAdmin bypass remains explicit for Finance governance mutations");
 
-check(claimController.includes('exports.permanentDelete') && claimController.includes('CLAIM_PERMANENT_DELETE_CLOSED_ONLY') && claimController.includes('await result.claim.deleteOne()'), "Permanent claim deletion physically deletes the Closed claim source record");
+check(claimController.includes("exports.permanentDelete") && !claimController.includes("CLAIM_PERMANENT_DELETE_CLOSED_ONLY") && claimController.includes("await result.claim.deleteOne()"), "Permanent claim deletion physically deletes the claim source record from any valid stage");
 check(claimRoutes.includes('/:type/:id/permanent'), "Permanent Closed-claim delete has a dedicated endpoint");
-check(/isSuperAdmin && c.status === "Closed"/.test(adminClaims), "Only SuperAdmin Closed claims expose permanent deletion in the UI");
+check(/isSuperAdmin/.test(adminClaims) && /openDeleteDialog/.test(adminClaims) && /Delete permanently/.test(adminClaims), "Only SuperAdmin exposes permanent claim deletion in the UI across valid stages");
 check(claimController.includes('Notification.deleteMany') && claimController.includes('SupportRequestPermissionRequest.updateMany') && claimController.includes('Promise.allSettled'), "Permanent claim deletion cleans stale derived references without letting secondary cleanup failures fake deletion failure");
 check(claimController.includes('sourceRemoved: true'), "Settled CommunityAssistance retains accounting evidence while de-linking the deleted claim source");
 

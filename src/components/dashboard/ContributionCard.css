@@ -40,7 +40,7 @@
 
 .wallet-icon{
 
-    color:#ff7a00;
+    color:var(--color-primary);
 
 }
 
@@ -114,9 +114,9 @@
 
         90deg,
 
-        #ff7a00,
+        var(--color-primary),
 
-        #ffb347
+        var(--color-primary)
 
     );
 
@@ -144,7 +144,7 @@
 
     border:none;
 
-    background:#ff7a00;
+    background:var(--color-primary);
 
     color:white;
 

@@ -1,3 +1,24 @@
+
+:root {
+  --color-primary: #f97316;
+  --color-primary-hover: #ea580c;
+  --color-primary-soft: #fff0e5;
+  --color-secondary: #ea580c;
+  --color-background: #fffaf5;
+  --color-surface: #ffffff;
+  --color-surface-elevated: #fff7ed;
+  --color-text: #1f2937;
+  --color-text-muted: #667085;
+  --color-border: #e5e7eb;
+  --color-focus: #fb923c;
+  --color-success: #15803d;
+  --color-warning: #b45309;
+  --color-danger: #b91c1c;
+  --color-header: #ea580c;
+  --color-sidebar: #ea580c;
+  --color-buttons: #f97316;
+  --color-links: #f97316;
+}
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap');
 
 * {
@@ -6,19 +27,11 @@
   box-sizing: border-box;
 }
 
-:root {
-  --orange: #e8751a;
-  --orange-dark: #c75d0d;
-  --dark: #252525;
-  --grey: #6b6b6b;
-  --light-grey: #f5f5f3;
-  --white: #ffffff;
-}
 
 body {
   font-family: "DM Sans", sans-serif;
-  color: var(--dark);
-  background: var(--white);
+  color: var(--color-text);
+  background: var(--color-surface);
 }
 
 a {
@@ -43,7 +56,7 @@ textarea {
 }
 
 .section-label {
-  color: var(--orange);
+  color: var(--color-primary);
   font-size: 13px;
   font-weight: 700;
   letter-spacing: 2px;
@@ -63,7 +76,7 @@ h2 {
 
 p {
   line-height: 1.8;
-  color: var(--grey);
+  color: var(--color-text-muted);
 }
 
 /* Mobile-width hardening: prevent fixed desktop assets/cards from widening the viewport. */

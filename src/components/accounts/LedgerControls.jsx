@@ -1,6 +1,6 @@
 import { Download, FileDown, Printer, RefreshCw } from "lucide-react";
 import API from "../../services/api";
-import { buildPrintHeadHtml, printHeadStyles } from "../../utils/printHead";
+import { openPrintDocument, escapePrintHtml } from "../../utils/printHead";
 
 const money = (v) => {
   if (v === null || v === undefined || v === "") return "—";
@@ -24,19 +24,10 @@ async function downloadBlob(url, params, fallbackName, type) {
 
 export default function LedgerControls({ data, dates, onLoad, busy = false, title = "Benevolent Constitution Ledger", personalContributionTotal, contributionStatus, currentBalanceLabel = "Scheme Current Book Balance" }) {
   const printLedger = () => {
-    if (!data) return;
-    const popup = window.open("", "_blank", "noopener,noreferrer");
-    if (!popup) return;
-    const rows = (data.entries || []).map((entry) => `
-      <tr><td>${dt(entry.date)}</td><td>${entry.transactionNumber || "—"}</td><td>${entry.transactedByName || entry.transactedBy?.fullName || entry.transactedBy?.name || "Recorded actor unavailable"}</td><td>${entry.description || "—"}</td><td>${entry.category || "—"}</td><td>${money(entry.amount)}</td><td>${entry.direction || "—"}</td><td>${entry.status || "—"}</td><td>${money(entry.runningBalance)}</td></tr>
-    `).join("");
-    popup.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${title}</title>${printHeadStyles()}<style>@page{size:A4 landscape;margin:10mm}.print-shell{break-after:auto}.ledger-summary{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:0 0 18px}.ledger-summary div{border:1px solid #ddd;padding:8px}.ledger-summary span{display:block;font-size:10px}.ledger-summary strong{font-size:14px}table{font-size:8px}th,td{padding:6px}</style></head><body>
-      ${buildPrintHeadHtml({ title, subtitle: `Date range: ${data.startDate} to ${data.endDate}` })}
-      <p class="print-note">Generated ${dt(new Date())}. Current live book balance reflects valid approved/completed scheme transactions as of the timestamp below.</p>
-      <div class="ledger-summary"><div><span>${currentBalanceLabel}</span><strong>${money(data.currentBookBalance)}</strong></div><div><span>Opening balance</span><strong>${money(data.openingBalance)}</strong></div><div><span>Money in</span><strong>${money(data.totals?.credit)}</strong></div><div><span>Money out</span><strong>${money(data.totals?.debit)}</strong></div><div><span>Closing balance</span><strong>${money(data.closingBalance)}</strong></div>${personalContributionTotal !== undefined && personalContributionTotal !== null ? `<div><span>My contributions</span><strong>${money(personalContributionTotal)}</strong></div>` : ""}${contributionStatus ? `<div><span>Contribution status</span><strong>${contributionStatus}</strong></div>` : ""}<div><span>As of</span><strong>${dt(data.asOf)}</strong></div></div>
-      <table><thead><tr><th>Date</th><th>Transaction/reference</th><th>Transacted by</th><th>Description</th><th>Category</th><th>Amount</th><th>Direction</th><th>Status</th><th>Running balance</th></tr></thead><tbody>${rows || '<tr><td colspan="9">No valid ledger entries were recorded for this date range.</td></tr>'}</tbody></table>
-      <script>window.addEventListener('load',()=>setTimeout(()=>window.print(),100));</script></body></html>`);
-    popup.document.close();
+    if (!data) return false;
+    const rows = (data.entries || []).map((entry) => `<tr><td>${escapePrintHtml(dt(entry.date))}</td><td>${escapePrintHtml(entry.transactionNumber || "—")}</td><td>${escapePrintHtml(entry.transactedByName || entry.transactedBy?.fullName || entry.transactedBy?.name || "Recorded actor unavailable")}</td><td>${escapePrintHtml(entry.description || "—")}</td><td>${escapePrintHtml(entry.category || "—")}</td><td>${escapePrintHtml(money(entry.amount))}</td><td>${escapePrintHtml(entry.direction || "—")}</td><td>${escapePrintHtml(entry.status || "—")}</td><td>${escapePrintHtml(money(entry.runningBalance))}</td></tr>`).join("");
+    const bodyHtml = `<p class="print-note">Current live book balance reflects authoritative ledger entries available as of the generated timestamp.</p><div class="print-summary"><div><span>${escapePrintHtml(currentBalanceLabel)}</span><strong>${escapePrintHtml(money(data.currentBookBalance))}</strong></div><div><span>Opening balance</span><strong>${escapePrintHtml(money(data.openingBalance))}</strong></div><div><span>Money in</span><strong>${escapePrintHtml(money(data.totals?.credit))}</strong></div><div><span>Money out</span><strong>${escapePrintHtml(money(data.totals?.debit))}</strong></div><div><span>Closing balance</span><strong>${escapePrintHtml(money(data.closingBalance))}</strong></div>${personalContributionTotal !== undefined && personalContributionTotal !== null ? `<div><span>Payroll contributions</span><strong>${escapePrintHtml(money(personalContributionTotal))}</strong></div>` : ""}${contributionStatus ? `<div><span>Contribution status</span><strong>${escapePrintHtml(contributionStatus)}</strong></div>` : ""}<div><span>As of</span><strong>${escapePrintHtml(dt(data.asOf))}</strong></div></div><div class="print-table-wrap"><table><thead><tr><th>Date</th><th>Transaction</th><th>Transacted by</th><th>Description</th><th>Category</th><th>Amount</th><th>Direction</th><th>Status</th><th>Running balance</th></tr></thead><tbody>${rows || '<tr><td colspan="9">No valid ledger entries were recorded for this date range.</td></tr>'}</tbody></table></div>`;
+    return openPrintDocument({ title, subtitle:`Date range: ${data.startDate} to ${data.endDate}`, portal:"Member / Admin / SuperAdmin", documentType:"Constitution Ledger", dateRange:`${data.startDate} to ${data.endDate}`, classification:"Official Record", bodyHtml, orientation:"landscape", filename:`benevolent-constitution-ledger-${dates?.start || "range"}-${dates?.end || "range"}` });
   };
 
   const runDownload = async (format) => {

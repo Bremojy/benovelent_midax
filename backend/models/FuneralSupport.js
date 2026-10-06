@@ -105,11 +105,6 @@ const funeralSupportSchema = new mongoose.Schema(
         default:"M-Pesa"
     },
 
-    paymentReference:{
-        type:String,
-        default:""
-    },
-
     paymentDate:Date,
 
     // =====================================
@@ -187,7 +182,7 @@ const funeralSupportSchema = new mongoose.Schema(
     },
 
     timeline: [
-      { status: String, remarks: String, updatedBy: { type: mongoose.Schema.Types.ObjectId }, date: { type: Date, default: Date.now } }
+      { status: String, remarks: String, updatedBy: { type: mongoose.Schema.Types.ObjectId, refPath:"updatedByModel" }, updatedByModel:{ type:String, enum:["Member","Admin","SuperAdmin"], default:null }, date: { type: Date, default: Date.now } }
     ],
 
     // =====================================
@@ -220,37 +215,41 @@ const funeralSupportSchema = new mongoose.Schema(
       default: "Admin",
     },
 
-    processedBy:{
-        type:mongoose.Schema.Types.ObjectId,
-        ref:"Admin"
-    },
+    processedBy:{ type:mongoose.Schema.Types.ObjectId, refPath:"processedByModel", default:null },
+    processedByModel:{ type:String, enum:["Admin","SuperAdmin"], default:null },
 
     // =====================================
     // AUDIT
     // =====================================
 
-    createdBy:{
-        type:mongoose.Schema.Types.ObjectId,
-        ref:"Member"
-    },
+    createdBy:{ type:mongoose.Schema.Types.ObjectId, refPath:"createdByModel" },
+    createdByModel:{ type:String, enum:["Member","Admin","SuperAdmin"], default:"Member" },
+
+    // Authoritative finance settlement for Paid/Completed claims. The legacy
+    // claim-level payment reference is deliberately no longer part of the
+    // active workflow. Historical records are migrated where safely matched.
+    settlementTransactionId:{ type:mongoose.Schema.Types.ObjectId, ref:"Finance", default:null },
+    settlementTransactionModel:{ type:String, enum:["Finance"], default:"Finance" },
 
     // Reversible member-facing visibility state. Historical documents without
     // this field remain visible because member queries filter only explicit false.
     memberVisible: { type: Boolean, default: true, index: true },
     hiddenAt: { type: Date, default: null },
-    hiddenBy: { type: mongoose.Schema.Types.ObjectId, default: null },
+    hiddenBy: { type: mongoose.Schema.Types.ObjectId, refPath:"hiddenByModel", default:null },
+    hiddenByModel: { type:String, enum:["Member","Admin","SuperAdmin"], default:null },
     publishedNewsId: { type: mongoose.Schema.Types.ObjectId, ref: "News", default: null },
     publishedToNews: { type: Boolean, default: false },
     publishedAt: { type: Date, default: null },
+    publishedBy: { type: mongoose.Schema.Types.ObjectId, refPath: "publishedByModel", default: null },
+    publishedByModel: { type: String, enum: ["Admin", "SuperAdmin"], default: null },
 
     isDeleted: { type: Boolean, default: false, index: true },
     deletedAt: { type: Date, default: null },
-    deletedBy: { type: mongoose.Schema.Types.ObjectId, default: null },
+    deletedBy: { type: mongoose.Schema.Types.ObjectId, refPath:"deletedByModel", default:null },
+    deletedByModel: { type:String, enum:["Member","Admin","SuperAdmin"], default:null },
 
-    updatedBy:{
-        type:mongoose.Schema.Types.ObjectId,
-        ref:"Member"
-    }
+    updatedBy:{ type:mongoose.Schema.Types.ObjectId, refPath:"updatedByModel", default:null },
+    updatedByModel:{ type:String, enum:["Member","Admin","SuperAdmin"], default:null }
 
 },
 {

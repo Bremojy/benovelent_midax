@@ -155,7 +155,7 @@ const educationSupportSchema = new mongoose.Schema(
     remarks: String,
 
     timeline: [
-      { status: String, remarks: String, updatedBy: { type: mongoose.Schema.Types.ObjectId }, date: { type: Date, default: Date.now } }
+      { status: String, remarks: String, updatedBy: { type: mongoose.Schema.Types.ObjectId, refPath:"updatedByModel" }, updatedByModel:{ type:String, enum:["Member","Admin","SuperAdmin"], default:null }, date: { type: Date, default: Date.now } }
     ],
 
     // =====================================
@@ -188,10 +188,8 @@ const educationSupportSchema = new mongoose.Schema(
       default: "Admin",
     },
 
-    createdBy: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Member",
-    },
+    createdBy: { type: mongoose.Schema.Types.ObjectId, refPath:"createdByModel" },
+    createdByModel: { type:String, enum:["Member","Admin","SuperAdmin"], default:"Member" },
 
     repayments: [
       {
@@ -200,21 +198,30 @@ const educationSupportSchema = new mongoose.Schema(
         paymentTransactionId: { type: mongoose.Schema.Types.ObjectId, ref: "MpesaTransaction", default: null },
         paidAt: { type: Date, default: Date.now },
         method: { type: String, default: "M-PESA" },
-        reference: { type: String, default: "" },
       },
     ],
+    // Authoritative finance settlement for Paid/Completed claims. The legacy
+    // claim-level payment reference is deliberately no longer part of the
+    // active workflow. Historical records are migrated where safely matched.
+    settlementTransactionId:{ type:mongoose.Schema.Types.ObjectId, ref:"Finance", default:null },
+    settlementTransactionModel:{ type:String, enum:["Finance"], default:"Finance" },
+
     // Explicit false hides a claim from its member; missing legacy values remain
     // visible so historical applications are not accidentally concealed.
     memberVisible: { type: Boolean, default: true, index: true },
     hiddenAt: { type: Date, default: null },
-    hiddenBy: { type: mongoose.Schema.Types.ObjectId, default: null },
+    hiddenBy: { type: mongoose.Schema.Types.ObjectId, refPath:"hiddenByModel", default:null },
+    hiddenByModel: { type:String, enum:["Member","Admin","SuperAdmin"], default:null },
     publishedNewsId: { type: mongoose.Schema.Types.ObjectId, ref: "News", default: null },
     publishedToNews: { type: Boolean, default: false },
     publishedAt: { type: Date, default: null },
+    publishedBy: { type: mongoose.Schema.Types.ObjectId, refPath: "publishedByModel", default: null },
+    publishedByModel: { type: String, enum: ["Admin", "SuperAdmin"], default: null },
 
     isDeleted: { type: Boolean, default: false, index: true },
     deletedAt: { type: Date, default: null },
-    deletedBy: { type: mongoose.Schema.Types.ObjectId, default: null },
+    deletedBy: { type: mongoose.Schema.Types.ObjectId, refPath:"deletedByModel", default:null },
+    deletedByModel: { type:String, enum:["Member","Admin","SuperAdmin"], default:null },
 
   },
   {

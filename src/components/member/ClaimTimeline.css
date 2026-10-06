@@ -36,7 +36,7 @@ z-index:2;
 }
 
 .timeline-step.active .circle{
-background:#ff7a00;
+background:var(--color-primary);
 }
 
 .timeline-step span{

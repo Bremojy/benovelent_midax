@@ -61,7 +61,7 @@ margin:0;
 display:inline-block;
 margin-top:8px;
 padding:5px 15px;
-background:#ff7a00;
+background:var(--color-primary);
 color:white;
 border-radius:30px;
 font-size:13px;
@@ -69,7 +69,7 @@ font-size:13px;
 
 .edit-profile-btn{
 padding:12px 24px;
-background:#ff7a00;
+background:var(--color-primary);
 border:none;
 color:white;
 border-radius:12px;

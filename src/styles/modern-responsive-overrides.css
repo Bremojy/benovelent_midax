@@ -5,7 +5,7 @@
    ========================================================= */
 
 :root{
-  --bm-orange:#ff7a00;
+  --bm-orange:var(--color-primary);
   --bm-orange-2:#ff9f43;
   --bm-ink:#111827;
   --bm-text:#252a31;
@@ -480,8 +480,8 @@ button:disabled{opacity:.62;}
 .dashboard-page input:focus,
 .dashboard-page select:focus,
 .dashboard-page textarea:focus {
-  border-color: color-mix(in srgb, var(--portal-accent) 60%, white);
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--portal-accent) 12%, transparent);
+  border-color: color-mix(in srgb, var(--color-primary) 60%, white);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-primary) 12%, transparent);
   outline: none;
 }
 

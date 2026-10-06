@@ -42,7 +42,7 @@ background:none;
 
 border:none;
 
-color:#ff7a00;
+color:var(--color-primary);
 
 font-weight:700;
 

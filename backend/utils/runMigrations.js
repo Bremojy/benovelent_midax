@@ -13,6 +13,10 @@ const migrations = [
   require("../migrations/011_remove_legacy_unverified_mpesa_defaults"),
   require("../migrations/012_backfill_finance_actor_provenance"),
   require("../migrations/013_remove_redundant_notification_index"),
+  require("../migrations/014_remove_dependent_obsolete_education_fields"),
+  require("../migrations/015_backfill_claim_actor_provenance"),
+  require("../migrations/016_link_claim_legacy_payment_references"),
+  require("../migrations/017_normalize_system_theme_branding"),
 ];
 
 function normalizeMigration(migration, index) {

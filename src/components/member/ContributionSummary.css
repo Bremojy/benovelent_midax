@@ -38,7 +38,7 @@ transform:translateY(-5px);
 
 .balance{
 
-background:linear-gradient(135deg,#ff7a00,#ff9d3d);
+background:linear-gradient(135deg,var(--color-primary),var(--color-primary));
 
 color:white;
 

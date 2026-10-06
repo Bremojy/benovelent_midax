@@ -57,7 +57,7 @@ body {
   place-items: center;
   border-radius: 16px;
   background: rgba(232,117,26,.12);
-  color: var(--orange);
+  color: var(--color-primary);
   margin-bottom: 18px;
 }
 
@@ -96,7 +96,7 @@ body {
   padding: 0 18px;
   border: 0;
   border-radius: 12px;
-  background: var(--orange);
+  background: var(--color-primary);
   color: #fff;
   font-weight: 700;
   display: inline-flex;

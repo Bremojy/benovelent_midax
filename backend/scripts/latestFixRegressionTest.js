@@ -19,10 +19,10 @@ assert(/const \{ getCurrentBookBalance \} = require\("\.\.\/services\/financeLed
 assert(/if \(role === "superadmin" && !protectedSettled && !linkedContribution\)/.test(financeController) && /action = "deleted"/.test(financeController) && /action = "archived"/.test(financeController), 'finance deletion uses the governed SuperAdmin delete path and preserves protected records through audit archive');
 assert(/protectedSettled/.test(financeController) && /action = "archived"/.test(financeController), 'settled or linked finance deletes remain protected by the existing audit/archive policy');
 assert(/createAuditLog\(/.test(financeController) && /FINANCE_TRANSACTION_ARCHIVED/.test(financeController), 'finance archive/delete writes an audit event');
-assert(/Midax Petroleum Marketing/.test(reportController) && /P\.O\. Box 7432/.test(reportController), 'management CSV contains the application printhead identity');
+assert(/getSystemSettings/.test(reportController) && /report\.organization/.test(reportController), 'management CSV uses authoritative SystemSettings organization metadata');
 assert(/assets.*print-letterhead\.jpg/.test(simplePdf) && /\/Im1 Do/.test(simplePdf), 'server-generated PDFs embed the existing Benevolent printhead asset');
 assert(exists('backend/assets/print-letterhead.jpg'), 'server printhead JPEG asset exists');
 assert(/letterheadDataUri/.test(dataIntegrity) && /print-letterhead\.png/.test(dataIntegrity), 'human-readable database print/download embeds the same printhead');
 for (const page of frontendPrint) assert(/openPrintDocument/.test(page), 'print action uses shared printhead document helper');
-assert(/buildPrintHeadHtml/.test(integrityPrint) && /printHeadStyles/.test(integrityPrint), 'integrity report print action uses the shared printhead markup/styles');
+assert(/openPrintDocument/.test(integrityPrint) && /Human-Readable Database Backup/.test(integrityPrint), 'integrity report print action uses the shared printhead document helper');
 pass('latest production-error fixes, delete execution and printhead coverage verified');

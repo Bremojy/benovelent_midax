@@ -9,7 +9,7 @@ gap:30px;
 display:flex;
 justify-content:space-between;
 align-items:center;
-background:linear-gradient(135deg,#ff7a00,#ff9800);
+background:linear-gradient(135deg,var(--color-primary),var(--color-primary));
 padding:35px;
 border-radius:20px;
 color:white;
@@ -28,7 +28,7 @@ max-width:500px;
 
 .primary-btn{
 background:white;
-color:#ff7a00;
+color:var(--color-primary);
 border:none;
 padding:14px 20px;
 border-radius:12px;
@@ -65,7 +65,7 @@ transform:translateY(-6px);
 .stat-card h2{
 margin:15px 0;
 font-size:30px;
-color:#ff7a00;
+color:var(--color-primary);
 }
 
 .dashboard-section{
@@ -99,7 +99,7 @@ text-align:left;
 }
 
 .quick-card:hover{
-background:#ff7a00;
+background:var(--color-primary);
 color:white;
 transform:translateY(-5px);
 }
@@ -158,7 +158,7 @@ height:45px;
 
 width:45px;
 
-background:#ff7a00;
+background:var(--color-primary);
 
 color:white;
 
@@ -194,7 +194,7 @@ transition:.3s;
 
 .notification:hover{
 
-background:#ff7a00;
+background:var(--color-primary);
 
 color:white;
 

@@ -25,7 +25,7 @@
 .member-section-heading span {
   display: block;
 
-  color: #ff7a00;
+  color: var(--color-primary);
 
   font-size: 11px;
 
@@ -147,7 +147,7 @@
 
   background: #fff3e8;
 
-  color: #ff7a00;
+  color: var(--color-primary);
 }
 
 /* =========================================
@@ -268,7 +268,7 @@
 
   background: #fff3e8;
 
-  color: #ff7a00;
+  color: var(--color-primary);
 
   font-weight: 900;
 }
@@ -321,7 +321,7 @@
     4px solid #eee;
 
   border-top-color:
-    #ff7a00;
+    var(--color-primary);
 
   border-radius: 50%;
 
@@ -349,7 +349,7 @@
 
   border-radius: 9px;
 
-  background: #ff7a00;
+  background: var(--color-primary);
 
   color: #ffffff;
 

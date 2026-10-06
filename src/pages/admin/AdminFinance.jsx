@@ -4,7 +4,7 @@ import { Edit3, Layers3, Plus, RefreshCw, Trash2, ShieldCheck, LockKeyhole, Wall
 import { useAuth } from "../../context/AuthContext";
 import DashboardLayout from "../../layouts/DashboardLayout";
 import API from "../../services/api";
-import { buildPrintHeadHtml, printHeadStyles } from "../../utils/printHead";
+import { openPrintDocument, escapePrintHtml } from "../../utils/printHead";
 import "../../styles/portalModule.css";
 import "./adminFinance.css";
 
@@ -361,19 +361,9 @@ export default function AdminFinance() {
   };
 
   const printLedger = () => {
-    const win = window.open("", "_blank", "width=1200,height=850");
-    if (!win) return;
     const rows = Array.isArray(ledger?.entries) ? ledger.entries : [];
     const totals = ledger?.totals || {};
-    win.document.write(`
-      <html><head><title>Benevolent Midax Ledger</title>${printHeadStyles()}</head><body>
-      ${buildPrintHeadHtml({ title: `Benevolent Fund Ledger — ${ledger?.year || new Date().getFullYear()}`, subtitle: "Official scheme financial ledger." })}
-      <p class="print-note">Credits: ${number(totals.credit)} • Debits: ${number(totals.debit)} • Balance: ${number(totals.balance)}</p>
-      <table><thead><tr><th>Date</th><th>Benevolent MIDAX Number</th><th>Description</th><th>Debit</th><th>Credit</th><th>Balance</th></tr></thead><tbody>
-      ${rows.map((row) => `<tr><td>${date(row.transactionDate || row.createdAt)}</td><td>${escapeHtml(row.employeeNumber || "—")}</td><td>${escapeHtml(row.description || row.category || row.type || "—")}</td><td>${number(row.debit)}</td><td>${number(row.credit)}</td><td>${number(row.runningBalance)}</td></tr>`).join("")}
-      <tr class="ledger-total-row"><td colspan="3">Totals</td><td>${number(totals.debit)}</td><td>${number(totals.credit)}</td><td>${number(totals.balance)}</td></tr>
-      </tbody></table><script>window.onload=()=>window.print();</script></body></html>`);
-    win.document.close();
+    return openPrintDocument({ title: `Benevolent Fund Ledger — ${ledger?.year || new Date().getFullYear()}`, subtitle: "Official scheme financial ledger.", portal: isSuperAdmin ? "SuperAdmin" : "Admin", documentType: "Constitution Ledger", classification: "Official Record", dateRange: ledger?.year ? String(ledger.year) : "Current", bodyHtml: `<p class="print-note">Credits: ${number(totals.credit)} • Debits: ${number(totals.debit)} • Balance: ${number(totals.balance)}</p><table><thead><tr><th>Date</th><th>Benevolent MIDAX Number</th><th>Description</th><th>Debit</th><th>Credit</th><th>Balance</th></tr></thead><tbody>${rows.map((row) => `<tr><td>${escapePrintHtml(date(row.transactionDate || row.createdAt))}</td><td>${escapePrintHtml(row.employeeNumber || "—")}</td><td>${escapePrintHtml(row.description || row.category || row.type || "—")}</td><td>${number(row.debit)}</td><td>${number(row.credit)}</td><td>${number(row.runningBalance)}</td></tr>`).join("")}<tr class="ledger-total-row"><td colspan="3">Totals</td><td>${number(totals.debit)}</td><td>${number(totals.credit)}</td><td>${number(totals.balance)}</td></tr></tbody></table>`, orientation: "landscape", filename: `benevolent-ledger-${ledger?.year || "current"}` });
   };
 
   return (

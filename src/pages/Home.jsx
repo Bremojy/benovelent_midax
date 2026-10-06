@@ -38,7 +38,7 @@ export default function Home() {
         <div className="modern-section-head">
           <span className="eyebrow">BENEVOLENT FUND SCHEME</span>
           <h2>{homeSection?.title || "Better life is better when you stand together."}</h2>
-          {homeLoading || settingsLoading ? <p aria-live="polite">Loading current scheme configuration…</p> : (homeError || settingsError) ? <p role="alert">{homeError || settingsError}</p> : <p>{homeSection?.subtitle || homeSection?.description || settings?.website?.subtitle || settings?.organization?.displayName || "Current scheme information is configured by SuperAdmin."}</p> }
+          {homeLoading || settingsLoading ? <p aria-live="polite">Loading current scheme configuration…</p> : (homeError || settingsError) ? <p role="alert">{homeError || settingsError}</p> : <p>{homeSection?.subtitle || homeSection?.description || settings?.website?.subtitle || settings?.organization?.displayName || "Current scheme information is published in the official scheme information."}</p> }
           <div className="modern-trust-band" aria-label="Current scheme settings">
             <Chip icon={Wallet} title={configured(scheme.monthlyContribution)} text="Monthly contribution" />
             <Chip icon={ShieldCheck} title={configured(scheme.minimumBookBalance)} text="Minimum book balance" />

@@ -44,7 +44,7 @@ function loadLetterhead() {
   }
 }
 
-function makePage({ title, subtitle, lines, pageNumber, imageRef }) {
+function makePage({ title, subtitle, lines, pageNumber, imageRef, organizationName, documentType, classification, dateRange, generatedAt }) {
   const commands = [];
   const imageWidth = 210;
   const imageHeight = Math.round(imageWidth * (437 / 1055) * 100) / 100;
@@ -59,12 +59,17 @@ function makePage({ title, subtitle, lines, pageNumber, imageRef }) {
   }
 
   let y = imageRef ? 705 : 800;
+  const generatedText = generatedAt ? new Date(generatedAt).toLocaleString("en-KE") : new Date().toLocaleString("en-KE");
+  const metadata = [documentType, classification, dateRange ? `Period: ${dateRange}` : "", `Generated: ${generatedText}`].filter(Boolean).join(" • ");
   commands.push(
     "BT",
     "/F1 9 Tf",
     `48 ${y} Td`,
-    "(Benevolent Fund Scheme | Midax Petroleum Marketing) Tj",
+    `(${escapePdf(organizationName)}) Tj`,
     "0 -13 Td",
+    `/F1 7 Tf`,
+    `(${escapePdf(metadata)}) Tj`,
+    "0 -14 Td",
     `/F1 17 Tf`,
     `(${escapePdf(title)}) Tj`,
     "0 -20 Td",
@@ -87,15 +92,19 @@ function makePage({ title, subtitle, lines, pageNumber, imageRef }) {
   commands.push(
     "ET",
     "BT",
+    "/F1 6 Tf",
+    "48 24 Td",
+    `(${escapePdf(`${organizationName} • ${classification} • Generated ${generatedText}`)}) Tj`,
+    "0 0 Td",
     "/F1 7 Tf",
-    "270 24 Td",
+    "515 24 Td",
     `(${pageNumber}) Tj`,
     "ET",
   );
   return commands.join("\n");
 }
 
-function buildPdf({ title, subtitle = "", lines = [] } = {}) {
+function buildPdf({ title, subtitle = "", lines = [], organizationName = "Benevolent MIDAX", documentType = "Report", classification = "Official Record", dateRange = "", generatedAt = new Date() } = {}) {
   const pageCapacity = 49;
   const pages = [];
   for (let i = 0; i < lines.length || i === 0; i += pageCapacity) {
@@ -114,7 +123,7 @@ function buildPdf({ title, subtitle = "", lines = [] } = {}) {
     : null;
 
   for (let i = 0; i < pages.length; i += 1) {
-    const content = makePage({ title, subtitle, lines: pages[i], pageNumber: i + 1, imageRef });
+    const content = makePage({ title, subtitle, lines: pages[i], pageNumber: i + 1, imageRef, organizationName, documentType, classification, dateRange, generatedAt });
     const contentRef = add(`<< /Length ${Buffer.byteLength(content, "latin1")} >>\nstream\n${content}\nendstream`);
     const resources = `/Font << /F1 ${fontObj} 0 R >>${imageRef ? ` /XObject << /Im1 ${imageRef} 0 R >>` : ""}`;
     const pageRef = add(`<< /Type /Page /Parent ${pagesObj} 0 R /MediaBox [0 0 595 842] /Resources << ${resources} >> /Contents ${contentRef} 0 R >>`);

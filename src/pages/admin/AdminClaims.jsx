@@ -1,7 +1,7 @@
 import { confirmAction } from "../../utils/modernDialog";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Eye, HeartHandshake, Megaphone, Trash2, Smartphone, WalletCards, LockKeyhole, RefreshCw, CheckCircle2, XCircle, ShieldAlert } from "lucide-react"
+import { Eye, HeartHandshake, Megaphone, Trash2, Smartphone, WalletCards, LockKeyhole, RefreshCw, CheckCircle2, XCircle, ShieldAlert, Landmark } from "lucide-react"
 import { useAuth } from "../../context/AuthContext";
 import DashboardLayout from "../../layouts/DashboardLayout";
 import API, { resolveApiUrl } from "../../services/api";
@@ -12,6 +12,12 @@ const STAGES = ["Pending", "Under Review", "Documents Required", "Eligibility Re
 const money = (v) => new Intl.NumberFormat("en-KE", { style: "currency", currency: "KES", maximumFractionDigits: 0 }).format(Number(v || 0));
 const formatDate = (v) => v ? new Date(v).toLocaleDateString("en-KE", { day: "2-digit", month: "short", year: "numeric" }) : "—";
 const typeLabel = (v) => String(v || "support").replace(/^./, (c) => c.toUpperCase());
+const actorDisplay = (actor, model) => {
+  if (!actor || typeof actor !== "object") return "Historical actor unavailable";
+  const name = actor.fullName || actor.name || actor.email;
+  return name ? `${name}${model ? ` · ${model}` : ""}` : "Historical actor unavailable";
+};
+const displayValue = (value) => value === null || value === undefined || value === "" ? "—" : String(value);
 
 export default function AdminClaims() {
   const { role } = useAuth();
@@ -28,9 +34,11 @@ export default function AdminClaims() {
   const [stage, setStage] = useState("");
   const [remarks, setRemarks] = useState("");
   const [approvedAmount, setApprovedAmount] = useState("");
-  const [paymentReference, setPaymentReference] = useState("");
+  const [settlementOptions, setSettlementOptions] = useState([]);
+  const [settlementTransactionId, setSettlementTransactionId] = useState("");
   const [repaymentAmount, setRepaymentAmount] = useState("");
-  const [repaymentReference, setRepaymentReference] = useState("");
+  const [repaymentOptions, setRepaymentOptions] = useState([]);
+  const [repaymentTransactionId, setRepaymentTransactionId] = useState("");
   const [communityTarget, setCommunityTarget] = useState("");
   const [communityTitle, setCommunityTitle] = useState("");
   const [communityDescription, setCommunityDescription] = useState("");
@@ -103,18 +111,28 @@ export default function AdminClaims() {
     setStage(claim.status || "Pending");
     setRemarks("");
     setApprovedAmount(String(claim.approvedAmount ?? claim.requestedAmount ?? ""));
-    setPaymentReference(String(claim.paymentReference || ""));
+    setSettlementTransactionId(String(claim.settlementTransactionId || ""));
+    setSettlementOptions([]);
     setRepaymentAmount(String(Math.min(Number(claim.balance || 0), Number(claim.monthlyInstallment || claim.balance || 0)) || ""));
-    setRepaymentReference("");
+    setRepaymentTransactionId("");
+    setRepaymentOptions([]);
     try {
-      const { data } = await API.get(`/claims/${claim.sourceType}/${claim._id}`);
+      const [{ data }, settlementResponse] = await Promise.all([
+        API.get(`/claims/${claim.sourceType}/${claim._id}`),
+        API.get(`/claims/${claim.sourceType}/${claim._id}/settlements`).catch(() => ({ data:{ success:true, settlements:[] } })),
+      ]);
       if (requestId !== detailRequestRef.current) return;
+      setSettlementOptions(Array.isArray(settlementResponse?.data?.settlements) ? settlementResponse.data.settlements : []);
+      if (claim.sourceType === "education") {
+        const repaymentResponse = await API.get(`/education/${claim._id}/repayment-transactions`).catch(() => ({ data:{ success:true, transactions:[] } }));
+        setRepaymentOptions(Array.isArray(repaymentResponse?.data?.transactions) ? repaymentResponse.data.transactions : []);
+      }
       const detail = data?.claim || data?.record;
       if (detail) {
         setSelected(detail);
         setStage(detail.status || "Pending");
         setApprovedAmount(String(detail.approvedAmount ?? detail.requestedAmount ?? ""));
-        setPaymentReference(String(detail.paymentReference || ""));
+        setSettlementTransactionId(String(detail.settlementTransactionId || ""));
         setRepaymentAmount(String(Math.min(Number(detail.balance || 0), Number(detail.monthlyInstallment || detail.balance || 0)) || ""));
       }
     } catch (e) {
@@ -147,7 +165,8 @@ export default function AdminClaims() {
     try {
       setBusy(selected._id);
       setError("");
-      const payload = { status: stage, remarks, paymentReference: paymentReference.trim() };
+      const payload = { status: stage, remarks };
+      if (stage === "Paid" || stage === "Completed") payload.settlementTransactionId = settlementTransactionId;
       if (stage === "Approved") payload.approvedAmount = Number(approvedAmount || selected.requestedAmount || 0);
       if (stage === "Rejected") payload.rejectionReason = remarks;
       const { data } = await API.put(`/claims/${selected.sourceType}/${selected._id}/stage`, payload);
@@ -182,14 +201,14 @@ export default function AdminClaims() {
       setError(`Repayment cannot exceed the current balance of ${money(selected.balance)}.`);
       return;
     }
-    if (!repaymentReference.trim()) {
-      setError("A repayment transaction/reference is required.");
+    if (!repaymentTransactionId) {
+      setError("Select a successful M-PESA repayment transaction.");
       return;
     }
     try {
       setBusy(`repay-${selected._id}`);
       setError("");
-      const { data } = await API.put(`/education/${selected._id}/repayment`, { amount, paymentReference: repaymentReference.trim(), method: "MANUAL" });
+      const { data } = await API.put(`/education/${selected._id}/repayment`, { amount, paymentTransactionId: repaymentTransactionId });
       if (!data?.success) throw new Error(data?.message || "Unable to record repayment.");
       setSuccess(data.message || "Education repayment recorded successfully.");
       setSelected(null);
@@ -390,9 +409,19 @@ export default function AdminClaims() {
     } finally { setBusy(""); }
   };
 
-  const openDeleteDialog = (c) => {
-    setDeleteConfirmation("");
-    setDeleteDialog(c);
+  const unhideClaim = async (c) => {
+    if (!await confirmAction("Make this claim visible to the member again?", { title:"Unhide claim", confirmText:"Unhide", danger:false })) return;
+    try { setBusy(`unhide-${c._id}`); setError(""); const { data } = await API.post(`/claims/${c.sourceType}/${c._id}/unhide`); if (!data?.success) throw new Error(data?.message || "The claim could not be unhidden."); setClaims((prev)=>prev.map((item)=>String(item._id)===String(c._id)&&item.sourceType===c.sourceType?{...item,memberVisible:true,hiddenAt:null,hiddenBy:null}:item)); setSuccess(data.message || "Claim is visible to the member again."); }
+    catch(e){ setError(e.response?.data?.message || e.message || "The claim could not be unhidden."); } finally { setBusy(""); }
+  };
+
+  const openDeleteDialog = async (c) => {
+    try {
+      setBusy(`impact-${c._id}`); setError("");
+      const { data } = await API.get(`/claims/${c.sourceType}/${c._id}/permanent-delete-impact`);
+      if (!data?.success) throw new Error(data?.message || "Unable to calculate deletion impact.");
+      setDeleteConfirmation(""); setDeleteDialog({ ...c, impact:data.impact || null });
+    } catch (e) { setError(e.response?.data?.message || e.message || "Unable to calculate deletion impact."); } finally { setBusy(""); }
   };
 
   const deleteClaim = async () => {
@@ -430,7 +459,7 @@ export default function AdminClaims() {
 
         <section className="portal-panel claim-filter-panel">
           <div className="portal-form-grid">
-            <div className="portal-field portal-field-wide"><label htmlFor="admin-claims-search">Search</label><input id="admin-claims-search" value={filters.search} onChange={(e) => setFilters((x) => ({ ...x, search: e.target.value }))} placeholder="Member, employee number, hospital, school, request ID…" /></div>
+            <div className="portal-field portal-field-wide"><label htmlFor="admin-claims-search">Search</label><input id="admin-claims-search" value={filters.search} onChange={(e) => setFilters((x) => ({ ...x, search: e.target.value }))} placeholder="Member, employee number, hospital, request details…" /></div>
             <div className="portal-field"><label htmlFor="admin-claims-status">Status</label><select id="admin-claims-status" value={filters.status} onChange={(e) => setFilters((x) => ({ ...x, status: e.target.value }))}><option value="">All statuses</option>{STAGES.map((item) => <option key={item}>{item}</option>)}</select></div>
             <div className="portal-field"><label htmlFor="admin-claims-type">Type</label><select id="admin-claims-type" value={filters.type} onChange={(e) => setFilters((x) => ({ ...x, type: e.target.value }))}><option value="">All types</option><option value="medical">Medical</option><option value="funeral">Funeral</option><option value="education">Education</option><option value="support">General support</option></select></div>
             <div className="portal-field"><label htmlFor="admin-claims-sort">Sort</label><select id="admin-claims-sort" value={filters.sort} onChange={(e) => setFilters((x) => ({ ...x, sort: e.target.value }))}><option value="newest">Newest first</option><option value="oldest">Oldest first</option></select></div>
@@ -479,9 +508,10 @@ export default function AdminClaims() {
                     {["Approved", "Paid", "Completed"].includes(c.status) && !c.publishedToNews && !c.publishedNewsId && <button className="portal-btn secondary" onClick={() => preparePublishClaim(c)} disabled={busy === `preview-${c._id}`}><Megaphone size={15} />{busy === `preview-${c._id}` ? "Preparing…" : "Publish to News"}</button>}
                     {c.publishedToNews && <span className="portal-badge approved">Published to News</span>}
                     {isSuperAdmin && ["Closed", "Rejected", "Cancelled"].includes(String(c.status)) && <button className="portal-btn secondary" onClick={() => reopenClaim(c)} disabled={busy === `reopen-${c._id}`}><RefreshCw size={15} />{busy === `reopen-${c._id}` ? "Reopening…" : "Reopen case"}</button>}
-                    {isSuperAdmin && c.memberVisible === false && <span className="portal-badge hidden-claim-badge"><ShieldAlert size={13} /> Hidden from member</span>}
-                    {isSuperAdmin && c.memberVisible !== false && <button className="portal-btn secondary" onClick={() => hideClaim(c)} disabled={busy === `hide-${c._id}`}><ShieldAlert size={15} />{busy === `hide-${c._id}` ? "Hiding…" : "Hide"}</button>}
-                    {isSuperAdmin && c.status === "Closed" && <button className="portal-btn danger" onClick={() => openDeleteDialog(c)} disabled={busy === `delete-${c._id}`}><Trash2 size={15} />Delete permanently</button>}
+                    {c.memberVisible === false && <span className="portal-badge hidden-claim-badge"><ShieldAlert size={13} /> Hidden from member</span>}
+                    {c.memberVisible === false && <button className="portal-btn secondary" onClick={() => unhideClaim(c)} disabled={busy === `unhide-${c._id}`}><RefreshCw size={15} />{busy === `unhide-${c._id}` ? "Unhiding…" : "Unhide"}</button>}
+                    {c.memberVisible !== false && <button className="portal-btn secondary" onClick={() => hideClaim(c)} disabled={busy === `hide-${c._id}`}><ShieldAlert size={15} />{busy === `hide-${c._id}` ? "Hiding…" : "Hide"}</button>}
+                    {isSuperAdmin && <button className="portal-btn danger" onClick={() => openDeleteDialog(c)} disabled={busy === `delete-${c._id}`}><Trash2 size={15} />Delete permanently</button>}
                   </div>
                   {Array.isArray(c.timeline) && c.timeline.length > 0 && <div className="claim-latest"><strong>Latest review</strong><p>{c.timeline[c.timeline.length - 1]?.status}: {c.timeline[c.timeline.length - 1]?.remarks || "—"}</p></div>}
                 </article>
@@ -578,8 +608,9 @@ export default function AdminClaims() {
 
         {deleteDialog && <div className="portal-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="claim-delete-title">
           <section className="portal-modal-card claim-delete-dialog">
-            <div className="portal-modal-head"><div><span>DESTRUCTIVE ACTION</span><h2 id="claim-delete-title">Permanently delete this claim?</h2><p>This action cannot be undone. The claim record will be permanently removed from the database. Accounting and audit evidence will be protected where required.</p></div><button className="portal-btn secondary" onClick={() => { setDeleteDialog(null); setDeleteConfirmation(""); }}>Close</button></div>
-            <div className="portal-alert" style={{ marginTop: 8 }}><strong>Claim:</strong> {typeLabel(deleteDialog.supportType)} • {deleteDialog.member?.fullName || "Member"} • {deleteDialog._id}</div>
+            <div className="portal-modal-head"><div><span>DESTRUCTIVE ACTION</span><h2 id="claim-delete-title">Permanently delete this claim?</h2><p>This action cannot be undone. The claim record will be permanently removed. Required financial and audit evidence will be preserved where funds have already moved.</p></div><button className="portal-btn secondary" onClick={() => { setDeleteDialog(null); setDeleteConfirmation(""); }}>Close</button></div>
+            <div className="portal-alert" style={{ marginTop: 8 }}><strong>Claim:</strong> {typeLabel(deleteDialog.supportType)} • {deleteDialog.member?.fullName || "Member"} • {deleteDialog.status || "—"}</div>
+            {deleteDialog.impact && <><div className="claim-detail-grid" style={{ marginTop:8 }}><div><span>Claim type</span><strong>{typeLabel(deleteDialog.impact.type)}</strong></div><div><span>Current status</span><strong>{deleteDialog.impact.status || "—"}</strong></div><div><span>Member</span><strong>{deleteDialog.impact.member?.fullName || "Historical actor/member unavailable"}</strong></div><div><span>Linked financial records</span><strong>{deleteDialog.impact.linkedFinancialRecords || 0}</strong></div><div><span>Community assistance</span><strong>{deleteDialog.impact.communityAssistance || 0}</strong></div><div><span>Publications</span><strong>{deleteDialog.impact.publications || 0}</strong></div><div><span>Notifications</span><strong>{deleteDialog.impact.notifications || 0}</strong></div></div>{deleteDialog.impact.settlement && <div className="portal-alert" style={{ marginTop:8 }}><strong>Settlement evidence:</strong> {deleteDialog.impact.settlement.transactionNumber || "Finance transaction"} · {money(deleteDialog.impact.settlement.amount)} · {deleteDialog.impact.settlement.status || "—"}</div>}</>}
             <div className="portal-field" style={{ marginTop: 14 }}><label htmlFor="claim-delete-confirmation">Type DELETE to confirm</label><input id="claim-delete-confirmation" value={deleteConfirmation} onChange={(event) => setDeleteConfirmation(event.target.value)} autoComplete="off" spellCheck="false" placeholder="DELETE" /></div>
             <div className="portal-actions"><button className="portal-btn danger" onClick={deleteClaim} disabled={deleteConfirmation !== "DELETE" || busy === `delete-${deleteDialog._id}`}><Trash2 size={16} />{busy === `delete-${deleteDialog._id}` ? "Deleting…" : "Permanently Delete"}</button><button className="portal-btn secondary" onClick={() => { setDeleteDialog(null); setDeleteConfirmation(""); }}>Cancel</button></div>
           </section>
@@ -592,14 +623,14 @@ export default function AdminClaims() {
             <section className="claim-detail-section" aria-labelledby="claim-submitted-details">
               <div className="claim-detail-section-head"><div><span>SUBMITTED CLAIM</span><h3 id="claim-submitted-details">Complete authorized claim details</h3><p>The information below is loaded from the selected claim record. Nothing is fabricated in the interface.</p></div></div>
               <div className="claim-detail-grid">
-                <div><span>Claim reference</span><strong>{selected._id || "—"}</strong></div>
                 <div><span>Claim type</span><strong>{typeLabel(selected.supportType)}</strong></div>
                 <div><span>Status</span><strong>{selected.status || "—"}</strong></div>
                 <div><span>Submitted</span><strong>{formatDate(selected.createdAt || selected.applicationDate)}</strong></div>
                 <div><span>Last updated</span><strong>{formatDate(selected.updatedAt)}</strong></div>
                 <div><span>Requested amount</span><strong>{money(selected.requestedAmount)}</strong></div>
                 <div><span>Approved amount</span><strong>{money(selected.approvedAmount)}</strong></div>
-                <div><span>Payment reference</span><strong>{selected.paymentReference || "—"}</strong></div>
+                <div><span>Paid amount</span><strong>{money(selected.paidAmount)}</strong></div>
+                <div><span>Settlement transaction</span><strong>{selected.settlementTransactionId ? (settlementOptions.find((item) => String(item._id) === String(selected.settlementTransactionId))?.transactionNumber || "Linked finance transaction") : "—"}</strong></div>
               </div>
               <div className="claim-detail-grid claim-member-grid">
                 <div><span>Member name</span><strong>{selected.member?.fullName || "—"}</strong></div>
@@ -612,7 +643,22 @@ export default function AdminClaims() {
               {(selected.description || selected.purpose || selected.caseDescription || selected.reason || selected.diagnosis || selected.treatment || selected.remarks || selected.rejectionReason) && <div className="claim-detail-texts">
                 {[["Description", selected.description], ["Purpose", selected.purpose], ["Case description", selected.caseDescription], ["Reason", selected.reason], ["Diagnosis", selected.diagnosis], ["Treatment", selected.treatment], ["Review notes", selected.reviewNotes || selected.remarks], ["Rejection reason", selected.rejectionReason]].filter(([, value]) => String(value || "").trim()).map(([label, value]) => <div key={label}><span>{label}</span><p>{value}</p></div>)}
               </div>}
-              {(selected.dependent || selected.dependentName || selected.relationship) && <div className="claim-detail-subpanel"><strong>Dependent / beneficiary</strong><div className="claim-detail-grid"><div><span>Name</span><strong>{selected.dependent?.fullName || selected.dependentName || "—"}</strong></div><div><span>Relationship</span><strong>{selected.dependent?.relationship || selected.relationship || "—"}</strong></div><div><span>School</span><strong>{selected.dependent?.school || selected.school || "—"}</strong></div><div><span>Education level</span><strong>{selected.dependent?.educationLevel || selected.educationLevel || "—"}</strong></div></div></div>}
+              {(selected.dependent || selected.dependentName || selected.relationship) && <div className="claim-detail-subpanel"><strong>Dependent / beneficiary</strong><div className="claim-detail-grid">
+                {[
+                  ["Full name", selected.dependent?.fullName || selected.dependentName],
+                  ["Relationship", selected.dependent?.relationship || selected.relationship],
+                  ["Gender", selected.dependent?.gender],
+                  ["Date of birth", selected.dependent?.dateOfBirth ? formatDate(selected.dependent.dateOfBirth) : null],
+                  ["National ID", selected.dependent?.nationalId],
+                  ["Phone", selected.dependent?.phone],
+                  ["Email", selected.dependent?.email],
+                  ["County", selected.dependent?.county],
+                  ["Address", selected.dependent?.address],
+                  ["Employment status", selected.dependent?.employmentStatus],
+                  ["Medical conditions", selected.dependent?.medicalConditions],
+                  ["Next of kin", selected.dependent?.isNextOfKin === true ? "Yes" : selected.dependent?.isNextOfKin === false ? "No" : null],
+                ].map(([label, value]) => <div key={label}><span>{label}</span><strong>{displayValue(value)}</strong></div>)}
+              </div></div>}
               <div className="claim-detail-subpanel"><strong>Evidence & attachments</strong>
                 {(selected.documents || []).length === 0 && !(selected.burialPermitChiefLetter || selected.deathCertificate || selected.burialPermit || selected.chiefLetter || selected.feeStructure || selected.admissionLetter || (selected.supportingDocuments || []).length) ? <p className="claim-detail-empty">No evidence files are recorded on this claim.</p> : <div className="claim-documents">
                   {(selected.documents || []).map((doc, index) => { const url = typeof doc === "string" ? doc : doc?.fileUrl || doc?.url; return url ? <button key={`doc-${index}`} type="button" className="portal-btn secondary" onClick={() => openDocument(selected, url)}>{doc?.label || doc?.fileName || `Document ${index + 1}`}</button> : null; })}
@@ -620,21 +666,31 @@ export default function AdminClaims() {
                   {(selected.supportingDocuments || []).map((url, index) => url ? <button key={`supporting-${index}`} type="button" className="portal-btn secondary" onClick={() => openDocument(selected, url)}>Supporting document {index + 1}</button> : null)}
                 </div>}
               </div>
+              <div className="claim-detail-subpanel"><strong>Audit & actor provenance</strong><div className="claim-detail-grid">
+                {[
+                  ["Created by", selected.provenance?.createdBy, selected.provenance?.createdByModel],
+                  ["Processed by", selected.provenance?.processedBy, selected.provenance?.processedByModel],
+                  ["Updated by", selected.provenance?.updatedBy, selected.provenance?.updatedByModel],
+                  ["Approved by", selected.provenance?.approvedBy, selected.provenance?.approvedByModel],
+                  ["Hidden by", selected.provenance?.hiddenBy, selected.provenance?.hiddenByModel],
+                  ["Published by", selected.provenance?.publishedBy, selected.provenance?.publishedByModel],
+                ].map(([label, actor, model]) => <div key={label}><span>{label}</span><strong>{actorDisplay(actor, model)}</strong></div>)}
+              </div></div>
               <div className="claim-detail-subpanel"><strong>Workflow history</strong>
                 {(selected.timeline || []).length ? <ol className="claim-detail-timeline">{selected.timeline.map((entry, index) => <li key={`${entry.date || index}-${index}`}><div><strong>{entry.status || "Update"}</strong><time>{formatDate(entry.date)}</time></div><p>{entry.remarks || "—"}</p></li>)}</ol> : <p className="claim-detail-empty">No workflow timeline entries are recorded.</p>}
               </div>
             </section>
-            <div className="claim-detail-subpanel claim-additional-fields"><strong>Additional submitted fields</strong><div className="claim-additional-grid">{Object.entries(selected).filter(([key, value]) => !["_id","__v","member","dependent","documents","timeline","supportingDocuments","burialPermitChiefLetter","deathCertificate","burialPermit","chiefLetter","feeStructure","admissionLetter","createdAt","updatedAt","status","requestedAmount","approvedAmount","paymentReference","remarks","reviewNotes","rejectionReason","supportType","sourceType","amount","memberVisible","hiddenAt","hiddenBy","publishedNewsId","publishedToNews","publishedAt"].includes(key) && value !== null && value !== undefined && typeof value !== "object" && String(value).trim() !== "").map(([key, value]) => <div key={key}><span>{key.replace(/([A-Z])/g, " $1").replace(/^./, (ch) => ch.toUpperCase())}</span><strong>{String(value)}</strong></div>)}</div></div>
+            <div className="claim-detail-subpanel claim-additional-fields"><strong>Additional submitted fields</strong><div className="claim-additional-grid">{Object.entries(selected).filter(([key, value]) => !["_id","__v","member","dependent","documents","timeline","supportingDocuments","burialPermitChiefLetter","deathCertificate","burialPermit","chiefLetter","feeStructure","admissionLetter","createdAt","updatedAt","status","requestedAmount","approvedAmount","settlementTransactionId","settlementTransactionModel","remarks","reviewNotes","rejectionReason","supportType","sourceType","amount","memberVisible","hiddenAt","hiddenBy","publishedNewsId","publishedToNews","publishedAt"].includes(key) && value !== null && value !== undefined && typeof value !== "object" && String(value).trim() !== "").map(([key, value]) => <div key={key}><span>{key.replace(/([A-Z])/g, " $1").replace(/^./, (ch) => ch.toUpperCase())}</span><strong>{String(value)}</strong></div>)}</div></div>
             <div className="portal-field"><label htmlFor="claim-stage">Stage</label><select id="claim-stage" value={stage} onChange={(e) => setStage(e.target.value)}>{STAGES.map((x) => <option key={x} value={x}>{x}</option>)}</select></div>
             {stage === "Approved" && <div className="portal-field" style={{ marginTop: 12 }}><label htmlFor="approved-amount">Approved amount</label><input id="approved-amount" type="number" min="0" inputMode="decimal" value={approvedAmount} onChange={(e) => setApprovedAmount(e.target.value)} /></div>}
-            {(stage === "Paid" || stage === "Completed") && <div className="portal-field" style={{ marginTop: 12 }}><label htmlFor="payment-reference">Payment transaction/reference</label><input id="payment-reference" type="text" value={paymentReference} onChange={(e) => setPaymentReference(e.target.value)} placeholder="M-PESA receipt, bank reference, or reconciled transaction ID" required /><small>Required payment evidence before Paid/Completed can be recorded.</small></div>}
+            {(stage === "Paid" || stage === "Completed") && <div className="portal-field" style={{ marginTop: 12 }}><label htmlFor="claim-settlement">Authoritative settlement</label><select id="claim-settlement" value={settlementTransactionId} onChange={(e) => setSettlementTransactionId(e.target.value)} required><option value="">Select a completed claim-finance settlement</option>{settlementOptions.map((item) => <option key={item._id} value={item._id}>{item.transactionNumber} • {money(item.amount)} • {item.paymentMethod || "—"} • {formatDate(item.transactionDate)}</option>)}</select>{settlementOptions.length === 0 ? <small>No completed linked claim-finance settlement is available. Create/reconcile the authoritative finance transaction first; the claim cannot be marked Paid/Completed on a free-text reference.</small> : <small>Paid/Completed is backed by the authoritative Finance transaction selected above.</small>}</div>}
             <div className="portal-field" style={{ marginTop: 12 }}><label htmlFor="review-remarks">Professional review notes</label><textarea id="review-remarks" rows="6" value={remarks} onChange={(e) => setRemarks(e.target.value)} placeholder="Record what was checked, what is missing, the eligibility finding, or the approval/rejection reason." /></div>
             {selected.sourceType === "education" && ["Paid", "Defaulted"].includes(stage) && Number(selected.balance || 0) > 0 && (
               <section className="portal-panel" style={{ marginTop: 14, background: "#f8fafc" }}>
-                <div className="claim-card-head"><div><span>EDUCATION REPAYMENT</span><h3>Record a verified manual repayment</h3><p>Use this only for a reconciled payment that is not being applied automatically from the member M-PESA flow.</p></div></div>
+                <div className="claim-card-head"><div><span>EDUCATION REPAYMENT</span><h3>Record a verified M-PESA repayment</h3><p>Use this only for a successful M-PESA repayment that is linked to this education loan.</p></div></div>
                 <div className="portal-form-grid">
                   <div className="portal-field"><label htmlFor="education-repayment-amount">Repayment amount</label><input id="education-repayment-amount" type="number" min="1" max={Number(selected.balance || 0)} value={repaymentAmount} onChange={(e) => setRepaymentAmount(e.target.value)} /></div>
-                  <div className="portal-field"><label htmlFor="education-repayment-reference">Payment reference</label><input id="education-repayment-reference" type="text" value={repaymentReference} onChange={(e) => setRepaymentReference(e.target.value)} placeholder="M-PESA receipt / bank reference" /></div>
+                  <div className="portal-field"><label htmlFor="education-repayment-transaction">Verified M-PESA transaction</label><select id="education-repayment-transaction" value={repaymentTransactionId} onChange={(e) => setRepaymentTransactionId(e.target.value)} required><option value="">Select a successful linked M-PESA transaction</option>{repaymentOptions.map((tx) => <option key={tx._id} value={tx._id}>KSh {Number(tx.amount || 0).toLocaleString("en-KE")} • {tx.mpesaReceiptNumber || "Receipt pending"} • {formatDate(tx.completedAt || tx.createdAt)}</option>)}</select>{repaymentOptions.length === 0 && <small>No successful linked M-PESA repayment is currently available for this loan.</small>}</div>
                 </div>
                 <button className="portal-btn primary" type="button" onClick={recordEducationRepayment} disabled={busy === `repay-${selected._id}`}>{busy === `repay-${selected._id}` ? "Recording…" : "Record repayment"}</button>
               </section>

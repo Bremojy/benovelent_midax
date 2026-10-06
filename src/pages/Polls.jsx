@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { BarChart3, CheckCircle2, FileDown, Plus, RefreshCw, Trash2, Vote } from "lucide-react";
 import DashboardLayout from "../layouts/DashboardLayout";
 import API from "../services/api";
-import { buildPrintHeadHtml, printHeadStyles } from "../utils/printHead";
+import { openPrintDocument, escapePrintHtml } from "../utils/printHead";
 import "./Polls.css";
 
 export default function Polls({ mode = "member" }) {
@@ -111,40 +111,7 @@ export default function Polls({ mode = "member" }) {
   const printResults = async (poll) => {
     const data = resultsByPoll[poll._id] || (await loadResults(poll._id)) || {};
     const statistics = Array.isArray(data?.statistics) ? data.statistics : [];
-    const win = window.open("", "_blank", "width=980,height=720");
-    if (!win) return;
-    win.document.write(`
-      <html>
-        <head>
-          <title>${escapeHtml(poll.title || "Poll Results")}</title>
-          ${printHeadStyles()}
-        </head>
-        <body>
-          ${buildPrintHeadHtml({
-            title: `Poll Results — ${poll.title || "Community Vote"}`,
-            subtitle: "Official poll results for the Benevolent Fund Scheme.",
-          })}
-          <p class="print-note">Total votes: ${Number(data?.totalVotes || poll.totalVotes || 0)}</p>
-          <table>
-            <thead><tr><th>Option</th><th>Votes</th><th>Percentage</th></tr></thead>
-            <tbody>
-              ${statistics.map((row) => `
-                <tr>
-                  <td>${escapeHtml(row.option || "")}</td>
-                  <td>${Number(row.votes || 0)}</td>
-                  <td>
-                    <div>${Number(row.percentage || 0).toFixed(2)}%</div>
-                    <div class="bar"><div style="width:${Number(row.percentage || 0)}%"></div></div>
-                  </td>
-                </tr>
-              `).join("")}
-            </tbody>
-          </table>
-          <script>window.onload = () => window.print();</script>
-        </body>
-      </html>
-    `);
-    win.document.close();
+    return openPrintDocument({ title: `Poll Results — ${poll.title || "Community Vote"}`, subtitle: "Official poll results for the Benevolent MIDAX community.", portal: isAdmin ? (mode === "superadmin" ? "SuperAdmin" : "Admin") : "Member", documentType: "Poll Results", classification: "Official Record", bodyHtml: `<p class="print-note">Total votes: ${Number(data?.totalVotes || poll.totalVotes || 0)}</p><table><thead><tr><th>Option</th><th>Votes</th><th>Percentage</th></tr></thead><tbody>${statistics.map((row) => `<tr><td>${escapePrintHtml(row.option || "")}</td><td>${Number(row.votes || 0)}</td><td>${Number(row.percentage || 0).toFixed(2)}%</td></tr>`).join("") || '<tr><td colspan="3">No published result rows are available.</td></tr>'}</tbody></table>`, filename: `poll-results-${poll.title || poll._id}` });
   };
 
   const adminPolls = useMemo(() => polls, [polls]);

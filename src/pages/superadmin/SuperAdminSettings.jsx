@@ -22,6 +22,7 @@ import {
 import DashboardLayout from "../../layouts/DashboardLayout";
 import NotificationSettings from "../../components/NotificationSettings";
 import API, { resolveApiUrl } from "../../services/api";
+import { THEME_PRESETS, THEME_TARGETS, DEFAULT_THEME, normalizeTheme, themeContrastWarnings, isHexColor, applyTheme } from "../../utils/theme";
 import { useAuth } from "../../context/AuthContext";
 import "../../styles/portalModule.css";
 
@@ -39,15 +40,6 @@ const SECTION_FIELDS = [
   { key: "privacy-policy", label: "Privacy Policy" },
   { key: "terms-conditions", label: "Terms & Conditions" },
   { key: "disclaimer", label: "Disclaimer" },
-];
-
-const THEMES = [
-  { name: "Midax Orange", value: "#ff7a00" },
-  { name: "Royal Violet", value: "#7c3aed" },
-  { name: "Trust Blue", value: "#0ea5e9" },
-  { name: "Community Green", value: "#10b981" },
-  { name: "Warm Rose", value: "#e11d48" },
-  { name: "Golden", value: "#f59e0b" },
 ];
 
 const EMPTY_SECTION = (section) => ({
@@ -87,7 +79,8 @@ export default function SuperAdminSettings({ initialTab = "website" }) {
   const [sections, setSections] = useState(() =>
     Object.fromEntries(SECTION_FIELDS.map((item) => [item.key, EMPTY_SECTION(item.key)]))
   );
-  const [themeColor, setThemeColor] = useState("#ff7a00");
+  const [theme, setTheme] = useState(DEFAULT_THEME);
+  const [themeTarget, setThemeTarget] = useState("primary");
   const [systemSettings, setSystemSettings] = useState(null);
   const [systemForm, setSystemForm] = useState({
     organization: { name:"", legalName:"", email:"", phone:"", address:"", location:"", officeHours:"", logo:"", favicon:"", socialChannels:{ whatsapp:"", instagram:"", facebook:"", x:"", website:"" } },
@@ -95,7 +88,7 @@ export default function SuperAdminSettings({ initialTab = "website" }) {
     scheme: { monthlyContribution:"", gracePeriodDays:"", minimumBookBalance:"", maintenanceMode:false },
     support: { funeral:{enabled:null}, medical:{enabled:null}, education:{enabled:null} },
     mpesa: { manualPaybill:"", manualAccountReference:"", displayLabel:"M-PESA", manualPaymentEnabled:false, stkEnabled:false, environment:"production", operationalShortcode:"", operationalStatus:"unknown" },
-    branding: { accentColor:"", secondaryColor:"", logoUrl:"", faviconUrl:"" },
+    branding: { ...DEFAULT_THEME, accentColor:DEFAULT_THEME.primary, secondaryColor:DEFAULT_THEME.secondary, logoUrl:"", faviconUrl:"" },
     homepage: { showCarousel:true, showLeaders:true, showPolicies:true },
     notificationReadiness: { browserPushEnabled:false },
     featureToggles: {},
@@ -186,7 +179,7 @@ export default function SuperAdminSettings({ initialTab = "website" }) {
           setSystemSettings(safe);
           setSystemForm(next);
           setSystemUpdatedAt(safe.updatedAt || null);
-          if (safe.branding?.accentColor) setThemeColor(safe.branding.accentColor);
+          setTheme(normalizeTheme(safe.branding || {}));
         }
 
         if (carouselRes.status === "fulfilled") {
@@ -287,7 +280,7 @@ export default function SuperAdminSettings({ initialTab = "website" }) {
       const { data } = await API.put("/superadmin/settings", payload);
       setSystemSettings(data?.settings || null); setSystemUpdatedAt(data?.updatedAt || null);
       setSystemForm((prev) => ({ ...prev, ...(data?.settings || {}) }));
-      setThemeColor(data?.settings?.branding?.accentColor || themeColor);
+      setTheme(normalizeTheme(data?.settings?.branding || {}));
       setMessage(data?.message || "System settings saved.");
     } catch (err) { setError(err.response?.data?.message || err.message || "Unable to save system settings."); }
     finally { setSystemSaving(false); }
@@ -295,28 +288,37 @@ export default function SuperAdminSettings({ initialTab = "website" }) {
 
   const saveTheme = async () => {
     try {
-      setSystemSaving(true);
-      setError("");
-      const { data } = await API.put("/superadmin/settings", {
-        branding: {
-          accentColor: themeColor,
-        },
-      });
-      const savedColor = data?.settings?.branding?.accentColor || themeColor;
-      setSystemSettings(data?.settings || null);
-      setSystemUpdatedAt(data?.updatedAt || null);
+      setSystemSaving(true); setError(""); setMessage("");
+      if (!theme || !THEME_PRESETS.some((preset) => preset.key === theme.preset) && !String(theme.preset || "").startsWith("custom")) setTheme((current) => normalizeTheme(current));
+      const branding = { ...normalizeTheme(theme), accentColor: theme.primary, secondaryColor: theme.secondary };
+      const warnings = themeContrastWarnings(branding);
+      if (warnings.length) {
+        setError(`Theme contrast needs attention: ${warnings.map((warning) => `${warning.label} (${warning.ratio.toFixed(2)}:1)`).join(", ")}.`);
+        return;
+      }
+      const { data } = await API.put("/superadmin/settings", { branding });
+      const saved = normalizeTheme(data?.settings?.branding || branding);
+      setTheme(saved);
+      setSystemSettings(data?.settings || null); setSystemUpdatedAt(data?.updatedAt || null);
       setSystemForm((prev) => ({ ...prev, ...(data?.settings || {}), branding: { ...prev.branding, ...(data?.settings?.branding || {}) } }));
-      document.documentElement.style.setProperty("--orange", savedColor);
-      document.documentElement.style.setProperty("--orange-dark", savedColor);
-      document.documentElement.style.setProperty("--portal-accent", savedColor);
-      document.documentElement.style.setProperty("--portal-accent-soft", `${savedColor}18`);
-      setMessage("Website theme updated in the authoritative system settings.");
-    } catch (err) {
-      setError(err.response?.data?.message || err.message || "Unable to save theme.");
-    } finally {
-      setSystemSaving(false);
-    }
+      applyTheme(saved);
+      setMessage("Brand and theme saved to the authoritative system settings.");
+    } catch (err) { setError(err.response?.data?.message || err.message || "Unable to save theme."); }
+    finally { setSystemSaving(false); }
   };
+
+  const updateThemeTarget = (value) => {
+    if (!isHexColor(value)) return;
+    setTheme((current) => normalizeTheme({ ...current, [themeTarget]: value, preset: "custom" }));
+    applyTheme({ ...theme, [themeTarget]: value, preset: "custom" });
+  };
+
+  const selectThemePreset = (preset) => {
+    const next = normalizeTheme({ ...preset, header: preset.secondary, sidebar: preset.secondary, buttons: preset.primary, links: preset.primary });
+    setTheme(next);
+    applyTheme(next);
+  };
+
 
   const uploadCarousel = async (e) => {
     e.preventDefault();
@@ -688,33 +690,24 @@ export default function SuperAdminSettings({ initialTab = "website" }) {
             )}
 
             {activeTab === "settings" && (
-              <div className="portal-panel">
-                <div className="portal-section-title">
-                  <Palette size={20} />
-                  <div>
-                    <span>THEME CONTROL</span>
-                    <h2>Choose the public brand color</h2>
+              <div className="portal-grid brand-theme-studio">
+                <section className="portal-panel">
+                  <div className="portal-section-title"><Palette size={20}/><div><span>BRAND & THEME STUDIO</span><h2>Visual theme control</h2><p>Choose a preset or customize a semantic color target. Changes preview live before they are saved.</p></div></div>
+                  <div className="theme-grid">
+                    {THEME_PRESETS.map((preset) => <button key={preset.key} type="button" className={theme.preset === preset.key ? "theme-swatch selected" : "theme-swatch"} onClick={() => selectThemePreset(preset)}><span style={{ background:preset.primary }} /><strong>{preset.name}</strong><small>{preset.primary}</small></button>)}
                   </div>
-                </div>
-
-                <div className="theme-grid">
-                  {THEMES.map((theme) => (
-                    <button key={theme.value} type="button" className={themeColor === theme.value ? "theme-swatch selected" : "theme-swatch"} onClick={() => setThemeColor(theme.value)}>
-                      <span style={{ background: theme.value }} />
-                      <strong>{theme.name}</strong>
-                      <small>{theme.value}</small>
-                    </button>
-                  ))}
-                </div>
-
-                <div className="portal-actions">
-                  <button className="portal-btn" type="button" onClick={saveTheme} disabled={systemSaving}>
-                    <Save size={16} /> {systemSaving ? "Saving..." : "Save theme"}
-                  </button>
-                  <button className="portal-btn light" type="button" onClick={() => setThemeColor("#ff7a00")}>
-                    <RefreshCw size={16} /> Reset to orange
-                  </button>
-                </div>
+                  <div className="portal-form-grid theme-controls">
+                    <label className="portal-field"><span>Color target</span><select value={themeTarget} onChange={(e)=>setThemeTarget(e.target.value)}>{THEME_TARGETS.map(([key,label])=><option value={key} key={key}>{label}</option>)}</select></label>
+                    <label className="portal-field"><span>HEX color</span><div className="theme-color-input"><input type="color" value={isHexColor(theme[themeTarget]) ? theme[themeTarget] : DEFAULT_THEME[themeTarget] || DEFAULT_THEME.primary} onChange={(e)=>updateThemeTarget(e.target.value)} aria-label={`Choose ${themeTarget} color`} /><input type="text" value={theme[themeTarget] || ""} onChange={(e)=>{ const value=e.target.value.trim(); setTheme((current)=>({ ...current, [themeTarget]:value, preset:"custom" })); }} onBlur={()=>updateThemeTarget(theme[themeTarget])} aria-label={`${themeTarget} HEX color`} placeholder="#000000" /></div></label>
+                  </div>
+                  <div className="theme-target-grid">{THEME_TARGETS.map(([key,label])=><button key={key} type="button" className={themeTarget===key?"theme-target active":"theme-target"} onClick={()=>setThemeTarget(key)}><span style={{ background:isHexColor(theme[key]) ? theme[key] : DEFAULT_THEME.primary }}></span><strong>{label}</strong><small>{theme[key] || "—"}</small></button>)}</div>
+                  {themeContrastWarnings(theme).length > 0 && <div className="portal-alert warning" role="alert">Some text/background combinations do not meet the recommended contrast ratio. Adjust the related colors before saving.</div>}
+                  <div className="theme-live-preview">
+                    <div className="theme-preview-header" style={{background:theme.header,color:theme.text}}><strong>Benevolent MIDAX</strong><span>Header preview</span></div>
+                    <div className="theme-preview-body" style={{background:theme.background,color:theme.text}}><aside style={{background:theme.sidebar,color:theme.text}}>Sidebar</aside><div className="theme-preview-content"><div className="theme-preview-card" style={{background:theme.surface,borderColor:theme.border}}><h3 style={{color:theme.text}}>Portal sample</h3><p style={{color:theme.mutedText}}>Cards, forms, tables and public content inherit the same semantic theme.</p><button type="button" style={{background:theme.buttons,color:theme.surface,borderColor:theme.buttons}}>Primary action</button><span className="theme-preview-link" style={{color:theme.links}}>Example link</span></div><div className="theme-preview-card" style={{background:theme.elevatedSurface,borderColor:theme.border}}><strong style={{color:theme.text}}>Status</strong><div className="theme-preview-statuses"><span style={{background:theme.success}}>Success</span><span style={{background:theme.warning}}>Warning</span><span style={{background:theme.danger}}>Danger</span></div></div></div></div>
+                  </div>
+                  <div className="portal-actions"><button className="portal-btn" type="button" onClick={saveTheme} disabled={systemSaving}><Save size={16}/> {systemSaving ? "Saving…" : "Apply & save theme"}</button><button className="portal-btn light" type="button" onClick={()=>selectThemePreset(DEFAULT_THEME)} disabled={systemSaving}><RefreshCw size={16}/> Reset to orange</button></div>
+                </section>
               </div>
             )}
 

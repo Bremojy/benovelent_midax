@@ -29,13 +29,14 @@ for (const file of ["backend/models/MedicalSupport.js", "backend/models/FuneralS
 }
 
 expect(memberController.includes('memberVisible: { $ne: false }'), "Member claims query excludes hidden claims server-side");
-expect(routes.includes('router.post("/:type/:id/hide", verifyToken, isSuperAdmin, controller.hideFromMember);'), "Hide is protected by the SuperAdmin route middleware");
+expect(routes.includes('router.post("/:type/:id/hide", verifyToken, isAdminOrSuperAdmin, controller.hideFromMember);'), "Hide is protected for Admin and SuperAdmin");
 expect(routes.includes('router.delete("/:type/:id/permanent", verifyToken, isSuperAdmin, controller.permanentDelete);'), "Permanent delete is protected by the SuperAdmin route middleware");
 expect(routes.includes('router.get("/:type/:id/publish-news-preview", verifyToken, isAdminOrSuperAdmin, controller.publishNewsPreview);'), "News preview has an explicit backend route before the dynamic claim detail route");
+expect(routes.includes('router.post("/:type/:id/unhide", verifyToken, isAdminOrSuperAdmin, controller.unhideForMember);'), "Unhide has a real Admin/SuperAdmin backend route");
 expect(controller.includes('action: "CLAIM_HIDDEN_FROM_MEMBER"'), "Hide writes a dedicated audit action");
 expect(controller.includes('action: "CLAIM_PERMANENT_DELETE_REQUESTED"') && controller.includes('action: "CLAIM_PERMANENTLY_DELETED"'), "Permanent deletion records both request and completed audit events");
 expect(controller.includes('String(req.user?.role || "").toLowerCase() !== "superadmin"'), "Permanent delete independently verifies SuperAdmin authorization on the server");
-expect(controller.includes('result.claim.memberVisible = false') && !controller.includes('deleteOne()') || controller.includes('result.claim.memberVisible = false'), "Hide mutates visibility without deleting the claim record");
+expect(controller.includes('result.claim.memberVisible = false') && controller.includes('exports.unhideForMember') && controller.includes('CLAIM_UNHIDDEN_FOR_MEMBER'), "Hide/unhide mutates persisted member visibility without deleting the claim record");
 expect(controller.includes('This public update intentionally excludes member identity, contact details, personal identifiers, financial amounts, private circumstances, internal review notes and submitted evidence.'), "Claim-to-News content is explicitly public-safe");
 expect(!controller.includes('news content') || true, "Claim-to-News path remains centralized in the existing News model");
 expect(controller.includes('sourceModel') && controller.includes('sourceId') && controller.includes('publishedNewsId'), "Published News remains linked to the canonical source claim");
@@ -54,7 +55,7 @@ expect(paymentController.includes('Finance.deleteMany') && paymentController.inc
 expect(!paymentController.includes('FUNDS_ALREADY_RECORDED'), "Community assistance deletion is not blocked merely because test data has collected or disbursed funds");
 expect(paymentController.includes('This does not reverse any real Safaricom movement') || paymentController.includes('does NOT reverse a real Safaricom movement'), "Community deletion clearly distinguishes application-record deletion from real Safaricom money reversal");
 expect(communityModel.includes('contributionTransactionIds') && communityModel.includes('payoutStatus'), "Community assistance model retains contribution and payout integrity fields");
-expect(adminController.includes('support:"SupportRequest"'), "Claim evidence access supports the unified general SupportRequest claim type");
+expect(/support:\s*"SupportRequest"/.test(adminController) && adminController.includes("CLAIM_DOCUMENT_ACCESSED"), "Claim evidence access supports the unified general SupportRequest claim type and audit logging");
 expect(news.includes('const requestedNewsId = searchParams.get("newsId");') && news.includes('loadedNews.find((item) => String(item?._id) === String(requestedNewsId))') && news.includes('setSelectedNews(requested)'), "Public News page can open a specific published article from the notification link without inventing a new route");
 expect((app.match(/<SmartAssistant\s*\/>/g) || []).length === 1, "App mounts exactly one global SmartAssistant");
 expect(!memberDashboard.includes('<SmartAssistant') && !adminDashboard.includes('<SmartAssistant') && !superDashboard.includes('<SmartAssistant'), "Dashboard pages do not duplicate the global Assistant mount");

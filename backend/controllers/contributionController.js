@@ -329,7 +329,7 @@ exports.getContributions = async (req, res) => {
         }
         const sort = { paymentDate: -1, year: -1, month: -1, createdAt: -1 };
         const [rows, total] = await Promise.all([
-            Contribution.find(filter).populate("member", "fullName memberNumber profileImage").populate("approvedBy", "fullName").sort(sort).skip((page - 1) * limit).limit(limit).lean(),
+            Contribution.find(filter).populate("member", "fullName memberNumber profileImage").populate("approvedBy", "fullName username email").sort(sort).skip((page - 1) * limit).limit(limit).lean(),
             Contribution.countDocuments(filter),
         ]);
         const summaryRows = await Contribution.find(filter).select("expectedAmount paidAmount balance year").lean();
@@ -593,7 +593,7 @@ exports.approveContribution = async (req, res) => {
         }
 
         contribution.approvedBy = req.user._id;
-
+        contribution.approvedByModel = String(req.user?.role || "").toLowerCase() === "superadmin" ? "SuperAdmin" : "Admin";
         contribution.approvedAt = new Date();
 
         await contribution.save();
@@ -671,7 +671,7 @@ exports.rejectContribution = async (req, res) => {
         contribution.status = "pending";
 
         contribution.approvedBy = req.user._id;
-
+        contribution.approvedByModel = String(req.user?.role || "").toLowerCase() === "superadmin" ? "SuperAdmin" : "Admin";
         contribution.approvedAt = new Date();
 
         await contribution.save();
@@ -894,7 +894,7 @@ exports.getContribution = async (req, res) => {
         const query = { _id: req.params.id };
         if (String(req.user?.role || "").toLowerCase() === "member") query.member = req.user._id;
         const contribution = await Contribution.findOne(query)
-            .select("member month year expectedAmount paidAmount balance paymentDate paymentMethod source receiptNumber status approvedBy approvedAt notes finance createdAt updatedAt")
+            .select("member month year expectedAmount paidAmount balance paymentDate paymentMethod source receiptNumber status approvedBy approvedByModel approvedAt notes finance createdAt updatedAt")
             .populate("member", "_id fullName memberNumber profileImage department position")
             .populate("finance", "transactionNumber type category amount paymentMethod receiptNumber referenceNumber transactionDate status notes");
 

@@ -51,7 +51,7 @@
     width:110px;
     height:110px;
     border-radius:50%;
-    background:linear-gradient(135deg,#ff7a00,#ffb347);
+    background:linear-gradient(135deg,var(--color-primary),var(--color-primary));
     display:flex;
     justify-content:center;
     align-items:center;
@@ -76,7 +76,7 @@
 }
 
 .upload-btn:hover{
-    background:#ff7a00;
+    background:var(--color-primary);
     color:#fff;
 }
 
@@ -121,7 +121,7 @@
 
 .input-box input:focus,
 .input-box textarea:focus{
-    border-color:#ff7a00;
+    border-color:var(--color-primary);
     box-shadow:0 0 0 4px rgba(255,122,0,.12);
     background:white;
 }
@@ -136,7 +136,7 @@
     padding:0 30px;
     border:none;
     border-radius:14px;
-    background:#ff7a00;
+    background:var(--color-primary);
     color:white;
     display:flex;
     align-items:center;
@@ -258,7 +258,7 @@ border:1px solid #ddd;
 
 margin-top:20px;
 
-background:#ff7a00;
+background:var(--color-primary);
 
 color:white;
 

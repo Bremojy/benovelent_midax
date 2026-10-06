@@ -1,0 +1,5 @@
+const mongoose=require("mongoose");
+const id="017_normalize_system_theme_branding";
+const defaults={preset:"orange",primary:"#f97316",secondary:"#ea580c",background:"#fffaf5",surface:"#ffffff",elevatedSurface:"#fff7ed",text:"#1f2937",mutedText:"#667085",border:"#e5e7eb",focus:"#fb923c",success:"#15803d",warning:"#b45309",danger:"#b91c1c",header:"#ea580c",sidebar:"#ea580c",buttons:"#f97316",links:"#f97316"};
+async function run(){ const db=mongoose.connection.db; if(!db) throw new Error("MongoDB database is not connected."); const row=await db.collection("systemsettings").findOne({singletonKey:"primary"}); if(!row) return; const b=row.branding||{}; const set={branding:{...defaults,...b,primary:b.primary||b.accentColor||defaults.primary,secondary:b.secondary||b.secondaryColor||defaults.secondary,accentColor:b.primary||b.accentColor||defaults.primary,secondaryColor:b.secondary||b.secondaryColor||defaults.secondary}}; await db.collection("systemsettings").updateOne({_id:row._id},{$set:set}); console.log(`[migration] ${id}: normalized SystemSettings semantic branding.`); }
+module.exports={id,run};

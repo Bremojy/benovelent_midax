@@ -1384,7 +1384,7 @@ exports.getClaims = async (req, res) => {
             let query = Model.find(filter).sort({ createdAt: sortDirection }).limit(sourceLimit).lean();
             if (key === "medical") query = query.populate("dependent", "fullName relationship");
             if (key === "funeral") query = query.populate("dependent", "fullName relationship");
-            if (key === "education") query = query.populate("dependent", "fullName relationship school educationLevel");
+            if (key === "education") query = query.populate("dependent", "fullName relationship gender dateOfBirth nationalId phone email county address employmentStatus");
             const [rows, total] = await Promise.all([query, Model.countDocuments(filter)]);
             return { key, rows, total };
         }));

@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import DashboardLayout from "../../layouts/DashboardLayout";
 import API from "../../services/api";
-import { buildPrintHeadHtml, printHeadStyles } from "../../utils/printHead";
+import { openPrintDocument, escapePrintHtml } from "../../utils/printHead";
 import "../../styles/portalModule.css";
 
 const COUNT_ITEMS = [
@@ -112,24 +112,12 @@ export default function SuperAdminDataIntegrity() {
   const printHumanBackup = async () => {
     try {
       setError("");
-      const { data } = await API.get("/superadmin/data-integrity/backup/human/print", {
-        responseType: "text",
-        timeout: 120000,
-        params: { _ts: Date.now() },
-      });
-      const popup = window.open("", "benevolentHumanBackupPrint", "width=1200,height=900");
-      if (!popup) {
-        setError("Your browser blocked the print window. Allow pop-ups for this site and try again.");
-        return;
-      }
-      popup.document.open();
-      popup.document.write(data);
-      popup.document.close();
-      popup.focus();
+      const { data } = await API.get("/superadmin/data-integrity/backup/human/print", { responseType: "text", timeout: 120000, params: { _ts: Date.now() } });
+      const body = String(data || "").match(/<body[^>]*>([\s\S]*?)<\/body>/i)?.[1] || String(data || "");
+      const opened = openPrintDocument({ title: "Human-Readable Database Backup", subtitle: "Redacted human-readable integrity backup for authorized governance use.", portal: "SuperAdmin", documentType: "System Backup", classification: "Internal Record", bodyHtml: body, filename: `human-backup-${new Date().toISOString().slice(0,10)}` });
+      if (!opened) { setError("Your browser blocked the print window. Allow pop-ups for this site and try again."); return; }
       setMessage("Human-readable backup opened for printing.");
-    } catch (err) {
-      setError(err.response?.data?.message || err.message || "Unable to open printable backup.");
-    }
+    } catch (err) { setError(err.response?.data?.message || err.message || "Unable to open printable backup."); }
   };
 
   const downloadBackup = async () => {
@@ -175,37 +163,22 @@ export default function SuperAdminDataIntegrity() {
     try {
       setError("");
       const { data } = await API.get("/superadmin/data-integrity/print-database", { responseType: "text", timeout: 120000, params: { _ts: Date.now() } });
-      const popup = window.open("", "benevolentDatabasePrint", "width=1400,height=900");
-      if (!popup) { setError("Your browser blocked the print window. Allow pop-ups for this site and try again."); return; }
-      popup.document.open(); popup.document.write(data); popup.document.close(); popup.focus();
+      const body = String(data || "").match(/<body[^>]*>([\s\S]*?)<\/body>/i)?.[1] || String(data || "");
+      const opened = openPrintDocument({ title: "Live Database Record View", subtitle: "Authorized live database view with sensitive credential and token fields redacted by the server.", portal: "SuperAdmin", documentType: "Database Record View", classification: "Internal Record", bodyHtml: body, orientation: "landscape", filename: "live-database-record-view" });
+      if (!opened) { setError("Your browser blocked the print window. Allow pop-ups for this site and try again."); return; }
       setMessage("Full live database print view opened. Sensitive credential/token fields are redacted.");
-    } catch (err) {
-      setError(err.response?.data?.message || err.message || "Unable to print the live database.");
-    }
+    } catch (err) { setError(err.response?.data?.message || err.message || "Unable to print the live database."); }
   };
 
   const printReport = () => {
-    if (!report) {
-      setError("Run a database scan before printing the report.");
-      return;
-    }
-    const popup = window.open("", "benevolentIntegrityPrint", "width=1200,height=850");
-    if (!popup) {
-      setError("Your browser blocked the print window. Allow pop-ups for this site and try again.");
-      return;
-    }
-
-    const safe = (value) => String(value ?? "").replace(/[&<>\"']/g, (character) => ({
-      "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;",
-    }[character]));
+    if (!report) { setError("Run a database scan before printing the report."); return; }
+    const safe = (value) => escapePrintHtml(value);
     const countRows = COUNT_ITEMS.map(([key, label]) => `<tr><th>${safe(label)}</th><td>${safe(report.counts?.[key] ?? 0)}</td></tr>`).join("");
     const renderGroups = (title, groups = []) => groups?.length
-      ? `<h2>${safe(title)}</h2><table><thead><tr><th>Group</th><th>Record</th><th>Email / ID</th><th>Status</th></tr></thead><tbody>${groups.slice(0, 500).flatMap((group) => (group.records || []).map((record) => `<tr><td>${safe(group.keep)}</td><td>${safe(record.name || "Unnamed")}</td><td>${safe(record.email || record.id)}</td><td>${safe(record.status || "—")}${record.id === group.keep ? " · CANONICAL" : " · DUPLICATE"}</td></tr>`)).join("")}</tbody></table>`
-      : `<h2>${safe(title)}</h2><p>None found.</p>`;
-
-    popup.document.write(`<!doctype html><html><head><title>Benevolent MIDAX — Database Integrity Report</title>${printHeadStyles()}<style>@page{size:A4;margin:14mm}body{font-family:Arial,sans-serif;color:#202124;margin:0}.integrity-print-body header{border-bottom:3px solid #ef7d00;padding-bottom:14px;margin-bottom:18px}h1{margin:0 0 4px;font-size:24px}h2{margin:24px 0 8px;font-size:16px}p{line-height:1.5;color:#50555c}.meta{font-size:12px;color:#6b7280}table{width:100%;border-collapse:collapse;margin-top:8px}th,td{border-bottom:1px solid #ddd;padding:7px;text-align:left;vertical-align:top;font-size:11px}th{background:#f5f5f5;text-transform:uppercase;letter-spacing:.04em}.grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}section{break-inside:avoid}.warning{padding:10px;border:1px solid #f0c36d;background:#fff8e8;border-radius:8px}</style></head><body>${buildPrintHeadHtml({ title: "Database Integrity & Governance", subtitle: "Governance-ready integrity snapshot." })}<div class="integrity-print-body"><header><h1>Benevolent Midax — Database Integrity & Governance</h1><div class="meta">Generated: ${safe(new Date(report.generatedAt || Date.now()).toLocaleString("en-KE"))}</div><div class="meta">Database: ${safe(report.database?.name || "Connected application database")}</div></header><p>This is a printable integrity snapshot. The downloadable database backup is available separately from the SuperAdmin page.</p><section><h2>Live database footprint</h2><table>${countRows}</table></section>${renderGroups("Duplicate member groups", report.duplicateMembers)}${renderGroups("Duplicate administrator groups", report.duplicateAdmins)}${renderGroups("Duplicate conversations", report.duplicateConversations?.map((x) => ({keep:x.keep,records:[{id:x.keep,name:"Canonical conversation",status:"keep"},...x.remove.map(id=>({id,name:"Duplicate conversation",status:"remove"}))]})))}${renderGroups("Duplicate carousel groups", report.duplicateCarousels?.map((x) => ({keep:x.keep,records:[{id:x.keep,name:x.title || "Carousel slide",status:"keep"},...x.remove.map(id=>({id,name:x.title || "Duplicate slide",status:"remove"}))]})))}<section><h2>Additional findings</h2><div class="warning">Self-conversations: ${safe(report.selfConversations?.length || 0)} · Orphan conversations: ${safe(report.orphanConversations?.length || 0)} · Orphan messages: ${safe(report.orphanMessages?.length || 0)} · Cross-collection identity collisions: ${safe(report.identityCollisions?.length || 0)}</div></section></div><script>window.onload=()=>{window.print()};</script></body></html>`);
-    popup.document.close();
-    popup.focus();
+      ? `<section><h2>${safe(title)}</h2><table><thead><tr><th>Group</th><th>Record</th><th>Email / ID</th><th>Status</th></tr></thead><tbody>${groups.slice(0, 500).flatMap((group) => (group.records || []).map((record) => `<tr><td>${safe(group.keep)}</td><td>${safe(record.name || "Unnamed")}</td><td>${safe(record.email || record.id)}</td><td>${safe(record.status || "—")}${record.id === group.keep ? " · CANONICAL" : " · DUPLICATE"}</td></tr>`)).join("")}</tbody></table></section>`
+      : `<section><h2>${safe(title)}</h2><p>None found.</p></section>`;
+    const bodyHtml = `<p class="print-note">Generated: ${safe(new Date(report.generatedAt || Date.now()).toLocaleString("en-KE"))} • Database: ${safe(report.database?.name || "Connected application database")}</p><p>This is a printable integrity snapshot. The downloadable database backup is available separately from the SuperAdmin page.</p><section><h2>Live database footprint</h2><table>${countRows}</table></section>${renderGroups("Duplicate member groups", report.duplicateMembers)}${renderGroups("Duplicate administrator groups", report.duplicateAdmins)}${renderGroups("Duplicate conversations", report.duplicateConversations?.map((x) => ({keep:x.keep,records:[{id:x.keep,name:"Canonical conversation",status:"keep"},...(x.remove || []).map(id=>({id,name:"Duplicate conversation",status:"remove"}))]})))}${renderGroups("Duplicate carousel groups", report.duplicateCarousels?.map((x) => ({keep:x.keep,records:[{id:x.keep,name:x.title || "Carousel slide",status:"keep"},...(x.remove || []).map(id=>({id,name:x.title || "Duplicate slide",status:"remove"}))]})))}<section><h2>Additional findings</h2><div class="warning">Self-conversations: ${safe(report.selfConversations?.length || 0)} • Orphan conversations: ${safe(report.orphanConversations?.length || 0)} • Orphan messages: ${safe(report.orphanMessages?.length || 0)} • Cross-collection identity collisions: ${safe(report.identityCollisions?.length || 0)}</div></section>`;
+    return openPrintDocument({ title: "Database Integrity & Governance", subtitle: "Governance-ready integrity snapshot.", portal: "SuperAdmin", documentType: "Data Integrity Report", classification: "Internal Record", bodyHtml, orientation: "landscape", extraStyles: ".warning{padding:10px;border:1px solid #f0c36d;background:#fff8e8;border-radius:8px}.warning{break-inside:avoid}", filename: "database-integrity-report" });
   };
 
   const deleteDuplicateMember = async (memberId, memberName) => {
@@ -538,7 +511,7 @@ export default function SuperAdminDataIntegrity() {
             <button onClick={() => runDirectAction("/superadmin/data-integrity/cleanup/member-income", "Remove legacy personal monthly-income fields from member documents?", "Legacy monthly-income fields removed.")}><ShieldCheck size={18}/><span><strong>Remove legacy income field</strong><small>Does not touch finance ledger income</small></span></button>
             <button onClick={downloadBackup} disabled={loading || cleaning}><Download size={18}/><span><strong>Backup entire database</strong><small>All collections, security fields redacted</small></span></button>
             <button onClick={printReport} disabled={!report}><Printer size={18}/><span><strong>Print full report</strong><small>Governance-ready printable snapshot</small></span></button>
-            <button onClick={printDatabaseDetails} disabled={loading || cleaning}><Database size={18}/><span><strong>Print all database details</strong><small>Live records with sensitive fields redacted</small></span></button>
+            <button onClick={printDatabaseDetails} disabled={loading || cleaning}><Database size={18}/><span><strong>View / Print all database details</strong><small>Live records with sensitive fields redacted</small></span></button>
             <button onClick={() => scrollToSection("integrity-duplicates")}><Database size={18}/><span><strong>Review all findings</strong><small>Open every detected issue</small></span></button>
           </div>
         </section>

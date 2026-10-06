@@ -43,26 +43,28 @@ assert(/Math\.min\(configuredMaximum.*20000/.test(education), "Education Support
 assert(/Under Review/.test(education) && /Disbursement Pending/.test(education), "Education Support retains explicit in-process review/disbursement states");
 assert(/application\.status !== "Approved"/.test(education) && /Disbursement Pending/.test(education), "Education disbursement cannot mark a case Paid directly");
 assert(/after Education Support has been paid and evidenced/.test(education), "manual Education repayment requires evidenced prior payment");
-assert(/DUPLICATE_REPAYMENT_REFERENCE/.test(education) && /application\.repayments\.push/.test(education), "manual Education repayment is reference-deduplicated and ledgered");
-assert(/reference: \{ type: String/.test(educationModel), "Education repayment records persist a manual payment reference");
+assert(/DUPLICATE_MPESA_REPAYMENT/.test(education) && /paymentTransactionId/.test(education) && /application\.repayments\.push/.test(education), "Education repayment is M-PESA-transaction-deduplicated and ledgered");
+assert(!/reference: \{ type: String/.test(educationModel), "Education repayment model does not expose a manually entered payment reference");
 assert(/\/:id\/repayment/.test(educationRoutes), "Education repayment has an admin route");
 assert(/application\.status === "Paid" \|\| application\.status === "Defaulted"/.test(payments), "M-PESA Education repayment is limited to Paid/Defaulted support");
 assert(/purpose === "loan_repayment"/.test(payments), "M-PESA loan repayment maps to EducationSupport");
 
-assert(/Disbursement Pending/.test(medical) && /PAYMENT_EVIDENCE_REQUIRED/.test(medical), "Medical Support cannot be marked Paid without pending disbursement and payment evidence");
-assert(/Disbursement Pending/.test(funeral) && /PAYMENT_EVIDENCE_REQUIRED/.test(funeral), "Funeral Support cannot be marked Paid without pending disbursement and payment evidence");
+assert(/Disbursement Pending/.test(medical) && /SETTLEMENT_TRANSACTION_REQUIRED/.test(medical) && /SETTLEMENT_TRANSACTION_INVALID/.test(medical), "Medical Support cannot be marked Paid without an authoritative settlement transaction");
+assert(/Disbursement Pending/.test(funeral) && /SETTLEMENT_TRANSACTION_REQUIRED/.test(funeral) && /SETTLEMENT_TRANSACTION_INVALID/.test(funeral), "Funeral Support cannot be marked Paid without an authoritative settlement transaction");
 assert(/const allowed =/.test(support) && /Cannot move a/.test(support), "general Support requests enforce server-side stage transitions");
-assert(/PAYMENT_EVIDENCE_REQUIRED/.test(support), "general Support Paid/Completed requires payment evidence");
+assert(/SETTLEMENT_TRANSACTION_REQUIRED/.test(support) && /SETTLEMENT_TRANSACTION_INVALID/.test(support), "general Support Paid/Completed requires authoritative settlement evidence");
 assert(/validateTransition/.test(claims) && /Approved: \["Disbursement Pending", "Closed"\]/.test(claims), "canonical claim workflow blocks direct Approved-to-Paid transitions");
-assert(/paymentReference/.test(claims) && /PAID_AMOUNT_REQUIRED/.test(claims), "canonical claim workflow requires payment evidence and paid amount");
-assert(/payment-reference/.test(adminClaims) && /selected\.sourceType === "education"/.test(adminClaims), "Admin Claims exposes payment evidence and Education repayment controls");
+assert(/settlementTransactionId/.test(claims) && /SETTLEMENT_TRANSACTION_REQUIRED/.test(claims), "canonical claim workflow requires authoritative settlement evidence");
+assert(!/paymentReference/.test(claims), "canonical claim workflow no longer reads or writes a free-text claim payment reference");
+assert(!/payment-reference/.test(adminClaims) && /selected\.sourceType === "education"/.test(adminClaims), "Admin Claims exposes authoritative payment evidence and Education repayment controls");
+assert(/isSuperAdmin/.test(claims) && /if \(!isSuperAdmin && !validateTransition/.test(claims), "SuperAdmin can correct any valid claim stage while Admins remain transition-restricted");
 assert(/purpose="loan_repayment"/.test(memberClaims), "member Claims exposes the real Education M-PESA repayment flow");
 
 assert(/getWebsiteManagementContent/.test(website) && /router\.get\("\/manage", protect, isSuperAdmin/.test(websiteRoutes), "SuperAdmin CMS has an authorized management-content source");
 assert(/published: true/.test(website), "public CMS reads filter out unpublished content");
 assert(/public:website:settings/.test(website) && /assistant:public/.test(website), "CMS cache invalidation uses centralized authoritative keys");
 assert(!/key: "settings", label: "Website Settings"/.test(settings), "duplicate WebsiteContent settings editor is removed from CMS sections");
-assert(/API\.put\("\/superadmin\/settings"/.test(settings) && /accentColor: themeColor/.test(settings), "theme changes persist through authoritative SystemSettings");
+assert(/API\.put\("\/superadmin\/settings"/.test(settings) && /branding/.test(settings) && /theme/.test(settings), "semantic theme changes persist through authoritative SystemSettings");
 
 assert(/router\.post\("\/:id\/reply"/.test(contactRoutes), "contact inbox exposes a reply workflow");
 assert(/archiveContactMessage/.test(contactRoutes) && /archiveContactMessage/.test(contactController), "contact delete action is replaced by audited archive behavior");
@@ -70,7 +72,7 @@ assert(/replies:/.test(contactModel), "contact replies are persisted with messag
 assert(/DELETE_SUPPORT_REQUEST/.test(support), "SuperAdmin support deletion is audited");
 assert(/status = "inactive"/.test(adminController) && /ARCHIVE_MEMBER/.test(adminController), "admin member deletion archives and audits instead of destroying the account");
 assert(!/MIDAX@123/.test(adminMembers), "temporary plaintext-password fallback is absent from Admin Members");
-assert(/exports\.permanentDelete/.test(claims) && /CLAIM_PERMANENT_DELETE_CLOSED_ONLY/.test(claims) && /await result\.claim\.deleteOne\(\)/.test(claims), "SuperAdmin permanently deletes Closed claims while retaining the legacy archive endpoint separately");
+assert(/exports\.permanentDelete/.test(claims) && !/CLAIM_PERMANENT_DELETE_CLOSED_ONLY/.test(claims) && /await result\.claim\.deleteOne\(\)/.test(claims), "SuperAdmin permanently deletes claims from any valid stage while retaining the legacy archive endpoint separately");
 assert(/service is temporarily unavailable/.test(server) && /app\.use\(compression\(\{ threshold: 1024 \}\)\);\napp\.use\(express\.json/.test(server), "5xx implementation errors are sanitized and duplicate compression is removed");
 assert(/profileCompleted/.test(memberRoutes) && /profileCompleted/.test(paymentRoutes) && /profileCompleted/.test(platformRoutes) && /profileCompleted/.test(voteRoutes), "member finance/platform/voting routes enforce profile completion");
 

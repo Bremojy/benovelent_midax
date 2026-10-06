@@ -54,7 +54,7 @@ transform:translateY(-10px);
 }
 
 .constitution-card svg{
-color:#ff7a00;
+color:var(--color-primary);
 margin-bottom:20px;
 }
 
@@ -73,7 +73,7 @@ margin-bottom:30px;
 }
 
 .primary-button{
-background:#ff7a00;
+background:var(--color-primary);
 color:white;
 padding:14px 28px;
 border-radius:8px;

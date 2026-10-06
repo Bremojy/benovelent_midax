@@ -1,13 +1,6 @@
 import { useEffect } from "react";
 import API from "../services/api";
-
-function applyTheme(color) {
-  if (!color || typeof document === "undefined") return;
-  document.documentElement.style.setProperty("--orange", color);
-  document.documentElement.style.setProperty("--orange-dark", color);
-  document.documentElement.style.setProperty("--portal-accent", color);
-  document.documentElement.style.setProperty("--portal-accent-soft", `${color}18`);
-}
+import { applyTheme } from "../utils/theme";
 
 export default function ThemeBootstrap() {
   useEffect(() => {
@@ -18,25 +11,16 @@ export default function ThemeBootstrap() {
     const loadTheme = async () => {
       try {
         const { data } = await API.get("/website/settings");
-        const section = data?.section || data?.settings || {};
-        const settings = section?.content || section?.settings || data?.content || data?.settings || {};
-        const color =
-          settings?.themeColor ||
-          settings?.accentColor ||
-          settings?.primaryColor ||
-          data?.section?.themeColor;
-        if (active && color) {
-          applyTheme(color);
-        }
-      } catch (error) {
-        // Keep the built-in theme if the settings section is not available yet.
+        const settings = data?.section?.content || data?.settings || data?.content || data?.section || {};
+        const branding = settings?.branding || data?.branding || {};
+        if (active) applyTheme(branding);
+      } catch (_) {
+        if (active) applyTheme({});
       }
     };
 
     loadTheme();
-    return () => {
-      active = false;
-    };
+    return () => { active = false; };
   }, []);
 
   return null;

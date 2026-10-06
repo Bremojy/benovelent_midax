@@ -22,7 +22,7 @@ const DEFAULTS = {
   scheme: { monthlyContribution: null, gracePeriodDays: null, minimumBookBalance: null, maintenanceMode: false },
   support: { funeral: { enabled: null }, medical: { enabled: null }, education: { enabled: null } },
   mpesa: { manualPaybill: "", manualAccountReference: "", displayLabel: "M-PESA", manualPaymentEnabled: false, stkEnabled: false, environment: "production", operationalShortcode: "", operationalStatus: "unknown" },
-  branding: { accentColor: "", secondaryColor: "", logoUrl: "", faviconUrl: "" },
+  branding: { preset:"orange", accentColor: "#f97316", secondaryColor: "#ea580c", primary:"#f97316", secondary:"#ea580c", background:"#fffaf5", surface:"#ffffff", elevatedSurface:"#fff7ed", text:"#1f2937", mutedText:"#667085", border:"#e5e7eb", focus:"#fb923c", success:"#15803d", warning:"#b45309", danger:"#b91c1c", header:"#ea580c", sidebar:"#ea580c", buttons:"#f97316", links:"#f97316", logoUrl:"", faviconUrl:"" },
   homepage: { showCarousel: true, showLeaders: true, showPolicies: true },
   notificationReadiness: { browserPushEnabled: false, incomingCallPushEnabled: false },
   featureToggles: {},

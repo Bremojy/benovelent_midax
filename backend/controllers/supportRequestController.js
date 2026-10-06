@@ -1,4 +1,6 @@
 const SupportRequest = require("../models/SupportRequest");
+const Finance = require("../models/Finance");
+const mongoose = require("mongoose");
 const Policy = require("../models/Policy");
 const { resolveStoredFileUrl } = require("../utils/uploadUrl");
 const createAuditLog = require("../utils/createAuditLog");
@@ -127,6 +129,8 @@ exports.create = async (req, res) => {
 
     const item = await SupportRequest.create({
       member: req.user._id,
+      createdBy: req.user._id,
+      createdByModel: "Member",
       supportType: asText(supportType),
       policySlug: asText(policySlug),
       policyName: asText(policyName),
@@ -142,6 +146,7 @@ exports.create = async (req, res) => {
           status: "Pending",
           remarks: "Application submitted by member",
           updatedBy: req.user._id,
+          updatedByModel: "Member",
         },
       ],
     });
@@ -154,7 +159,7 @@ exports.create = async (req, res) => {
 
 exports.mine = async (req, res) => {
   try {
-    const requests = await SupportRequest.find({ member: req.user._id })
+    const requests = await SupportRequest.find({ member: req.user._id, isDeleted: { $ne: true }, memberVisible: { $ne: false } })
       .sort({ createdAt: -1 })
       .lean();
 
@@ -268,7 +273,7 @@ exports.memberUpdate = async (req, res) => {
     item.description = nextDescription;
     if (amountWasChanged) item.requestedAmount = nextAmount;
     item.documents = documents;
-    item.timeline.push({ status: item.status, remarks: "Member updated an approved support-request field after administrator permission was granted.", updatedBy: req.user._id });
+    item.timeline.push({ status: item.status, remarks: "Member updated an approved support-request field after administrator permission was granted.", updatedBy: req.user._id, updatedByModel: "Member" });
     await item.save();
 
     await createAuditLog({
@@ -335,7 +340,7 @@ exports.update = async (req, res) => {
       return res.status(404).json({ success: false, message: "Support request not found." });
     }
 
-    const { status, approvedAmount, rejectionReason, remarks, paymentReference } = req.body;
+    const { status, approvedAmount, rejectionReason, remarks, settlementTransactionId } = req.body;
 
     if (status) {
       const allowed = {
@@ -350,20 +355,31 @@ exports.update = async (req, res) => {
         Completed: [], Rejected: [], Cancelled: [], Closed: [],
       };
       const current = String(item.status || "Pending");
-      if (current !== status && !allowed[current]?.includes(status)) return res.status(409).json({ success: false, message: `Cannot move a ${current} support request directly to ${status}.` });
-      if ((status === "Paid" || status === "Completed") && !String(paymentReference || item.paymentReference || "").trim()) return res.status(400).json({ success: false, code: "PAYMENT_EVIDENCE_REQUIRED", message: "A payment transaction/reference is required before this support request can be finalized." });
+      const superAdmin = String(req.user?.role || "").toLowerCase() === "superadmin";
+      if (!superAdmin && current !== status && !allowed[current]?.includes(status)) return res.status(409).json({ success: false, message: `Cannot move a ${current} support request directly to ${status}.` });
+      if (status === "Paid" || status === "Completed") {
+        const settlementId = String(settlementTransactionId || item.settlementTransactionId || "").trim();
+        if (!mongoose.Types.ObjectId.isValid(settlementId)) return res.status(400).json({ success:false, code:"SETTLEMENT_TRANSACTION_REQUIRED", message:"Select a completed authoritative Finance settlement transaction before finalizing this support request." });
+        const settlement = await Finance.findOne({ _id:settlementId, type:"claim", status:"completed" }).lean();
+        if (!settlement) return res.status(409).json({ success:false, code:"SETTLEMENT_TRANSACTION_INVALID", message:"The selected Finance settlement is not completed." });
+        if (settlement.member && String(settlement.member) !== String(item.member)) return res.status(409).json({ success:false, code:"SETTLEMENT_MEMBER_MISMATCH", message:"The selected settlement belongs to a different member." });
+        if (settlement.sourceId && String(settlement.sourceId) !== String(item._id)) return res.status(409).json({ success:false, code:"SETTLEMENT_SOURCE_MISMATCH", message:"The selected settlement is linked to a different claim." });
+        item.settlementTransactionId = settlement._id;
+        item.settlementTransactionModel = "Finance";
+      }
       item.status = status;
-      if ((status === "Paid" || status === "Completed") && "paymentReference" in item) item.paymentReference = String(paymentReference || item.paymentReference || "").trim();
     }
     if (approvedAmount !== undefined) item.approvedAmount = Math.max(0, Number(approvedAmount) || 0);
     if (rejectionReason !== undefined) item.rejectionReason = rejectionReason;
     if (remarks !== undefined) item.remarks = remarks;
 
     item.processedBy = req.user._id;
+    item.processedByModel = String(req.user?.role || "").toLowerCase() === "superadmin" ? "SuperAdmin" : "Admin";
     item.timeline.push({
       status: item.status,
       remarks: remarks || rejectionReason || "Status updated",
       updatedBy: req.user._id,
+      updatedByModel: String(req.user?.role || "").toLowerCase() === "superadmin" ? "SuperAdmin" : "Admin",
     });
 
     await item.save();

@@ -85,7 +85,13 @@ const contributionSchema = new mongoose.Schema({
 
     approvedBy:{
         type:mongoose.Schema.Types.ObjectId,
-        ref:"Admin",
+        refPath:"approvedByModel",
+        default:null
+    },
+
+    approvedByModel:{
+        type:String,
+        enum:["Admin","SuperAdmin"],
         default:null
     },
 

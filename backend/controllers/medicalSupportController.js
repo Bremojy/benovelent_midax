@@ -8,6 +8,8 @@ const MedicalSupport = require("../models/MedicalSupport");
 const Member = require("../models/Member");
 const Dependent = require("../models/Dependent");
 const Policy = require("../models/Policy");
+const Finance = require("../models/Finance");
+const mongoose = require("mongoose");
 
 const createNotification = require("../utils/createNotification");
 
@@ -22,7 +24,8 @@ const addTimeline = async (
     application,
     status,
     remarks,
-    user = null
+    user = null,
+    userModel = "Admin"
 ) => {
 
     application.timeline.push({
@@ -32,6 +35,7 @@ const addTimeline = async (
         remarks,
 
         updatedBy: user,
+        updatedByModel: userModel,
 
         date: new Date()
 
@@ -191,7 +195,8 @@ exports.createMedicalApplication = async (req, res) => {
 
             documents: uploadedDocuments,
 
-            createdBy: req.user._id
+            createdBy: req.user._id,
+            createdByModel: "Member"
 
         });
 
@@ -353,7 +358,7 @@ exports.getApplicationById = async (req, res) => {
         // Members may only resolve their own application; Admin/SuperAdmin can manage
         // the full application set through the protected administration flows.
         const filter = role === "member"
-            ? { _id: req.params.id, member: req.user._id }
+            ? { _id: req.params.id, member: req.user._id, isDeleted: { $ne: true }, memberVisible: { $ne: false } }
             : { _id: req.params.id };
 
         const application = await MedicalSupport.findOne(filter)
@@ -398,8 +403,9 @@ exports.cancelApplication = async (
         const application = await MedicalSupport.findOne({
 
             _id: req.params.id,
-
-            member: req.user._id
+            member: req.user._id,
+            isDeleted: { $ne: true },
+            memberVisible: { $ne: false }
 
         });
 
@@ -632,6 +638,7 @@ exports.markUnderReview = async (req, res) => {
         application.status = "Under Review";
 
         application.processedBy = req.user._id;
+        application.processedByModel = String(req.user?.role || "").toLowerCase() === "superadmin" ? "SuperAdmin" : "Admin";
 
         application.remarks = remarks;
 
@@ -740,6 +747,7 @@ exports.approveApplication = async (req, res) => {
     application.approvedByModel = req.user.role === "superadmin" ? "SuperAdmin" : "Admin";
 
         application.processedBy = req.user._id;
+        application.processedByModel = String(req.user?.role || "").toLowerCase() === "superadmin" ? "SuperAdmin" : "Admin";
 
         application.approvalDate = new Date();
 
@@ -844,6 +852,7 @@ exports.rejectApplication = async (req, res) => {
         application.rejectionReason = rejectionReason;
 
         application.processedBy = req.user._id;
+        application.processedByModel = String(req.user?.role || "").toLowerCase() === "superadmin" ? "SuperAdmin" : "Admin";
 
         await addTimeline(
 
@@ -915,12 +924,7 @@ exports.markAsPaid = async (req, res) => {
 
     try {
 
-        const {
-
-            paidAmount,
-            paymentReference
-
-        } = req.body;
+        const { paidAmount, settlementTransactionId } = req.body;
 
         const application = await MedicalSupport.findById(
 
@@ -944,19 +948,23 @@ exports.markAsPaid = async (req, res) => {
             return res.status(400).json({ success: false, message: "Medical Support must be approved and awaiting disbursement before payment can be recorded." });
         }
 
-        const reference = String(paymentReference || "").trim();
-        if (!reference) {
-            return res.status(400).json({ success: false, code: "PAYMENT_EVIDENCE_REQUIRED", message: "A payment transaction/reference is required before Medical Support can be marked Paid." });
-        }
-        const amount = Number(paidAmount ?? application.approvedAmount ?? application.requestedAmount ?? 0);
+        const settlementId = String(settlementTransactionId || application.settlementTransactionId || "").trim();
+        if (!mongoose.Types.ObjectId.isValid(settlementId)) return res.status(400).json({ success:false, code:"SETTLEMENT_TRANSACTION_REQUIRED", message:"Select a completed authoritative Finance settlement transaction before marking Medical Support Paid." });
+        const settlement = await Finance.findOne({ _id:settlementId, type:"claim", status:"completed" }).lean();
+        if (!settlement) return res.status(409).json({ success:false, code:"SETTLEMENT_TRANSACTION_INVALID", message:"The selected Finance settlement is not completed." });
+        if (settlement.member && String(settlement.member) !== String(application.member)) return res.status(409).json({ success:false, code:"SETTLEMENT_MEMBER_MISMATCH", message:"The selected settlement belongs to a different member." });
+        if (settlement.sourceId && String(settlement.sourceId) !== String(application._id)) return res.status(409).json({ success:false, code:"SETTLEMENT_SOURCE_MISMATCH", message:"The selected settlement is linked to a different claim." });
+        const amount = Number(paidAmount ?? settlement.amount ?? application.approvedAmount ?? application.requestedAmount ?? 0);
         if (!Number.isFinite(amount) || amount <= 0) return res.status(400).json({ success: false, message: "Enter a valid paid amount." });
 
         application.status = "Paid";
         application.paidAmount = amount;
-        application.paymentReference = reference;
+        application.settlementTransactionId = settlement._id;
+        application.settlementTransactionModel = "Finance";
         application.paymentDate = new Date();
 
         application.processedBy = req.user._id;
+        application.processedByModel = String(req.user?.role || "").toLowerCase() === "superadmin" ? "SuperAdmin" : "Admin";
 
         await addTimeline(
 

@@ -27,6 +27,7 @@ const {
     getApplicationById,
     getAllApplications,
     getEducationSummary,
+    getRepaymentTransactions,
     approveApplication,
     rejectApplication,
     disburseFunds,
@@ -116,6 +117,14 @@ router.put(
     protect,
     requireAdmin,
     disburseFunds
+);
+
+// Available successful M-PESA repayments for reconciliation
+router.get(
+    "/:id/repayment-transactions",
+    protect,
+    requireAdmin,
+    getRepaymentTransactions
 );
 
 // Record repayment

@@ -1,5 +1,6 @@
 const { resolveStoredFileUrl } = require("../utils/uploadUrl");
 const FuneralSupport = require("../models/FuneralSupport");
+const Finance = require("../models/Finance");
 const Member = require("../models/Member");
 const Dependent = require("../models/Dependent");
 const Policy = require("../models/Policy");
@@ -170,7 +171,8 @@ exports.applyFuneralSupport = async (req, res) => {
 
             profileCompletion:100,
 
-            createdBy:member._id
+            createdBy:member._id,
+            createdByModel:"Member"
 
         });
 
@@ -867,12 +869,16 @@ exports.recordPayment = async (req,res)=>{
         if (!["Disbursement Pending"].includes(String(application.status || ""))) {
             return res.status(400).json({ success:false, message:"Funeral Support must be approved or awaiting disbursement before payment can be recorded." });
         }
-        const paymentReference = String(req.body.paymentReference || "").trim();
-        if (!paymentReference) return res.status(400).json({ success:false, code:"PAYMENT_EVIDENCE_REQUIRED", message:"A payment transaction/reference is required before Funeral Support can be marked Paid." });
+        const settlementId = String(req.body.settlementTransactionId || application.settlementTransactionId || "").trim();
+        if (!mongoose.Types.ObjectId.isValid(settlementId)) return res.status(400).json({ success:false, code:"SETTLEMENT_TRANSACTION_REQUIRED", message:"Select a completed authoritative Finance settlement transaction before marking Funeral Support Paid." });
+        const settlement = await Finance.findOne({ _id:settlementId, type:"claim", status:"completed" }).lean();
+        if (!settlement) return res.status(409).json({ success:false, code:"SETTLEMENT_TRANSACTION_INVALID", message:"The selected Finance settlement is not completed." });
+        if (settlement.member && String(settlement.member) !== String(application.member)) return res.status(409).json({ success:false, code:"SETTLEMENT_MEMBER_MISMATCH", message:"The selected settlement belongs to a different member." });
+        if (settlement.sourceId && String(settlement.sourceId) !== String(application._id)) return res.status(409).json({ success:false, code:"SETTLEMENT_SOURCE_MISMATCH", message:"The selected settlement is linked to a different claim." });
 
         application.status="Paid";
-
-        application.paymentReference=paymentReference;
+        application.settlementTransactionId=settlement._id;
+        application.settlementTransactionModel="Finance";
 
         application.paymentMethod=
 
@@ -885,6 +891,7 @@ exports.recordPayment = async (req,res)=>{
         application.processedBy=
 
         req.user._id;
+        application.processedByModel = String(req.user?.role || "").toLowerCase() === "superadmin" ? "SuperAdmin" : "Admin";
 
         await application.save();
 

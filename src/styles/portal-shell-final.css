@@ -88,7 +88,7 @@
 }
 
 .dashboard-sidebar .sidebar-role {
-  color: var(--portal-accent, #ff7a00) !important;
+  color: var(--color-primary) !important;
 }
 
 .dashboard-sidebar .sidebar-menu {
@@ -105,16 +105,16 @@
 
 .dashboard-sidebar .sidebar-link:hover,
 .dashboard-sidebar .sidebar-link:focus-visible {
-  color: var(--portal-accent, #ff7a00) !important;
-  background: var(--portal-soft, rgba(255, 122, 0, 0.08)) !important;
+  color: var(--color-primary) !important;
+  background: var(--color-primary-soft, rgba(255, 122, 0, 0.08)) !important;
   border-color: rgba(15, 23, 42, 0.04) !important;
 }
 
 .dashboard-sidebar .sidebar-link.active {
-  color: var(--portal-accent-2, #d95f00) !important;
-  background: var(--portal-soft, rgba(255, 122, 0, 0.11)) !important;
-  border-color: color-mix(in srgb, var(--portal-accent, #ff7a00) 18%, transparent) !important;
-  box-shadow: inset 3px 0 0 var(--portal-accent, #ff7a00) !important;
+  color: var(--color-secondary) !important;
+  background: var(--color-primary-soft, rgba(255, 122, 0, 0.11)) !important;
+  border-color: color-mix(in srgb, var(--color-primary) 18%, transparent) !important;
+  box-shadow: inset 3px 0 0 var(--color-primary) !important;
 }
 
 .dashboard-sidebar .sidebar-footer {
@@ -125,7 +125,7 @@
 .dashboard-sidebar .logout-btn {
   margin: 0 !important;
   color: #ffffff !important;
-  background: linear-gradient(135deg, var(--portal-accent, #ff7a00), var(--portal-accent-2, #d95f00)) !important;
+  background: linear-gradient(135deg, var(--color-primary), var(--color-secondary)) !important;
 }
 
 /* The sticky top bar belongs to the content column, so it can never cover the
@@ -310,9 +310,9 @@
 
   .dashboard-sidebar.mobile-bottom-nav .sidebar-link.active,
   .dashboard-sidebar.mobile-bottom-nav .sidebar-more-button.active {
-    color: var(--portal-accent, #ff7a00) !important;
-    background: var(--portal-soft, rgba(255, 122, 0, 0.11)) !important;
-    border-color: color-mix(in srgb, var(--portal-accent, #ff7a00) 18%, transparent) !important;
+    color: var(--color-primary) !important;
+    background: var(--color-primary-soft, rgba(255, 122, 0, 0.11)) !important;
+    border-color: color-mix(in srgb, var(--color-primary) 18%, transparent) !important;
     box-shadow: none !important;
   }
 
@@ -357,7 +357,7 @@
   }
 
   .dashboard-sidebar.mobile-drawer .sidebar-link.active {
-    color: var(--portal-accent-2, #d95f00) !important;
+    color: var(--color-secondary) !important;
   }
 
   .dashboard-drawer-backdrop {

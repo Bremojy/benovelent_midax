@@ -26,6 +26,7 @@ import InstallPWA from "./components/InstallPWA";
 import LoginFeedbackPrompt from "./components/feedback/LoginFeedbackPrompt";
 import GlobalCommunicationCenter from "./components/GlobalCommunicationCenter";
 import SmartAssistant from "./components/SmartAssistant";
+import useDialogAccessibility from "./hooks/useDialogAccessibility";
 
 import "./App.css";
 import "./styles/interaction-system.css";
@@ -760,6 +761,7 @@ function AppContent() {
 // =====================================================
 
 function App() {
+  useDialogAccessibility();
   return (
     <BrowserRouter>
 

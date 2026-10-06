@@ -1,12 +1,12 @@
 
 /* FINAL UI POLISH — Benevolent MIDAX */
 :root {
-  --midax-brand: #ff7a00;
-  --midax-ink: #18212b;
-  --midax-muted: #667085;
-  --midax-line: #e8ecf0;
-  --midax-surface: #ffffff;
-  --midax-soft: #f6f8fa;
+  --midax-brand: var(--color-primary);
+  --midax-ink: var(--color-text);
+  --midax-muted: var(--color-text-muted);
+  --midax-line: var(--color-border);
+  --midax-surface: var(--color-surface);
+  --midax-soft: var(--color-surface-elevated);
   --midax-radius: 18px;
   --midax-shadow: 0 14px 45px rgba(15, 23, 42, .07);
 }
@@ -28,16 +28,16 @@ button:disabled { cursor: not-allowed; opacity: .58; }
 .portal-stat { position:relative; overflow:hidden; min-width:0; }
 .portal-stat::after {
   content:""; position:absolute; width:72px; height:72px; right:-28px; top:-28px; border-radius:50%;
-  background:rgba(255,122,0,.07);
+  background:color-mix(in srgb, var(--color-primary) 7%, transparent);
 }
 .portal-stat strong, .portal-stat span { position:relative; z-index:1; }
 .portal-btn {
   min-height:42px; padding:10px 14px; border-radius:12px; border:1px solid transparent;
-  background:linear-gradient(135deg,#ff7a00,#ff9c42); box-shadow:0 8px 18px rgba(255,122,0,.16);
+  background:linear-gradient(135deg,var(--color-primary),var(--color-primary)); box-shadow:0 8px 18px color-mix(in srgb, var(--color-primary) 16%, transparent);
   transition:transform .15s ease, box-shadow .15s ease, filter .15s ease;
 }
 .portal-btn:hover:not(:disabled), .portal-btn:focus-visible:not(:disabled) {
-  transform:translateY(-1px); box-shadow:0 11px 24px rgba(255,122,0,.22);
+  transform:translateY(-1px); box-shadow:0 11px 24px color-mix(in srgb, var(--color-primary) 22%, transparent);
 }
 .portal-btn.secondary, .portal-btn.light {
   background:#f4f6f8; color:#344054; border-color:#e3e7eb; box-shadow:none;
@@ -58,13 +58,13 @@ button:disabled { cursor: not-allowed; opacity: .58; }
 .portal-panel textarea { min-height:110px; }
 .portal-field input:focus, .portal-field select:focus, .portal-field textarea:focus,
 .portal-panel input:not([type="checkbox"]):not([type="radio"]):focus, .portal-panel select:focus, .portal-panel textarea:focus {
-  background:#fff; border-color:#ff9b42; box-shadow:0 0 0 4px rgba(255,122,0,.11);
+  background:#fff; border-color:var(--color-primary); box-shadow:0 0 0 4px color-mix(in srgb, var(--color-primary) 11%, transparent);
 }
-.portal-badge { border:1px solid rgba(255,122,0,.10); background:#fff5eb; color:#a94f00; white-space:nowrap; }
+.portal-badge { border:1px solid rgba(255,122,0,.10); background:var(--color-primary-soft); color:var(--color-primary); white-space:nowrap; }
 .claim-feed-card { border-color:var(--midax-line); box-shadow:0 10px 30px rgba(15,23,42,.045); }
 .claim-feed-card:hover { transform:translateY(-1px); box-shadow:0 16px 38px rgba(15,23,42,.075); }
 .dashboard-content {
-  background:radial-gradient(circle at 92% 8%, rgba(255,122,0,.035), transparent 28%), linear-gradient(180deg,#fbfcfd 0%,#f7f9fb 100%);
+  background:radial-gradient(circle at 92% 8%, color-mix(in srgb, var(--color-primary) 4%, transparent), transparent 28%), linear-gradient(180deg,#fbfcfd 0%,#f7f9fb 100%);
 }
 .dashboard-topbar { backdrop-filter:blur(16px) saturate(145%); -webkit-backdrop-filter:blur(16px) saturate(145%); }
 @media (max-width:900px) {

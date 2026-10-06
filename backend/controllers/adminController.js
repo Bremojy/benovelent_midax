@@ -1590,4 +1590,24 @@ exports.updateSettings = async (req, res) => {
 };
 
 
-exports.openClaimDocument = async (req,res)=>{try{const map={medical:"MedicalSupport",funeral:"FuneralSupport",education:"EducationSupport",support:"SupportRequest"};const modelName=map[String(req.params.type).toLowerCase()];if(!modelName)return res.status(400).json({success:false,message:"Invalid claim type."});const Model=require(`../models/${modelName}`);const claim=await Model.findById(req.params.id);if(!claim)return res.status(404).json({success:false,message:"Claim not found."});claim.processedBy=req.user._id;if(Array.isArray(claim.timeline))claim.timeline.push({status:claim.status,remarks:`Document opened by administrator ${req.user.fullName||req.user.email||req.user._id}`,updatedBy:req.user._id,date:new Date()});claim.updatedBy=req.user._id;await claim.save();res.json({success:true,message:"Document access recorded."})}catch(e){res.status(500).json({success:false,message:e.message})}};
+exports.openClaimDocument = async (req, res) => {
+  try {
+    const map = { medical: "MedicalSupport", funeral: "FuneralSupport", education: "EducationSupport", support: "SupportRequest" };
+    const modelName = map[String(req.params.type).toLowerCase()];
+    if (!modelName) return res.status(400).json({ success: false, message: "Invalid claim type." });
+    const Model = require(`../models/${modelName}`);
+    const claim = await Model.findById(req.params.id);
+    if (!claim) return res.status(404).json({ success: false, message: "Claim not found." });
+    const actorModel = String(req.user?.role || "").toLowerCase() === "superadmin" ? "SuperAdmin" : "Admin";
+    claim.processedBy = req.user._id;
+    claim.processedByModel = actorModel;
+    if ("updatedBy" in claim) { claim.updatedBy = req.user._id; claim.updatedByModel = actorModel; }
+    if (Array.isArray(claim.timeline)) claim.timeline.push({ status: claim.status, remarks: "Claim document accessed for authorized review.", updatedBy: req.user._id, updatedByModel: actorModel, date: new Date() });
+    await claim.save();
+    const createAuditLog = require("../utils/createAuditLog");
+    await createAuditLog({ user: req.user._id, userRole: req.user.role, action: "CLAIM_DOCUMENT_ACCESSED", module: "Claim", description: `Authorized staff accessed a document on ${modelName} ${claim._id}.`, req, metadata: { claimId: String(claim._id), claimType: String(req.params.type).toLowerCase(), actorModel } });
+    res.json({ success: true, message: "Document access recorded." });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+};

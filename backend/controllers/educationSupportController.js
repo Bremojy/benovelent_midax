@@ -3,6 +3,7 @@ const EducationSupport = require("../models/EducationSupport");
 const Policy = require("../models/Policy");
 const Member = require("../models/Member");
 const Dependent = require("../models/Dependent");
+const MpesaTransaction = require("../models/MpesaTransaction");
 const createNotification =
 require("../utils/createNotification");
 const createAuditLog = require("../utils/createAuditLog");
@@ -183,11 +184,9 @@ exports.applyEducationSupport = async (req, res) => {
         dependentName: dependent.fullName,
         relationship: dependent.relationship,
 
-        school: String(req.body.school || dependent.school || "").trim(),
-        admissionNumber:
-          String(req.body.admissionNumber || dependent.admissionNumber || "").trim(),
-        educationLevel:
-          dependent.educationLevel,
+        school: String(req.body.school || "").trim(),
+        admissionNumber: String(req.body.admissionNumber || "").trim(),
+        educationLevel: String(req.body.educationLevel || "").trim(),
 
         purpose,
 
@@ -205,6 +204,7 @@ exports.applyEducationSupport = async (req, res) => {
         ].filter(Boolean),
 
         createdBy: member._id,
+        createdByModel: "Member",
       });
 
     const Admin = require("../models/Admin");
@@ -274,7 +274,7 @@ exports.getMyApplications = async (req, res) => {
     })
       .populate(
         "dependent",
-        "fullName relationship school educationLevel"
+        "fullName relationship gender dateOfBirth nationalId phone email county address employmentStatus"
       )
       .sort({ createdAt: -1 });
 
@@ -301,14 +301,14 @@ exports.getMyApplications = async (req, res) => {
 exports.getApplicationById = async (req, res) => {
   try {
     const application =
-      await EducationSupport.findOne({ _id: req.params.id, isDeleted: { $ne: true } })
+      await EducationSupport.findOne({ _id: req.params.id, member: req.user._id, isDeleted: { $ne: true }, memberVisible: { $ne: false } })
         .populate(
           "member",
           "memberNumber fullName email phone"
         )
         .populate(
           "dependent",
-          "fullName relationship school admissionNumber educationLevel"
+          "fullName relationship gender dateOfBirth nationalId phone email county address employmentStatus"
         )
         .populate(
           "approvedBy",
@@ -825,7 +825,7 @@ exports.disburseFunds = async (req, res) => {
 
     res.json({
       success: true,
-      message: "Education Support moved to Disbursement Pending. Record Paid only after a verified payment reference is available.",
+      message: "Education Support moved to Disbursement Pending. Record Paid only after a verified M-PESA settlement transaction is available.",
       application,
     });
 
@@ -846,120 +846,51 @@ exports.disburseFunds = async (req, res) => {
 // PUT /api/education/:id/repayment
 // ======================================================
 
-exports.recordRepayment = async (req, res) => {
-
+exports.getRepaymentTransactions = async (req, res) => {
   try {
+    const application = await EducationSupport.findById(req.params.id).select("member").lean();
+    if (!application) return res.status(404).json({ success:false, message:"Application not found." });
+    const transactions = await MpesaTransaction.find({
+      member: application.member,
+      purpose: "loan_repayment",
+      referenceId: application._id,
+      referenceModel: "EducationSupport",
+      status: "successful",
+      amount: { $gt: 0 },
+    }).sort({ completedAt:-1, createdAt:-1 }).limit(100).select("_id amount mpesaReceiptNumber completedAt transactionDate createdAt reconciled").lean();
+    return res.json({ success:true, transactions });
+  } catch (error) { return res.status(500).json({ success:false, message:error.message }); }
+};
 
+exports.recordRepayment = async (req, res) => {
+  try {
     const amount = Number(req.body.amount);
-    const paymentReference = String(req.body.paymentReference || req.body.reference || "").trim();
-
-    if (!Number.isInteger(amount) || amount <= 0) {
-      return res.status(400).json({
-        success: false,
-        message: "Enter a valid whole-number repayment amount.",
-      });
-    }
-    if (!paymentReference) {
-      return res.status(400).json({
-        success: false,
-        code: "PAYMENT_EVIDENCE_REQUIRED",
-        message: "A payment transaction/reference is required before recording a manual repayment.",
-      });
-    }
+    const paymentTransactionId = String(req.body.paymentTransactionId || "").trim();
+    if (!Number.isInteger(amount) || amount <= 0) return res.status(400).json({ success:false, message:"Enter a valid whole-number repayment amount." });
+    if (!paymentTransactionId || !require("mongoose").Types.ObjectId.isValid(paymentTransactionId)) return res.status(400).json({ success:false, code:"MPESA_TRANSACTION_REQUIRED", message:"Select the successful M-PESA repayment transaction before recording the repayment." });
 
     const application = await EducationSupport.findById(req.params.id);
+    if (!application) return res.status(404).json({ success:false, message:"Application not found." });
+    if (!(application.status === "Paid" || application.status === "Defaulted")) return res.status(400).json({ success:false, message:"Repayment can only be recorded after Education Support has been paid and evidenced." });
+    if (Number(application.balance) <= 0) return res.status(400).json({ success:false, message:"This education loan is already fully repaid." });
+    if (amount > Number(application.balance)) return res.status(400).json({ success:false, message:"Repayment cannot exceed the current Education Support balance." });
 
-    if (!application) {
-      return res.status(404).json({
-        success: false,
-        message: "Application not found.",
-      });
-    }
-    if (!(application.status === "Paid" || application.status === "Defaulted")) {
-      return res.status(400).json({
-        success: false,
-        message: "Repayment can only be recorded after Education Support has been paid and evidenced.",
-      });
-    }
-    if (Number(application.balance) <= 0) {
-      return res.status(400).json({
-        success: false,
-        message: "This education loan is already fully repaid.",
-      });
-    }
-    if (amount > Number(application.balance)) {
-      return res.status(400).json({
-        success: false,
-        message: "Repayment cannot exceed the current Education Support balance.",
-      });
-    }
-    if (Array.isArray(application.repayments) && application.repayments.some((entry) => String(entry.reference || "").trim().toUpperCase() === paymentReference.toUpperCase())) {
-      return res.status(409).json({ success: false, code: "DUPLICATE_REPAYMENT_REFERENCE", message: "This repayment reference has already been recorded." });
-    }
+    const transaction = await MpesaTransaction.findOne({ _id:paymentTransactionId, member:application.member, purpose:"loan_repayment", referenceId:application._id, referenceModel:"EducationSupport", status:"successful" }).lean();
+    if (!transaction) return res.status(409).json({ success:false, code:"MPESA_TRANSACTION_INVALID", message:"The selected M-PESA repayment is not a successful transaction linked to this education loan." });
+    if (Number(transaction.amount) !== amount) return res.status(409).json({ success:false, code:"MPESA_AMOUNT_MISMATCH", message:`Selected M-PESA transaction amount is KSh ${Number(transaction.amount).toLocaleString("en-KE")}; it must match the repayment amount.` });
+    if (Array.isArray(application.repayments) && application.repayments.some((entry) => String(entry.paymentTransactionId || "") === String(transaction._id))) return res.status(409).json({ success:false, code:"DUPLICATE_MPESA_REPAYMENT", message:"This M-PESA repayment has already been recorded." });
 
     application.amountPaid += amount;
     application.balance = Math.max(0, Number(application.balance) - amount);
     application.repayments = Array.isArray(application.repayments) ? application.repayments : [];
-    application.repayments.push({ amount, reference: paymentReference, paidAt: new Date(), method: String(req.body.method || "MANUAL").trim() || "MANUAL" });
-
-    if (application.balance === 0) {
-      application.status = "Completed";
-      application.completionDate = new Date();
-    }
-
+    application.repayments.push({ amount, mpesaReceiptNumber:transaction.mpesaReceiptNumber || "", paymentTransactionId:transaction._id, paidAt:transaction.completedAt || new Date(), method:"M-PESA" });
+    if (application.balance === 0) { application.status="Completed"; application.completionDate=new Date(); }
     await application.save();
-    await createAuditLog({
-      action: "EDUCATION_REPAYMENT_RECORDED",
-      performedBy: req.user._id,
-      performedByModel: req.user.role === "superadmin" ? "SuperAdmin" : "Admin",
-      entityType: "EducationSupport",
-      entityId: application._id,
-      details: { amount, paymentReference, remainingBalance: application.balance },
-    });
-    await createNotification({
-
-    recipient: application.member,
-
-    recipientModel: "Member",
-
-    sender: req.user._id,
-
-    senderModel:
-        req.user.role === "superadmin"
-            ? "SuperAdmin"
-            : "Admin",
-
-    title: "Repayment Received",
-
-    message:
-        `Repayment of KSh ${amount} has been received. Remaining balance: KSh ${application.balance}.`,
-
-    type: "education",
-
-    referenceId: application._id,
-
-    referenceModel: "EducationSupport",
-
-    icon: "payments",
-
-});
-
-    res.json({
-      success: true,
-      message: "Repayment recorded successfully.",
-      application,
-    });
-
-  } catch (error) {
-
-    console.error(error);
-
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
-
-  }
+    await MpesaTransaction.updateOne({ _id:transaction._id }, { $set:{ reconciled:true, reconciledAt:new Date() } });
+    await createAuditLog({ action:"EDUCATION_REPAYMENT_RECORDED", performedBy:req.user._id, performedByModel:req.user.role === "superadmin" ? "SuperAdmin" : "Admin", entityType:"EducationSupport", entityId:application._id, details:{ amount, paymentTransactionId:transaction._id, mpesaReceiptNumber:transaction.mpesaReceiptNumber || "", remainingBalance:application.balance } });
+    await createNotification({ recipient:application.member, recipientModel:"Member", sender:req.user._id, senderModel:req.user.role === "superadmin" ? "SuperAdmin" : "Admin", title:"Repayment Received", message:`Repayment of KSh ${amount} has been received. Remaining balance: KSh ${application.balance}.`, type:"education", referenceId:application._id, referenceModel:"EducationSupport", icon:"payments" });
+    return res.json({ success:true, message:"Verified M-PESA repayment recorded successfully.", application });
+  } catch (error) { console.error(error); return res.status(500).json({ success:false, message:error.message }); }
 };
 
 // ======================================================

@@ -6,7 +6,7 @@ margin-bottom:25px;
 }
 
 .new-claim-btn{
-background:#ff7a00;
+background:var(--color-primary);
 color:white;
 border:none;
 padding:14px 22px;

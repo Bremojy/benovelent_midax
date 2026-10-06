@@ -1,3 +1,4 @@
+const mongoose = require("mongoose");
 const Finance = require("../models/Finance");
 const Member = require("../models/Member");
 const Admin = require("../models/Admin");
@@ -9,6 +10,7 @@ const { getLedger: getAuthoritativeLedger, getCurrentBookBalance, invalidateFina
 const { buildPdf } = require("../utils/simplePdf");
 const createAuditLog = require("../utils/createAuditLog");
 const { getFinanceActor } = require("../utils/financeActor");
+const { getSystemSettings } = require("../services/systemSettings");
 
 const normalizeFinanceRole = (role) => String(role || "").trim().toLowerCase();
 
@@ -135,6 +137,8 @@ exports.createTransaction = async (req, res) => {
             type, category, amount: Number(amount), description, paymentMethod: type === "contribution" ? "Payroll" : paymentMethod,
             referenceNumber, receiptNumber, notes,
             contributorType: scope, contributor, contributorModel, contributorName,
+            sourceId: type === "claim" && mongoose.Types.ObjectId.isValid(String(req.body?.sourceId || "")) ? req.body.sourceId : null,
+            sourceModel: type === "claim" && ["MedicalSupport","FuneralSupport","EducationSupport","SupportRequest"].includes(String(req.body?.sourceModel || "")) ? String(req.body.sourceModel) : null,
             transactedBy: financeActor.id,
             transactedByModel: financeActor.model,
             transactedByName: financeActor.name,
@@ -1035,8 +1039,11 @@ exports.exportConstitutionLedger = async (req, res) => {
       includeHidden: role === "superadmin" && String(req.query.includeHidden || "false").toLowerCase() === "true",
     });
     ledger = prepareMemberSafeLedger(ledger, req);
+    const systemSettings = await getSystemSettings();
+    const organizationName = systemSettings?.website?.siteTitle || systemSettings?.displayName || systemSettings?.organizationName || "Benevolent MIDAX";
+    const publicContact = systemSettings?.website?.publicContactInformation || [systemSettings?.email, systemSettings?.phone, systemSettings?.address].filter(Boolean).join(" | ");
     const rows = [
-      "Benevolent Constitution",
+      organizationName,
       `Date range: ${ledger.startDate} to ${ledger.endDate}`,
       `Generated: ${new Date().toISOString()}`,
       `Opening balance: KES ${ledger.openingBalance.toFixed(2)}`,
@@ -1045,14 +1052,12 @@ exports.exportConstitutionLedger = async (req, res) => {
       `Closing balance: KES ${ledger.closingBalance.toFixed(2)}`,
       `Current live book balance: KES ${ledger.currentBookBalance.toFixed(2)}`,
       "Report reference: BENE-LEDGER-" + new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14),
-      "Midax Petroleum Marketing | P.O. Box 7432 - 00300 Nairobi | www.midax.co.ke",
-      "Email: marketing@midax.co.ke / info@midax.co.ke",
-      "Services: Fuels | Lubricants | LPG Gas | Service | Carwash",
+      `Public contact: ${publicContact || "Current official contact details are not configured."}`,
       "",
       "DATE | TRANSACTION | TRANSACTED BY | DESCRIPTION | CATEGORY | AMOUNT | DIRECTION | STATUS | RUNNING BALANCE",
       ...ledger.entries.map((entry) => `${new Date(entry.date).toISOString().slice(0,10)} | ${entry.transactionNumber} | ${entry.transactedByName || entry.transactedBy?.fullName || entry.transactedBy?.name || "Recorded actor unavailable"} | ${entry.description || "-"} | ${entry.category || "-"} | KES ${entry.amount.toFixed(2)} | ${entry.direction} | ${entry.status} | KES ${entry.runningBalance.toFixed(2)}`),
     ];
-    const pdf = buildPdf({ title: "Benevolent Constitution Ledger", subtitle: `A4 ledger report • ${ledger.startDate} to ${ledger.endDate}`, lines: rows });
+    const pdf = buildPdf({ title: "Benevolent Constitution Ledger", subtitle: "A4 ledger report.", organizationName: "Benevolent MIDAX", documentType: "Constitution Ledger", classification: "Official Record", dateRange: `${ledger.startDate} to ${ledger.endDate}`, generatedAt: new Date(), lines: rows });
     res.set({ "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="benevolent-constitution-ledger-${ledger.startDate}-${ledger.endDate}.pdf"`, "Content-Length": pdf.length });
     return res.send(pdf);
   } catch (error) {

@@ -28,7 +28,7 @@ assert(migrationRunner.includes("013_remove_redundant_notification_index"), "Not
 
 const settings = read("src/pages/superadmin/SuperAdminSettings.jsx");
 assert(/validTabs = \[.*"system"/.test(settings), "System settings tab must be a valid tab.");
-assert(/API\.put\("\/superadmin\/settings", \{\s*branding:\s*\{\s*accentColor: themeColor/.test(settings), "Theme save must patch branding only.");
+assert(/API\.put\("\/superadmin\/settings"/.test(settings) && /branding/.test(settings), "Theme save persists through the authoritative branding settings contract.");
 assert(/settings-tab-groups/.test(settings), "SuperAdmin settings must use grouped navigation.");
 
 const dependents = read("src/pages/member/Dependents.jsx");

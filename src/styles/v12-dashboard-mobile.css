@@ -2,32 +2,14 @@
 
 .dashboard-container {
   --dashboard-sidebar-width: 270px;
-  --portal-accent: #ff7a00;
-  --portal-accent-2: #d95f00;
-  --portal-soft: rgba(255, 122, 0, 0.12);
   width: 100%;
   min-width: 0;
   overflow-x: clip;
   overflow-y: visible;
 }
 
-.dashboard-container.portal-role-member {
-  --portal-accent: #159447;
-  --portal-accent-2: #0f6f35;
-  --portal-soft: rgba(21, 148, 71, 0.12);
-}
 
-.dashboard-container.portal-role-admin {
-  --portal-accent: #ff7a00;
-  --portal-accent-2: #d95f00;
-  --portal-soft: rgba(255, 122, 0, 0.12);
-}
 
-.dashboard-container.portal-role-superadmin {
-  --portal-accent: #7c3aed;
-  --portal-accent-2: #5b21b6;
-  --portal-soft: rgba(124, 58, 237, 0.13);
-}
 
 .dashboard-main {
   width: calc(100% - var(--dashboard-sidebar-width));
@@ -57,26 +39,26 @@
 }
 
 .dashboard-container .portal-accent-text {
-  color: var(--portal-accent);
+  color: var(--color-primary);
 }
 
 .dashboard-container .portal-chip-action,
 .dashboard-container .primary-btn,
 .dashboard-container .portal-btn {
-  background: linear-gradient(135deg, var(--portal-accent), var(--portal-accent-2));
+  background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
 }
 
 .dashboard-container .sidebar-link.active {
-  background: linear-gradient(135deg, var(--portal-accent), var(--portal-accent-2));
-  box-shadow: 0 12px 28px var(--portal-soft);
+  background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
+  box-shadow: 0 12px 28px var(--color-primary-soft);
 }
 
 .dashboard-container .dashboard-topbar {
-  border-top: 3px solid var(--portal-accent);
+  border-top: 3px solid var(--color-primary);
 }
 
 .dashboard-container .sidebar-role {
-  color: color-mix(in srgb, white 75%, var(--portal-accent));
+  color: color-mix(in srgb, white 75%, var(--color-primary));
 }
 
 @media (max-width: 900px) {
