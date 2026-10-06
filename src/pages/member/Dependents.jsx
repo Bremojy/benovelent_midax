@@ -70,7 +70,11 @@ export default function Dependents() {
     setRequestFields({ ...empty, ...Object.fromEntries(Object.keys(empty).map((key) => [key, dependent[key] ?? ""])) });
     setReason("");
     setRequestFiles([]);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    window.requestAnimationFrame(() => {
+      const target = document.getElementById("dependent-request-edit");
+      target?.scrollIntoView({ behavior: "smooth", block: "start" });
+      window.setTimeout(() => document.getElementById("dependent-request-dependent")?.focus(), 180);
+    });
   };
 
   const submitRequest = async (e) => {
@@ -187,10 +191,11 @@ export default function Dependents() {
             </form>
 
             <div className="support-divider" />
-            <div className="support-section-heading"><span>CONTROLLED CHANGES</span><h2>Request a Record Edit</h2></div>
-            <p className="support-muted">Existing dependents cannot be edited or deleted directly by members. Submit the requested change and an authorized administrator will review it.</p>
-            <form onSubmit={submitRequest}>
-              <Field label="Dependent"><select value={requestDependent} onChange={(e)=>{ const id=e.target.value; setRequestDependent(id); const d=dependents.find((x)=>String(x._id)===String(id)); if(d) setRequestFields({...empty,...d,dateOfBirth:d.dateOfBirth?String(d.dateOfBirth).slice(0,10):""}); }}><option value="">Select dependent</option>{dependents.map((d)=><option key={d._id} value={d._id}>{d.fullName} — {d.relationship}</option>)}</select></Field>
+            <section id="dependent-request-edit" className="dependent-request-editor">
+              <div className="support-section-heading"><span>CONTROLLED CHANGES</span><h2>Request a Record Edit</h2></div>
+              <p className="support-muted">Existing dependents cannot be edited or deleted directly by members. Submit the requested change and an authorized administrator will review it.</p>
+              <form onSubmit={submitRequest}>
+              <Field label="Dependent"><select id="dependent-request-dependent" value={requestDependent} onChange={(e)=>{ const id=e.target.value; setRequestDependent(id); const d=dependents.find((x)=>String(x._id)===String(id)); if(d) setRequestFields({...empty,...d,dateOfBirth:d.dateOfBirth?String(d.dateOfBirth).slice(0,10):""}); }}><option value="">Select dependent</option>{dependents.map((d)=><option key={d._id} value={d._id}>{d.fullName} — {d.relationship}</option>)}</select></Field>
               {selectedRequestDependent && <>
                 <div className="support-two-col">
                   <Field label="Full Name"><input type="text" value={requestFields.fullName} onChange={(e)=>setRequest("fullName",e.target.value)} /></Field>
@@ -207,7 +212,8 @@ export default function Dependents() {
                 <Field label="Reason for change"><textarea value={reason} onChange={(e)=>setReason(e.target.value)} rows={3} /></Field><Field label="Optional supporting files"><input type="file" multiple onChange={(e)=>setRequestFiles(Array.from(e.target.files || []))} /><small className="support-muted">Add evidence that helps the reviewer understand the requested change.</small></Field>
                 <button className="support-submit-button" type="submit" disabled={requestSaving}>{requestSaving ? "Submitting..." : "Submit Edit Request"}</button>
               </>}
-            </form>
+              </form>
+            </section>
           </section>
 
           <section className="support-history-card">

@@ -81,7 +81,7 @@ export default function SuperAdminSettings({ initialTab = "website" }) {
   const { user } = useAuth();
   const [searchParams] = useSearchParams();
   const requestedTab = searchParams.get("tab");
-  const validTabs = ["website", "carousel", "leaders", "gallery", "constitution", "settings", "notifications"];
+  const validTabs = ["website", "carousel", "leaders", "gallery", "constitution", "system", "settings", "notifications"];
   const initialTabValue = validTabs.includes(requestedTab) ? requestedTab : (validTabs.includes(initialTab) ? initialTab : "website");
   const [activeTab, setActiveTab] = useState(initialTabValue);
   const [sections, setSections] = useState(() =>
@@ -298,9 +298,7 @@ export default function SuperAdminSettings({ initialTab = "website" }) {
       setSystemSaving(true);
       setError("");
       const { data } = await API.put("/superadmin/settings", {
-        ...systemForm,
         branding: {
-          ...systemForm.branding,
           accentColor: themeColor,
         },
       });
@@ -557,13 +555,12 @@ export default function SuperAdminSettings({ initialTab = "website" }) {
             <h1>Website Manager content studio</h1>
             <p>See what the public website contains, then edit pages, leaders, gallery images and theme settings from one place.</p>
           </div>
-          <div className="portal-actions">
-            <button type="button" className={activeTab === "website" ? "portal-btn" : "portal-btn light"} onClick={() => setActiveTab("website")}>Website content</button>
-            <button type="button" className={activeTab === "carousel" ? "portal-btn" : "portal-btn light"} onClick={() => setActiveTab("carousel")}>Carousel</button>
-            <button type="button" className={activeTab === "leaders" ? "portal-btn" : "portal-btn light"} onClick={() => setActiveTab("leaders")}>Leaders</button>
-            <button type="button" className={activeTab === "gallery" ? "portal-btn" : "portal-btn light"} onClick={() => setActiveTab("gallery")}>Gallery</button>
-            <button type="button" className={activeTab === "system" ? "portal-btn" : "portal-btn light"} onClick={() => setActiveTab("system")}>System settings</button><button type="button" className={activeTab === "settings" ? "portal-btn" : "portal-btn light"} onClick={() => setActiveTab("settings")}>Theme</button>
-          </div>
+          <nav className="settings-tab-groups" aria-label="Website management areas">
+            <div className="settings-tab-group"><span>WEBSITE CONTENT</span><button type="button" className={activeTab === "website" ? "portal-btn" : "portal-btn light"} onClick={() => setActiveTab("website")}>Pages</button></div>
+            <div className="settings-tab-group"><span>MEDIA</span><button type="button" className={activeTab === "carousel" ? "portal-btn" : "portal-btn light"} onClick={() => setActiveTab("carousel")}>Carousel</button><button type="button" className={activeTab === "leaders" ? "portal-btn" : "portal-btn light"} onClick={() => setActiveTab("leaders")}>Leaders</button><button type="button" className={activeTab === "gallery" ? "portal-btn" : "portal-btn light"} onClick={() => setActiveTab("gallery")}>Gallery</button></div>
+            <div className="settings-tab-group"><span>BRANDING & CONFIG</span><button type="button" className={activeTab === "settings" ? "portal-btn" : "portal-btn light"} onClick={() => setActiveTab("settings")}>Branding</button><button type="button" className={activeTab === "system" ? "portal-btn" : "portal-btn light"} onClick={() => setActiveTab("system")}>Configuration</button></div>
+            <div className="settings-tab-group"><span>SCHEME SYSTEM</span><button type="button" className={activeTab === "constitution" ? "portal-btn" : "portal-btn light"} onClick={() => setActiveTab("constitution")}>Constitution</button><button type="button" className={activeTab === "notifications" ? "portal-btn" : "portal-btn light"} onClick={() => setActiveTab("notifications")}>Notifications</button></div>
+          </nav>
         </header>
 
         <section className="portal-panel">
@@ -586,7 +583,7 @@ export default function SuperAdminSettings({ initialTab = "website" }) {
           <div className="portal-form-grid">
             <div className="portal-field" style={{ gridColumn: "1 / -1" }}>
               <p style={{ margin: 0, color: "#666", lineHeight: 1.6 }}>
-                The public site can be edited through the Website content tab. The SuperAdmin area also provides dedicated controls for the Newsroom, event/resource presentation and the assistant guidance scope. Carousel slides are what show on the home hero. Leaders are shown on the public leadership page. Gallery images are reflected on the public gallery page.
+                Use Pages for published website copy, Media for visual content, Branding for public presentation and Configuration for authoritative organization/scheme settings. Detailed governance tools remain in their dedicated SuperAdmin modules.
               </p>
             </div>
           </div>

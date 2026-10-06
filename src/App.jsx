@@ -85,6 +85,7 @@ const PortalSettings = lazy(
 const Polls = lazy(() => import("./pages/Polls"));
 const Feedback = lazy(() => import("./pages/Feedback"));
 const PortalGuide = lazy(() => import("./pages/member/PortalGuide"));
+const AdminGuide = lazy(() => import("./pages/admin/AdminGuide"));
 const VerifyMembership = lazy(() => import("./pages/VerifyMembership"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const PortalSectionPage = lazy(() => import("./pages/PortalSectionPage"));
@@ -540,6 +541,7 @@ function AppContent() {
           <Route path="/superadmin/reports" element={<ProtectedRoute allowedRoles={["superadmin"]}><AdminReports /></ProtectedRoute>} />
           <Route path="/admin/polls" element={<ProtectedRoute allowedRoles={["admin"]}><Polls mode="admin" /></ProtectedRoute>} />
           <Route path="/admin/feedback" element={<ProtectedRoute allowedRoles={["admin"]}><Feedback /></ProtectedRoute>} />
+          <Route path="/admin/guide" element={<ProtectedRoute allowedRoles={["admin"]}><AdminGuide /></ProtectedRoute>} />
 
 
           {/* =================================================

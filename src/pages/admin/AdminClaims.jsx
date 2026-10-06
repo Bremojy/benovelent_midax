@@ -152,9 +152,17 @@ export default function AdminClaims() {
       if (stage === "Rejected") payload.rejectionReason = remarks;
       const { data } = await API.put(`/claims/${selected.sourceType}/${selected._id}/stage`, payload);
       if (!data?.success) throw new Error(data?.message || "Could not update claim.");
+
+      // The primary mutation is authoritative. Close and acknowledge success
+      // immediately; a follow-up refresh is best-effort and must not turn a
+      // successful claim update into a false failure notification.
+      const successMessage = data?.message || `Claim moved to ${stage}.`;
       setSelected(null);
-      setSuccess(`Claim moved to ${stage}.`);
-      await load();
+      setSuccess(successMessage);
+      load().catch((refreshError) => {
+        console.warn("Claim updated successfully, but the list refresh failed:", refreshError?.message || refreshError);
+        setError("Claim updated successfully. The list could not be refreshed automatically; use Refresh to load the latest state.");
+      });
     } catch (e) {
       setError(e.response?.data?.message || e.message || "Unable to update claim.");
     } finally {

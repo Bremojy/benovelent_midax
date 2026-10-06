@@ -1,5 +1,6 @@
 const bcrypt = require("bcryptjs");
 const redisCache = require("../services/redisCache");
+
 const { MEMBER_STATUS } = require("../constants/memberStatus");
 
 const Member = require("../models/Member");
@@ -1765,4 +1766,19 @@ exports.getCommunityStats = async (req,res)=>{
     }
     const __originalJson = res.json.bind(res);
     res.json = (body) => { redisCache.setJson(cacheKey, body, 30).catch(() => {}); return __originalJson(body); };
-try{const MemberModel=require("../models/Member");const Admin=require("../models/Admin");const [totalMembers,activeMembers,suspendedMembers,totalLeaders,book,medicalClaims,funeralClaims,educationClaims]=await Promise.all([MemberModel.countDocuments({isDeleted:false}),MemberModel.countDocuments({status:"active",isDeleted:false}),MemberModel.countDocuments({status:"suspended",isDeleted:false}),Admin.countDocuments({status:{$ne:"deleted"}}),getCurrentBookBalance(),require("../models/MedicalSupport").countDocuments({status:{$in:["Approved","Paid","Completed","Closed"]}}),require("../models/FuneralSupport").countDocuments({status:{$in:["Approved","Paid","Completed","Closed"]}}),require("../models/EducationSupport").countDocuments({status:{$in:["Approved","Paid","Completed","Closed"]}})]);res.json({success:true,stats:{totalMembers,activeMembers,suspendedMembers,totalLeaders,bookBalance:Number(book?.balance||0),approvedClaims:medicalClaims+funeralClaims+educationClaims}})}catch(e){res.status(500).json({success:false,message:e.message})}};
+try{
+  const MemberModel=require("../models/Member");
+  const Admin=require("../models/Admin");
+  const memberFilter={role:"member",isDeleted:false};
+  const [totalMembers,activeMembers,suspendedMembers,totalLeaders,book,medicalClaims,funeralClaims,educationClaims]=await Promise.all([
+    MemberModel.countDocuments(memberFilter),
+    MemberModel.countDocuments({...memberFilter,status:"active"}),
+    MemberModel.countDocuments({...memberFilter,status:"suspended"}),
+    Admin.countDocuments({status:{$ne:"deleted"}}),
+    getCurrentBookBalance(),
+    require("../models/MedicalSupport").countDocuments({status:{$in:["Approved","Paid","Completed","Closed"]}}),
+    require("../models/FuneralSupport").countDocuments({status:{$in:["Approved","Paid","Completed","Closed"]}}),
+    require("../models/EducationSupport").countDocuments({status:{$in:["Approved","Paid","Completed","Closed"]}})
+  ]);
+  res.json({success:true,stats:{totalMembers,activeMembers,suspendedMembers,totalLeaders,bookBalance:Number(book?.balance||0),approvedClaims:medicalClaims+funeralClaims+educationClaims}})
+}catch(e){res.status(500).json({success:false,message:"Unable to load community statistics right now."})}};

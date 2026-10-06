@@ -29,8 +29,9 @@ check(memberController.includes('SystemSettings'), 'Member summary must read the
 check(memberController.includes('Contribution.find({ member: member._id, isArchived: { $ne: true } })'), 'Member summary must scope contribution totals to the authenticated member and exclude archived records');
 check(memberController.includes('totalContributed'), 'Member summary must return a persisted contribution total');
 check(memberController.includes('currentMonthContribution'), 'Member summary must return current-period contribution information');
-check(member.includes('personalContributionTotal={summary?.totalContributed}'), 'Member Accounts must pass the canonical personalContributionTotal prop');
-check(member.includes('contributionStatus={summary?.contributionStatus}'), 'Member Accounts must pass the canonical contributionStatus prop');
+check(!member.includes('personalContributionTotal={summary?.totalContributed}'), 'Member Constitution ledger must not present personal contribution totals');
+check(!member.includes('contributionStatus={summary?.contributionStatus}'), 'Member Constitution ledger must not present personal contribution status');
+check(member.includes('PAYROLL CONTRIBUTIONS') && member.includes('Your ordinary contribution records'), 'Member personal contributions must remain in the dedicated payroll contribution section');
 check(!member.includes('memberContributionTotal='), 'Member Accounts must not send the obsolete memberContributionTotal prop');
 check(!member.includes('memberContributionStatus='), 'Member Accounts must not send the obsolete memberContributionStatus prop');
 check(member.includes('Promise.allSettled'), 'Member Accounts auxiliary loading must be resilient to partial request failure');

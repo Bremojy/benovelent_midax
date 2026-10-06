@@ -1,4 +1,4 @@
-import { LayoutDashboard, UserRound, Wallet, HandHeart, MessageCircle, Users, Landmark, BarChart3, ShieldCheck, Settings, Newspaper, DatabaseZap } from "lucide-react";
+import { LayoutDashboard, UserRound, Wallet, HandHeart, MessageCircle, Users, Landmark, BarChart3, ShieldCheck, Settings, Newspaper, DatabaseZap, HelpCircle } from "lucide-react";
 
 export const dashboardMenus = {
   member: [
@@ -18,6 +18,7 @@ export const dashboardMenus = {
     { section: "Content", title: "Website & Communications", icon: Newspaper, path: "/admin/website", childPaths: ["/admin/website", "/admin/announcements"] },
     { section: "Reports", title: "Reports", icon: BarChart3, path: "/admin/reports" },
     { section: "Leadership", title: "Leadership & Constitution", icon: Landmark, path: "/admin/leadership", childPaths: ["/admin/leadership"] },
+    { section: "Help", title: "Help & Guide", icon: HelpCircle, path: "/admin/guide" },
     { section: "Settings", title: "Profile & Settings", icon: UserRound, path: "/admin/settings" },
   ],
   superadmin: [

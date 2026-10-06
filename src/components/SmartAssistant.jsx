@@ -26,6 +26,16 @@ const isAssistantAllowedRoute = (pathname) => {
   const path = String(pathname || "/");
   if (ASSISTANT_HIDDEN_EXACT_ROUTES.has(path)) return false;
   if (ASSISTANT_HIDDEN_PATTERNS.some((pattern) => pattern.test(path))) return false;
+
+  // Public website pages may use the Assistant. Inside a portal it is only
+  // allowed on the dashboard home itself; service/sub-pages must have no
+  // Assistant DOM footprint so it cannot consume UI space or block tasks.
+  const portalMatch = path.match(/^\/(member|admin|superadmin)(?:\/.*)?$/);
+  if (portalMatch) {
+    const [, role] = portalMatch;
+    return path === `/${role}` || path === `/${role}/`;
+  }
+
   return true;
 };
 

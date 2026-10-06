@@ -12,6 +12,7 @@ const migrations = [
   require("../migrations/009_create_system_settings_authority"),
   require("../migrations/011_remove_legacy_unverified_mpesa_defaults"),
   require("../migrations/012_backfill_finance_actor_provenance"),
+  require("../migrations/013_remove_redundant_notification_index"),
 ];
 
 function normalizeMigration(migration, index) {

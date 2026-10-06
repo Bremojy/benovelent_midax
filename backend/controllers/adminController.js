@@ -1,6 +1,17 @@
 const { generateMemberNumber, normalizeLegacyMemberNumber } = require("../utils/memberNumber");
 const bcrypt = require("bcryptjs");
 const redisCache = require("../services/redisCache");
+
+const invalidateMemberRelatedCaches = async (memberId) => {
+  const id = memberId ? String(memberId) : null;
+  return redisCache.invalidateMany([
+    "public:community:stats",
+    id ? `member:${id}:dashboard` : null,
+    id ? `member:${id}:summary` : null,
+    "admin:dashboard",
+    "superadmin:dashboard",
+  ]);
+};
 const Member = require("../models/Member");
 const Admin = require("../models/Admin");
 const SuperAdmin = require("../models/SuperAdmin");
@@ -485,6 +496,8 @@ exports.createMember = async (req, res) => {
       throw createError;
     }
 
+    await invalidateMemberRelatedCaches(member._id);
+
     // ==========================================
     // SEND INVITE CREDENTIALS
     // ==========================================
@@ -728,6 +741,7 @@ exports.updateMember = async (req, res) => {
     member.profileCompleted = completion.percentage === 100;
 
     await member.save();
+    await invalidateMemberRelatedCaches(member._id);
 
     res.json({
       success: true,
@@ -798,11 +812,9 @@ exports.verifyMember = async (req, res) => {
     // Secondary side effects are deliberately isolated so they cannot turn a
     // successful verification into a false HTTP failure.
     await Promise.allSettled([
+      invalidateMemberRelatedCaches(member._id),
       redisCache.invalidateMany([
-        `member:${member._id}:dashboard`,
         `member:${member._id}:dependents`,
-        "admin:dashboard",
-        "superadmin:dashboard",
       ]),
       !alreadyVerified
         ? createNotification({
@@ -865,6 +877,7 @@ exports.suspendMember = async (req, res) => {
     member.online = false;
 
     await member.save();
+    await invalidateMemberRelatedCaches(member._id);
 
     res.json({
 
@@ -916,6 +929,7 @@ exports.activateMember = async (req,res)=>{
     member.status="active";
 
     await member.save();
+    await invalidateMemberRelatedCaches(member._id);
 
     res.json({
 
@@ -962,6 +976,7 @@ exports.deleteMember = async (req, res) => {
     member.deletedBy = req.user._id;
     member.status = "inactive";
     await member.save();
+    await invalidateMemberRelatedCaches(member._id);
 
     await createAuditLog({
       user: req.user._id,
@@ -1016,6 +1031,7 @@ exports.restoreMember = async (req,res)=>{
     member.deletedBy = null;
     member.status = "active";
     await member.save();
+    await invalidateMemberRelatedCaches(member._id);
 
     await createAuditLog({
       user: req.user._id,

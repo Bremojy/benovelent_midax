@@ -159,6 +159,19 @@ export const portalSections = {
         ["Governance", "Open leadership governance resources.", "/admin/leadership?view=governance", ShieldCheck],
       ],
     },
+    {
+      key: "help",
+      title: "Help & Guide",
+      eyebrow: "HELP",
+      description: "Use the verified admin guide for member oversight, support, finance, communications and escalation responsibilities.",
+      icon: HelpCircle,
+      path: "/admin/guide",
+      links: [
+        ["Admin Guide", "Read the practical leadership workflow guide.", "/admin/guide", HelpCircle],
+        ["Contact", "Reach the organization when escalation is required.", "/contact", Phone],
+        ["Feedback", "Review the available member feedback workflow.", "/admin/feedback", FileText],
+      ],
+    },
   ],
   superadmin: [
     {
