@@ -16,7 +16,7 @@ const invalidateWebsitePublicCache = async () => {
 };
 const { getSystemSettings, toPublicConfig } = require("../services/systemSettings");
 const { resolveStoredFileUrl } = require("../utils/uploadUrl");
-const { useCloudinary, cloudinary, getCloudinaryFolder } = require("../config/uploadConfig");
+const { useCloudinary, cloudinary, getCloudinaryFolder, uploadRoot } = require("../config/uploadConfig");
 const { isAllowedSection, pickSectionPayload, sanitizeValue } = require("../config/websiteManagerRegistry");
 
 const DEFAULT_SECTIONS = ["home", "about", "services", "contact", "footer", "settings", "gallery", "constitution", "privacy-policy", "terms-conditions", "disclaimer", "news", "events", "resources", "chatbot"];
@@ -135,6 +135,30 @@ const toPublicSection = (section) => {
         safe.content = {
             ...(safe.content && typeof safe.content === "object" ? safe.content : {}),
             galleryItems: items,
+        };
+    }
+    if (safe.section === "resources" && safe.content && typeof safe.content === "object") {
+        const rawDocuments = Array.isArray(safe.content.documents) ? safe.content.documents : [];
+        safe.content = {
+            ...safe.content,
+            documents: rawDocuments
+                .filter((item) => item && typeof item === "object" && item.published !== false && item.isPublic !== false)
+                .slice(0, 200)
+                .map((item) => ({
+                    id: String(item.id || item._id || ""),
+                    title: String(item.title || item.name || ""),
+                    name: String(item.name || item.fileName || item.title || ""),
+                    description: String(item.description || ""),
+                    category: String(item.category || "General"),
+                    url: String(item.url || item.fileUrl || item.downloadUrl || ""),
+                    size: Number.isFinite(Number(item.size)) && Number(item.size) >= 0 ? Number(item.size) : 0,
+                    mimeType: String(item.mimeType || "application/octet-stream"),
+                    version: String(item.version || "1"),
+                    published: item.published !== false,
+                    uploadedAt: item.uploadedAt || null,
+                    updatedAt: item.updatedAt || item.uploadedAt || null,
+                    archivedAt: item.archivedAt || null,
+                })),
         };
     }
     return safe;
@@ -525,6 +549,215 @@ exports.uploadGalleryImage = async (req, res) => {
 };
 
 /* =====================================================
+   RESOURCE DOCUMENT MANAGEMENT
+===================================================== */
+
+const RESOURCE_EXTENSIONS = new Set([".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".txt"]);
+const RESOURCE_MIME_TYPES = new Set([
+    "application/pdf",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/vnd.ms-excel",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "application/vnd.ms-powerpoint",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    "text/plain",
+]);
+
+const normalizeResourceItems = (section) => {
+    const content = section?.content && typeof section.content === "object" ? section.content : {};
+    return Array.isArray(content.documents) ? content.documents.filter((item) => item && typeof item === "object") : [];
+};
+
+const cleanupResourceUpload = async (req) => {
+    if (useCloudinary && req.file?.cloudinary?.public_id) {
+        try { await cloudinary.uploader.destroy(req.file.cloudinary.public_id, { resource_type: req.file.cloudinary.resource_type || "raw" }); } catch (_) {}
+    } else if (req.file?.path) {
+        try { fs.unlinkSync(req.file.path); } catch (_) {}
+    }
+};
+
+exports.uploadResourceDocument = async (req, res) => {
+    let createdLocalFile = "";
+    let resourcePersisted = false;
+    try {
+        if (!req.file) return res.status(400).json({ success: false, message: "Choose a document to upload." });
+        const originalName = path.basename(String(req.file.originalname || "document").replace(/\\/g, "/")).slice(0, 180);
+        const extension = path.extname(originalName).toLowerCase();
+        const mime = String(req.file.mimetype || "").toLowerCase();
+        if (!RESOURCE_EXTENSIONS.has(extension) || !RESOURCE_MIME_TYPES.has(mime)) {
+            await cleanupResourceUpload(req);
+            return res.status(400).json({ success: false, code: "RESOURCE_FILE_TYPE_NOT_ALLOWED", message: "Upload a PDF, Word, Excel, PowerPoint, or plain-text document." });
+        }
+        if (Number(req.file.size || 0) > 20 * 1024 * 1024) {
+            await cleanupResourceUpload(req);
+            return res.status(413).json({ success: false, message: "Resource documents must be 20 MB or smaller." });
+        }
+
+        const title = String(req.body.title || path.basename(originalName, extension) || "Resource document").trim().slice(0, 180);
+        const description = String(req.body.description || "").trim().slice(0, 1200);
+        const category = String(req.body.category || "General").trim().slice(0, 80) || "General";
+        const version = String(req.body.version || "1").trim().slice(0, 30) || "1";
+        if (!title) {
+            await cleanupResourceUpload(req);
+            return res.status(400).json({ success: false, message: "A resource title is required." });
+        }
+
+        const section = await findOrCreateSection("resources", {
+            title: "Resources", subtitle: "Forms, guides and official documents",
+            description: "Published documents appear inside the public Newsroom.", content: { documents: [] },
+        });
+        const currentItems = normalizeResourceItems(section);
+        if (currentItems.length >= 200) {
+            await cleanupResourceUpload(req);
+            return res.status(409).json({ success: false, message: "The resource library has reached its 200-document limit. Archive an existing resource before adding another." });
+        }
+        const id = require("crypto").randomUUID();
+        let url;
+        if (useCloudinary) {
+            url = resolveStoredFileUrl(req.file, "");
+            if (!/^https:\/\//i.test(url)) throw new Error("Cloudinary did not return a secure HTTPS document URL.");
+        } else {
+            if (!req.file.filename || !req.file.path) throw new Error("The local document upload did not produce a stored file reference.");
+            createdLocalFile = req.file.path;
+            url = `/api/website/resources/${id}/file`;
+        }
+        const now = new Date().toISOString();
+        const resource = {
+            id,
+            title,
+            name: originalName,
+            fileName: originalName,
+            storageFileName: useCloudinary ? "" : path.basename(req.file.filename),
+            storageKind: useCloudinary ? "cloudinary" : "website-resource",
+            description,
+            category,
+            version,
+            url,
+            size: Number(req.file.size || 0),
+            mimeType: mime,
+            published: String(req.body.published || "true").toLowerCase() !== "false",
+            isPublic: true,
+            uploadedAt: now,
+            publishedAt: String(req.body.published || "true").toLowerCase() !== "false" ? now : null,
+            updatedAt: now,
+            uploadedBy: String(req.user?._id || ""),
+        };
+
+        section.content = {
+            ...(section.content && typeof section.content === "object" && !Array.isArray(section.content) ? section.content : {}),
+            documents: [...currentItems, resource],
+        };
+        section.updatedBy = req.user?._id;
+        await section.save();
+        resourcePersisted = true;
+        await invalidateWebsitePublicCache();
+        await createAuditLog({
+            user: req.user?._id,
+            userRole: String(req.user?.role || "superadmin").toLowerCase(),
+            action: "UPLOAD",
+            module: "WebsiteResources",
+            description: `${resource.published ? "Published" : "Uploaded draft of"} resource document ${title}.`,
+            req,
+            metadata: { resourceId: id, title, category, published: resource.published, size: resource.size },
+        });
+
+        const safeResource = {
+            id: resource.id, title: resource.title, name: resource.name, description: resource.description,
+            category: resource.category, url: resource.url, size: resource.size, mimeType: resource.mimeType,
+            version: resource.version, published: resource.published, uploadedAt: resource.uploadedAt,
+            publishedAt: resource.publishedAt || null, updatedAt: resource.updatedAt, archivedAt: resource.archivedAt || null,
+        };
+        return res.status(201).json({ success: true, message: resource.published ? "Resource uploaded and published." : "Resource uploaded as a draft.", section: toPublicSection(section), resource: safeResource });
+    } catch (error) {
+        if (!resourcePersisted) {
+            if (!useCloudinary && createdLocalFile) { try { fs.unlinkSync(createdLocalFile); } catch (_) {} }
+            else await cleanupResourceUpload(req);
+        }
+        console.error("Resource document upload error:", error);
+        return res.status(500).json({ success: false, message: "Unable to upload this resource document right now." });
+    }
+};
+
+exports.updateResourceDocument = async (req, res) => {
+    try {
+        const section = await WebsiteContent.findOne({ section: "resources" });
+        if (!section) return res.status(404).json({ success: false, message: "Resources are not configured." });
+        const items = normalizeResourceItems(section);
+        const index = items.findIndex((item) => String(item.id || item._id || "") === String(req.params.resourceId));
+        if (index < 0) return res.status(404).json({ success: false, message: "Resource document not found." });
+        const current = { ...items[index] };
+        if (req.body.title !== undefined && !String(req.body.title).trim()) {
+            return res.status(400).json({ success: false, message: "Resource title cannot be empty." });
+        }
+        const wasPublished = current.published !== false;
+        for (const key of ["title", "description", "category", "version"]) {
+            if (req.body[key] !== undefined) current[key] = String(req.body[key]).trim().slice(0, key === "description" ? 1200 : 180);
+        }
+        if (req.body.published !== undefined) {
+            if (typeof req.body.published !== "boolean") return res.status(400).json({ success: false, message: "Publication status must be true or false." });
+            current.published = req.body.published;
+            if (!req.body.published) current.archivedAt = new Date().toISOString();
+            else {
+                delete current.archivedAt;
+                if (!wasPublished) current.publishedAt = new Date().toISOString();
+            }
+        }
+        current.updatedAt = new Date().toISOString();
+        items[index] = current;
+        section.content = { ...(section.content && typeof section.content === "object" ? section.content : {}), documents: items };
+        section.updatedBy = req.user?._id;
+        await section.save();
+        await invalidateWebsitePublicCache();
+        await createAuditLog({
+            user: req.user?._id,
+            userRole: String(req.user?.role || "superadmin").toLowerCase(),
+            action: current.published ? "UPDATE" : "ARCHIVE",
+            module: "WebsiteResources",
+            description: `${current.published ? "Updated" : "Archived"} resource document ${current.title || current.name}.`,
+            req,
+            metadata: { resourceId: current.id, published: current.published },
+        });
+        return res.json({ success: true, message: current.published ? "Resource saved." : "Resource archived from the public website.", resource: toPublicSection({ section: "resources", content: { documents: [current] } }).content.documents[0] });
+    } catch (error) {
+        console.error("Resource document update error:", error);
+        return res.status(500).json({ success: false, message: "Unable to update this resource document right now." });
+    }
+};
+
+exports.downloadPublicResourceDocument = async (req, res) => {
+    try {
+        const section = await WebsiteContent.findOne({ section: "resources", published: true }).select("content").lean();
+        const item = normalizeResourceItems(section).find((resource) => String(resource.id || "") === String(req.params.resourceId) && resource.published !== false && resource.isPublic !== false);
+        if (!item) return res.status(404).json({ success: false, message: "This published resource is not available." });
+        if (/^https:\/\//i.test(String(item.url || ""))) return res.redirect(302, item.url);
+
+        const storedName = String(item.storageFileName || "");
+        // Resource uploads use their own storage bucket, never DOCUMENT_ROOT,
+        // which may contain private evidence or other administrative uploads.
+        const allowedStoredName = /^\d+-\d+-[A-Za-z0-9_-]+\.(pdf|docx?|xlsx?|pptx?|txt)$/i.test(storedName);
+        if (item.storageKind !== "website-resource" || !allowedStoredName || path.basename(storedName) !== storedName || storedName.includes("..")) {
+            return res.status(404).json({ success: false, message: "This resource file is not available." });
+        }
+        const root = path.resolve(path.join(uploadRoot, "resources"));
+        const target = path.resolve(root, storedName);
+        if (!target.startsWith(`${root}${path.sep}`) || !fs.existsSync(target) || !fs.statSync(target).isFile()) {
+            return res.status(404).json({ success: false, message: "This resource file is not available." });
+        }
+        const safeName = path.basename(String(item.name || item.fileName || "resource-document")).replace(/[\r\n"\\]/g, "_").slice(0, 180);
+        const contentTypes = { ".pdf": "application/pdf", ".doc": "application/msword", ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document", ".xls": "application/vnd.ms-excel", ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", ".ppt": "application/vnd.ms-powerpoint", ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation", ".txt": "text/plain; charset=utf-8" };
+        res.setHeader("Content-Disposition", `attachment; filename="${safeName}"`);
+        res.setHeader("X-Content-Type-Options", "nosniff");
+        res.setHeader("Cache-Control", "public, max-age=60, stale-while-revalidate=300");
+        res.type(contentTypes[path.extname(safeName).toLowerCase()] || "application/octet-stream");
+        return res.sendFile(target);
+    } catch (error) {
+        console.error("Public resource download error:", error);
+        return res.status(500).json({ success: false, message: "Unable to download this resource right now." });
+    }
+};
+
+/* =====================================================
    GALLERY ITEM MANAGEMENT
 ===================================================== */
 
@@ -738,6 +971,18 @@ exports.updateSection = async (req, res) => {
             const incomingContent = sanitizeValue(payload.content);
             if (sectionKey === "settings" && incomingContent && typeof incomingContent === "object" && !Array.isArray(incomingContent)) {
                 section.content = { ...(section.content && typeof section.content === "object" ? section.content : {}), ...incomingContent };
+            } else if (sectionKey === "resources" && incomingContent && typeof incomingContent === "object" && !Array.isArray(incomingContent)) {
+                const oldContent = section.content && typeof section.content === "object" ? section.content : {};
+                const oldDocuments = Array.isArray(oldContent.documents) ? oldContent.documents : [];
+                const incomingDocuments = Array.isArray(incomingContent.documents) ? incomingContent.documents : oldDocuments;
+                const mergedDocuments = incomingDocuments.slice(0, 200).map((item) => {
+                    const oldItem = oldDocuments.find((candidate) => String(candidate?.id || candidate?._id || "") === String(item?.id || item?._id || ""));
+                    if (!oldItem) return item;
+                    // Preserve private storage/ownership fields when the editable
+                    // content payload contains only public metadata.
+                    return { ...oldItem, ...item, storageFileName: oldItem.storageFileName || "", storageKind: oldItem.storageKind || "", uploadedBy: oldItem.uploadedBy || "" };
+                });
+                section.content = { ...oldContent, ...incomingContent, documents: mergedDocuments };
             } else {
                 section.content = incomingContent;
             }

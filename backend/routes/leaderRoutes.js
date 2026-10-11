@@ -41,7 +41,9 @@ router.get("/manage", protect, isSuperAdmin, async (_req, res) => {
 
 router.get("/current", async (_req, res) => {
   try {
-    const cacheKey = "public:leadership:current";
+    // Version the cache after tightening the public response fields so an
+    // older cached payload cannot continue exposing administrator contacts.
+    const cacheKey = "public:leadership:directory:v2";
     const cached = await redisCache.getJson(cacheKey);
     if (cached) {
       res.set("Cache-Control", "public, max-age=120, stale-while-revalidate=600");
@@ -49,8 +51,8 @@ router.get("/current", async (_req, res) => {
     }
 
     const [admins, superadmins] = await Promise.all([
-      Admin.find({ status: "active", deletedAt: null }).select("fullName name email phone role profileImage permissions createdAt").sort({ createdAt: 1 }).lean(),
-      SuperAdmin.find({ status: "active" }).select("name email role profileImage createdAt").sort({ createdAt: 1 }).lean(),
+      Admin.find({ status: "active", deletedAt: null }).select("fullName name role profileImage createdAt").sort({ createdAt: 1 }).lean(),
+      SuperAdmin.find({ status: "active" }).select("name role profileImage createdAt").sort({ createdAt: 1 }).lean(),
     ]);
 
     const payload = {
@@ -59,9 +61,7 @@ router.get("/current", async (_req, res) => {
         _id: person._id,
         name: person.fullName || person.name || "Benevolent MIDAX Administrator",
         role: String(person.role || "admin").toLowerCase(),
-        roleLabel: String(person.role || "admin").toLowerCase() === "superadmin" ? "SuperAdmin / General Scheme Manager" : (person.permissions?.join(" • ") || "Scheme Administrator"),
-        email: person.email || "",
-        phone: person.phone || "",
+        roleLabel: String(person.role || "admin").toLowerCase() === "superadmin" ? "Scheme Manager" : "Scheme Administrator",
         profileImage: person.profileImage || "",
       })),
     };

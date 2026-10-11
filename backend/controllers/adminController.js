@@ -556,7 +556,7 @@ exports.createMember = async (req, res) => {
     // SUCCESS
     // ==========================================
 
-    await redisCache.invalidateMany(["public:leadership:current"]);
+    await redisCache.invalidateMany(["public:leadership:current", "public:leadership:directory:v2"]);
     return res.status(201).json({
       success: true,
 

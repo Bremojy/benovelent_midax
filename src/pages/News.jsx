@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import {
   Newspaper,
   Search,
@@ -40,6 +40,7 @@ function News() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [news, setNews] = useState([]);
   const [events, setEvents] = useState([]);
+  const [pastEvents, setPastEvents] = useState([]);
   const [documents, setDocuments] = useState([]);
   const [polls, setPolls] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -71,7 +72,10 @@ function News() {
         }
       }
       if (pollResponse.status === "fulfilled") setPolls(Array.isArray(pollResponse.value.data?.polls) ? pollResponse.value.data.polls : []);
-      if (eventsResponse.status === "fulfilled") setEvents(Array.isArray(eventsResponse.value.data?.events) ? eventsResponse.value.data.events : []);
+      if (eventsResponse.status === "fulfilled") {
+        setEvents(Array.isArray(eventsResponse.value.data?.events) ? eventsResponse.value.data.events : []);
+        setPastEvents(Array.isArray(eventsResponse.value.data?.pastEvents) ? eventsResponse.value.data.pastEvents : []);
+      }
       if (documentsResponse.status === "fulfilled") setDocuments(Array.isArray(documentsResponse.value.data?.documents) ? documentsResponse.value.data.documents : []);
       const failures = [
         [newsResponse, "news"], [pollResponse, "polls"], [eventsResponse, "events"], [documentsResponse, "resources"],
@@ -100,6 +104,10 @@ function News() {
     const q = search.trim().toLowerCase();
     return events.filter((item) => !q || `${item.title || ""} ${item.description || ""} ${item.location || ""} ${item.type || ""}`.toLowerCase().includes(q));
   }, [events, search]);
+  const filteredPastEvents = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return pastEvents.filter((item) => !q || `${item.title || ""} ${item.description || ""} ${item.location || ""} ${item.type || ""}`.toLowerCase().includes(q));
+  }, [pastEvents, search]);
   const filteredDocuments = useMemo(() => {
     const q = search.trim().toLowerCase();
     return documents.filter((item) => !q || String(item.name || "").toLowerCase().includes(q));
@@ -169,7 +177,8 @@ function News() {
 
             {(activeTab === "all" || activeTab === "news") && <section className="newsroom-v8-section"><div className="news-section-title"><div><span>NEWSROOM</span><h2>Latest updates</h2></div><strong>{filteredNews.length}</strong></div>{filteredNews.length ? <div className="news-grid">{filteredNews.map((item) => <article className="news-card" key={item._id}><div className="news-image"><img src={imageFor(item)} alt={item.title} loading="lazy" onError={(e) => { e.currentTarget.src = "/news-placeholder.svg"; }} /></div><div className="news-content"><div className="news-date"><Calendar size={15} /> {formatDate(item.publishDate || item.createdAt)}</div><h3>{item.title}</h3><p>{(item.summary || item.content || "").slice(0, 170)}{(item.summary || item.content || "").length > 170 ? "..." : ""}</p><button className="read-more-btn" type="button" onClick={() => setSelectedNews(item)}>Read More <ArrowRight size={17} /></button></div></article>)}</div> : <div className="empty-news"><Newspaper size={38}/><h2>No news matches your search</h2><p>Published announcements will appear here automatically.</p></div>}</section>}
 
-            {(activeTab === "all" || activeTab === "events") && <section className="newsroom-v8-section"><div className="news-section-title"><div><span>{eventsSection?.title || "UPCOMING ACTIVITIES"}</span><h2>{eventsSection?.subtitle || "What's happening"}</h2></div><CalendarDays size={25}/></div>{filteredEvents.length ? <div className="newsroom-event-grid">{filteredEvents.map((event) => <article className="newsroom-event-card" key={event._id}><div className="newsroom-event-date"><strong>{event.startAt ? new Date(event.startAt).toLocaleDateString("en-GB", { day: "2-digit" }) : "—"}</strong><span>{event.startAt ? new Date(event.startAt).toLocaleDateString("en-GB", { month: "short" }) : "TBC"}</span></div><div className="newsroom-event-copy"><span>{event.type || "Community event"}</span><h3>{event.title}</h3><p>{event.description || "See the event details in the member portal."}</p><small>{event.location && <><MapPin size={13}/> {event.location} · </>}{eventDate(event.startAt)}</small></div></article>)}</div> : <div className="empty-news compact"><CalendarDays size={32}/><p>No public events have been published yet.</p></div>}</section>}
+            {(activeTab === "all" || activeTab === "events") && <section className="newsroom-v8-section"><div className="news-section-title"><div><span>{eventsSection?.title || "UPCOMING ACTIVITIES"}</span><h2>{eventsSection?.subtitle || "What's happening"}</h2></div><CalendarDays size={25}/></div>{filteredEvents.length ? <div className="newsroom-event-grid">{filteredEvents.map((event) => <article className="newsroom-event-card" key={event._id}><div className="newsroom-event-date"><strong>{event.startAt ? new Date(event.startAt).toLocaleDateString("en-GB", { day: "2-digit" }) : "—"}</strong><span>{event.startAt ? new Date(event.startAt).toLocaleDateString("en-GB", { month: "short" }) : "TBC"}</span></div><div className="newsroom-event-copy"><span>{event.type || "Community event"}</span><h3>{event.title}</h3><p>{event.description || "No additional event description was provided."}</p><small>{event.location && <><MapPin size={13}/> {event.location} · </>}{eventDate(event.startAt)}</small>{event._id && <Link className="newsroom-event-detail-link" to={`/events/${encodeURIComponent(event._id)}`}>View event details <ArrowRight size={15}/></Link>}</div></article>)}</div> : <div className="empty-news compact"><CalendarDays size={32}/><p>No upcoming public events have been published yet.</p></div>}</section>}
+            {(activeTab === "all" || activeTab === "events") && <section className="newsroom-v8-section"><div className="news-section-title"><div><span>EVENT ARCHIVE</span><h2>Past public activities</h2></div><CalendarDays size={25}/></div>{filteredPastEvents.length ? <div className="newsroom-event-grid">{filteredPastEvents.map((event) => <article className="newsroom-event-card past-event-card" key={event._id}><div className="newsroom-event-date"><strong>{event.startAt ? new Date(event.startAt).toLocaleDateString("en-GB", { day: "2-digit" }) : "—"}</strong><span>{event.startAt ? new Date(event.startAt).toLocaleDateString("en-GB", { month: "short" }) : "Past"}</span></div><div className="newsroom-event-copy"><span>Past activity · {event.type || "Community event"}</span><h3>{event.title}</h3><p>{event.description || "No additional event description was provided."}</p><small>{event.location && <><MapPin size={13}/> {event.location} · </>}{eventDate(event.startAt)}</small>{event._id && <Link className="newsroom-event-detail-link" to={`/events/${encodeURIComponent(event._id)}`}>View event details <ArrowRight size={15}/></Link>}</div></article>)}</div> : <div className="empty-news compact"><CalendarDays size={32}/><p>No past public activities are available.</p></div>}</section>}
 
             {(activeTab === "all" || activeTab === "resources") && <section className="newsroom-v8-section"><div className="news-section-title"><div><span>{resourcesSection?.title || "RESOURCES"}</span><h2>{resourcesSection?.subtitle || "Documents, forms & guides"}</h2></div><FileText size={25}/></div>{filteredDocuments.length ? <div className="newsroom-resource-grid">{filteredDocuments.map((doc) => <a className="newsroom-resource-card" key={doc.name} href={resolveApiUrl(doc.url)} target="_blank" rel="noreferrer"><span className="resource-icon"><FileText size={23}/></span><span className="resource-copy"><strong>{doc.name}</strong><small>{Math.max(1, Math.round((doc.size || 0) / 1024))} KB · Updated {formatDate(doc.updatedAt)}</small></span><Download size={18}/></a>)}</div> : <div className="empty-news compact"><FileText size={32}/><p>No published resources are available yet.</p></div>}</section>}
           </>

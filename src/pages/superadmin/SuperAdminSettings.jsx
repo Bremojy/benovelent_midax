@@ -18,6 +18,9 @@ import {
   Smartphone,
   FileText,
   ShieldCheck,
+  CalendarDays,
+  MapPin,
+  Video,
 } from "lucide-react";
 import DashboardLayout from "../../layouts/DashboardLayout";
 import NotificationSettings from "../../components/NotificationSettings";
@@ -63,17 +66,51 @@ function normalizeContent(value) {
   return String(value);
 }
 
+function resourceContentObject(value) {
+  try {
+    const parsed = typeof value === "string" ? JSON.parse(value || "{}") : value;
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function resourceItemsFromContent(value) {
+  const content = resourceContentObject(value);
+  return Array.isArray(content.documents) ? content.documents.filter((item) => item && typeof item === "object") : [];
+}
+
+function resourceEditorContent(value) {
+  const content = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  const docs = Array.isArray(content.documents) ? content.documents.map((item) => {
+    const { storageFileName, uploadedBy, ...publicFields } = item || {};
+    return publicFields;
+  }) : [];
+  return JSON.stringify({ ...content, documents: docs }, null, 2);
+}
+
 function normalizeImagePath(src) {
   if (!src) return "";
   if (src.startsWith("http")) return src;
   return resolveApiUrl(src);
 }
 
+function eventDateTimeInput(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
+}
+
+function newEventDraft() {
+  return { title: "", description: "", type: "event", startAt: "", endAt: "", location: "", virtualUrl: "", coverImage: "", audience: ["public"], published: true };
+}
+
 export default function SuperAdminSettings({ initialTab = "website" }) {
   const { user } = useAuth();
   const [searchParams] = useSearchParams();
   const requestedTab = searchParams.get("tab");
-  const validTabs = ["website", "carousel", "leaders", "gallery", "constitution", "system", "settings", "notifications"];
+  const validTabs = ["website", "carousel", "leaders", "gallery", "events", "constitution", "system", "settings", "notifications"];
   const initialTabValue = validTabs.includes(requestedTab) ? requestedTab : (validTabs.includes(initialTab) ? initialTab : "website");
   const [activeTab, setActiveTab] = useState(initialTabValue);
   const [sections, setSections] = useState(() =>
@@ -98,7 +135,17 @@ export default function SuperAdminSettings({ initialTab = "website" }) {
   const [slides, setSlides] = useState([]);
   const [leaders, setLeaders] = useState([]);
   const [gallery, setGallery] = useState([]);
+  const [managedEvents, setManagedEvents] = useState([]);
+  const [eventDraft, setEventDraft] = useState(newEventDraft);
+  const [editingEventId, setEditingEventId] = useState("");
+  const [savingEvent, setSavingEvent] = useState(false);
+  const [eventActionId, setEventActionId] = useState("");
   const [galleryDraft, setGalleryDraft] = useState({ title: "", caption: "", altText: "" });
+  const [resourceFile, setResourceFile] = useState(null);
+  const [resourceInputKey, setResourceInputKey] = useState(0);
+  const [resourceDraft, setResourceDraft] = useState({ title: "", description: "", category: "General", version: "1", published: true });
+  const [resourceEdits, setResourceEdits] = useState({});
+  const [savingResource, setSavingResource] = useState(false);
   const [loading, setLoading] = useState(true);
   const [savingKey, setSavingKey] = useState("");
   const [savingCarousel, setSavingCarousel] = useState(false);
@@ -135,12 +182,13 @@ export default function SuperAdminSettings({ initialTab = "website" }) {
     const load = async () => {
       try {
         setLoading(true);
-        const [websiteRes, carouselRes, leadersRes, galleryRes, systemRes] = await Promise.allSettled([
+        const [websiteRes, carouselRes, leadersRes, galleryRes, systemRes, eventsRes] = await Promise.allSettled([
           API.get("/website/manage"),
           API.get("/carousel/manage"),
           API.get("/leaders/manage"),
           API.get("/website/gallery"),
           API.get("/superadmin/settings"),
+          API.get("/platform/events/manage"),
         ]);
 
         if (!active) return;
@@ -156,7 +204,9 @@ export default function SuperAdminSettings({ initialTab = "website" }) {
               title: row.title || "",
               subtitle: row.subtitle || "",
               description: row.description || "",
-              content: normalizeContent(row.content),
+              content: row.section === "resources" && row.content && typeof row.content === "object"
+                ? resourceEditorContent(row.content)
+                : normalizeContent(row.content),
               published: row.published !== false,
             };
           });
@@ -190,6 +240,11 @@ export default function SuperAdminSettings({ initialTab = "website" }) {
           setLeaders(Array.isArray(leadersRes.value.data) ? leadersRes.value.data : []);
         }
 
+        if (eventsRes.status === "fulfilled") {
+          const eventRows = Array.isArray(eventsRes.value.data?.events) ? eventsRes.value.data.events : [];
+          setManagedEvents(eventRows.slice().sort((a, b) => new Date(b.startAt || b.createdAt || 0) - new Date(a.startAt || a.createdAt || 0)));
+        }
+
         if (galleryRes.status === "fulfilled") {
           const section = galleryRes.value.data?.section || {};
           const configuredItems = section?.content?.galleryItems;
@@ -202,7 +257,7 @@ export default function SuperAdminSettings({ initialTab = "website" }) {
         }
         const failures = [
           [websiteRes, "website content"], [carouselRes, "carousel"], [leadersRes, "leaders"],
-          [galleryRes, "gallery"], [systemRes, "system settings"],
+          [galleryRes, "gallery"], [systemRes, "system settings"], [eventsRes, "event manager"],
         ].filter(([result]) => result.status === "rejected").map(([, label]) => label);
         if (failures.length) setError(`Unable to load ${failures.join(", ")}. Loaded sections remain visible, but failed sections were not replaced with fake data.`);
       } catch (err) {
@@ -238,8 +293,8 @@ export default function SuperAdminSettings({ initialTab = "website" }) {
         subtitle: item.subtitle,
         description: item.description,
         published: item.published,
-        content: { body: item.content },
       };
+      if (key !== "resources") payload.content = { body: item.content };
 
       const request = item._id
         ? API.put(`/website/${key}`, payload)
@@ -255,7 +310,7 @@ export default function SuperAdminSettings({ initialTab = "website" }) {
             title: saved.title ?? prev[key]?.title ?? "",
             subtitle: saved.subtitle ?? prev[key]?.subtitle ?? "",
             description: saved.description ?? prev[key]?.description ?? "",
-            content: normalizeContent(saved.content),
+            content: key === "resources" ? prev[key]?.content || "{}" : normalizeContent(saved.content),
             published: saved.published !== false,
           },
         }));
@@ -266,6 +321,160 @@ export default function SuperAdminSettings({ initialTab = "website" }) {
     } finally {
       setSavingKey("");
     }
+  };
+
+  const patchResourceEditorContent = (resources) => {
+    const current = resourceContentObject(sections.resources?.content);
+    patchSection("resources", { content: JSON.stringify({ ...current, documents: resources }, null, 2) });
+  };
+
+  const uploadResource = async (event) => {
+    event.preventDefault();
+    if (!resourceFile) { setError("Choose a document to upload first."); return; }
+    if (!resourceDraft.title.trim()) { setError("Enter a resource title before uploading."); return; }
+    try {
+      setSavingResource(true); setError(""); setMessage("");
+      const form = new FormData();
+      form.append("file", resourceFile);
+      form.append("title", resourceDraft.title.trim());
+      form.append("description", resourceDraft.description.trim());
+      form.append("category", resourceDraft.category.trim() || "General");
+      form.append("version", resourceDraft.version.trim() || "1");
+      form.append("published", String(resourceDraft.published));
+      const { data } = await API.post("/website/resources/upload", form, { headers: { "Content-Type": "multipart/form-data" } });
+      const current = resourceItemsFromContent(sections.resources?.content);
+      patchResourceEditorContent([...current, data.resource].filter(Boolean));
+      if (data.section?._id) setSections((previous) => ({ ...previous, resources: { ...previous.resources, _id: data.section._id, title: data.section.title || previous.resources?.title || "Resources", subtitle: data.section.subtitle || previous.resources?.subtitle || "", description: data.section.description || previous.resources?.description || "" } }));
+      setResourceFile(null); setResourceInputKey((n) => n + 1);
+      setResourceDraft({ title: "", description: "", category: "General", version: "1", published: true });
+      setMessage(data?.message || "Resource uploaded.");
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || "Unable to upload resource document.");
+    } finally { setSavingResource(false); }
+  };
+
+  const patchResourceDraft = (resourceId, patch) => {
+    setResourceEdits((previous) => ({ ...previous, [resourceId]: { ...(previous[resourceId] || {}), ...patch } }));
+  };
+
+  const saveResourceDetails = async (resource) => {
+    const edits = resourceEdits[resource.id] || {};
+    try {
+      setError(""); setMessage("");
+      const { data } = await API.patch(`/website/resources/${encodeURIComponent(resource.id)}`, edits);
+      const current = resourceItemsFromContent(sections.resources?.content);
+      patchResourceEditorContent(current.map((item) => item.id === resource.id ? { ...item, ...(data.resource || edits) } : item));
+      setResourceEdits((previous) => { const next = { ...previous }; delete next[resource.id]; return next; });
+      setMessage(data?.message || "Resource details saved.");
+    } catch (err) { setError(err.response?.data?.message || err.message || "Unable to update resource details."); }
+  };
+
+  const setResourcePublished = async (resource, published) => {
+    try {
+      setError(""); setMessage("");
+      const { data } = await API.patch(`/website/resources/${encodeURIComponent(resource.id)}`, { published });
+      const current = resourceItemsFromContent(sections.resources?.content);
+      patchResourceEditorContent(current.map((item) => item.id === resource.id ? { ...item, ...(data.resource || {}), published } : item));
+      setMessage(data?.message || (published ? "Resource published." : "Resource archived."));
+    } catch (err) { setError(err.response?.data?.message || err.message || "Unable to change resource publication state."); }
+  };
+
+  const archiveResource = async (resource) => {
+    if (!await confirmAction(`Archive “${resource.title || resource.name}” from the public resource library? The stored file will be retained.`)) return;
+    try {
+      setError(""); setMessage("");
+      const { data } = await API.delete(`/website/resources/${encodeURIComponent(resource.id)}`);
+      const current = resourceItemsFromContent(sections.resources?.content);
+      patchResourceEditorContent(current.map((item) => item.id === resource.id ? { ...item, ...(data.resource || {}), published: false } : item));
+      setMessage(data?.message || "Resource archived. The stored file was retained.");
+    } catch (err) { setError(err.response?.data?.message || err.message || "Unable to archive resource."); }
+  };
+
+  const resetEventEditor = () => {
+    setEditingEventId("");
+    setEventDraft(newEventDraft());
+  };
+
+  const editManagedEvent = (event) => {
+    setEditingEventId(String(event._id || ""));
+    setEventDraft({
+      title: event.title || "",
+      description: event.description || "",
+      type: event.type || "event",
+      startAt: eventDateTimeInput(event.startAt),
+      endAt: eventDateTimeInput(event.endAt),
+      location: event.location || "",
+      virtualUrl: event.virtualUrl || "",
+      coverImage: event.coverImage || "",
+      audience: Array.isArray(event.audience) ? event.audience : ["member", "admin", "superadmin"],
+      published: event.published !== false,
+    });
+    setError("");
+    setMessage("");
+    setActiveTab("events");
+  };
+
+  const saveManagedEvent = async (event) => {
+    event.preventDefault();
+    const title = eventDraft.title.trim();
+    const startDate = eventDraft.startAt ? new Date(eventDraft.startAt) : null;
+    const endDate = eventDraft.endAt ? new Date(eventDraft.endAt) : null;
+    if (!title) { setError("An event title is required."); return; }
+    if (!startDate || Number.isNaN(startDate.getTime())) { setError("Choose a valid event start date and time."); return; }
+    if (endDate && (Number.isNaN(endDate.getTime()) || endDate < startDate)) { setError("The event end must be at or after its start."); return; }
+    if (!eventDraft.audience.length) { setError("Select at least one audience for this event."); return; }
+    const payload = {
+      title,
+      description: eventDraft.description.trim(),
+      type: eventDraft.type,
+      startAt: startDate.toISOString(),
+      endAt: endDate ? endDate.toISOString() : null,
+      location: eventDraft.location.trim(),
+      virtualUrl: eventDraft.virtualUrl.trim(),
+      coverImage: eventDraft.coverImage.trim(),
+      audience: eventDraft.audience,
+      published: Boolean(eventDraft.published),
+    };
+    try {
+      setSavingEvent(true); setError(""); setMessage("");
+      const response = editingEventId
+        ? await API.patch(`/platform/events/${encodeURIComponent(editingEventId)}`, payload)
+        : await API.post("/platform/events", payload);
+      const saved = response.data?.event;
+      if (!saved?._id) throw new Error("The server did not return the saved event record.");
+      setManagedEvents((previous) => {
+        const next = editingEventId ? previous.map((item) => item._id === saved._id ? saved : item) : [saved, ...previous];
+        return next.slice().sort((a, b) => new Date(b.startAt || b.createdAt || 0) - new Date(a.startAt || a.createdAt || 0));
+      });
+      resetEventEditor();
+      setMessage(response.data?.message || (editingEventId ? "Event updated." : "Event created."));
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || "Unable to save the event.");
+    } finally { setSavingEvent(false); }
+  };
+
+  const toggleManagedEventPublication = async (event) => {
+    try {
+      setEventActionId(String(event._id)); setError(""); setMessage("");
+      const { data } = await API.patch(`/platform/events/${encodeURIComponent(event._id)}`, { published: event.published === false });
+      if (!data?.event?._id) throw new Error("The server did not return the updated event record.");
+      setManagedEvents((previous) => previous.map((item) => item._id === data.event._id ? data.event : item));
+      setMessage(data.message || (data.event.published ? "Event published." : "Event unpublished."));
+    } catch (err) { setError(err.response?.data?.message || err.message || "Unable to change event publication state."); }
+    finally { setEventActionId(""); }
+  };
+
+  const archiveManagedEvent = async (event) => {
+    if (!await confirmAction(`Unpublish “${event.title || "this event"}” from public and portal event listings? The event record and RSVP history will be retained.`)) return;
+    try {
+      setEventActionId(String(event._id)); setError(""); setMessage("");
+      const { data } = await API.delete(`/platform/events/${encodeURIComponent(event._id)}`);
+      const updated = data?.event;
+      if (updated?._id) setManagedEvents((previous) => previous.map((item) => item._id === updated._id ? updated : item));
+      else setManagedEvents((previous) => previous.map((item) => item._id === event._id ? { ...item, published: false } : item));
+      setMessage(data.message || "Event unpublished; the record was retained.");
+    } catch (err) { setError(err.response?.data?.message || err.message || "Unable to unpublish event."); }
+    finally { setEventActionId(""); }
   };
 
   const patchSystem = (group, patch) => setSystemForm((prev) => ({ ...prev, [group]: { ...prev[group], ...patch } }));
@@ -560,6 +769,7 @@ export default function SuperAdminSettings({ initialTab = "website" }) {
           <nav className="settings-tab-groups" aria-label="Website management areas">
             <div className="settings-tab-group"><span>WEBSITE CONTENT</span><button type="button" className={activeTab === "website" ? "portal-btn" : "portal-btn light"} onClick={() => setActiveTab("website")}>Pages</button></div>
             <div className="settings-tab-group"><span>MEDIA</span><button type="button" className={activeTab === "carousel" ? "portal-btn" : "portal-btn light"} onClick={() => setActiveTab("carousel")}>Carousel</button><button type="button" className={activeTab === "leaders" ? "portal-btn" : "portal-btn light"} onClick={() => setActiveTab("leaders")}>Leaders</button><button type="button" className={activeTab === "gallery" ? "portal-btn" : "portal-btn light"} onClick={() => setActiveTab("gallery")}>Gallery</button></div>
+            <div className="settings-tab-group"><span>PUBLISHED ACTIVITIES</span><button type="button" className={activeTab === "events" ? "portal-btn" : "portal-btn light"} onClick={() => setActiveTab("events")}>Events & activities</button></div>
             <div className="settings-tab-group"><span>BRANDING & CONFIG</span><button type="button" className={activeTab === "settings" ? "portal-btn" : "portal-btn light"} onClick={() => setActiveTab("settings")}>Branding</button><button type="button" className={activeTab === "system" ? "portal-btn" : "portal-btn light"} onClick={() => setActiveTab("system")}>Configuration</button></div>
             <div className="settings-tab-group"><span>SCHEME SYSTEM</span><button type="button" className={activeTab === "constitution" ? "portal-btn" : "portal-btn light"} onClick={() => setActiveTab("constitution")}>Constitution</button><button type="button" className={activeTab === "notifications" ? "portal-btn" : "portal-btn light"} onClick={() => setActiveTab("notifications")}>Notifications</button></div>
           </nav>
@@ -623,11 +833,48 @@ export default function SuperAdminSettings({ initialTab = "website" }) {
                         <label>Description</label>
                         <textarea rows="4" value={sections[item.key]?.description || ""} onChange={(e) => patchSection(item.key, { description: e.target.value })} />
                       </div>
-                      <div className="portal-field" style={{ gridColumn: "1 / -1" }}>
-                        <label>Extra content</label>
-                        <textarea rows="6" value={sections[item.key]?.content || ""} onChange={(e) => patchSection(item.key, { content: e.target.value })} placeholder="Optional body text, JSON or notes for this page." />
-                      </div>
+                      {item.key !== "resources" && (
+                        <div className="portal-field" style={{ gridColumn: "1 / -1" }}>
+                          <label>Extra content</label>
+                          <textarea rows="6" value={sections[item.key]?.content || ""} onChange={(e) => patchSection(item.key, { content: e.target.value })} placeholder="Optional body text, JSON or notes for this page." />
+                        </div>
+                      )}
                     </div>
+
+                    {item.key === "resources" && (
+                      <div className="portal-resource-manager" aria-label="Resource document manager">
+                        <div className="portal-section-title"><FileText size={18}/><div><span>DOCUMENT LIBRARY</span><h3>Upload and manage public resources</h3><small>Only published documents in a published Resources section appear publicly. Files are retained when archived.</small></div></div>
+                        <form className="portal-form-grid" onSubmit={uploadResource}>
+                          <label className="portal-field"><span>Document file</span><input key={resourceInputKey} type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,application/pdf" onChange={(e) => setResourceFile(e.target.files?.[0] || null)} required /></label>
+                          <label className="portal-field"><span>Public title</span><input value={resourceDraft.title} onChange={(e) => setResourceDraft((previous) => ({ ...previous, title: e.target.value }))} maxLength={180} required /></label>
+                          <label className="portal-field"><span>Category</span><input value={resourceDraft.category} onChange={(e) => setResourceDraft((previous) => ({ ...previous, category: e.target.value }))} maxLength={80} /></label>
+                          <label className="portal-field"><span>Version</span><input value={resourceDraft.version} onChange={(e) => setResourceDraft((previous) => ({ ...previous, version: e.target.value }))} maxLength={30} /></label>
+                          <label className="portal-field" style={{ gridColumn: "1 / -1" }}><span>Description</span><textarea rows="2" value={resourceDraft.description} onChange={(e) => setResourceDraft((previous) => ({ ...previous, description: e.target.value }))} maxLength={1200} /></label>
+                          <label className="portal-field"><span>Publication</span><select value={resourceDraft.published ? "published" : "draft"} onChange={(e) => setResourceDraft((previous) => ({ ...previous, published: e.target.value === "published" }))}><option value="published">Publish immediately</option><option value="draft">Save as draft</option></select></label>
+                          <div className="portal-actions" style={{ alignSelf: "end" }}><button type="submit" className="portal-btn" disabled={savingResource || !resourceFile}><Upload size={16}/>{savingResource ? "Uploading…" : "Upload document"}</button></div>
+                        </form>
+                        <div className="portal-resource-list">
+                          {resourceItemsFromContent(sections.resources?.content).length === 0 ? <p className="portal-empty">No resource documents are configured yet.</p> : resourceItemsFromContent(sections.resources?.content).map((resource) => {
+                            const draft = { title: resource.title || "", description: resource.description || "", category: resource.category || "General", version: resource.version || "1", ...(resourceEdits[resource.id] || {}) };
+                            return <article className="portal-resource-item" key={resource.id || resource.url}>
+                              <div className="portal-resource-item-header"><div><strong>{resource.name || resource.title || "Resource document"}</strong><small>{resource.size ? `${(Number(resource.size) / 1024 / 1024).toFixed(2)} MB` : "File size unavailable"} · {resource.published === false ? "Draft / archived" : "Published"}</small></div><span className={resource.published === false ? "portal-resource-status draft" : "portal-resource-status"}>{resource.published === false ? "Unpublished" : "Published"}</span></div>
+                              <div className="portal-form-grid">
+                                <label className="portal-field"><span>Title</span><input value={draft.title} onChange={(e) => patchResourceDraft(resource.id, { title: e.target.value })} maxLength={180} /></label>
+                                <label className="portal-field"><span>Category</span><input value={draft.category} onChange={(e) => patchResourceDraft(resource.id, { category: e.target.value })} maxLength={80} /></label>
+                                <label className="portal-field"><span>Version</span><input value={draft.version} onChange={(e) => patchResourceDraft(resource.id, { version: e.target.value })} maxLength={30} /></label>
+                                <label className="portal-field" style={{ gridColumn: "1 / -1" }}><span>Description</span><textarea rows="2" value={draft.description} onChange={(e) => patchResourceDraft(resource.id, { description: e.target.value })} maxLength={1200} /></label>
+                              </div>
+                              <div className="portal-actions">
+                                <button type="button" className="portal-btn light" onClick={() => saveResourceDetails(resource)}>Save details</button>
+                                {resource.published === false ? <button type="button" className="portal-btn" onClick={() => setResourcePublished(resource, true)}>Publish</button> : <button type="button" className="portal-btn light" onClick={() => setResourcePublished(resource, false)}>Unpublish</button>}
+                                {resource.published !== false && <button type="button" className="portal-btn light" onClick={() => archiveResource(resource)}><Trash2 size={15}/>Archive</button>}
+                                {resource.url && /^https:\/\//i.test(resource.url) && <a className="portal-btn light" href={resource.url} target="_blank" rel="noreferrer">Preview file</a>}
+                              </div>
+                            </article>;
+                          })}
+                        </div>
+                      </div>
+                    )}
 
                     <div className="portal-actions" style={{ justifyContent: "space-between", flexWrap: "wrap" }}>
                       <label className="portal-field" style={{ margin: 0, minWidth: 180 }}>
@@ -662,6 +909,31 @@ export default function SuperAdminSettings({ initialTab = "website" }) {
                 </div>
                 <div className="portal-actions"><button type="button" className="portal-btn light" onClick={() => setPreviewKey("")}>Close preview</button></div>
               </section>
+            )}
+
+            {activeTab === "events" && (
+              <div className="portal-grid event-manager-layout">
+                <section className="portal-panel portal-event-editor">
+                  <div className="portal-section-title"><CalendarDays size={20} /><div><span>WEBSITE MANAGER · EVENTS</span><h2>{editingEventId ? "Edit event or activity" : "Create an event or activity"}</h2><p>Only explicitly public, published events appear on the public website. Existing member/admin-only events remain private by default.</p></div></div>
+                  <form className="portal-form-grid" onSubmit={saveManagedEvent}>
+                    <label className="portal-field"><span>Title *</span><input value={eventDraft.title} onChange={(e) => setEventDraft((previous) => ({ ...previous, title: e.target.value }))} maxLength={160} required /></label>
+                    <label className="portal-field"><span>Activity type</span><select value={eventDraft.type} onChange={(e) => setEventDraft((previous) => ({ ...previous, type: e.target.value }))}><option value="event">Event</option><option value="meeting">Meeting</option><option value="training">Training</option><option value="support">Support activity</option><option value="deadline">Deadline</option><option value="other">Other</option></select></label>
+                    <label className="portal-field"><span>Starts *</span><input type="datetime-local" value={eventDraft.startAt} onChange={(e) => setEventDraft((previous) => ({ ...previous, startAt: e.target.value }))} required /></label>
+                    <label className="portal-field"><span>Ends (optional)</span><input type="datetime-local" value={eventDraft.endAt} min={eventDraft.startAt || undefined} onChange={(e) => setEventDraft((previous) => ({ ...previous, endAt: e.target.value }))} /></label>
+                    <label className="portal-field" style={{ gridColumn: "1 / -1" }}><span>Description</span><textarea rows="4" value={eventDraft.description} onChange={(e) => setEventDraft((previous) => ({ ...previous, description: e.target.value }))} maxLength={4000} placeholder="Provide factual details, purpose and useful attendee information." /></label>
+                    <label className="portal-field"><span>Location (optional)</span><input value={eventDraft.location} onChange={(e) => setEventDraft((previous) => ({ ...previous, location: e.target.value }))} maxLength={240} /></label>
+                    <label className="portal-field"><span>Online meeting URL (optional)</span><input type="url" inputMode="url" value={eventDraft.virtualUrl} onChange={(e) => setEventDraft((previous) => ({ ...previous, virtualUrl: e.target.value }))} placeholder="https://…" /></label>
+                    <label className="portal-field" style={{ gridColumn: "1 / -1" }}><span>Cover image URL or safe site path (optional)</span><input value={eventDraft.coverImage} onChange={(e) => setEventDraft((previous) => ({ ...previous, coverImage: e.target.value }))} maxLength={1200} placeholder="https://… or /image.jpg" /></label>
+                    <fieldset className="portal-field event-audience-field"><legend>Who can see this event?</legend><div className="event-audience-options">{[["public", "Public website"], ["member", "Members"], ["admin", "Admins"], ["superadmin", "Website Manager"]].map(([value, label]) => <label key={value}><input type="checkbox" checked={eventDraft.audience.includes(value)} onChange={(e) => setEventDraft((previous) => ({ ...previous, audience: e.target.checked ? [...new Set([...previous.audience, value])] : previous.audience.filter((item) => item !== value) }))} />{label}</label>)}</div><small>Changing this list controls visibility in the published website and role-specific portal event feeds.</small></fieldset>
+                    <label className="portal-field"><span>Publication status</span><select value={eventDraft.published ? "published" : "draft"} onChange={(e) => setEventDraft((previous) => ({ ...previous, published: e.target.value === "published" }))}><option value="published">Published</option><option value="draft">Draft / unpublished</option></select></label>
+                    <div className="portal-actions event-form-actions"><button type="submit" className="portal-btn" disabled={savingEvent}>{savingEvent ? "Saving…" : editingEventId ? "Save event changes" : "Create event"}</button>{editingEventId && <button type="button" className="portal-btn light" onClick={resetEventEditor} disabled={savingEvent}>Cancel edit</button>}</div>
+                  </form>
+                </section>
+                <section className="portal-panel portal-event-list-panel">
+                  <div className="portal-section-title"><CalendarDays size={20} /><div><span>PERSISTED RECORDS</span><h2>Managed events ({managedEvents.length})</h2><p>Records are loaded from the event API; this list is not populated with demonstration content.</p></div></div>
+                  {managedEvents.length ? <div className="portal-event-list">{managedEvents.map((event) => <article className="portal-event-item" key={event._id}><div className="portal-event-item-head"><div><span className="portal-event-type">{event.type || "event"}</span><h3>{event.title || "Untitled event"}</h3><p>{event.startAt ? new Date(event.startAt).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" }) : "Start date unavailable"}{event.endAt ? ` – ${new Date(event.endAt).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" })}` : ""}</p></div><span className={`portal-resource-status ${event.published === false ? "draft" : ""}`}>{event.published === false ? "Unpublished" : "Published"}</span></div><p className="portal-event-audiences">Audience: {(Array.isArray(event.audience) ? event.audience : []).join(", ") || "Not specified"}</p>{event.location && <p className="portal-event-location"><MapPin size={15}/>{event.location}</p>}{event.virtualUrl && <p className="portal-event-location"><Video size={15}/><a href={event.virtualUrl} target="_blank" rel="noreferrer">Online meeting link</a></p>}<div className="portal-actions"><button type="button" className="portal-btn light" onClick={() => editManagedEvent(event)}><Edit3 size={15}/>Edit</button><button type="button" className="portal-btn light" onClick={() => toggleManagedEventPublication(event)} disabled={eventActionId === String(event._id)}>{event.published === false ? "Publish" : "Unpublish"}</button>{event.published !== false && <button type="button" className="portal-btn light" onClick={() => archiveManagedEvent(event)} disabled={eventActionId === String(event._id)}><Trash2 size={15}/>Archive</button>}</div></article>)}</div> : <div className="portal-empty" role="status">No event records were returned. Create a record above to begin publishing activities.</div>}
+                </section>
+              </div>
             )}
 
             {activeTab === "system" && (

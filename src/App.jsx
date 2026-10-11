@@ -67,6 +67,8 @@ const News = lazy(
   () => import("./pages/News")
 );
 
+const EventDetail = lazy(() => import("./pages/EventDetail"));
+
 const Contact = lazy(
   () => import("./pages/Contact")
 );
@@ -302,6 +304,64 @@ function PageCutTransition() {
   );
 }
 
+const PUBLIC_PAGE_METADATA = {
+  "/": { title: "Benevolent MIDAX | Community Support & Scheme Information", description: "Explore BENEvolent MIDAX support guidance, published news, community activities, leadership and the official Constitution." },
+  "/about": { title: "About BENEvolent MIDAX", description: "Read published information about BENEvolent MIDAX, its purpose and current scheme guidance." },
+  "/services": { title: "Support Services | BENEvolent MIDAX", description: "Review the current published support policies and service guidance for BENEvolent MIDAX members." },
+  "/leaders": { title: "Leadership | BENEvolent MIDAX", description: "View the current published leadership directory for BENEvolent MIDAX." },
+  "/constitution": { title: "Official Constitution | BENEvolent MIDAX", description: "Read the current authoritative BENEvolent MIDAX Constitution and governance document." },
+  "/gallery": { title: "Community Gallery | BENEvolent MIDAX", description: "Explore approved community photos published by BENEvolent MIDAX." },
+  "/news": { title: "News, Events & Resources | BENEvolent MIDAX", description: "Read official BENEvolent MIDAX news, public events and approved resources." },
+  "/events": { title: "Public Events | BENEvolent MIDAX", description: "Browse public BENEvolent MIDAX events and community activities." },
+  "/contact": { title: "Contact | BENEvolent MIDAX", description: "Use BENEvolent MIDAX official contact details or send a message through the website." },
+  "/privacy-policy": { title: "Privacy Policy | BENEvolent MIDAX", description: "Read the BENEvolent MIDAX privacy policy." },
+  "/terms-conditions": { title: "Terms & Conditions | BENEvolent MIDAX", description: "Read the BENEvolent MIDAX terms and conditions." },
+  "/disclaimer": { title: "Disclaimer | BENEvolent MIDAX", description: "Read the BENEvolent MIDAX website disclaimer." },
+  "/login": { title: "Member Login | BENEvolent MIDAX", description: "Sign in to the secure BENEvolent MIDAX member portal." },
+  "/verify-membership": { title: "Membership Verification | BENEvolent MIDAX", description: "Use the official BENEvolent MIDAX membership verification page." },
+};
+
+function upsertMeta(selector, attribute, key, value) {
+  let element = document.head.querySelector(selector);
+  if (!element) {
+    element = document.createElement("meta");
+    element.setAttribute(attribute, key);
+    document.head.appendChild(element);
+  }
+  element.setAttribute("content", value);
+}
+
+function PageMetadata() {
+  const location = useLocation();
+  useEffect(() => {
+    const path = location.pathname || "/";
+    const publicEventDetail = /^\/events\/[^/]+\/?$/.test(path);
+    const privateRoute = /^\/(member|admin|superadmin)(?:\/|$)/i.test(path) || path === "/login" || path === "/verify-membership" || (!PUBLIC_PAGE_METADATA[path] && !publicEventDetail);
+    const metadata = PUBLIC_PAGE_METADATA[path] || (publicEventDetail ? { title: "Public Event | BENEvolent MIDAX", description: "Read details for a public BENEvolent MIDAX event or community activity." } : {
+      title: "Secure Portal | BENEvolent MIDAX",
+      description: "Secure BENEvolent MIDAX member and administration services.",
+    });
+    const title = metadata.title;
+    document.title = title;
+    upsertMeta('meta[name="description"]', "name", "description", metadata.description);
+    upsertMeta('meta[property="og:title"]', "property", "og:title", title);
+    upsertMeta('meta[property="og:description"]', "property", "og:description", metadata.description);
+    upsertMeta('meta[property="og:type"]', "property", "og:type", path === "/news" ? "article" : "website");
+    upsertMeta('meta[name="twitter:card"]', "name", "twitter:card", "summary_large_image");
+    upsertMeta('meta[name="robots"]', "name", "robots", privateRoute ? "noindex, nofollow" : "index, follow");
+
+    let canonical = document.head.querySelector('link[rel="canonical"]');
+    if (!canonical) {
+      canonical = document.createElement("link");
+      canonical.setAttribute("rel", "canonical");
+      document.head.appendChild(canonical);
+    }
+    canonical.setAttribute("href", `${window.location.origin}${path}`);
+    upsertMeta('meta[property="og:url"]', "property", "og:url", `${window.location.origin}${path}`);
+  }, [location.pathname]);
+  return null;
+}
+
 function PublicNavbar() {
   const location = useLocation();
 
@@ -342,6 +402,7 @@ function AppContent() {
 
   return (
     <>
+      <PageMetadata />
       <PageCutTransition />
       <ThemeBootstrap />
       <Toaster
@@ -419,8 +480,9 @@ function AppContent() {
             path="/news"
             element={<News />}
           />
+          <Route path="/events/:id" element={<EventDetail />} />
 
-          {/* V8: Events and Resources are now content types inside News. Keep old URLs as redirects for bookmarks. */}
+          {/* V8: Events and Resources are browsed through Newsroom; the ID route renders public event details. */}
           <Route path="/resources" element={<Navigate to="/news?tab=resources" replace />} />
           <Route path="/events" element={<Navigate to="/news?tab=events" replace />} />
 

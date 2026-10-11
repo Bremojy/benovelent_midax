@@ -1150,9 +1150,17 @@ exports.getLatestNews=async(req,res)=>{
             res.set("Cache-Control", "public, max-age=60, stale-while-revalidate=300");
             return res.json(cached);
         }
-        const news=await News.find({ published:true, status:"published" })
-        .populate("author","fullName profileImage")
-        .sort({ publishDate:-1 })
+        const now = new Date();
+        const news = await News.find({
+            published: true,
+            status: "published",
+            $and: [
+                { $or: [{ publishDate: { $exists: false } }, { publishDate: null }, { publishDate: { $lte: now } }] },
+                { $or: [{ expiryDate: { $exists: false } }, { expiryDate: null }, { expiryDate: { $gt: now } }] },
+            ],
+        })
+        .populate("author", "fullName profileImage")
+        .sort({ publishDate: -1, createdAt: -1 })
         .limit(10)
         .lean();
         const payload={ success:true, news };

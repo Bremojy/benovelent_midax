@@ -15,6 +15,9 @@ const {
   updateSection,
   deleteSection,
   uploadGalleryImage,
+  uploadResourceDocument,
+  updateResourceDocument,
+  downloadPublicResourceDocument,
   updateGalleryItem,
   reorderGallery,
   archiveGalleryItem,
@@ -40,6 +43,13 @@ router.patch("/gallery/items/reorder", protect, isSuperAdmin, reorderGallery);
 router.patch("/gallery/items/:itemId", protect, isSuperAdmin, updateGalleryItem);
 router.delete("/gallery/items/:itemId", protect, isSuperAdmin, archiveGalleryItem);
 router.post("/constitution/upload", protect, isSuperAdmin, setUploadType("documents"), uploadSingle("file"), uploadConstitutionFile);
+router.post("/resources/upload", protect, isSuperAdmin, setUploadType("resources"), uploadSingle("file"), uploadResourceDocument);
+router.get("/resources/:resourceId/file", downloadPublicResourceDocument);
+router.patch("/resources/:resourceId", protect, isSuperAdmin, updateResourceDocument);
+router.delete("/resources/:resourceId", protect, isSuperAdmin, (req, res, next) => {
+  req.body = { ...(req.body || {}), published: false };
+  return updateResourceDocument(req, res, next);
+});
 router.post("/constitution/restore/:version", protect, isSuperAdmin, restoreConstitutionVersion);
 
 // Get one section

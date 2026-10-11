@@ -18,7 +18,7 @@ const eventSchema = new mongoose.Schema({
   virtualUrl: { type: String, default: "", trim: true },
   coverImage: { type: String, default: "" },
   published: { type: Boolean, default: true },
-  audience: { type: [String], enum: ["member", "admin", "superadmin"], default: ["member", "admin", "superadmin"] },
+  audience: { type: [String], enum: ["public", "member", "admin", "superadmin"], default: ["member", "admin", "superadmin"] },
   createdBy: { type: mongoose.Schema.Types.ObjectId, required: true, refPath: "createdByModel" },
   createdByModel: { type: String, enum: ["Member", "Admin", "SuperAdmin"], required: true },
   attendees: { type: [attendeeSchema], default: [] },

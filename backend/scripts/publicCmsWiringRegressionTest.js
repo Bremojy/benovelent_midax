@@ -15,6 +15,11 @@ const news = page("News.jsx");
 const gallery = page("Gallery.jsx");
 const legal = read("src/components/LegalSectionPage.jsx");
 const settings = page("superadmin/SuperAdminSettings.jsx");
+const homeApi = read("backend/controllers/platformController.js");
+const publicNewsApi = read("backend/controllers/newsController.js");
+const eventModel = read("backend/models/Event.js");
+const platformRoutes = read("backend/routes/platformRoutes.js");
+const eventDetail = page("EventDetail.jsx");
 
 assert(/usePublicWebsiteSection\("home"\)/.test(home) && /homeContent=\{homeSection\}/.test(home), "Home consumes published CMS content");
 assert(/function Hero\(\{ homeContent/.test(hero) && /fallbackSlide/.test(hero) && /homeContent\?\.title/.test(hero), "Home CMS content reaches the carousel fallback");
@@ -26,4 +31,30 @@ assert(/content\?\.galleryItems/.test(gallery) && /section\?\.title/.test(galler
 assert(/API\.get\(`\/website\/\$\{section\}`\)/.test(legal), "Legal pages consume the authoritative public CMS section endpoint");
 assert(/const request = item\._id/.test(settings) && /API\.put\(`\/website\/\$\{key\}`/.test(settings), "CMS editor chooses update vs create from the persisted record identity");
 assert(/Draft \/ unpublished/.test(settings) && /setPreviewKey/.test(settings), "CMS editor exposes draft/public state and an in-editor preview");
-pass("public CMS wiring regression contracts verified");
+assert(["/news/public", "/platform/public/events", "/website/gallery", "/platform/public/documents"].every((endpoint) => home.includes(endpoint)), "Homepage previews read real public news, events, gallery and document endpoints");
+assert(/API\.get\("\/leaders\/active"\)/.test(home) && !/API\.get\("\/leaders\/current"\)/.test(home) && /leader\.position \|\| leader\.roleLabel/.test(home), "Homepage leadership preview uses explicitly active CMS leadership profiles rather than administrator accounts");
+assert(/home-featured-news/.test(home) && /home-event-grid/.test(home) && /home-gallery-grid/.test(home) && /home-resource-list/.test(home), "Homepage includes dedicated editorial, event, gallery and resource preview sections");
+assert(/newsState\.error/.test(home) && /eventsState\.error/.test(home) && /galleryState\.error/.test(home) && /resourcesState\.error/.test(home), "Homepage exposes service failures instead of substituting fictional content");
+assert(/publishDate:\s*\{\s*\$lte:\s*now\s*\}/.test(publicNewsApi) && /expiryDate:\s*\{\s*\$gt:\s*now\s*\}/.test(publicNewsApi), "Public latest news excludes future-dated and expired articles");
+assert(/audience:\s*"public"/.test(homeApi) && /enum:\s*\["public",\s*"member",\s*"admin",\s*"superadmin"\]/.test(eventModel), "Anonymous events API only returns records explicitly designated for public viewing");
+assert(!/documentRoot/.test(homeApi.slice(homeApi.indexOf("exports.publicDocuments"))) && /WebsiteContent\.findOne\(\{ section: "resources", published: true \}\)/.test(homeApi), "Public document listing does not enumerate private uploads and can expose only published resources");
+assert(/role="dialog"/.test(gallery) && /event\.key === "ArrowRight"/.test(gallery) && /event\.key === "Escape"/.test(gallery), "Gallery lightbox has dialog semantics and keyboard navigation");
+assert(/router\.get\("\/public\/events\/:id", controller\.publicEventDetails\)/.test(platformRoutes) && /published: true, audience: "public"/.test(homeApi.slice(homeApi.indexOf("exports.publicEventDetails"), homeApi.indexOf("exports.publicDocuments"))), "Public event details only resolve published, explicitly public event records");
+assert(/router\.get\("\/events\/manage", protect, isSuperAdmin, controller\.manageEvents\)/.test(platformRoutes) && /router\.patch\("\/events\/:id", protect, isSuperAdmin, controller\.updateEvent\)/.test(platformRoutes) && /router\.delete\("\/events\/:id", protect, isSuperAdmin, controller\.archiveEvent\)/.test(platformRoutes), "Event CMS management APIs enforce SuperAdmin authorization on reads and mutations");
+assert(/API\.get\("\/platform\/events\/manage"\)/.test(settings) && /saveManagedEvent/.test(settings) && /toggleManagedEventPublication/.test(settings) && /archiveManagedEvent/.test(settings), "Website Manager supports persisted event create, edit, publication and archive workflows");
+assert(/pastEvents/.test(news) && /newsroom-event-detail-link/.test(news) && /filteredPastEvents/.test(news), "Newsroom shows upcoming and past public activities with working detail links");
+assert(/API\.get\(`\/platform\/public\/events\//.test(eventDetail) && /Browse public events/.test(eventDetail), "Public event detail page fetches the canonical API and handles unavailable events");
+assert(/row\.section === "resources"/.test(settings) && !/content: item\.key === "resources"/.test(settings), "Website Manager section hydration refers to each persisted row rather than an out-of-scope variable");
+
+const websiteRoutes = read("backend/routes/websiteRoutes.js");
+const websiteController = read("backend/controllers/websiteController.js");
+assert(/router\.post\("\/resources\/upload", protect, isSuperAdmin/.test(websiteRoutes), "Resource uploads require authenticated SuperAdmin access");
+assert(/router\.patch\("\/resources\/:resourceId", protect, isSuperAdmin/.test(websiteRoutes) && /router\.delete\("\/resources\/:resourceId", protect, isSuperAdmin/.test(websiteRoutes), "Resource metadata and archive actions are role-protected");
+assert(/storageFileName/.test(websiteController) && /downloadPublicResourceDocument/.test(websiteController) && /path\.resolve\(root, storedName\)/.test(websiteController) && /path\.join\(uploadRoot, "resources"\)/.test(websiteController), "Local resource downloads use an isolated managed-resource bucket and allowlisted stored filenames");
+assert(/module:\s*"WebsiteResources"/.test(websiteController) && /RESOURCE_FILE_TYPE_NOT_ALLOWED/.test(websiteController), "Resource workflows audit changes and validate document types");
+assert(/Upload and manage public resources/.test(settings) && /setResourcePublished/.test(settings) && /archiveResource/.test(settings), "Website Manager offers resource upload, publication and archive actions");
+
+const leaderRoutes = read("backend/routes/leaderRoutes.js");
+assert(/public:leadership:directory:v2/.test(leaderRoutes), "Public leadership cache uses a new version after data-minimization changes");
+assert(!/select\("fullName name email phone role profileImage permissions createdAt"\)/.test(leaderRoutes) && !/email:\s*person\.email/.test(leaderRoutes) && !/phone:\s*person\.phone/.test(leaderRoutes), "Public leadership payload does not expose administrator contact details or internal permissions without explicit public-contact controls");
+pass("public CMS and public-content security regression contracts verified");

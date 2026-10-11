@@ -44,7 +44,6 @@ const SupportRequestPermissionRequest = require("../models/SupportRequestPermiss
 const SystemSettings = require("../models/SystemSettings");
 const { getSystemSettings, toPublicConfig } = require("../services/systemSettings");
 const redisCache = require("../services/redisCache");
-const { documentRoot } = require("../config/uploadConfig");
 const { logActivity } = require("../services/auditService");
 
 const asUserModel = (role) => role === "superadmin" ? "SuperAdmin" : role === "admin" ? "Admin" : "Member";
@@ -444,29 +443,151 @@ exports.search = async (req, res) => {
 exports.events = async (req, res) => {
   const role = req.userRole;
   const now = new Date();
-  const events = await Event.find({ published: true, audience: role, startAt: { $gte: new Date(now.getTime() - 86400000 * 14) } }).sort({ startAt: 1 }).limit(50).lean();
+  const events = await Event.find({ published: true, audience: { $in: [role, "public"] }, startAt: { $gte: new Date(now.getTime() - 86400000 * 14) } }).sort({ startAt: 1 }).limit(50).lean();
   res.json({ success: true, events });
 };
 
-exports.createEvent = async (req, res) => {
-  const role = req.userRole;
-  if (!["admin", "superadmin"].includes(role)) return res.status(403).json({ success: false, message: "Only administrators can create events." });
-  const event = await Event.create({
-    title: String(req.body.title || "").trim(),
-    description: String(req.body.description || "").trim(),
-    type: req.body.type || "event",
-    startAt: req.body.startAt,
-    endAt: req.body.endAt || null,
-    location: String(req.body.location || "").trim(),
-    virtualUrl: String(req.body.virtualUrl || "").trim(),
-    coverImage: String(req.body.coverImage || "").trim(),
-    audience: Array.isArray(req.body.audience) && req.body.audience.length ? req.body.audience : ["member", "admin", "superadmin"],
-    createdBy: req.user._id,
-    createdByModel: asUserModel(role),
-  });
-  await logActivity({ user: req.user._id, userModel: asUserModel(role), userRole: role, action: "CREATE", module: "Events", description: `Created event ${event.title}`, endpoint: req.originalUrl, method: req.method });
-  res.status(201).json({ success: true, event });
+exports.manageEvents = async (_req, res) => {
+  try {
+    const events = await Event.find({}).select("title description type startAt endAt location virtualUrl coverImage published audience createdAt updatedAt").sort({ startAt: -1, createdAt: -1 }).limit(500).lean();
+    return res.json({ success: true, events });
+  } catch (error) {
+    console.error("Website event manager load error:", error);
+    return res.status(500).json({ success: false, message: "Unable to load managed events right now." });
+  }
 };
+
+const EVENT_TYPES = new Set(["meeting", "event", "training", "support", "deadline", "other"]);
+const EVENT_AUDIENCES = new Set(["public", "member", "admin", "superadmin"]);
+const normalizeEventAudience = (value, fallback = ["member", "admin", "superadmin"]) => {
+  if (!Array.isArray(value) || value.length === 0) return fallback;
+  const values = [...new Set(value.map((item) => String(item || "").toLowerCase()))];
+  return values.every((item) => EVENT_AUDIENCES.has(item)) ? values : null;
+};
+const validEventLink = (value, allowRelative = false) => {
+  const input = String(value || "").trim();
+  if (!input) return "";
+  if (allowRelative && input.startsWith("/") && !input.startsWith("//") && !input.includes("\\")) return input.slice(0, 1200);
+  try {
+    const parsed = new URL(input);
+    return ["https:", "http:"].includes(parsed.protocol) ? parsed.href.slice(0, 1200) : null;
+  } catch (_) { return null; }
+};
+const invalidateEventCaches = async () => redisCache.invalidateMany([
+  "assistant:public:context", "assistant:public", "assistant:context:public",
+  "assistant:context:member", "assistant:context:admin", "assistant:context:superadmin",
+]);
+
+exports.createEvent = async (req, res) => {
+  try {
+    const role = String(req.userRole || req.user?.role || "").toLowerCase();
+    if (!["admin", "superadmin"].includes(role)) return res.status(403).json({ success: false, message: "Only administrators can create events." });
+    const title = String(req.body.title || "").trim();
+    const description = String(req.body.description || "").trim();
+    const type = String(req.body.type || "event").toLowerCase();
+    const startAt = new Date(req.body.startAt);
+    const endAt = req.body.endAt ? new Date(req.body.endAt) : null;
+    if (!title) return res.status(400).json({ success: false, message: "An event title is required." });
+    if (title.length > 160) return res.status(400).json({ success: false, message: "Event titles must be 160 characters or fewer." });
+    if (!req.body.startAt || Number.isNaN(startAt.getTime())) return res.status(400).json({ success: false, message: "A valid start date and time are required." });
+    if (endAt && (Number.isNaN(endAt.getTime()) || endAt < startAt)) return res.status(400).json({ success: false, message: "The event end must be a valid date at or after its start." });
+    if (description.length > 4000) return res.status(400).json({ success: false, message: "Event descriptions must be 4,000 characters or fewer." });
+    if (!EVENT_TYPES.has(type)) return res.status(400).json({ success: false, message: "Choose a supported event type." });
+    const audience = req.body.audience === undefined
+      ? ["member", "admin", "superadmin"]
+      : normalizeEventAudience(req.body.audience, null);
+    if (!audience) return res.status(400).json({ success: false, message: "Choose at least one valid event visibility option." });
+    if (role !== "superadmin" && audience.includes("public")) {
+      return res.status(403).json({ success: false, message: "Only the Website Manager can publish events to the public website." });
+    }
+    const virtualUrl = validEventLink(req.body.virtualUrl);
+    const coverImage = validEventLink(req.body.coverImage, true);
+    if (virtualUrl === null || coverImage === null) return res.status(400).json({ success: false, message: "Use a valid HTTP(S) link or a safe relative image path." });
+
+    const event = await Event.create({
+      title, description, type, startAt, endAt, location: String(req.body.location || "").trim().slice(0, 240),
+      virtualUrl, coverImage, audience, published: req.body.published !== false,
+      createdBy: req.user._id, createdByModel: asUserModel(role),
+    });
+    await logActivity({ user: req.user._id, userModel: asUserModel(role), userRole: role, action: "CREATE", module: "Events", description: `Created event ${event.title}`, endpoint: req.originalUrl, method: req.method });
+    await invalidateEventCaches();
+    return res.status(201).json({ success: true, event });
+  } catch (error) {
+    console.error("Create event error:", error);
+    return res.status(500).json({ success: false, message: "Unable to create this event right now." });
+  }
+};
+
+exports.updateEvent = async (req, res) => {
+  try {
+    if (!/^[a-f\d]{24}$/i.test(String(req.params.id || ""))) return res.status(404).json({ success: false, message: "Event not found." });
+    const event = await Event.findById(req.params.id);
+    if (!event) return res.status(404).json({ success: false, message: "Event not found." });
+    const body = req.body || {};
+    const nextTitle = body.title === undefined ? event.title : String(body.title || "").trim();
+    if (!nextTitle) return res.status(400).json({ success: false, message: "An event title is required." });
+    if (nextTitle.length > 160) return res.status(400).json({ success: false, message: "Event titles must be 160 characters or fewer." });
+    if (body.description !== undefined) {
+      const description = String(body.description || "").trim();
+      if (description.length > 4000) return res.status(400).json({ success: false, message: "Event descriptions must be 4,000 characters or fewer." });
+      event.description = description;
+    }
+    if (body.type !== undefined) {
+      const type = String(body.type || "").toLowerCase();
+      if (!EVENT_TYPES.has(type)) return res.status(400).json({ success: false, message: "Choose a supported event type." });
+      event.type = type;
+    }
+    if (body.startAt !== undefined) {
+      const startAt = new Date(body.startAt);
+      if (Number.isNaN(startAt.getTime())) return res.status(400).json({ success: false, message: "A valid start date and time are required." });
+      event.startAt = startAt;
+    }
+    if (body.endAt !== undefined) {
+      if (body.endAt === null || body.endAt === "") event.endAt = undefined;
+      else {
+        const endAt = new Date(body.endAt);
+        if (Number.isNaN(endAt.getTime())) return res.status(400).json({ success: false, message: "The event end date is invalid." });
+        event.endAt = endAt;
+      }
+    }
+    if (event.endAt && event.endAt < event.startAt) return res.status(400).json({ success: false, message: "The event end must be at or after its start." });
+    if (body.location !== undefined) event.location = String(body.location || "").trim().slice(0, 240);
+    if (body.virtualUrl !== undefined) {
+      const virtualUrl = validEventLink(body.virtualUrl);
+      if (virtualUrl === null) return res.status(400).json({ success: false, message: "Use a valid HTTP(S) meeting link." });
+      event.virtualUrl = virtualUrl;
+    }
+    if (body.coverImage !== undefined) {
+      const coverImage = validEventLink(body.coverImage, true);
+      if (coverImage === null) return res.status(400).json({ success: false, message: "Use a valid HTTP(S) image URL or safe relative image path." });
+      event.coverImage = coverImage;
+    }
+    if (body.audience !== undefined) {
+      const audience = normalizeEventAudience(body.audience, null);
+      if (!audience) return res.status(400).json({ success: false, message: "Choose valid event visibility options." });
+      event.audience = audience;
+    }
+    if (body.published !== undefined) {
+      if (typeof body.published !== "boolean") return res.status(400).json({ success: false, message: "Publication status must be true or false." });
+      event.published = body.published;
+    }
+    event.title = nextTitle;
+    await event.save();
+    const role = String(req.userRole || req.user?.role || "superadmin").toLowerCase();
+    await logActivity({ user: req.user._id, userModel: asUserModel(role), userRole: role, action: event.published ? "UPDATE" : "ARCHIVE", module: "Events", description: `Updated event ${event.title}`, endpoint: req.originalUrl, method: req.method });
+    await invalidateEventCaches();
+    return res.json({ success: true, event });
+  } catch (error) {
+    console.error("Update event error:", error);
+    return res.status(500).json({ success: false, message: "Unable to update this event right now." });
+  }
+};
+
+exports.archiveEvent = async (req, res) => {
+  req.body = { ...(req.body || {}), published: false };
+  return exports.updateEvent(req, res);
+};
+
 
 exports.rsvp = async (req, res) => {
   const event = await Event.findById(req.params.id);
@@ -638,11 +759,12 @@ exports.assistant = async (req, res) => {
 
 
 exports.assistantContext = async (req, res) => {
-  const role = req.userRole || "public";
+  const role = String(req.userRole || "public").toLowerCase();
+  const eventAudience = role === "public" ? "public" : { $in: [role, "public"] };
   const [website, news, events, policies, settings] = await Promise.all([
     WebsiteContent.find({ published: true }).sort({ section: 1 }).limit(40).select("section title subtitle description content updatedAt").lean(),
-    News.find({ published: true, status: "published" }).sort({ publishDate: -1 }).limit(8).select("title summary category publishDate").lean(),
-    Event.find({ published: true, ...(role !== "public" ? { audience: role } : {}), startAt: { $gte: new Date(Date.now() - 86400000) } }).sort({ startAt: 1 }).limit(8).select("title description type startAt location audience").lean().catch(() => []),
+    News.find({ published: true, status: "published", $or: [{ publishDate: { $exists: false } }, { publishDate: null }, { publishDate: { $lte: new Date() } }] }).sort({ publishDate: -1 }).limit(8).select("title summary category publishDate").lean(),
+    Event.find({ published: true, audience: eventAudience, startAt: { $gte: new Date(Date.now() - 86400000) } }).sort({ startAt: 1 }).limit(8).select("title description type startAt location audience").lean().catch(() => []),
     Policy.find({ enabled: true }).sort({ order: 1, updatedAt: -1 }).limit(50).select("name slug description category minAmount maxAmount interestRate repaymentEnabled repaymentMonths communityAssistanceEnabled applicationPath order updatedAt").lean(),
     getSystemSettings(),
   ]);
@@ -650,21 +772,130 @@ exports.assistantContext = async (req, res) => {
 };
 
 exports.publicEvents = async (_req, res) => {
-  const events = await Event.find({ published: true, audience: { $in: ["member", "admin", "superadmin"] }, startAt: { $gte: new Date(Date.now() - 86400000 * 7) } }).sort({ startAt: 1 }).limit(50).select("title description type startAt endAt location virtualUrl coverImage").lean();
-  res.json({ success: true, events });
+  const now = new Date();
+  const publicFilter = { published: true, audience: "public" };
+  const [events, pastEvents] = await Promise.all([
+    Event.find({
+      ...publicFilter,
+      $or: [
+        { startAt: { $gte: now } },
+        { startAt: { $lt: now }, endAt: { $gte: now } },
+      ],
+    })
+      .sort({ startAt: 1 })
+      .limit(50)
+      .select("title description type startAt endAt location virtualUrl coverImage")
+      .lean(),
+    Event.find({
+      ...publicFilter,
+      $or: [
+        { endAt: { $lt: now } },
+        { endAt: { $exists: false }, startAt: { $lt: now } },
+        { endAt: null, startAt: { $lt: now } },
+      ],
+    })
+      .sort({ startAt: -1 })
+      .limit(50)
+      .select("title description type startAt endAt location virtualUrl coverImage")
+      .lean(),
+  ]);
+  res.set("Cache-Control", "public, max-age=60, stale-while-revalidate=300");
+  return res.json({ success: true, events, pastEvents });
+};
+
+exports.publicEventDetails = async (req, res) => {
+  try {
+    if (!/^[a-f\d]{24}$/i.test(String(req.params.id || ""))) return res.status(404).json({ success: false, message: "This public event was not found." });
+    const event = await Event.findOne({ _id: req.params.id, published: true, audience: "public" })
+      .select("title description type startAt endAt location virtualUrl coverImage")
+      .lean();
+    if (!event) return res.status(404).json({ success: false, message: "This public event was not found or is no longer available." });
+    res.set("Cache-Control", "public, max-age=60, stale-while-revalidate=300");
+    return res.json({ success: true, event });
+  } catch (error) {
+    console.error("Public event detail error:", error);
+    return res.status(500).json({ success: false, message: "Unable to load this public event right now." });
+  }
 };
 
 exports.publicDocuments = async (_req, res) => {
+  // Never enumerate the private DOCUMENT_ROOT. It may contain uploaded evidence
+  // or unpublished files. Public documents come only from the public asset
+  // directory or explicitly published WebsiteContent resource entries.
   const publicRoot = path.join(__dirname, "..", "..", "public", "documents");
   const documents = [];
+  const allowedExtension = /\.(pdf|docx?|xlsx?|pptx?|txt)$/i;
+  const seenUrls = new Set();
+
   try {
     for (const name of fs.readdirSync(publicRoot)) {
-      if (!/\.(pdf|docx?|xlsx?|pptx?)$/i.test(name)) continue;
-      const stat = fs.statSync(path.join(publicRoot, name));
-      documents.push({ name, url: `/documents/${encodeURIComponent(name)}`, size: stat.size, updatedAt: stat.mtime });
+      // The constitution is the only bundled document declared public by the
+      // server's static-file policy. Other resource documents must be published
+      // through WebsiteContent instead of being exposed by directory listing.
+      if (name !== "benevolent-midax-constitution.pdf") continue;
+      const fullPath = path.join(publicRoot, name);
+      const stat = fs.statSync(fullPath);
+      if (!stat.isFile() || !allowedExtension.test(name)) continue;
+      const url = `/documents/${encodeURIComponent(name)}`;
+      documents.push({ name, url, size: stat.size, updatedAt: stat.mtime });
+      seenUrls.add(url);
     }
-  } catch (_) {}
-  res.json({ success: true, documents });
+  } catch (error) {
+    if (error?.code !== "ENOENT") throw error;
+  }
+
+  const resourceSection = await WebsiteContent.findOne({ section: "resources", published: true })
+    .select("content updatedAt")
+    .lean();
+  const content = resourceSection?.content && typeof resourceSection.content === "object" ? resourceSection.content : {};
+  const configuredItems = [content.documents, content.resources, content.items]
+    .filter(Array.isArray)
+    .flat();
+
+  for (const item of configuredItems.slice(0, 200)) {
+    if (!item || typeof item !== "object" || item.published === false || item.isPublic === false) continue;
+    const fileName = String(item.fileName || item.name || item.title || "").trim().slice(0, 180);
+    const name = String(item.name || item.fileName || item.title || "").trim().slice(0, 180);
+    const rawUrl = String(item.url || item.fileUrl || item.downloadUrl || "").trim();
+    if (!name || !allowedExtension.test(fileName)) continue;
+
+    let url = "";
+    if (/^https:\/\//i.test(rawUrl)) {
+      // Cloudinary and approved document providers use HTTPS. Do not allow
+      // javascript:, data:, protocol-relative, or arbitrary local paths.
+      try {
+        const parsed = new URL(rawUrl);
+        if (parsed.protocol === "https:") url = parsed.href;
+      } catch (_) {}
+    } else {
+      const localResource = rawUrl.match(/^\/api\/website\/resources\/([a-f0-9-]{36})\/file$/i);
+      if (localResource && String(item.id || item._id || "") === localResource[1]) {
+        url = `/api/website/resources/${localResource[1]}/file`;
+      } else if (/^\/documents\/[A-Za-z0-9 _().%-]+\.(pdf|docx?|xlsx?|pptx?|txt)$/i.test(rawUrl)) {
+        const filename = decodeURIComponent(rawUrl.slice("/documents/".length));
+        if (!filename.includes("..") && fs.existsSync(path.join(publicRoot, filename))) url = `/documents/${encodeURIComponent(filename)}`;
+      }
+    }
+    if (!url || seenUrls.has(url)) continue;
+
+    documents.push({
+      id: String(item.id || item._id || ""),
+      name,
+      title: String(item.title || item.name || "").trim().slice(0, 180),
+      description: String(item.description || "").trim().slice(0, 1200),
+      category: String(item.category || "General").trim().slice(0, 80),
+      version: String(item.version || "1").slice(0, 30),
+      mimeType: String(item.mimeType || "application/octet-stream"),
+      publishedAt: item.publishedAt || null,
+      url,
+      size: Number.isFinite(Number(item.size)) && Number(item.size) >= 0 ? Number(item.size) : 0,
+      updatedAt: item.updatedAt || item.publishedAt || resourceSection?.updatedAt || null,
+    });
+    seenUrls.add(url);
+  }
+
+  res.set("Cache-Control", "public, max-age=60, stale-while-revalidate=300");
+  return res.json({ success: true, documents });
 };
 
 exports.publicMembershipVerifyPage = async (req, res) => { res.json({ success: true, message: "Use GET /api/platform/membership/verify?token=..." }); };
