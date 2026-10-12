@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { Menu, X, ShieldCheck, MessageCircle, ArrowUpRight } from "lucide-react";
+import { Menu, X, ShieldCheck, Phone, MessageCircle, ArrowUpRight } from "lucide-react";
 import { publicNavigationItems } from "../config/iconography";
 import { useEffect, useState } from "react";
 

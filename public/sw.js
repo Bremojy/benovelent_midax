@@ -1,4 +1,4 @@
-const CACHE = "benevolent-shell-v28-api-pwa-18-5-4-blankpage-recovery";
+const CACHE = "benevolent-shell-v29-api-pwa-18-5-5-phone-import-fix";
 const VIDEO_CACHE = "benevolent-midax-videos-v3";
 const ASSETS = ["/", "/index.html", "/manifest.webmanifest", "/pwa-icon-192.png", "/pwa-icon-512.png", "/apple-touch-icon.png"];
 const DB_NAME = "benovelent-pwa";
