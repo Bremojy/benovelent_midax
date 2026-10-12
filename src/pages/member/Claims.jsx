@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { CheckCircle2, Clock3, HeartHandshake, RefreshCw, ShieldCheck } from "lucide-react";
 import MpesaPaymentButton from "../../components/payments/MpesaPaymentButton";
+import StatusBadge from "../../components/common/StatusBadge";
 import toast from "react-hot-toast";
 import DashboardLayout from "../../layouts/DashboardLayout";
 import API from "../../services/api";
@@ -115,7 +116,7 @@ export default function Claims() {
               const isOwn = ownCampaigns.has(String(campaign.referenceId)) || false;
               const remaining = Math.max(0, Number(campaign.targetAmount || 0) - Number(campaign.raisedAmount || 0));
               return <article className="portal-panel" key={campaign._id} style={{ margin: 0 }}>
-                <div className="claim-card-head"><div><span className="portal-badge">COMMUNITY M-PESA</span><h3>{campaign.title}</h3></div><span className={`portal-badge ${campaign.status === "target_reached" ? "approved" : ""}`}>{campaign.status === "target_reached" ? "Target reached" : "Open"}</span></div>
+                <div className="claim-card-head"><div><span className="portal-badge">COMMUNITY M-PESA</span><h3>{campaign.title}</h3></div><StatusBadge status={campaign.status === "target_reached" ? "Target reached" : "Open"} /></div>
                 <p>{campaign.description}</p>
                 <div className="portal-stat-grid compact"><div className="portal-stat"><span>Target</span><strong>{money(campaign.targetAmount)}</strong></div><div className="portal-stat"><span>Raised</span><strong>{money(campaign.raisedAmount)}</strong></div></div>
                 <div className="community-progress" aria-label={`Community assistance progress ${Math.min(100, Math.round((Number(campaign.raisedAmount || 0) / Math.max(1, Number(campaign.targetAmount || 1))) * 100))}%`}>
@@ -146,7 +147,7 @@ export default function Claims() {
             const history = Array.isArray(claim.timeline) ? claim.timeline : [];
             const campaign = campaignFor(claim);
             return <article className="portal-panel" key={`${claim.sourceType}-${claim._id}`}>
-              <div className="claim-card-head"><div><span className="portal-badge">{String(claim.supportType || "support").toUpperCase()}</span><h2>{claim.description || claim.purpose || claim.hospitalName || claim.deceasedName || "Support application"}</h2><p>Submitted {fmt(claim.createdAt || claim.applicationDate)}</p></div><span className={`portal-badge ${["Rejected", "Cancelled", "Closed"].includes(status) ? "rejected" : ["Approved", "Paid", "Completed"].includes(status) ? "approved" : ""}`}>{status}</span></div>
+              <div className="claim-card-head"><div><span className="portal-badge">{String(claim.supportType || "support").toUpperCase()}</span><h2>{claim.description || claim.purpose || claim.hospitalName || claim.deceasedName || "Support application"}</h2><p>Submitted {fmt(claim.createdAt || claim.applicationDate)}</p></div><StatusBadge status={status} /></div>
               <div className="portal-stat-grid compact"><div className="portal-stat"><span>Requested</span><strong>{money(claim.requestedAmount || claim.amount)}</strong></div><div className="portal-stat"><span>Approved</span><strong>{money(claim.approvedAmount)}</strong></div>{claim.repaymentEnabled && <div className="portal-stat"><span>Repayment balance</span><strong>{money(claim.balance)}</strong></div>}</div>
               {claim.sourceType === "education" && claim.repaymentEnabled && ["Paid", "Defaulted"].includes(status) && Number(claim.balance || 0) > 0 && (
                 <div className="portal-panel" style={{ marginTop: 14, background: "#f8fafc" }}>

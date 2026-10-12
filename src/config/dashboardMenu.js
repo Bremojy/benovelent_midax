@@ -1,4 +1,4 @@
-import { LayoutDashboard, UserRound, Wallet, HandHeart, MessageCircle, Users, Landmark, BarChart3, ShieldCheck, Settings, Newspaper, DatabaseZap, HelpCircle } from "lucide-react";
+import { LayoutDashboard, UserRound, Wallet, HandHeart, MessageCircle, Users, Landmark, BarChart3, ShieldCheck, Settings, HelpCircle, Globe2 } from "lucide-react";
 
 export const dashboardMenus = {
   member: [
@@ -7,7 +7,7 @@ export const dashboardMenus = {
     { section: "Finance", title: "Money & Contributions", icon: Wallet, path: "/member/money", childPaths: ["/member/accounts", "/member/contributions", "/member/mpesa-records", "/member/money"] },
     { section: "Support", title: "Support & Claims", icon: HandHeart, path: "/member/support-center", childPaths: ["/member/support", "/member/claims", "/member/benefits", "/member/support-center"] },
     { section: "Community", title: "Community", icon: MessageCircle, path: "/member/community", childPaths: ["/member/messages", "/member/announcements", "/member/notifications", "/member/polls", "/member/feedback", "/member/community"] },
-    { section: "Help", title: "Help & Guide", icon: MessageCircle, path: "/member/help", childPaths: ["/member/guide", "/member/help"] },
+    { section: "Help", title: "Help & Guide", icon: HelpCircle, path: "/member/help", childPaths: ["/member/guide", "/member/help"] },
     { section: "Settings", title: "Settings", icon: Settings, path: "/member/settings" },
   ],
   admin: [
@@ -15,7 +15,7 @@ export const dashboardMenus = {
     { section: "Operations", title: "People & Operations", icon: Users, path: "/admin/operations", childPaths: ["/admin/members", "/admin/support", "/admin/claims", "/admin/operations"] },
     { section: "Finance", title: "Finance", icon: Wallet, path: "/admin/finance-center", childPaths: ["/admin/accounts", "/admin/finance-center"] },
     { section: "Communications", title: "Communications", icon: MessageCircle, path: "/admin/communications", childPaths: ["/admin/messages", "/admin/notifications", "/admin/announcements", "/admin/polls", "/admin/feedback", "/admin/communications"] },
-    { section: "Content", title: "Website & Communications", icon: Newspaper, path: "/admin/website", childPaths: ["/admin/website", "/admin/announcements"] },
+    { section: "Content", title: "Website & Communications", icon: Globe2, path: "/admin/website", childPaths: ["/admin/website", "/admin/announcements"] },
     { section: "Reports", title: "Reports", icon: BarChart3, path: "/admin/reports" },
     { section: "Leadership", title: "Leadership & Constitution", icon: Landmark, path: "/admin/leadership", childPaths: ["/admin/leadership"] },
     { section: "Help", title: "Help & Guide", icon: HelpCircle, path: "/admin/guide" },
@@ -26,7 +26,7 @@ export const dashboardMenus = {
     { section: "People", title: "People & Access", icon: Users, path: "/superadmin/people", childPaths: ["/superadmin/admins", "/superadmin/members", "/superadmin/leaders", "/superadmin/people"] },
     { section: "Governance", title: "Governance", icon: Landmark, path: "/superadmin/governance", childPaths: ["/superadmin/constitution", "/superadmin/policies", "/superadmin/audit", "/superadmin/governance"] },
     { section: "Finance", title: "Finance & Assistance", icon: Wallet, path: "/superadmin/finance-center", childPaths: ["/superadmin/accounts", "/superadmin/claims", "/superadmin/support", "/superadmin/finance-center"] },
-    { section: "Website", title: "Website Manager", icon: Newspaper, path: "/superadmin/website-manager", childPaths: ["/superadmin/website-manager", "/superadmin/settings", "/superadmin/news", "/superadmin/leaders", "/superadmin/policies", "/superadmin/constitution"] },
+    { section: "Website", title: "Website Manager", icon: Globe2, path: "/superadmin/website-manager", childPaths: ["/superadmin/website-manager", "/superadmin/settings", "/superadmin/news", "/superadmin/leaders", "/superadmin/policies", "/superadmin/constitution"] },
     { section: "Reports", title: "Reports & Records", icon: BarChart3, path: "/superadmin/reports" },
     { section: "System", title: "System & Diagnostics", icon: ShieldCheck, path: "/superadmin/system-center", childPaths: ["/superadmin/data-integrity", "/superadmin/system", "/superadmin/notifications", "/superadmin/system-center"] },
     { section: "Settings", title: "Settings", icon: Settings, path: "/superadmin/settings-center", childPaths: ["/superadmin/settings", "/superadmin/password", "/superadmin/settings-center"] },

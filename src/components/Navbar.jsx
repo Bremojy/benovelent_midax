@@ -1,5 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
-import { Menu, X, ShieldCheck, Phone, MessageCircle, ArrowUpRight } from "lucide-react";
+import { Menu, X, ShieldCheck, MessageCircle, ArrowUpRight } from "lucide-react";
+import { publicNavigationItems } from "../config/iconography";
 import { useEffect, useState } from "react";
 
 export default function Navbar() {
@@ -44,11 +45,12 @@ export default function Navbar() {
           )}
         </Link>
         <nav className={open ? "nav-links open" : "nav-links"} aria-label="Primary navigation">
-          <Link to="/" className={active("/")} onClick={close}>Home</Link>
-          <Link to="/about" className={active("/about")} onClick={close}>About</Link>
-          <Link to="/services" className={active("/services")} onClick={close}>Services</Link>
-          <Link to="/news" className={active("/news")} onClick={close}>News</Link>
-          <Link to="/contact" className={active("/contact")} onClick={close}>Contact</Link>
+          {publicNavigationItems.map(({ label, path, Icon }) => (
+            <Link key={path} to={path} className={active(path)} onClick={close}>
+              <Icon size={16} strokeWidth={2} aria-hidden="true" />
+              <span>{label}</span>
+            </Link>
+          ))}
           <Link to="/login" className="admin-link" onClick={close}><ShieldCheck size={17}/> Member Portal <ArrowUpRight size={15}/></Link>
         </nav>
         <button type="button" className="menu-button" onClick={() => setOpen((v) => !v)} aria-label={open ? "Close navigation" : "Open navigation"} aria-expanded={open}>

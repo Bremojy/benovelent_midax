@@ -1,0 +1,78 @@
+/* BENEvolent MIDAX shared icon language: Lucide throughout, orange/grey brand palette. */
+svg.lucide {
+  flex-shrink: 0;
+  vertical-align: middle;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.nav-links a > svg,
+.public-utility-inner svg,
+.footer-contact > svg,
+.footer-social > svg {
+  flex-shrink: 0;
+}
+
+.nav-links a > svg {
+  opacity: .92;
+  transition: color .18s ease, opacity .18s ease, transform .18s ease;
+}
+
+.nav-links a.active > svg,
+.nav-links a:hover > svg {
+  color: var(--bm-orange, var(--color-primary, #EA7B28));
+  opacity: 1;
+}
+
+.nav-links .admin-link > svg,
+.nav-links .admin-link:hover > svg {
+  color: currentColor;
+}
+
+.sidebar-link > svg,
+.mobile-more-link > svg,
+.logout-btn > svg,
+.row-actions button > svg,
+.portal-btn > svg,
+button > svg.lucide {
+  flex-shrink: 0;
+}
+
+.sidebar-link.active > svg,
+.mobile-more-link.active > svg {
+  color: var(--bm-orange, var(--color-primary, #EA7B28));
+}
+
+.bene-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: fit-content;
+  max-width: 100%;
+  padding: 6px 10px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1.2;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  vertical-align: middle;
+}
+
+.bene-status > svg { flex: 0 0 auto; }
+.bene-status--success { color: #166534; background: #dcfce7; border-color: #bbf7d0; }
+.bene-status--pending { color: #92400e; background: #fef3c7; border-color: #fde68a; }
+.bene-status--danger { color: #991b1b; background: #fee2e2; border-color: #fecaca; }
+.bene-status--warning { color: #9a3412; background: #ffedd5; border-color: #fed7aa; }
+.bene-status--info { color: #1d4ed8; background: #dbeafe; border-color: #bfdbfe; }
+.bene-status--neutral { color: #475569; background: #f1f5f9; border-color: #e2e8f0; }
+
+@media (max-width: 560px) {
+  .bene-status { gap: 5px; padding: 5px 8px; font-size: 11px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nav-links a > svg { transition: none; }
+}

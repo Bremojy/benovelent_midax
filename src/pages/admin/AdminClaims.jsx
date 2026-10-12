@@ -6,6 +6,7 @@ import { useAuth } from "../../context/AuthContext";
 import DashboardLayout from "../../layouts/DashboardLayout";
 import API, { resolveApiUrl } from "../../services/api";
 import MpesaPaymentButton from "../../components/payments/MpesaPaymentButton";
+import StatusBadge from "../../components/common/StatusBadge";
 import "../../styles/portalModule.css";
 
 const STAGES = ["Pending", "Under Review", "Documents Required", "Eligibility Review", "Approval Review", "Approved", "Disbursement Pending", "Paid", "Completed", "Rejected", "Cancelled", "Closed"];
@@ -483,7 +484,7 @@ export default function AdminClaims() {
                       <h2>{c.description || c.purpose || c.caseDescription || "Support application"}</h2>
                       <p>{c.member?.fullName || c.member?.memberNumber || "Member"} • {formatDate(c.createdAt || c.applicationDate)}</p>
                     </div>
-                    <span className={`portal-badge ${c.status === "Rejected" ? "rejected" : ["Approved", "Paid", "Completed"].includes(c.status) ? "approved" : ""}`}>{c.status || "Pending"}</span>
+                    <StatusBadge status={c.status || "Pending"} />
                   </div>
                   <div className="portal-stat-grid compact">
                     <div className="portal-stat"><span>Requested</span><strong>{money(c.requestedAmount)}</strong></div>

@@ -7,6 +7,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import API from "../../services/api";
 import { createAdminMember, getAdminMembers } from "../../services/adminService";
+import StatusBadge from "../../components/common/StatusBadge";
 import "../../styles/portalModule.css";
 
 export default function AdminSupport() {
@@ -489,7 +490,7 @@ export default function AdminSupport() {
                         <p style={{ margin: "8px 0 0", lineHeight: 1.6 }}>{item.reason || "No reason supplied."}</p>
                       </div>
                       <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                        <span className="portal-badge">{item.status}</span>
+                        <StatusBadge status={item.status || "Pending"} />
                         <button type="button" className="portal-btn secondary" onClick={() => { setPermissionError(""); setPermissionReviewReason(""); setSelectedPermission(item); }}><ShieldCheck size={15} /> Review</button>
                       </div>
                     </div>
@@ -519,7 +520,7 @@ export default function AdminSupport() {
                         <div style={{ marginTop: 4 }}>{money(request.requestedAmount)}</div>
                       </div>
                       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-                        <span className="portal-badge">{request.status}</span>
+                        <StatusBadge status={request.status || "Pending"} />
                         <button type="button" className="portal-btn secondary" onClick={() => openSupportRequest(request)}>Review</button>
                         {isSuperAdmin && (
                           <button type="button" className="portal-btn danger" onClick={() => deleteSupportRequest(request._id)}>
@@ -633,7 +634,7 @@ export default function AdminSupport() {
                   <div><strong>Employee number</strong><div>{selectedSupport.member?.memberNumber || "—"}</div></div>
                   <div><strong>Support type</strong><div>{selectedSupport.supportType || "—"}</div></div>
                   <div><strong>Policy</strong><div>{selectedSupport.policyName || selectedSupport.policySlug || "—"}</div></div>
-                  <div><strong>Current status</strong><div>{selectedSupport.status || "—"}</div></div>
+                  <div><strong>Current status</strong><div style={{ marginTop: 6 }}><StatusBadge status={selectedSupport.status || "Unknown"} /></div></div>
                   <div><strong>Requested amount</strong><div>{money(selectedSupport.requestedAmount)}</div></div>
                   <div><strong>Approved amount</strong><div>{selectedSupport.approvedAmount === null || selectedSupport.approvedAmount === undefined ? "Unavailable" : money(selectedSupport.approvedAmount)}</div></div>
                   <div><strong>Submitted</strong><div>{selectedSupport.createdAt ? new Date(selectedSupport.createdAt).toLocaleString() : "—"}</div></div>

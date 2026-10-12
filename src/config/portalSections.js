@@ -1,8 +1,8 @@
 import {
   UserRound, Users, FileText, ShieldCheck, Wallet, Smartphone, ReceiptText,
   HandHeart, ClipboardList, MessageCircle, Megaphone, Bell, Vote, Newspaper,
-  UserPlus, Settings, Landmark, DatabaseZap, Activity, Globe2, Image,
-  HelpCircle, Phone, BarChart3, HeartPulse
+  UserPlus, Settings, Landmark, DatabaseZap, Activity, Globe2,
+  HelpCircle, Phone, BarChart3, HeartPulse, Palette, Images
 } from "lucide-react";
 
 export const portalSections = {
@@ -224,7 +224,7 @@ export const portalSections = {
       links: [
         ["Website Overview", "See live content coverage and recent publishing signals.", "/superadmin/website-manager", Globe2],
         ["Pages & Content", "Edit supported public website sections.", "/superadmin/settings", FileText],
-        ["Home / Carousel", "Manage homepage slides and visibility.", "/superadmin/settings?tab=carousel", Image],
+        ["Home / Carousel", "Manage homepage slides and visibility.", "/superadmin/settings?tab=carousel", Images],
         ["Leadership", "Manage public leadership presentation.", "/superadmin/leaders", Users],
         ["News & Events", "Create, edit, publish and archive website news.", "/superadmin/news", Newspaper],
         ["Policies", "Publish and maintain approved policy content.", "/superadmin/policies", FileText],
@@ -255,7 +255,7 @@ export const portalSections = {
         ["Health", "Review system health indicators.", "/superadmin/system", Activity],
         ["Notifications", "Inspect notification operations.", "/superadmin/notifications", Bell],
         ["Security", "Open security and access controls.", "/superadmin/system", ShieldCheck],
-        ["Branding", "Manage public branding and appearance settings.", "/superadmin/settings?tab=settings", Image],
+        ["Branding & Appearance", "Manage public branding, themes and appearance settings.", "/superadmin/settings?tab=settings", Palette],
       ],
     },
     {

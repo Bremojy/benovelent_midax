@@ -12,29 +12,6 @@ justify-content:space-between;
 align-items:center;
 }
 
-.status{
-padding:8px 18px;
-border-radius:30px;
-font-size:13px;
-font-weight:600;
-color:white;
-}
-
-.status.pending{
-background:var(--color-primary);
-}
-
-.status.approved{
-background:#22c55e;
-}
-
-.status.rejected{
-background:#ef4444;
-}
-
-.status.paid{
-background:#2563eb;
-}
 
 .claim-date{
 margin-top:20px;

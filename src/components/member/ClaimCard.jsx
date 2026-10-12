@@ -1,4 +1,5 @@
 import ClaimTimeline from "./ClaimTimeline";
+import StatusBadge from "../common/StatusBadge";
 
 import "./ClaimCard.css";
 
@@ -32,17 +33,7 @@ claim.amount||0
 
 </div>
 
-<span className={
-
-"status " +
-
-claim.status.toLowerCase()
-
-}>
-
-{claim.status}
-
-</span>
+<StatusBadge status={claim.status || "Pending"} />
 
 </div>
 

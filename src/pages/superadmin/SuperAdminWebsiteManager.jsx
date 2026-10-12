@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowUpRight, FileText, GalleryHorizontal, Globe2, Image, Landmark, Newspaper, RefreshCw, ShieldCheck, Users } from "lucide-react";
+import { ArrowUpRight, FileText, GalleryHorizontal, Globe2, Images, Landmark, Newspaper, RefreshCw, ShieldCheck, Users, History, Palette, Phone, Send } from "lucide-react";
 import DashboardLayout from "../../layouts/DashboardLayout";
 import API from "../../services/api";
 import "./SuperAdminWebsiteManager.css";
@@ -43,20 +43,22 @@ export default function SuperAdminWebsiteManager() {
       <Metric icon={<Newspaper />} label="Published news" value={state.loading ? "—" : number(news)} detail="live public newsroom" />
       <Metric icon={<GalleryHorizontal />} label="Active carousel" value={state.loading ? "—" : number(activeSlides)} detail={`${state.slides.length} stored records`} />
       <Metric icon={<Users />} label="Active leaders" value={state.loading ? "—" : number(activeLeaders)} detail={`${state.leaders.length} stored records`} />
-      <Metric icon={<Image />} label="Gallery" value={state.loading ? "—" : number(activeGallery)} detail={`${state.gallery.length} configured items`} />
+      <Metric icon={<Images />} label="Gallery" value={state.loading ? "—" : number(activeGallery)} detail={`${state.gallery.length} configured items`} />
       <Metric icon={<Landmark />} label="Enabled policies" value={state.loading ? "—" : number(enabledPolicies)} detail={`${state.policies.length} stored records`} />
     </section>
     <section className="wm-section"><div className="wm-section-heading"><div><span>CONTENT</span><h2>Manage the public experience.</h2><p>Use the existing live editors for each supported website resource.</p></div></div><div className="wm-card-grid">
       <ManagerCard icon={<FileText />} title="Pages & Content" text="Home, About, Services, Contact, Footer, legal pages and approved assistant guidance." href="/superadmin/settings?tab=website" />
       <ManagerCard icon={<GalleryHorizontal />} title="Home / Carousel" text="Upload, edit, reorder and archive homepage slides." href="/superadmin/settings?tab=carousel" />
       <ManagerCard icon={<Users />} title="Leadership" text="Maintain public leadership records, photos, order and visibility." href="/superadmin/leaders" />
-      <ManagerCard icon={<Image />} title="Gallery" text="Manage public gallery images, captions, ordering and visibility." href="/superadmin/settings?tab=gallery" />
+      <ManagerCard icon={<Images />} title="Gallery" text="Manage public gallery images, captions, ordering and visibility." href="/superadmin/settings?tab=gallery" />
       <ManagerCard icon={<Newspaper />} title="News & Events" text="Create drafts, publish updates, unpublish and archive newsroom items." href="/superadmin/news" />
-      <ManagerCard icon={<ShieldCheck />} title="Policies" text="Manage enabled/disabled policy records used by the public/member experience." href="/superadmin/policies" />
+      <ManagerCard icon={<FileText />} title="Policies" text="Manage enabled/disabled policy records used by the public/member experience." href="/superadmin/policies" />
       <ManagerCard icon={<Landmark />} title="Constitution" text="Review the current constitution and preserve earlier versions safely." href="/superadmin/constitution" />
-      <ManagerCard icon={<ShieldCheck />} title="Audit History" text="Trace important Website Manager mutations through the existing audit system." href="/superadmin/audit" />
+      <ManagerCard icon={<History />} title="Audit History" text="Trace important Website Manager mutations through the existing audit system." href="/superadmin/audit" />
+      <ManagerCard icon={<Palette />} title="Brand & Appearance" text="Adjust approved brand colors and preview the shared website and portal theme." href="/superadmin/settings?tab=settings" />
+      <ManagerCard icon={<Phone />} title="Contact & Social" text="Maintain public organization contact details and approved social channels." href="/superadmin/settings?tab=system" />
     </div></section>
-    <section className="wm-section wm-publish-strip"><div><span>PUBLISH CENTRE</span><h2>Drafts stay private until the backend confirms publication.</h2><p>Public pages continue to read published/active records. Archive actions retain records rather than deleting content by default.</p></div><div className="wm-publish-actions"><a href="/superadmin/settings?tab=website">Edit pages <ArrowUpRight size={16} /></a><a href="/superadmin/news">Open newsroom <ArrowUpRight size={16} /></a><a href="/superadmin/audit">Review audit history <ArrowUpRight size={16} /></a></div></section>
+    <section className="wm-section wm-publish-strip"><div><span className="wm-publish-kicker"><Send size={14} aria-hidden="true" /> PUBLISH CENTRE</span><h2>Drafts stay private until the backend confirms publication.</h2><p>Public pages continue to read published/active records. Archive actions retain records rather than deleting content by default.</p></div><div className="wm-publish-actions"><a href="/superadmin/settings?tab=website">Edit pages <ArrowUpRight size={16} /></a><a href="/superadmin/news">Open newsroom <ArrowUpRight size={16} /></a><a href="/superadmin/audit">Review audit history <ArrowUpRight size={16} /></a></div></section>
     <section className="wm-footer-note"><ShieldCheck size={17} /><span>High-risk business data such as finance, support decisions, authentication and audit records remains behind its dedicated business APIs.</span></section>
   </main></DashboardLayout>);
 }

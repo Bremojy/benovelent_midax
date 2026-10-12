@@ -22,6 +22,7 @@ import "./styles/v9-modern-forms.css";
 import "./styles/v11-responsive-hardening.css";
 import "./App.css";
 import "./styles/portal-shell-final.css";
+import "./styles/iconography.css";
 
 createRoot(
   document.getElementById("root")
