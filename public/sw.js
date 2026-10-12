@@ -1,4 +1,4 @@
-const CACHE = "benevolent-shell-v27-api-pwa-18-5-0";
+const CACHE = "benevolent-shell-v28-api-pwa-18-5-4-blankpage-recovery";
 const VIDEO_CACHE = "benevolent-midax-videos-v3";
 const ASSETS = ["/", "/index.html", "/manifest.webmanifest", "/pwa-icon-192.png", "/pwa-icon-512.png", "/apple-touch-icon.png"];
 const DB_NAME = "benovelent-pwa";
@@ -35,7 +35,7 @@ self.addEventListener("install", (event) => {
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((key) => key !== CACHE).map((key) => caches.delete(key))))
+      .then((keys) => Promise.all(keys.filter((key) => key !== CACHE && key !== VIDEO_CACHE).map((key) => caches.delete(key))))
       .then(() => self.clients.claim())
   );
 });

@@ -7,6 +7,7 @@ import {
 } from "react-dom/client";
 
 import App from "./App.jsx";
+import AppErrorBoundary from "./components/AppErrorBoundary.jsx";
 
 import {
   SocketProvider,
@@ -24,25 +25,26 @@ import "./App.css";
 import "./styles/portal-shell-final.css";
 import "./styles/iconography.css";
 
-createRoot(
-  document.getElementById("root")
-).render(
+const rootElement = document.getElementById("root");
+if (!rootElement) {
+  throw new Error("BENEvolent MIDAX could not find its application root element.");
+}
 
+const root = createRoot(rootElement);
+root.render(
   <StrictMode>
-
-    <AuthProvider>
-
-      <SocketProvider>
-
-        <App />
-
-      </SocketProvider>
-
-    </AuthProvider>
-
+    <AppErrorBoundary>
+      <AuthProvider>
+        <SocketProvider>
+          <App />
+        </SocketProvider>
+      </AuthProvider>
+    </AppErrorBoundary>
   </StrictMode>
-
 );
+// The static startup screen is only needed if this entry module cannot load.
+// React's mounted error boundary handles render-time failures from this point.
+rootElement.dataset.appModuleLoaded = "true";
 
 // Prime foreground call audio after the browser receives a real user gesture.
 // When the tab/browser is hidden or closed, the service-worker push notification

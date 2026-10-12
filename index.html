@@ -11,15 +11,71 @@
 <title>Benevolent MIDAX | Member Support & Community</title>
   </head>
   <body>
-    <div id="root">
-      <noscript>
-        <main style="max-width:760px;margin:48px auto;padding:24px;font-family:Arial,sans-serif;line-height:1.6">
-          <h1>Benevolent MIDAX</h1>
-          <p>This website requires JavaScript for the interactive member portal. Please enable JavaScript to continue.</p>
-          <p>Public information includes the Benevolent MIDAX services, news, Constitution and contact information.</p>
-        </main>
-      </noscript>
+    <div id="root" aria-live="polite">
+      <main id="app-boot-screen" role="status" aria-live="polite" style="min-height:100vh;box-sizing:border-box;display:grid;place-content:center;justify-items:center;gap:14px;padding:24px;background:#f8fafc;color:#1f2937;text-align:center;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+        <div aria-hidden="true" style="width:42px;height:42px;border:4px solid #fed7aa;border-top-color:#e8751a;border-radius:50%;animation:midax-spin .85s linear infinite"></div>
+        <h1 style="margin:0;font-size:clamp(22px,4vw,30px)">BENEvolent MIDAX</h1>
+        <p id="app-boot-message" style="max-width:34rem;margin:0;color:#6b7280;line-height:1.6">Loading the website securely…</p>
+        <noscript>
+          <style>#app-boot-screen{display:none!important}</style>
+          <main style="max-width:760px;margin:48px auto;padding:24px;font-family:Arial,sans-serif;line-height:1.6;text-align:left">
+            <h1>Benevolent MIDAX</h1>
+            <p>This website requires JavaScript for the interactive member portal. Please enable JavaScript to continue.</p>
+            <p>Public information includes the Benevolent MIDAX services, news, Constitution and contact information.</p>
+          </main>
+        </noscript>
+      </main>
     </div>
+    <style>@keyframes midax-spin{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){#app-boot-screen div[aria-hidden="true"]{animation:none}}</style>
+    <script>
+      (() => {
+        const root = document.getElementById("root");
+        const screen = () => document.getElementById("app-boot-screen");
+        const showBootFailure = (detail) => {
+          if (!root || root.dataset.appModuleLoaded === "true") return;
+          const current = screen();
+          if (!current) return;
+          current.setAttribute("role", "alert");
+          current.setAttribute("aria-live", "assertive");
+          current.style.padding = "24px";
+          current.style.justifyItems = "stretch";
+          current.replaceChildren();
+
+          const card = document.createElement("section");
+          Object.assign(card.style, { width: "min(100%, 600px)", boxSizing: "border-box", margin: "0 auto", padding: "clamp(22px,5vw,40px)", borderRadius: "20px", background: "#fff", border: "1px solid #e5e7eb", boxShadow: "0 16px 44px rgba(15,23,42,.10)", textAlign: "left" });
+          const brand = document.createElement("p");
+          brand.textContent = "BENEvolent MIDAX";
+          Object.assign(brand.style, { margin: "0", color: "#c75c10", fontSize: "12px", fontWeight: "800", letterSpacing: ".12em", textTransform: "uppercase" });
+          const heading = document.createElement("h1");
+          heading.textContent = "The website could not start";
+          Object.assign(heading.style, { margin: "10px 0", fontSize: "clamp(24px,5vw,34px)", lineHeight: "1.2" });
+          const summary = document.createElement("p");
+          summary.textContent = "An application file failed to load before the website could start. Reload the page to try again. If it continues, share the technical detail below with the website manager.";
+          Object.assign(summary.style, { color: "#4b5563", lineHeight: "1.6" });
+          const detailNode = document.createElement("code");
+          detailNode.textContent = String(detail || "Application startup failed.").slice(0, 240);
+          Object.assign(detailNode.style, { display: "block", marginTop: "12px", padding: "12px", borderRadius: "10px", background: "#f3f4f6", color: "#374151", whiteSpace: "pre-wrap", overflowWrap: "anywhere", fontSize: "12px" });
+          const button = document.createElement("button");
+          button.type = "button";
+          button.textContent = "Reload website";
+          Object.assign(button.style, { minHeight: "44px", marginTop: "18px", padding: "0 18px", border: "0", borderRadius: "10px", background: "#e8751a", color: "white", fontWeight: "700", cursor: "pointer" });
+          button.addEventListener("click", () => window.location.reload());
+          card.append(brand, heading, summary, detailNode, button);
+          current.append(card);
+        };
+
+        window.addEventListener("error", (event) => {
+          const isScriptLoadError = String(event.target?.tagName || "").toUpperCase() === "SCRIPT";
+          if (event.target === window || isScriptLoadError) {
+            showBootFailure(event.message || "The main application script could not be loaded.");
+          }
+        }, true);
+        window.addEventListener("unhandledrejection", (event) => {
+          const reason = event.reason;
+          showBootFailure(reason?.message || String(reason || "An application startup task failed."));
+        });
+      })();
+    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
